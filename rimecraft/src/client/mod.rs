@@ -1,7 +1,7 @@
 pub mod main;
 pub mod util;
 
-mod args {
+pub mod args {
     pub struct RunArgs {
 
     }

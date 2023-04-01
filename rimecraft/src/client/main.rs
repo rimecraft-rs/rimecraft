@@ -1,6 +1,10 @@
-use crate::network::Proxy;
+use crate::{network::Proxy, util::uuids};
+use chrono::Utc;
 use clap::Parser;
+use log::warn;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
+use super::util::{AccountType, Session};
 
 #[derive(Debug, Parser)]
 struct OptionSet {
@@ -16,14 +20,12 @@ struct OptionSet {
     proxy_port: u16,
     proxy_user: Option<String>,
     proxy_pass: Option<String>,
-    #[arg(default_value_t = format!("Player 114514"))]
-    username: String,
+    username: Option<String>,
     uuid: Option<String>,
     #[arg(default_value_t = format!(""))]
     xuid: String,
     #[arg(default_value_t = format!(""))]
     client_id: String,
-    #[arg(default_value_t = format!(""))]
     access_token: String,
     version: String,
     #[arg(default_value_t = 854)]
@@ -56,5 +58,30 @@ pub fn main() {
                 },
             );
         }
+    }
+    let account_type = AccountType::by_name(&option_set.user_type);
+    if account_type.is_none() {
+        warn!("Unrecognized user type: {}", option_set.user_type)
+    }
+    let username = option_set
+        .username
+        .unwrap_or(format!("Player{}", Utc::now().timestamp_millis() & 1000));
+    let session = Session::new(
+        username.clone(),
+        option_set
+            .uuid
+            .unwrap_or(uuids::get_offline_player_uuid(&username).to_string()),
+        option_set.access_token,
+        str_to_optional(option_set.xuid),
+        str_to_optional(option_set.client_id),
+        account_type.unwrap_or_default(),
+    );
+}
+
+fn str_to_optional(string: String) -> Option<String> {
+    if string.is_empty() {
+        None
+    } else {
+        Some(string)
     }
 }

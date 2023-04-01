@@ -1,10 +1,10 @@
 pub mod client;
+pub mod network;
 pub mod resource;
 pub mod util;
-pub mod network;
 
 fn main() {
-    println!("Hello, world!");
+    crate::client::main::main()
 }
 
 pub mod consts {
