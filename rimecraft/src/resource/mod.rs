@@ -1,3 +1,5 @@
+pub mod fs;
+
 #[derive(PartialEq, Eq)]
 pub enum ResourceType {
     CLIENT_RESOURCES,
