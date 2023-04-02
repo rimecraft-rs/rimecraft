@@ -1,8 +1,41 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 pub struct ResourceFileSystem {
     store_name: String,
     root: ResourcePath,
+}
+
+impl ResourceFileSystem {
+    pub fn new(name: String, root: Directory) -> Self {
+        Self {
+            store_name: name,
+            root: Self::to_resource_path(root, String::new(), None),
+        }
+    }
+
+    fn to_resource_path(
+        root: Directory,
+        name: String,
+        parent: Option<ResourcePath>,
+    ) -> ResourcePath {
+        let map: HashMap<String, ResourcePath> = HashMap::new();
+        let resource_path = ResourcePath::new(name, parent, ResourceFile::Directory(()));
+        todo!()
+    }
+}
+
+pub struct Directory {
+    pub children: HashMap<String, Directory>,
+    pub files: HashMap<String, String>,
+}
+
+impl Default for Directory {
+    fn default() -> Self {
+        Self {
+            children: HashMap::new(),
+            files: HashMap::new(),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -15,7 +48,7 @@ pub struct ResourcePath {
 }
 
 impl ResourcePath {
-    pub fn new(name: String, parent: Option<ResourcePath>, file: ResourceFile) -> Self {
+    pub fn new(name: String, parent: Option<Self>, file: ResourceFile) -> Self {
         let mut s = Self {
             name,
             parent: parent.map(|r| Box::new(r)),
@@ -27,7 +60,7 @@ impl ResourcePath {
         s
     }
 
-    fn relativize(path: Option<ResourcePath>, name: String) -> Self {
+    fn relativize(path: Option<Self>, name: String) -> Self {
         Self::new(name, path, ResourceFile::Relative)
     }
 
@@ -42,7 +75,7 @@ impl ResourcePath {
         }
     }
 
-    fn get(&self, name: &str) -> ResourcePath {
+    fn get(&self, name: &str) -> Self {
         match &self.file {
             ResourceFile::Empty | ResourceFile::Relative => {
                 Self::new(name.to_owned(), Some(self.clone()), self.file.clone())
@@ -74,11 +107,11 @@ impl ResourcePath {
         }
     }
 
-    pub fn get_file_name(&self) -> ResourcePath {
+    pub fn get_file_name(&self) -> Self {
         Self::relativize(None, self.name.clone())
     }
 
-    pub fn get_parent(&self) -> Option<&ResourcePath> {
+    pub fn get_parent(&self) -> Option<&Self> {
         self.parent.as_deref()
     }
 
@@ -98,12 +131,12 @@ impl ResourcePath {
         vec
     }
 
-    pub fn sub_path(&self, i: usize, j: usize) -> Option<ResourcePath> {
+    pub fn sub_path(&self, i: usize, j: usize) -> Option<Self> {
         let list = self.get_names();
         if j > list.len() || i >= j {
             None
         } else {
-            let mut resource_path: Option<ResourcePath> = None;
+            let mut resource_path: Option<Self> = None;
             let mut k = i;
             while k < j {
                 resource_path = Some(Self::relativize(
