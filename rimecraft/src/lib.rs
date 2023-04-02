@@ -3,10 +3,6 @@ pub mod network;
 pub mod resource;
 pub mod util;
 
-fn main() {
-    crate::client::main::main()
-}
-
 pub mod consts {
     use std::sync::Mutex;
 

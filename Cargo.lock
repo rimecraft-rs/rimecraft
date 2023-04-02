@@ -654,6 +654,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rc-env"
+version = "1.19.4"
+dependencies = [
+ "rimecraft",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
