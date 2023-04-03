@@ -187,7 +187,6 @@ impl ResourcePath {
                 ResourceFile::Empty,
                 map,
             ),
-            _ => unreachable!(),
         }
     }
 
