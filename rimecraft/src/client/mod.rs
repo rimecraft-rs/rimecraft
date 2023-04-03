@@ -1,6 +1,7 @@
 pub mod main;
 pub mod resource;
 pub mod util;
+pub mod blaze3d;
 
 pub mod args {
     use super::util::Session;

@@ -73,3 +73,10 @@ pub mod uuids {
         Uuid::from_bytes(hash)
     }
 }
+
+pub fn into_option<T, U>(result: Result<T, U>) -> Option<T> {
+    match result {
+        Ok(obj) => Some(obj),
+        Err(_) => None,
+    }
+}

@@ -10,7 +10,7 @@ impl ResourceFileSystem {
         let mut storage = HashMap::new();
         let e =
             Self::to_resource_path(&root, String::new(), None, &mut storage, String::from("!r"));
-        storage.insert(String::from("!r"), e);
+        storage.insert(String::from("/"), e);
         Self {
             store_name: name,
             storage,
