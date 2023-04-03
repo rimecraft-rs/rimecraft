@@ -2,7 +2,7 @@ use crate::{network::Proxy, util::uuids};
 use chrono::Utc;
 use clap::Parser;
 use log::warn;
-use std::{net::{Ipv4Addr, SocketAddr, SocketAddrV4}, fs};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use super::util::{AccountType, Session};
 

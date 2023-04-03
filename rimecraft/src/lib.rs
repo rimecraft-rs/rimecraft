@@ -158,8 +158,8 @@ pub mod version {
 
         fn get_resource_version(&self, res: &ResourceType) -> i64 {
             match res {
-                ResourceType::CLIENT_RESOURCES => self.resource_pack_version,
-                ResourceType::SERVER_DATA => self.data_pack_version,
+                ResourceType::ClientResources => self.resource_pack_version,
+                ResourceType::ServerData => self.data_pack_version,
             }
         }
 

@@ -2,15 +2,15 @@ pub mod fs;
 
 #[derive(PartialEq, Eq)]
 pub enum ResourceType {
-    CLIENT_RESOURCES,
-    SERVER_DATA,
+    ClientResources,
+    ServerData,
 }
 
 impl ResourceType {
     pub fn get_dictionary(&self) -> String {
         match self {
-            ResourceType::CLIENT_RESOURCES => String::from("assets"),
-            ResourceType::SERVER_DATA => String::from("data"),
+            ResourceType::ClientResources => String::from("assets"),
+            ResourceType::ServerData => String::from("data"),
         }
     }
 }
