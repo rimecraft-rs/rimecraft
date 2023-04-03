@@ -1,5 +1,6 @@
-use std::str::FromStr;
+pub mod render;
 
+use std::str::FromStr;
 use uuid::Uuid;
 
 pub enum AccountType {

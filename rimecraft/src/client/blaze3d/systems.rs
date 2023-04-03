@@ -65,12 +65,34 @@ impl RenderCallStorage {
         }
     }
 
+    pub fn get_last_processed_queue(&self) -> &VecDeque<RenderCall> {
+        self.recording_queues
+            .get(self.last_processed_index)
+            .unwrap()
+    }
+
+    pub fn get_last_processed_queue_mut(&mut self) -> &mut VecDeque<RenderCall> {
+        self.recording_queues
+            .get_mut(self.last_processed_index)
+            .unwrap()
+    }
+
     pub fn get_recording_queue(&self) -> &VecDeque<RenderCall> {
         self.recording_queues.get(self.recording_index).unwrap()
     }
 
     pub fn get_recording_queue_mut(&mut self) -> &mut VecDeque<RenderCall> {
         self.recording_queues.get_mut(self.recording_index).unwrap()
+    }
+
+    pub fn get_processing_queue(&self) -> &VecDeque<RenderCall> {
+        self.recording_queues.get(self.processing_index).unwrap()
+    }
+
+    pub fn get_processing_queue_mut(&mut self) -> &mut VecDeque<RenderCall> {
+        self.recording_queues
+            .get_mut(self.processing_index)
+            .unwrap()
     }
 }
 
