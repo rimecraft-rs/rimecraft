@@ -1,38 +1,99 @@
 use std::collections::HashMap;
 
-pub struct ResourceFileSystem<'a> {
+pub struct ResourceFileSystem {
     store_name: String,
-    root: ResourcePath<'a>,
+    storage: HashMap<String, ResourcePath>,
 }
 
-impl<'a> ResourceFileSystem<'a> {
-    pub fn new(name: String, root: Directory) -> Self {
+impl ResourceFileSystem {
+    pub fn new(name: String, root: &Directory) -> Self {
+        let mut storage = HashMap::new();
+        let e =
+            Self::to_resource_path(&root, String::new(), None, &mut storage, String::from("!r"));
+        storage.insert(String::from("!r"), e);
         Self {
             store_name: name,
-            root: Self::to_resource_path(&root, String::new(), None),
+            storage,
         }
     }
 
     fn to_resource_path(
         root: &Directory,
         name: String,
-        parent: Option<&ResourcePath>,
-    ) -> ResourcePath<'a> {
-        let mut map = HashMap::new();
-        let resource_path = ResourcePath::new(name, parent, ResourceFile::Directory(&map));
-        for ele in root.files {
+        parent: Option<String>,
+        map: &mut HashMap<String, ResourcePath>,
+        save: String,
+    ) -> ResourcePath {
+        let resource_path = ResourcePath::new(name, parent.clone(), ResourceFile::Directory, map);
+        for ele in &root.files {
             map.insert(
-                ele.0,
-                ResourcePath::new(ele.0, Some(&resource_path), ResourceFile::File(ele.1)),
+                ele.0.to_owned(),
+                ResourcePath::new(
+                    ele.0.to_owned(),
+                    Some(save.clone()),
+                    ResourceFile::File(ele.1.to_owned()),
+                    map,
+                ),
             );
         }
-        for ele in root.children {
-            map.insert(ele.0, Self::to_resource_path(ele.1, ele.0, parent));
+        for ele in &root.children {
+            let e =
+                Self::to_resource_path(ele.1, ele.0.clone(), parent.clone(), map, ele.0.clone());
+            map.insert(ele.0.clone(), e);
         }
         resource_path
     }
 }
+pub struct ResourceFileSystemBuilder<'a> {
+    root: Directory<'a>,
+}
 
+impl<'a> ResourceFileSystemBuilder<'a> {
+    pub fn new() -> Self {
+        Self {
+            root: Directory::default(),
+        }
+    }
+
+    pub fn with_file(&mut self, directories: Vec<&str>, name: String, path: String) {
+        for string in directories {
+            self.root = {
+                self.root
+                    .children
+                    .get(string)
+                    .unwrap_or(&&Directory::default())
+                    .clone()
+                    .clone()
+            };
+        }
+        self.root.files.insert(name, path);
+    }
+
+    pub fn with_file_default(&mut self, directories: Vec<&str>, path: String) {
+        if !directories.is_empty() {
+            let i = directories.len() - 1;
+            self.with_file(
+                {
+                    let mut ii = 0;
+                    let mut vec: Vec<&str> = Vec::new();
+                    while ii < i {
+                        vec.push(directories.get(i).unwrap());
+                        ii += 1
+                    }
+                    vec
+                },
+                directories.get(i).unwrap().to_string(),
+                path,
+            )
+        }
+    }
+
+    pub fn build(self, name: String) -> ResourceFileSystem {
+        ResourceFileSystem::new(name, &self.root)
+    }
+}
+
+#[derive(Clone)]
 pub struct Directory<'a> {
     pub children: HashMap<String, &'a Directory<'a>>,
     pub files: HashMap<String, String>,
@@ -48,16 +109,21 @@ impl Default for Directory<'_> {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-pub struct ResourcePath<'a> {
+pub struct ResourcePath {
     name: String,
-    parent: Option<&'a ResourcePath<'a>>,
+    parent: Option<String>,
     names: Option<Vec<String>>,
     path_string: Option<String>,
-    file: ResourceFile<'a>,
+    file: ResourceFile,
 }
 
-impl<'a> ResourcePath<'a> {
-    pub fn new(name: String, parent: Option<&'a Self>, file: ResourceFile) -> Self {
+impl ResourcePath {
+    pub fn new(
+        name: String,
+        parent: Option<String>,
+        file: ResourceFile,
+        map: &HashMap<String, ResourcePath>,
+    ) -> Self {
         let mut s = Self {
             name,
             parent,
@@ -65,39 +131,57 @@ impl<'a> ResourcePath<'a> {
             path_string: None,
             file,
         };
-        s.refresh_names();
+        s.refresh_names(map);
         s
     }
 
-    fn relativize(path: Option<&'a Self>, name: String) -> Self {
-        Self::new(name, path, ResourceFile::Relative)
+    fn relativize(path: Option<String>, name: String, map: &HashMap<String, ResourcePath>) -> Self {
+        Self::new(name, path, ResourceFile::Relative, map)
     }
 
-    fn refresh_names(&mut self) {
+    fn refresh_names(&mut self, map: &HashMap<String, ResourcePath>) {
         if self.names.is_none() {
             let mut vec = Vec::new();
             if self.parent.is_some() {
-                vec.append(&mut self.parent.unwrap().get_names())
+                vec.append(&mut map.get(&self.parent.clone().unwrap()).unwrap().get_names())
             }
-            vec.push(&self.name);
+            vec.push(self.name.clone());
             self.names = Some(vec.iter().map(|s| String::from(s.to_owned())).collect());
         }
     }
 
-    fn get(&self, name: &str) -> Self {
-        match &self.file {
-            ResourceFile::Empty | ResourceFile::Relative => {
-                Self::new(name.to_owned(), Some(&self), self.file.clone())
+    fn get(&self, name: &str, map: &HashMap<String, ResourcePath>) -> Self {
+        let key: String = {
+            let mut n = String::new();
+            for m in map {
+                if self == m.1 {
+                    n = m.0.clone()
+                }
             }
-            ResourceFile::Directory(children) => children
+            n
+        };
+        match &self.file {
+            ResourceFile::Empty | ResourceFile::Relative => Self::new(
+                name.to_owned(),
+                Some(key.to_owned()),
+                self.file.clone(),
+                map,
+            ),
+            ResourceFile::Directory => map
                 .get(name)
                 .unwrap_or(&Self::new(
                     name.to_owned(),
-                    Some(&self),
+                    Some(key.to_owned()),
                     ResourceFile::Empty,
+                    map,
                 ))
                 .clone(),
-            ResourceFile::File(_) => Self::new(name.to_owned(), Some(&self), ResourceFile::Empty),
+            ResourceFile::File(_) => Self::new(
+                name.to_owned(),
+                Some(key.to_owned()),
+                ResourceFile::Empty,
+                map,
+            ),
             _ => unreachable!(),
         }
     }
@@ -114,11 +198,11 @@ impl<'a> ResourcePath<'a> {
         }
     }
 
-    pub fn get_file_name(&self) -> Self {
-        Self::relativize(None, self.name.clone())
+    pub fn get_file_name(&self, map: &HashMap<String, ResourcePath>) -> Self {
+        Self::relativize(None, self.name.clone(), map)
     }
 
-    pub fn get_parent(&self) -> Option<&Self> {
+    pub fn get_parent(&self) -> Option<&str> {
         self.parent.as_deref()
     }
 
@@ -126,46 +210,28 @@ impl<'a> ResourcePath<'a> {
         self.get_names().len()
     }
 
-    pub fn get_names(&self) -> Vec<&str> {
+    pub fn get_names(&self) -> Vec<String> {
         if self.name.is_empty() {
             return Vec::new();
         }
 
         let mut vec = Vec::new();
-        for s in &self.names.unwrap() {
-            vec.push(s as &str);
+        for s in &self.names.clone().unwrap() {
+            vec.push(s.clone());
         }
         vec
-    }
-
-    pub fn sub_path(&self, i: usize, j: usize) -> Option<&'a Self> {
-        let list = self.get_names();
-        if j > list.len() || i >= j {
-            None
-        } else {
-            let mut resource_path = None;
-            let mut k = i;
-            while k < j {
-                resource_path = Some(&Self::relativize(
-                    resource_path,
-                    list.get(k).unwrap().to_string(),
-                ));
-                k += 1
-            }
-            resource_path
-        }
     }
 }
 
 #[derive(PartialEq, Eq, Clone)]
-pub enum ResourceFile<'a> {
+pub enum ResourceFile {
     Empty,
     Relative,
-    Directory(&'a HashMap<String, ResourcePath<'a>>),
+    Directory,
     File(String),
 }
 
-impl ResourceFile<'_> {
+impl ResourceFile {
     pub fn is_special(&self) -> bool {
         match &self {
             ResourceFile::Empty | ResourceFile::Relative => true,
@@ -174,7 +240,7 @@ impl ResourceFile<'_> {
     }
 }
 
-impl ToString for ResourceFile<'_> {
+impl ToString for ResourceFile {
     fn to_string(&self) -> String {
         match &self {
             ResourceFile::Empty => String::from("empty"),
