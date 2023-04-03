@@ -43,7 +43,12 @@ impl ResourceFileSystem {
         }
         resource_path
     }
+
+    pub fn builder<'a>() -> ResourceFileSystemBuilder<'a> {
+        ResourceFileSystemBuilder::new()
+    }
 }
+
 pub struct ResourceFileSystemBuilder<'a> {
     root: Directory<'a>,
 }
