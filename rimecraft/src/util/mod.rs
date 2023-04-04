@@ -1,6 +1,7 @@
 pub mod json_helper;
 pub mod system_details;
 pub mod uuids;
+pub mod crash;
 
 use std::process::Command;
 use url::Url;
