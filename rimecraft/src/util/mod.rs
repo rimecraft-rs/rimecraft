@@ -1,9 +1,9 @@
-use std::process::Command;
-
-use url::Url;
-
 pub mod json_helper;
+pub mod system_details;
 pub mod uuids;
+
+use std::process::Command;
+use url::Url;
 
 pub fn into_option<T, U>(result: Result<T, U>) -> Option<T> {
     match result {
@@ -14,6 +14,10 @@ pub fn into_option<T, U>(result: Result<T, U>) -> Option<T> {
 
 pub fn get_operation_system() -> OperationSystem {
     match std::env::consts::OS {
+        "linux" => OperationSystem::GnuLinux,
+        "macos" => OperationSystem::MacOS,
+        "windows" => OperationSystem::Windows,
+        "solaris" => OperationSystem::Solaris,
         _ => OperationSystem::Unknown,
     }
 }

@@ -8,7 +8,7 @@ pub mod consts {
 
     use once_cell::sync::Lazy;
 
-    use crate::version::{GameVersion, RimecraftVersion};
+    use crate::version::RimecraftVersion;
 
     pub const SNBT_TOO_OLD_THRESHOLD: i64 = 3318;
 
@@ -16,22 +16,26 @@ pub mod consts {
         Lazy::new(|| Mutex::new(GameVersionContainer { version: None }));
 
     struct GameVersionContainer {
-        pub version: Option<Box<dyn GameVersion + Sync + Send>>,
+        pub version: Option<RimecraftVersion>,
     }
 
     pub fn get_protocol_version() -> i64 {
         762
     }
 
-    pub fn set_game_version(game_version: impl GameVersion + Sync + Send + 'static) {
-        GAME_VERSION.lock().unwrap().version = Some(Box::new(game_version));
+    pub fn set_game_version(game_version: RimecraftVersion) {
+        GAME_VERSION.lock().unwrap().version = Some(game_version);
     }
 
     pub fn create_game_version() {
         if GAME_VERSION.lock().unwrap().version.is_none() {
             GAME_VERSION.lock().unwrap().version =
-                Some(Box::new(RimecraftVersion::create().unwrap()));
+                Some(RimecraftVersion::create().unwrap());
         }
+    }
+
+    pub fn get_game_version() -> Option<RimecraftVersion> {
+        GAME_VERSION.lock().unwrap().version.clone()
     }
 }
 
@@ -42,6 +46,7 @@ pub mod version {
     use chrono::{NaiveDate, Utc};
     use log::warn;
 
+    #[derive(Clone)]
     pub struct RimecraftVersion {
         id: String,
         name: String,
@@ -182,6 +187,7 @@ pub mod version {
         fn is_stable(&self) -> bool;
     }
 
+    #[derive(Clone)]
     pub struct SaveVersion {
         id: i64,
         series: String,
