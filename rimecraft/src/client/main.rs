@@ -1,4 +1,4 @@
-use crate::{network::Proxy, util::uuids, bootstrap};
+use crate::{bootstrap, network::Proxy, util::uuids};
 use chrono::Utc;
 use clap::Parser;
 use log::warn;
@@ -11,34 +11,41 @@ use super::{
 
 #[derive(Debug, Parser)]
 struct OptionSet {
-    server: Option<String>,
-    #[arg(default_value_t = 25565)]
-    port: i64,
-    #[arg(default_value_t = format!("."))]
+    #[arg(long, default_value_t = format!("."))]
     game_dir: String,
+    #[arg(long)]
     assets_dir: Option<String>,
+    #[arg(long)]
     resource_pack_dir: Option<String>,
+    #[arg(long)]
     proxy_host: Option<String>,
-    #[arg(default_value_t = 8080)]
+    #[arg(long, default_value_t = 8080)]
     proxy_port: u16,
+    #[arg(long)]
     proxy_user: Option<String>,
+    #[arg(long)]
     proxy_pass: Option<String>,
+    #[arg(long)]
     username: Option<String>,
+    #[arg(long)]
     uuid: Option<String>,
-    #[arg(default_value_t = format!(""))]
+    #[arg(long, default_value_t = format!(""))]
     xuid: String,
-    #[arg(default_value_t = format!(""))]
+    #[arg(long, default_value_t = format!(""))]
     client_id: String,
+    #[arg(long)]
     access_token: String,
+    #[arg(long)]
     version: String,
-    #[arg(default_value_t = 854)]
+    #[arg(long, default_value_t = 854)]
     width: u32,
-    #[arg(default_value_t = 480)]
+    #[arg(long, default_value_t = 480)]
     height: u32,
+    #[arg(long)]
     asset_index: Option<String>,
-    #[arg(default_value_t = format!("legacy"))]
+    #[arg(long, default_value_t = format!("legacy"))]
     user_type: String,
-    #[arg(default_value_t = format!("release"))]
+    #[arg(long, default_value_t = format!("release"))]
     version_type: String,
 }
 

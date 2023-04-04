@@ -1,1 +1,1 @@
-cargo run
+cargo run -- --access-token 0 --version 1.19.4
