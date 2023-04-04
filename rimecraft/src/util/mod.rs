@@ -37,12 +37,23 @@ impl OperationSystem {
         }
     }
 
-    pub fn open_url(url: Url) {}
+    pub fn open_url(&self, url: Url) {
+        let _output = self.get_url_open_command(&url).output();
+    }
 
     fn get_url_open_command(&self, url: &Url) -> Command {
         match &self {
-            OperationSystem::Windows => todo!(),
-            OperationSystem::MacOS => todo!(),
+            OperationSystem::Windows => {
+                let mut command = Command::new("rundll32");
+                command.arg("url.dll,FileProtocolHandler");
+                command.arg(url.as_str());
+                command
+            }
+            OperationSystem::MacOS => {
+                let mut command = Command::new("open");
+                command.arg(url.as_str());
+                command
+            }
             _ => {
                 let mut string = url.as_str().to_owned();
                 if let Some(s) = string.strip_prefix("file:") {
