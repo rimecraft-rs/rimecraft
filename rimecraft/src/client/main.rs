@@ -1,10 +1,13 @@
-use crate::{network::Proxy, util::uuids};
+use crate::{network::Proxy, util::uuids, bootstrap};
 use chrono::Utc;
 use clap::Parser;
 use log::warn;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
-use super::util::{AccountType, Session};
+use super::{
+    args::{self, RunArgs},
+    util::{AccountType, Session},
+};
 
 #[derive(Debug, Parser)]
 struct OptionSet {
@@ -29,9 +32,9 @@ struct OptionSet {
     access_token: String,
     version: String,
     #[arg(default_value_t = 854)]
-    width: i64,
+    width: u32,
     #[arg(default_value_t = 480)]
-    height: i64,
+    height: u32,
     asset_index: Option<String>,
     #[arg(default_value_t = format!("legacy"))]
     user_type: String,
@@ -76,6 +79,22 @@ pub fn main() {
         str_to_optional(option_set.client_id),
         account_type.unwrap_or_default(),
     );
+    let run_args = RunArgs::new(
+        args::Network::new(session, proxy),
+        super::WindowSettings::new(option_set.width, option_set.height),
+        args::Directions::new(
+            option_set.game_dir.clone(),
+            option_set
+                .resource_pack_dir
+                .unwrap_or(format!("{}/resourcepacks", option_set.game_dir)),
+            option_set
+                .assets_dir
+                .unwrap_or(format!("{}/assets", option_set.game_dir)),
+            option_set.asset_index,
+        ),
+        args::Game::new(option_set.version, option_set.version_type),
+    );
+    bootstrap::initialize();
 }
 
 fn str_to_optional(string: String) -> Option<String> {

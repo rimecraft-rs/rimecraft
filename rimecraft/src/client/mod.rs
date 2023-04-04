@@ -1,13 +1,45 @@
+pub mod blaze3d;
 pub mod main;
 pub mod resource;
 pub mod util;
-pub mod blaze3d;
+
+pub struct WindowSettings {
+    pub width: u32,
+    pub height: u32,
+}
+
+impl WindowSettings {
+    pub fn new(width: u32, height: u32) -> Self {
+        Self { width, height }
+    }
+}
 
 pub mod args {
-    use super::util::Session;
+    use super::{util::Session, WindowSettings};
     use crate::network::Proxy;
 
-    pub struct RunArgs {}
+    pub struct RunArgs {
+        pub network: Network,
+        pub window_settings: WindowSettings,
+        pub directories: Directions,
+        pub game: Game,
+    }
+
+    impl RunArgs {
+        pub fn new(
+            network: Network,
+            window_settings: WindowSettings,
+            directories: Directions,
+            game: Game,
+        ) -> Self {
+            Self {
+                network,
+                window_settings,
+                directories,
+                game,
+            }
+        }
+    }
 
     pub struct Network {
         pub session: Session,
@@ -50,6 +82,20 @@ pub mod args {
                 self.assets_dir.clone()
             } else {
                 todo!()
+            }
+        }
+    }
+
+    pub struct Game {
+        pub version: String,
+        pub version_type: String,
+    }
+
+    impl Game {
+        pub fn new(version: String, version_type: String) -> Self {
+            Self {
+                version,
+                version_type,
             }
         }
     }

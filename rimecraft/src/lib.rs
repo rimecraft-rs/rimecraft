@@ -1,3 +1,4 @@
+pub mod bootstrap;
 pub mod client;
 pub mod network;
 pub mod resource;
@@ -29,8 +30,7 @@ pub mod consts {
 
     pub fn create_game_version() {
         if GAME_VERSION.lock().unwrap().version.is_none() {
-            GAME_VERSION.lock().unwrap().version =
-                Some(RimecraftVersion::create().unwrap());
+            GAME_VERSION.lock().unwrap().version = Some(RimecraftVersion::create().unwrap());
         }
     }
 
