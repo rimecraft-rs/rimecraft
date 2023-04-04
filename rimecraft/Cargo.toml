@@ -9,7 +9,6 @@ edition = "2021"
 chrono = { version = "0.4.24", features = ["serde"] }
 clap = { version = "4.1.14", features = ["derive"] }
 fast-socks5 = "0.8.1"
-favent = "0.1.0"
 log = "0.4.17"
 log4rs = "1.2.0"
 once_cell = "1.17.1"
