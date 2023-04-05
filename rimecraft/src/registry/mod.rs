@@ -1,12 +1,15 @@
 pub mod entry;
 pub mod registries;
 pub mod tag;
+pub mod wrapper;
 
-use std::{fmt::Display, slice::Iter};
+use std::{fmt::Display, slice::Iter, collections::HashMap};
 
 use datafixerupper::serialization::{DynamicOps, Keyable, Lifecycle};
 
 use crate::util::{collection::IndexedIterable, Identifier};
+
+use self::entry::RegistryEntry;
 
 pub struct RegistryKey<T> {
     registry: Identifier,
@@ -95,10 +98,12 @@ impl<T> PartialEq for RegistryKey<T> {
     }
 }
 
-pub trait Registry<T>: Keyable + IndexedIterable<T> {
-    fn keys<V>(&self, ops: &impl DynamicOps<V>) -> Iter<V> {
-        todo!()
-    }
+pub trait Registry<T>: 
+// Keyable + 
+IndexedIterable<T> {
+    // fn keys<V>(&self, ops: &impl DynamicOps<V>) -> Iter<V> {
+    //     todo!()
+    // }
 
     fn get_self_key(&self) -> &RegistryKey<Self>;
 
@@ -119,4 +124,104 @@ pub trait Registry<T>: Keyable + IndexedIterable<T> {
     fn contains(&self, key: &RegistryKey<T>) -> bool;
 
     fn freeze(&mut self);
+}
+
+pub trait DefaultedRegistry<T>: Registry<T> {
+    fn get_id_default<'a>(&'a self, object: &'a T) -> &'a Identifier;
+    fn get_from_id_default(&self, id: &Identifier) -> &T;
+    fn get_from_raw_id_default(&self, id: usize) -> &T;
+    fn get_default_id(&self) -> Identifier;
+}
+
+pub trait MutableRegistry<T>: Registry<T> {
+    fn set(&mut self, id: usize, key: RegistryKey<T>, object: T, lifecycle: Lifecycle) -> &RegistryEntry<T>;
+    fn add(&mut self, key: RegistryKey<T>, object: T, lifecycle: Lifecycle) -> &RegistryEntry<T>;
+    fn is_empty(&self) -> bool;
+}
+
+pub struct SimpleRegistry<'r, T> {
+    key: &'r RegistryKey<SimpleRegistry<'r, T>>,
+    entries: Vec<(RegistryEntry<'r, T>, RegistryKey<T>, Identifier, Lifecycle)>,
+    lifecycle: Lifecycle,
+    
+}
+
+impl<T: PartialEq> IndexedIterable<T> for SimpleRegistry<'_, T> {
+    fn get_raw_id<'a>(&'a self, object: &'a T) -> Option<usize> {
+        todo!()
+    }
+
+    fn get_from_raw_id(&self, id: usize) -> Option<&T> {
+        todo!()
+    }
+
+    fn get_from_raw_id_mut(&mut self, id: usize) -> Option<&mut T> {
+        todo!()
+    }
+
+    fn size(&self) -> usize {
+        todo!()
+    }
+
+    fn iter(&self) -> std::option::Iter<T> {
+        todo!()
+    }
+
+    fn iter_mut(&mut self) -> std::option::IterMut<T> {
+        todo!()
+    }
+}
+
+impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
+    fn get_self_key(&self) -> &RegistryKey<Self> {
+        todo!()
+    }
+
+    fn get_id<'a>(&'a self, obj: &'a T) -> Option<&'a Identifier> {
+        todo!()
+    }
+
+    fn get_key<'a>(&'a self, obj: &'a T) -> Option<&'a RegistryKey<T>> {
+        todo!()
+    }
+
+    fn get_from_key<'a>(&'a self, key: &RegistryKey<T>) -> Option<&'a T> {
+        todo!()
+    }
+
+    fn get_from_id<'a>(&'a self, id: &Identifier) -> Option<&'a T> {
+        todo!()
+    }
+
+    fn get_entry_lifecycle<'a>(&'a self, entry: &'a T) -> &Lifecycle {
+        todo!()
+    }
+
+    fn get_lifecycle(&self) -> &Lifecycle {
+        todo!()
+    }
+
+    fn get_ids(&self) -> Vec<&Identifier> {
+        todo!()
+    }
+
+    fn get_entry_set(&self) -> Vec<(&RegistryKey<T>, &T)> {
+        todo!()
+    }
+
+    fn get_keys(&self) -> Vec<&RegistryKey<T>> {
+        todo!()
+    }
+
+    fn contains_id(&self, id: &Identifier) -> bool {
+        todo!()
+    }
+
+    fn contains(&self, key: &RegistryKey<T>) -> bool {
+        todo!()
+    }
+
+    fn freeze(&mut self) {
+        todo!()
+    }
 }

@@ -9,6 +9,20 @@ pub enum RegistryEntry<'r, T> {
 }
 
 impl<'r, T> RegistryEntry<'r, T> {
+    pub fn as_ref_entry(&self) -> Option<&ReferenceEntry<'r, T>> {
+        match self {
+            RegistryEntry::Direct(_) => None,
+            RegistryEntry::Reference(r) => Some(r),
+        }
+    }
+
+    pub fn as_ref_entry_mut(&mut self) -> Option<&mut ReferenceEntry<'r, T>> {
+        match self {
+            RegistryEntry::Direct(_) => None,
+            RegistryEntry::Reference(r) => Some(r),
+        }
+    }
+
     pub fn value(&self) -> Option<&T> {
         match self {
             RegistryEntry::Direct(value) => Some(value),
@@ -86,13 +100,6 @@ impl<'r, T> RegistryEntry<'r, T> {
             },
         }
     }
-
-    pub fn owner_eq(&self, owner: &impl RegistryEntryOwner<T>) -> bool {
-        match self {
-            RegistryEntry::Direct(_) => true,
-            RegistryEntry::Reference(r) => r.owner.owner_eq(owner),
-        }
-    }
 }
 
 impl<T: Display> Display for RegistryEntry<'_, T> {
@@ -130,11 +137,30 @@ pub struct ReferenceEntry<'r, T> {
     pub owner: &'r dyn RegistryEntryOwner<T>,
 }
 
+impl<'r, T> ReferenceEntry<'r, T> {
+    fn new(
+        reference_type: ReferenceType,
+        owner: &'r impl RegistryEntryOwner<T>,
+        registry_key: Option<RegistryKey<T>>,
+        value: Option<&'r T>,
+    ) -> Self {
+        Self {
+            value,
+            registry_key,
+            reference_type,
+            tags: Vec::new(),
+            owner,
+        }
+    }
+
+    pub fn stand_alone(owner: &'r impl RegistryEntryOwner<T>, value: Option<&'r T>) -> Self {
+        Self::new(ReferenceType::StandAlone, owner, None, value)
+    }
+}
+
 pub enum ReferenceType {
     StandAlone,
     Intrusive,
 }
 
-pub trait RegistryEntryOwner<T> {
-    fn owner_eq(&self, other: &impl RegistryEntryOwner<T>) -> bool;
-}
+pub trait RegistryEntryOwner<T> {}
