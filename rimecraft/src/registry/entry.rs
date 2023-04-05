@@ -3,20 +3,20 @@ use crate::util::Identifier;
 use datafixerupper::datafixers::util::Either;
 use std::fmt::Display;
 
-pub enum RegistryEntry<'r, T> {
+pub enum RegistryEntry<T> {
     Direct(T),
-    Reference(ReferenceEntry<'r, T>),
+    Reference(ReferenceEntry<T>),
 }
 
-impl<'r, T> RegistryEntry<'r, T> {
-    pub fn as_ref_entry(&self) -> Option<&ReferenceEntry<'r, T>> {
+impl<T> RegistryEntry<T> {
+    pub fn as_ref_entry(&self) -> Option<&ReferenceEntry<T>> {
         match self {
             RegistryEntry::Direct(_) => None,
             RegistryEntry::Reference(r) => Some(r),
         }
     }
 
-    pub fn as_ref_entry_mut(&mut self) -> Option<&mut ReferenceEntry<'r, T>> {
+    pub fn as_ref_entry_mut(&mut self) -> Option<&mut ReferenceEntry<T>> {
         match self {
             RegistryEntry::Direct(_) => None,
             RegistryEntry::Reference(r) => Some(r),
@@ -26,7 +26,10 @@ impl<'r, T> RegistryEntry<'r, T> {
     pub fn value(&self) -> Option<&T> {
         match self {
             RegistryEntry::Direct(value) => Some(value),
-            RegistryEntry::Reference(r) => r.value,
+            RegistryEntry::Reference(r) => match &r.value {
+                Some(a) => Some(a),
+                None => None,
+            },
         }
     }
 
@@ -102,7 +105,7 @@ impl<'r, T> RegistryEntry<'r, T> {
     }
 }
 
-impl<T: Display> Display for RegistryEntry<'_, T> {
+impl<T: Display> Display for RegistryEntry<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RegistryEntry::Direct(value) => {
@@ -117,7 +120,7 @@ impl<T: Display> Display for RegistryEntry<'_, T> {
                     None => f.write_str("nil"),
                 }?;
                 f.write_str("=")?;
-                match r.value {
+                match &r.value {
                     Some(s) => s.fmt(f),
                     None => f.write_str("nil"),
                 }?;
@@ -129,32 +132,29 @@ impl<T: Display> Display for RegistryEntry<'_, T> {
     }
 }
 
-pub struct ReferenceEntry<'r, T> {
-    pub value: Option<&'r T>,
+pub struct ReferenceEntry<T> {
+    pub value: Option<T>,
     pub registry_key: Option<RegistryKey<T>>,
     pub reference_type: ReferenceType,
     pub tags: Vec<TagKey<T>>,
-    pub owner: &'r dyn RegistryEntryOwner<T>,
 }
 
-impl<'r, T> ReferenceEntry<'r, T> {
+impl<T> ReferenceEntry<T> {
     fn new(
         reference_type: ReferenceType,
-        owner: &'r impl RegistryEntryOwner<T>,
         registry_key: Option<RegistryKey<T>>,
-        value: Option<&'r T>,
+        value: Option<T>,
     ) -> Self {
         Self {
             value,
             registry_key,
             reference_type,
             tags: Vec::new(),
-            owner,
         }
     }
 
-    pub fn stand_alone(owner: &'r impl RegistryEntryOwner<T>, value: Option<&'r T>) -> Self {
-        Self::new(ReferenceType::StandAlone, owner, None, value)
+    pub fn stand_alone(value: Option<T>) -> Self {
+        Self::new(ReferenceType::StandAlone, None, value)
     }
 }
 

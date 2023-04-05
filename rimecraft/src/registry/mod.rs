@@ -9,7 +9,7 @@ use datafixerupper::serialization::{DynamicOps, Keyable, Lifecycle};
 
 use crate::util::{collection::IndexedIterable, Identifier};
 
-use self::entry::RegistryEntry;
+use self::{entry::RegistryEntry, tag::TagKey};
 
 pub struct RegistryKey<T> {
     registry: Identifier,
@@ -141,9 +141,8 @@ pub trait MutableRegistry<T>: Registry<T> {
 
 pub struct SimpleRegistry<'r, T> {
     key: &'r RegistryKey<SimpleRegistry<'r, T>>,
-    entries: Vec<(RegistryEntry<'r, T>, RegistryKey<T>, Identifier, Lifecycle)>,
+    entries: Vec<(RegistryEntry<T>, RegistryKey<T>, Identifier, Lifecycle)>,
     lifecycle: Lifecycle,
-    
 }
 
 impl<T: PartialEq> IndexedIterable<T> for SimpleRegistry<'_, T> {
