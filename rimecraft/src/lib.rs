@@ -3,6 +3,7 @@ pub mod client;
 pub mod network;
 pub mod resource;
 pub mod util;
+pub mod registry;
 
 pub mod consts {
     use std::sync::Mutex;

@@ -1,9 +1,24 @@
-use std::{fmt::Debug, hash::Hash, ops::Add};
+use std::{
+    fmt::Debug,
+    hash::Hash,
+    ops::Add,
+    option::{Iter, IterMut},
+};
 
 use crate::datafixers::{
     kinds::{App, K1},
     util::Either,
 };
+
+pub trait Keyable {
+    fn keys<T>(&self, ops: &impl DynamicOps<T>) -> Iter<T>;
+    fn keys_mut<T>(&mut self, ops: &impl DynamicOps<T>) -> IterMut<T>;
+}
+
+pub trait DynamicOps<T> {
+    fn empty(&self) -> T;
+    // TODO: more
+}
 
 pub struct DataResult<R> {
     result: Either<R, PartialResult<R>>,

@@ -1,9 +1,10 @@
+pub mod collection;
 pub mod crash;
 pub mod json_helper;
 pub mod system_details;
 pub mod uuids;
 
-use std::process::Command;
+use std::{fmt::Display, process::Command};
 use url::Url;
 
 pub fn into_option<T, U>(result: Result<T, U>) -> Option<T> {
@@ -72,7 +73,7 @@ impl OperationSystem {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Identifier {
     namespace: String,
     path: String,
@@ -92,8 +93,11 @@ impl Identifier {
     }
 
     pub fn split_on(id: String, delimiter: char) -> Option<Self> {
-        let arr = id.split_once(delimiter)?;
-        Self::new(arr.0.to_string(), arr.1.to_string())
+        if let Some(arr) = id.split_once(delimiter) {
+            Self::new(arr.0.to_string(), arr.1.to_string())
+        } else {
+            Self::new(String::from("rimecraft"), id)
+        }
     }
 
     fn new_unchecked(namespace: String, path: String) -> Self {
@@ -132,5 +136,14 @@ impl Identifier {
 
     pub fn get_path(&self) -> &str {
         &self.path
+    }
+}
+
+impl Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.namespace)?;
+        f.write_str(":")?;
+        f.write_str(&self.path)?;
+        std::fmt::Result::Ok(())
     }
 }
