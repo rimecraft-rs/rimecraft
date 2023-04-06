@@ -33,6 +33,16 @@ impl<T, R: Registry<T>> RegistryEntry<T, R> {
         }
     }
 
+    pub fn value_mut(&mut self) -> Option<&mut T> {
+        match self {
+            RegistryEntry::Direct(value) => Some(value),
+            RegistryEntry::Reference(r) => match &mut r.value {
+                Some(a) => Some(a),
+                None => None,
+            },
+        }
+    }
+
     pub fn has_key_and_value(&self) -> bool {
         match self {
             RegistryEntry::Direct(_) => true,

@@ -3,12 +3,9 @@ pub mod registries;
 pub mod tag;
 pub mod wrapper;
 
-use std::{fmt::Display, slice::Iter, collections::HashMap};
-
-use datafixerupper::serialization::{DynamicOps, Keyable, Lifecycle};
-
+use std::{fmt::Display, collections::HashMap};
+use datafixerupper::serialization::Lifecycle;
 use crate::util::{collection::IndexedIterable, Identifier};
-
 use self::{entry::RegistryEntry, tag::TagKey};
 
 pub struct RegistryKey<T> {
@@ -140,34 +137,53 @@ pub trait MutableRegistry<T>: Registry<T> {
 }
 
 pub struct SimpleRegistry<'r, T: PartialEq> {
-    key: &'r RegistryKey<SimpleRegistry<'r, T>>,
+    key: &'r RegistryKey<Self>,
     entries: Vec<(RegistryEntry<T, Self>, RegistryKey<T>, Identifier, Lifecycle)>,
     lifecycle: Lifecycle,
+    tags: HashMap<TagKey<T, Self>, Vec<usize>>,
+    frozen: bool,
+}
+
+impl<'r, T: PartialEq> SimpleRegistry<'r, T> {
+    pub fn new(key: &'r RegistryKey<Self>, lifecycle: Lifecycle) -> Self {
+        Self { key, entries: Vec::new(), lifecycle, tags: HashMap::new(), frozen: false }
+    }
 }
 
 impl<T: PartialEq> IndexedIterable<T> for SimpleRegistry<'_, T> {
     fn get_raw_id<'a>(&'a self, object: &'a T) -> Option<usize> {
-        todo!()
+        for e in self.entries.iter().enumerate() {
+            if e.1.0.value().is_some() && e.1.0.value().unwrap() == object {
+                return Some(e.0);
+            }
+        }
+        None
     }
 
     fn get_from_raw_id(&self, id: usize) -> Option<&T> {
-        todo!()
+        match self.entries.get(id).map(|t| t.0.value()) {
+            Some(Some(a)) => Some(a),
+            _ => None,
+        }
     }
 
     fn get_from_raw_id_mut(&mut self, id: usize) -> Option<&mut T> {
-        todo!()
+        match self.entries.get_mut(id).map(|t| t.0.value_mut()) {
+            Some(Some(a)) => Some(a),
+            _ => None,
+        }
     }
 
     fn size(&self) -> usize {
-        todo!()
+        self.entries.len()
     }
 
-    fn iter(&self) -> std::option::Iter<T> {
-        todo!()
+    fn vec(&self) -> Vec<&T> {
+        self.entries.iter().map(|e| e.0.value()).filter(|o| o.is_some()).map(|o| o.unwrap()).collect()
     }
 
-    fn iter_mut(&mut self) -> std::option::IterMut<T> {
-        todo!()
+    fn vec_mut(&mut self) -> Vec<&mut T> {
+        self.entries.iter_mut().map(|e| e.0.value_mut()).filter(|o| o.is_some()).map(|o| o.unwrap()).collect()
     }
 }
 
