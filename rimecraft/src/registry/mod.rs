@@ -5,7 +5,7 @@ pub mod wrapper;
 
 use std::{fmt::Display, collections::HashMap};
 use datafixerupper::serialization::Lifecycle;
-use crate::util::{collection::IndexedIterable, Identifier};
+use crate::util::{collection::IndexedIterable, Identifier, self};
 use self::{entry::RegistryEntry, tag::TagKey};
 
 pub struct RegistryKey<T> {
@@ -110,7 +110,7 @@ IndexedIterable<T> {
     fn get_from_key<'a>(&'a self, key: &RegistryKey<T>) -> Option<&'a T>;
     fn get_from_id<'a>(&'a self, id: &Identifier) -> Option<&'a T>;
 
-    fn get_entry_lifecycle<'a>(&'a self, entry: &'a T) -> &Lifecycle;
+    fn get_entry_lifecycle<'a>(&'a self, entry: &'a T) -> Option<&Lifecycle>;
     fn get_lifecycle(&self) -> &Lifecycle;
 
     fn get_ids(&self) -> Vec<&Identifier>;
@@ -189,54 +189,88 @@ impl<T: PartialEq> IndexedIterable<T> for SimpleRegistry<'_, T> {
 
 impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
     fn get_self_key(&self) -> &RegistryKey<Self> {
-        todo!()
+        self.key
     }
 
     fn get_id<'a>(&'a self, obj: &'a T) -> Option<&'a Identifier> {
-        todo!()
+        for entry in &self.entries {
+            if let Some(v) = entry.0.value() {
+                if obj == v {
+                    return Some(&entry.2);
+                }
+            }
+        }
+        None
     }
 
     fn get_key<'a>(&'a self, obj: &'a T) -> Option<&'a RegistryKey<T>> {
-        todo!()
+        for entry in &self.entries {
+            if let Some(v) = entry.0.value() {
+                if obj == v {
+                    return Some(&entry.1);
+                }
+            }
+        }
+        None
     }
 
     fn get_from_key<'a>(&'a self, key: &RegistryKey<T>) -> Option<&'a T> {
-        todo!()
+        for entry in &self.entries {
+            if &entry.1 == key {
+                return entry.0.value()
+            }
+        }
+        None
     }
 
     fn get_from_id<'a>(&'a self, id: &Identifier) -> Option<&'a T> {
-        todo!()
+        for entry in &self.entries {
+            if &entry.2 == id {
+                return entry.0.value()
+            }
+        }
+        None
     }
 
-    fn get_entry_lifecycle<'a>(&'a self, entry: &'a T) -> &Lifecycle {
-        todo!()
+    fn get_entry_lifecycle<'a>(&'a self, entry: &'a T) -> Option<&Lifecycle> {
+        for e in &self.entries {
+            if let Some(v) = e.0.value() {
+                if entry == v {
+                    return Some(&e.3);
+                }
+            }
+        }
+        None
     }
 
     fn get_lifecycle(&self) -> &Lifecycle {
-        todo!()
+        &self.lifecycle
     }
 
     fn get_ids(&self) -> Vec<&Identifier> {
-        todo!()
+        self.entries.iter().map(|t| &t.2).collect()
     }
 
     fn get_entry_set(&self) -> Vec<(&RegistryKey<T>, &T)> {
-        todo!()
+        self.entries.iter().filter(|t| t.0.value().is_some()).map(|t| (&t.1, t.0.value().unwrap())).collect()
     }
 
     fn get_keys(&self) -> Vec<&RegistryKey<T>> {
-        todo!()
+        self.entries.iter().map(|t| &t.1).collect()
     }
 
     fn contains_id(&self, id: &Identifier) -> bool {
-        todo!()
+        self.entries.iter().any(|p| &p.2 == id)
     }
 
     fn contains(&self, key: &RegistryKey<T>) -> bool {
-        todo!()
+        self.entries.iter().any(|p| &p.1 == key)
     }
 
     fn freeze(&mut self) {
-        todo!()
+        if self.frozen {
+            return;
+        }
+        self.frozen = true;
     }
 }

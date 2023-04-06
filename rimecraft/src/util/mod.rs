@@ -147,3 +147,10 @@ impl Display for Identifier {
         std::fmt::Result::Ok(())
     }
 }
+
+pub fn option_is_some_and<T>(option: &Option<T>, predicate: impl Fn(&T) -> bool) -> bool {
+    match option {
+        Some(s) => predicate(s),
+        None => false,
+    }
+}
