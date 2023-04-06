@@ -151,7 +151,7 @@ pub trait MutableRegistry<T>: Registry<T> {
 
 pub struct SimpleRegistry<'r, T: PartialEq> {
     key: &'r RegistryKey<Self>,
-    entries: Vec<(RegistryEntry<T, Self>, RegistryKey<T>, Lifecycle)>,
+    entries: Vec<(RegistryEntry<T, Self>, Lifecycle)>,
     lifecycle: Lifecycle,
     frozen: bool,
 }
@@ -223,7 +223,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
         for entry in &self.entries {
             if let Some(v) = entry.0.value() {
                 if obj == v {
-                    return Some(&entry.1.get_value());
+                    return entry.0.get_key().map(|f| f.get_value());
                 }
             }
         }
@@ -234,7 +234,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
         for entry in &self.entries {
             if let Some(v) = entry.0.value() {
                 if obj == v {
-                    return Some(&entry.1);
+                    return entry.0.get_key();
                 }
             }
         }
@@ -243,7 +243,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
 
     fn get_from_key<'a>(&'a self, key: &RegistryKey<T>) -> Option<&'a T> {
         for entry in &self.entries {
-            if &entry.1 == key {
+            if entry.0.get_key()? == key {
                 return entry.0.value();
             }
         }
@@ -252,7 +252,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
 
     fn get_from_id<'a>(&'a self, id: &Identifier) -> Option<&'a T> {
         for entry in &self.entries {
-            if entry.1.get_value() == id {
+            if entry.0.get_key()?.get_value() == id {
                 return entry.0.value();
             }
         }
@@ -263,7 +263,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
         for e in &self.entries {
             if let Some(v) = e.0.value() {
                 if entry == v {
-                    return Some(&e.2);
+                    return Some(&e.1);
                 }
             }
         }
@@ -275,27 +275,39 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
     }
 
     fn get_ids(&self) -> Vec<&Identifier> {
-        self.entries.iter().map(|t| t.1.get_value()).collect()
+        self.entries
+            .iter()
+            .filter(|t| t.0.get_key().is_some())
+            .map(|t| t.0.get_key().unwrap().get_value())
+            .collect()
     }
 
     fn get_entry_set(&self) -> Vec<(&RegistryKey<T>, &T)> {
         self.entries
             .iter()
-            .filter(|t| t.0.value().is_some())
-            .map(|t| (&t.1, t.0.value().unwrap()))
+            .filter(|t| t.0.value().is_some() && t.0.get_key().is_some())
+            .map(|t| (t.0.get_key().unwrap(), t.0.value().unwrap()))
             .collect()
     }
 
     fn get_keys(&self) -> Vec<&RegistryKey<T>> {
-        self.entries.iter().map(|t| &t.1).collect()
+        self.entries
+            .iter()
+            .filter(|t| t.0.get_key().is_some())
+            .map(|t| t.0.get_key().unwrap())
+            .collect()
     }
 
     fn contains_id(&self, id: &Identifier) -> bool {
-        self.entries.iter().any(|p| p.1.get_value() == id)
+        self.entries
+            .iter()
+            .any(|p| p.0.get_key().is_some() && p.0.get_key().unwrap().get_value() == id)
     }
 
     fn contains(&self, key: &RegistryKey<T>) -> bool {
-        self.entries.iter().any(|p| &p.1 == key)
+        self.entries
+            .iter()
+            .any(|p| p.0.get_key().is_some() && p.0.get_key().unwrap() == key)
     }
 
     fn freeze(&mut self) {
@@ -321,8 +333,11 @@ impl<T: PartialEq> MutableRegistry<T> for SimpleRegistry<'_, T> {
         self.entries.insert(
             id,
             (
-                RegistryEntry::Reference(ReferenceEntry::<T, Self>::stand_alone(Some(object))),
-                key,
+                {
+                    let mut reference = ReferenceEntry::<T, Self>::stand_alone(Some(object));
+                    reference.set_registry_key(key);
+                    RegistryEntry::Reference(reference)
+                },
                 lifecycle,
             ),
         );

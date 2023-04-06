@@ -166,6 +166,10 @@ impl<T, R: Registry<T>> ReferenceEntry<T, R> {
     pub fn stand_alone(value: Option<T>) -> Self {
         Self::new(ReferenceType::StandAlone, None, value)
     }
+
+    pub fn intrusive(value: Option<T>) -> Self {
+        Self::new(ReferenceType::Intrusive, None, value)
+    }
 }
 
 impl<T: PartialEq, R: Registry<T>> ReferenceEntry<T, R> {
@@ -185,6 +189,13 @@ impl<T: PartialEq, R: Registry<T>> ReferenceEntry<T, R> {
     pub fn set_registry_key(&mut self, registry_key: RegistryKey<T>) {
         if !(self.registry_key.is_some() && self.registry_key.as_ref().unwrap() != &registry_key) {
             self.registry_key = Some(registry_key)
+        }
+    }
+
+    pub fn get_registry_key(&self) -> Option<&RegistryKey<T>> {
+        match &self.registry_key {
+            Some(s) => Some(s),
+            None => None,
         }
     }
 }
