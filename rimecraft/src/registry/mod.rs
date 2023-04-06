@@ -5,7 +5,7 @@ pub mod wrapper;
 
 use std::{fmt::Display, collections::HashMap};
 use datafixerupper::serialization::Lifecycle;
-use crate::util::{collection::IndexedIterable, Identifier, self};
+use crate::util::{collection::IndexedIterable, Identifier};
 use self::{entry::RegistryEntry, tag::TagKey};
 
 pub struct RegistryKey<T> {
