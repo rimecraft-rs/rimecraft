@@ -134,14 +134,14 @@ pub trait DefaultedRegistry<T>: Registry<T> {
 }
 
 pub trait MutableRegistry<T>: Registry<T> {
-    fn set(&mut self, id: usize, key: RegistryKey<T>, object: T, lifecycle: Lifecycle) -> &RegistryEntry<T>;
-    fn add(&mut self, key: RegistryKey<T>, object: T, lifecycle: Lifecycle) -> &RegistryEntry<T>;
+    fn set(&mut self, id: usize, key: RegistryKey<T>, object: T, lifecycle: Lifecycle) -> &RegistryEntry<T, Self>;
+    fn add(&mut self, key: RegistryKey<T>, object: T, lifecycle: Lifecycle) -> &RegistryEntry<T, Self>;
     fn is_empty(&self) -> bool;
 }
 
-pub struct SimpleRegistry<'r, T> {
+pub struct SimpleRegistry<'r, T: PartialEq> {
     key: &'r RegistryKey<SimpleRegistry<'r, T>>,
-    entries: Vec<(RegistryEntry<T>, RegistryKey<T>, Identifier, Lifecycle)>,
+    entries: Vec<(RegistryEntry<T, Self>, RegistryKey<T>, Identifier, Lifecycle)>,
     lifecycle: Lifecycle,
 }
 

@@ -1,22 +1,22 @@
-use super::{tag::TagKey, RegistryKey};
+use super::{tag::TagKey, Registry, RegistryKey};
 use crate::util::Identifier;
 use datafixerupper::datafixers::util::Either;
 use std::fmt::Display;
 
-pub enum RegistryEntry<T> {
+pub enum RegistryEntry<T, R: Registry<T>> {
     Direct(T),
-    Reference(ReferenceEntry<T>),
+    Reference(ReferenceEntry<T, R>),
 }
 
-impl<T> RegistryEntry<T> {
-    pub fn as_ref_entry(&self) -> Option<&ReferenceEntry<T>> {
+impl<T, R: Registry<T>> RegistryEntry<T, R> {
+    pub fn as_ref_entry(&self) -> Option<&ReferenceEntry<T, R>> {
         match self {
             RegistryEntry::Direct(_) => None,
             RegistryEntry::Reference(r) => Some(r),
         }
     }
 
-    pub fn as_ref_entry_mut(&mut self) -> Option<&mut ReferenceEntry<T>> {
+    pub fn as_ref_entry_mut(&mut self) -> Option<&mut ReferenceEntry<T, R>> {
         match self {
             RegistryEntry::Direct(_) => None,
             RegistryEntry::Reference(r) => Some(r),
@@ -70,14 +70,14 @@ impl<T> RegistryEntry<T> {
         }
     }
 
-    pub fn is_in(&self, tag: &TagKey<T>) -> bool {
+    pub fn is_in(&self, tag: &TagKey<T, R>) -> bool {
         match self {
             RegistryEntry::Direct(_) => false,
             RegistryEntry::Reference(r) => r.tags.contains(tag),
         }
     }
 
-    pub fn get_tags(&self) -> Vec<&TagKey<T>> {
+    pub fn get_tags(&self) -> Vec<&TagKey<T, R>> {
         match self {
             RegistryEntry::Direct(_) => Vec::new(),
             RegistryEntry::Reference(r) => r.tags.iter().collect(),
@@ -105,7 +105,7 @@ impl<T> RegistryEntry<T> {
     }
 }
 
-impl<T: Display> Display for RegistryEntry<T> {
+impl<T: Display, R: Registry<T>> Display for RegistryEntry<T, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RegistryEntry::Direct(value) => {
@@ -132,14 +132,14 @@ impl<T: Display> Display for RegistryEntry<T> {
     }
 }
 
-pub struct ReferenceEntry<T> {
+pub struct ReferenceEntry<T, R: Registry<T>> {
     pub value: Option<T>,
     pub registry_key: Option<RegistryKey<T>>,
     pub reference_type: ReferenceType,
-    pub tags: Vec<TagKey<T>>,
+    pub tags: Vec<TagKey<T, R>>,
 }
 
-impl<T> ReferenceEntry<T> {
+impl<T, R: Registry<T>> ReferenceEntry<T, R> {
     fn new(
         reference_type: ReferenceType,
         registry_key: Option<RegistryKey<T>>,
