@@ -3,10 +3,14 @@ pub mod registries;
 pub mod tag;
 pub mod wrapper;
 
-use self::{entry::RegistryEntry, tag::TagKey};
-use crate::util::{collection::IndexedIterable, Identifier};
+use self::entry::RegistryEntry;
+use crate::{
+    registry::entry::ReferenceEntry,
+    util::{collection::IndexedIterable, Identifier},
+};
 use datafixerupper::serialization::Lifecycle;
-use std::{collections::HashMap, fmt::Display};
+use log::error;
+use std::fmt::Display;
 
 pub struct RegistryKey<T> {
     registry: Identifier,
@@ -135,26 +139,20 @@ pub trait MutableRegistry<T>: Registry<T> {
         key: RegistryKey<T>,
         object: T,
         lifecycle: Lifecycle,
-    ) -> &RegistryEntry<T, Self>;
+    ) -> Option<&RegistryEntry<T, Self>>;
     fn add(
         &mut self,
         key: RegistryKey<T>,
         object: T,
         lifecycle: Lifecycle,
-    ) -> &RegistryEntry<T, Self>;
+    ) -> Option<&RegistryEntry<T, Self>>;
     fn is_empty(&self) -> bool;
 }
 
 pub struct SimpleRegistry<'r, T: PartialEq> {
     key: &'r RegistryKey<Self>,
-    entries: Vec<(
-        RegistryEntry<T, Self>,
-        RegistryKey<T>,
-        Identifier,
-        Lifecycle,
-    )>,
+    entries: Vec<(RegistryEntry<T, Self>, RegistryKey<T>, Lifecycle)>,
     lifecycle: Lifecycle,
-    tags: HashMap<TagKey<T, Self>, Vec<usize>>,
     frozen: bool,
 }
 
@@ -164,7 +162,6 @@ impl<'r, T: PartialEq> SimpleRegistry<'r, T> {
             key,
             entries: Vec::new(),
             lifecycle,
-            tags: HashMap::new(),
             frozen: false,
         }
     }
@@ -226,7 +223,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
         for entry in &self.entries {
             if let Some(v) = entry.0.value() {
                 if obj == v {
-                    return Some(&entry.2);
+                    return Some(&entry.1.get_value());
                 }
             }
         }
@@ -255,7 +252,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
 
     fn get_from_id<'a>(&'a self, id: &Identifier) -> Option<&'a T> {
         for entry in &self.entries {
-            if &entry.2 == id {
+            if entry.1.get_value() == id {
                 return entry.0.value();
             }
         }
@@ -266,7 +263,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
         for e in &self.entries {
             if let Some(v) = e.0.value() {
                 if entry == v {
-                    return Some(&e.3);
+                    return Some(&e.2);
                 }
             }
         }
@@ -278,7 +275,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
     }
 
     fn get_ids(&self) -> Vec<&Identifier> {
-        self.entries.iter().map(|t| &t.2).collect()
+        self.entries.iter().map(|t| t.1.get_value()).collect()
     }
 
     fn get_entry_set(&self) -> Vec<(&RegistryKey<T>, &T)> {
@@ -294,7 +291,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
     }
 
     fn contains_id(&self, id: &Identifier) -> bool {
-        self.entries.iter().any(|p| &p.2 == id)
+        self.entries.iter().any(|p| p.1.get_value() == id)
     }
 
     fn contains(&self, key: &RegistryKey<T>) -> bool {
@@ -302,9 +299,47 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
     }
 
     fn freeze(&mut self) {
-        if self.frozen {
-            return;
-        }
         self.frozen = true;
+    }
+}
+
+impl<T: PartialEq> MutableRegistry<T> for SimpleRegistry<'_, T> {
+    fn set(
+        &mut self,
+        id: usize,
+        key: RegistryKey<T>,
+        object: T,
+        lifecycle: Lifecycle,
+    ) -> Option<&RegistryEntry<T, Self>> {
+        if self.frozen || self.entries.len() < id {
+            error!("Registry is already frozen (trying to add key {})", key);
+            return None;
+        }
+        if self.entries.len() != id {
+            self.entries.remove(id);
+        }
+        self.entries.insert(
+            id,
+            (
+                RegistryEntry::Reference(ReferenceEntry::<T, Self>::stand_alone(Some(object))),
+                key,
+                lifecycle,
+            ),
+        );
+        self.lifecycle = self.lifecycle + lifecycle;
+        self.entries.get(id).map(|t| &t.0)
+    }
+
+    fn add(
+        &mut self,
+        key: RegistryKey<T>,
+        object: T,
+        lifecycle: Lifecycle,
+    ) -> Option<&RegistryEntry<T, Self>> {
+        self.set(self.entries.len(), key, object, lifecycle)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 }

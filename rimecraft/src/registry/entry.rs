@@ -168,6 +168,28 @@ impl<T, R: Registry<T>> ReferenceEntry<T, R> {
     }
 }
 
+impl<T: PartialEq, R: Registry<T>> ReferenceEntry<T, R> {
+    pub fn set_value(&mut self, value: T) {
+        if !(self.reference_type == ReferenceType::Intrusive
+            && self.value.is_some()
+            && self.value.as_ref().unwrap() == &value)
+        {
+            self.value = Some(value)
+        }
+    }
+
+    pub fn set_tags(&mut self, tags: Vec<TagKey<T, R>>) {
+        self.tags = tags
+    }
+
+    pub fn set_registry_key(&mut self, registry_key: RegistryKey<T>) {
+        if !(self.registry_key.is_some() && self.registry_key.as_ref().unwrap() != &registry_key) {
+            self.registry_key = Some(registry_key)
+        }
+    }
+}
+
+#[derive(PartialEq, Eq)]
 pub enum ReferenceType {
     StandAlone,
     Intrusive,
