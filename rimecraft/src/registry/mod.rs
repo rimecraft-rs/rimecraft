@@ -3,10 +3,10 @@ pub mod registries;
 pub mod tag;
 pub mod wrapper;
 
-use std::{fmt::Display, collections::HashMap};
-use datafixerupper::serialization::Lifecycle;
-use crate::util::{collection::IndexedIterable, Identifier};
 use self::{entry::RegistryEntry, tag::TagKey};
+use crate::util::{collection::IndexedIterable, Identifier};
+use datafixerupper::serialization::Lifecycle;
+use std::{collections::HashMap, fmt::Display};
 
 pub struct RegistryKey<T> {
     registry: Identifier,
@@ -95,9 +95,7 @@ impl<T> PartialEq for RegistryKey<T> {
     }
 }
 
-pub trait Registry<T>: 
-// Keyable + 
-IndexedIterable<T> {
+pub trait Registry<T>: IndexedIterable<T> {
     // fn keys<V>(&self, ops: &impl DynamicOps<V>) -> Iter<V> {
     //     todo!()
     // }
@@ -131,14 +129,30 @@ pub trait DefaultedRegistry<T>: Registry<T> {
 }
 
 pub trait MutableRegistry<T>: Registry<T> {
-    fn set(&mut self, id: usize, key: RegistryKey<T>, object: T, lifecycle: Lifecycle) -> &RegistryEntry<T, Self>;
-    fn add(&mut self, key: RegistryKey<T>, object: T, lifecycle: Lifecycle) -> &RegistryEntry<T, Self>;
+    fn set(
+        &mut self,
+        id: usize,
+        key: RegistryKey<T>,
+        object: T,
+        lifecycle: Lifecycle,
+    ) -> &RegistryEntry<T, Self>;
+    fn add(
+        &mut self,
+        key: RegistryKey<T>,
+        object: T,
+        lifecycle: Lifecycle,
+    ) -> &RegistryEntry<T, Self>;
     fn is_empty(&self) -> bool;
 }
 
 pub struct SimpleRegistry<'r, T: PartialEq> {
     key: &'r RegistryKey<Self>,
-    entries: Vec<(RegistryEntry<T, Self>, RegistryKey<T>, Identifier, Lifecycle)>,
+    entries: Vec<(
+        RegistryEntry<T, Self>,
+        RegistryKey<T>,
+        Identifier,
+        Lifecycle,
+    )>,
     lifecycle: Lifecycle,
     tags: HashMap<TagKey<T, Self>, Vec<usize>>,
     frozen: bool,
@@ -146,14 +160,20 @@ pub struct SimpleRegistry<'r, T: PartialEq> {
 
 impl<'r, T: PartialEq> SimpleRegistry<'r, T> {
     pub fn new(key: &'r RegistryKey<Self>, lifecycle: Lifecycle) -> Self {
-        Self { key, entries: Vec::new(), lifecycle, tags: HashMap::new(), frozen: false }
+        Self {
+            key,
+            entries: Vec::new(),
+            lifecycle,
+            tags: HashMap::new(),
+            frozen: false,
+        }
     }
 }
 
 impl<T: PartialEq> IndexedIterable<T> for SimpleRegistry<'_, T> {
     fn get_raw_id<'a>(&'a self, object: &'a T) -> Option<usize> {
         for e in self.entries.iter().enumerate() {
-            if e.1.0.value().is_some() && e.1.0.value().unwrap() == object {
+            if e.1 .0.value().is_some() && e.1 .0.value().unwrap() == object {
                 return Some(e.0);
             }
         }
@@ -179,11 +199,21 @@ impl<T: PartialEq> IndexedIterable<T> for SimpleRegistry<'_, T> {
     }
 
     fn vec(&self) -> Vec<&T> {
-        self.entries.iter().map(|e| e.0.value()).filter(|o| o.is_some()).map(|o| o.unwrap()).collect()
+        self.entries
+            .iter()
+            .map(|e| e.0.value())
+            .filter(|o| o.is_some())
+            .map(|o| o.unwrap())
+            .collect()
     }
 
     fn vec_mut(&mut self) -> Vec<&mut T> {
-        self.entries.iter_mut().map(|e| e.0.value_mut()).filter(|o| o.is_some()).map(|o| o.unwrap()).collect()
+        self.entries
+            .iter_mut()
+            .map(|e| e.0.value_mut())
+            .filter(|o| o.is_some())
+            .map(|o| o.unwrap())
+            .collect()
     }
 }
 
@@ -217,7 +247,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
     fn get_from_key<'a>(&'a self, key: &RegistryKey<T>) -> Option<&'a T> {
         for entry in &self.entries {
             if &entry.1 == key {
-                return entry.0.value()
+                return entry.0.value();
             }
         }
         None
@@ -226,7 +256,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
     fn get_from_id<'a>(&'a self, id: &Identifier) -> Option<&'a T> {
         for entry in &self.entries {
             if &entry.2 == id {
-                return entry.0.value()
+                return entry.0.value();
             }
         }
         None
@@ -252,7 +282,11 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
     }
 
     fn get_entry_set(&self) -> Vec<(&RegistryKey<T>, &T)> {
-        self.entries.iter().filter(|t| t.0.value().is_some()).map(|t| (&t.1, t.0.value().unwrap())).collect()
+        self.entries
+            .iter()
+            .filter(|t| t.0.value().is_some())
+            .map(|t| (&t.1, t.0.value().unwrap()))
+            .collect()
     }
 
     fn get_keys(&self) -> Vec<&RegistryKey<T>> {
