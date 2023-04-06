@@ -126,10 +126,21 @@ pub trait Registry<T>: IndexedIterable<T> {
 }
 
 pub trait DefaultedRegistry<T>: Registry<T> {
-    fn get_id_default<'a>(&'a self, object: &'a T) -> &'a Identifier;
-    fn get_from_id_default(&self, id: &Identifier) -> &T;
-    fn get_from_raw_id_default(&self, id: usize) -> &T;
-    fn get_default_id(&self) -> Identifier;
+    fn get_id_default<'a>(&'a self, object: &'a T) -> &'a Identifier {
+        self.get_id(object).unwrap_or(self.get_default_id())
+    }
+
+    fn get_from_id_default(&self, id: &Identifier) -> &T {
+        self.get_from_id(id)
+            .unwrap_or(self.get_from_id(self.get_default_id()).unwrap())
+    }
+
+    fn get_from_raw_id_default(&self, id: usize) -> &T {
+        self.get_from_raw_id(id)
+            .unwrap_or(self.get_from_id(self.get_default_id()).unwrap())
+    }
+
+    fn get_default_id(&self) -> &Identifier;
 }
 
 pub trait MutableRegistry<T>: Registry<T> {
@@ -154,15 +165,21 @@ pub struct SimpleRegistry<'r, T: PartialEq> {
     entries: Vec<(RegistryEntry<T, Self>, Lifecycle)>,
     lifecycle: Lifecycle,
     frozen: bool,
+    default_id: Option<Identifier>,
 }
 
 impl<'r, T: PartialEq> SimpleRegistry<'r, T> {
-    pub fn new(key: &'r RegistryKey<Self>, lifecycle: Lifecycle) -> Self {
+    pub fn new(
+        key: &'r RegistryKey<Self>,
+        lifecycle: Lifecycle,
+        default: Option<Identifier>,
+    ) -> Self {
         Self {
             key,
             entries: Vec::new(),
             lifecycle,
             frozen: false,
+            default_id: default,
         }
     }
 }
@@ -356,5 +373,11 @@ impl<T: PartialEq> MutableRegistry<T> for SimpleRegistry<'_, T> {
 
     fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+}
+
+impl<T: PartialEq> DefaultedRegistry<T> for SimpleRegistry<'_, T> {
+    fn get_default_id(&self) -> &Identifier {
+        self.default_id.as_ref().unwrap()
     }
 }
