@@ -1,3 +1,3 @@
 fn main() {
-    rimecraft::client::main::main()
+    rimecraft::client::main::main(None)
 }

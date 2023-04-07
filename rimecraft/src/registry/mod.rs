@@ -2,6 +2,7 @@ pub mod entry;
 pub mod registries;
 pub mod tag;
 pub mod wrapper;
+pub mod registry_keys;
 
 use self::entry::RegistryEntry;
 use crate::{
@@ -104,7 +105,7 @@ pub trait Registry<T>: IndexedIterable<T> {
     //     todo!()
     // }
 
-    fn get_self_key(&self) -> &RegistryKey<Self>;
+    fn get_self_key(&self) -> RegistryKey<Self>;
 
     fn get_id<'a>(&'a self, obj: &'a T) -> Option<&'a Identifier>;
     fn get_key<'a>(&'a self, obj: &'a T) -> Option<&'a RegistryKey<T>>;
@@ -160,22 +161,18 @@ pub trait MutableRegistry<T>: Registry<T> {
     fn is_empty(&self) -> bool;
 }
 
-pub struct SimpleRegistry<'r, T: PartialEq> {
-    key: &'r RegistryKey<Self>,
+pub struct SimpleRegistry<T: PartialEq> {
+    key: (Identifier, Identifier),
     entries: Vec<(RegistryEntry<T, Self>, Lifecycle)>,
     lifecycle: Lifecycle,
     frozen: bool,
     default_id: Option<Identifier>,
 }
 
-impl<'r, T: PartialEq> SimpleRegistry<'r, T> {
-    pub fn new(
-        key: &'r RegistryKey<Self>,
-        lifecycle: Lifecycle,
-        default: Option<Identifier>,
-    ) -> Self {
+impl<T: PartialEq> SimpleRegistry<T> {
+    pub fn new(key: RegistryKey<Self>, lifecycle: Lifecycle, default: Option<Identifier>) -> Self {
         Self {
-            key,
+            key: (key.get_registry().clone(), key.get_value().clone()),
             entries: Vec::new(),
             lifecycle,
             frozen: false,
@@ -184,7 +181,7 @@ impl<'r, T: PartialEq> SimpleRegistry<'r, T> {
     }
 }
 
-impl<T: PartialEq> IndexedIterable<T> for SimpleRegistry<'_, T> {
+impl<T: PartialEq> IndexedIterable<T> for SimpleRegistry<T> {
     fn get_raw_id<'a>(&'a self, object: &'a T) -> Option<usize> {
         for e in self.entries.iter().enumerate() {
             if e.1 .0.value().is_some() && e.1 .0.value().unwrap() == object {
@@ -231,9 +228,9 @@ impl<T: PartialEq> IndexedIterable<T> for SimpleRegistry<'_, T> {
     }
 }
 
-impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
-    fn get_self_key(&self) -> &RegistryKey<Self> {
-        self.key
+impl<T: PartialEq> Registry<T> for SimpleRegistry<T> {
+    fn get_self_key(&self) -> RegistryKey<Self> {
+        RegistryKey::new(self.key.0.clone(), self.key.1.clone())
     }
 
     fn get_id<'a>(&'a self, obj: &'a T) -> Option<&'a Identifier> {
@@ -332,7 +329,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<'_, T> {
     }
 }
 
-impl<T: PartialEq> MutableRegistry<T> for SimpleRegistry<'_, T> {
+impl<T: PartialEq> MutableRegistry<T> for SimpleRegistry<T> {
     fn set(
         &mut self,
         id: usize,
@@ -376,7 +373,7 @@ impl<T: PartialEq> MutableRegistry<T> for SimpleRegistry<'_, T> {
     }
 }
 
-impl<T: PartialEq> DefaultedRegistry<T> for SimpleRegistry<'_, T> {
+impl<T: PartialEq> DefaultedRegistry<T> for SimpleRegistry<T> {
     fn get_default_id(&self) -> &Identifier {
         self.default_id.as_ref().unwrap()
     }

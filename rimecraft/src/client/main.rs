@@ -10,48 +10,48 @@ use super::{
 };
 
 #[derive(Debug, Parser)]
-struct OptionSet {
+pub struct OptionSet {
     #[arg(long, default_value_t = format!("."))]
-    game_dir: String,
+    pub game_dir: String,
     #[arg(long)]
-    assets_dir: Option<String>,
+    pub assets_dir: Option<String>,
     #[arg(long)]
-    resource_pack_dir: Option<String>,
+    pub resource_pack_dir: Option<String>,
     #[arg(long)]
-    proxy_host: Option<String>,
+    pub proxy_host: Option<String>,
     #[arg(long, default_value_t = 8080)]
-    proxy_port: u16,
+    pub proxy_port: u16,
     #[arg(long)]
-    proxy_user: Option<String>,
+    pub proxy_user: Option<String>,
     #[arg(long)]
-    proxy_pass: Option<String>,
+    pub proxy_pass: Option<String>,
     #[arg(long)]
-    username: Option<String>,
+    pub username: Option<String>,
     #[arg(long)]
-    uuid: Option<String>,
+    pub uuid: Option<String>,
     #[arg(long, default_value_t = format!(""))]
-    xuid: String,
+    pub xuid: String,
     #[arg(long, default_value_t = format!(""))]
-    client_id: String,
+    pub client_id: String,
     #[arg(long)]
-    access_token: String,
+    pub access_token: String,
     #[arg(long)]
-    version: String,
+    pub version: String,
     #[arg(long, default_value_t = 854)]
-    width: u32,
+    pub width: u32,
     #[arg(long, default_value_t = 480)]
-    height: u32,
+    pub height: u32,
     #[arg(long)]
-    asset_index: Option<String>,
+    pub asset_index: Option<String>,
     #[arg(long, default_value_t = format!("legacy"))]
-    user_type: String,
+    pub user_type: String,
     #[arg(long, default_value_t = format!("release"))]
-    version_type: String,
+    pub version_type: String,
 }
 
-pub fn main() {
+pub fn main(options: Option<OptionSet>) {
     crate::consts::create_game_version();
-    let option_set = OptionSet::parse();
+    let option_set = options.unwrap_or(OptionSet::parse());
     let mut proxy: Proxy = Proxy::NoProxy;
     if let Some(h) = &option_set.proxy_host {
         let addr: Result<Ipv4Addr, _> = h.parse();
