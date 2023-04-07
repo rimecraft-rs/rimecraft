@@ -13,7 +13,7 @@ struct InitSwitch {
 
 pub fn initialize() {
     if INITIALIZED.lock().unwrap().initialized {
-        return;
+        unreachable!()
     }
     INITIALIZED.lock().unwrap().initialized = true;
     // TODO: registries
