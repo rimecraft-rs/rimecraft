@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use sysinfo::{CpuExt, System, SystemExt};
 
-use crate::consts;
+use crate::{consts, version::GameVersion};
 
 fn get_operation_system_format() -> String {
     let sys = System::new_all();
@@ -17,30 +17,18 @@ pub struct SystemDetails {
 }
 
 impl SystemDetails {
-    pub async fn new() -> Self {
+    pub fn new() -> Self {
         let mut obj = Self {
             sections: HashMap::new(),
         };
         let sys = System::new_all();
         obj.add_section(
             "Rimecraft Version".to_string(),
-            consts::GAME_VERSION
-                .read()
-                .await
-                .as_ref()
-                .unwrap()
-                .get_name()
-                .to_owned(),
+            consts::get_game_version().unwrap().get_name().to_owned(),
         );
         obj.add_section(
             "Rimecraft Version ID".to_string(),
-            consts::GAME_VERSION
-                .read()
-                .await
-                .as_ref()
-                .unwrap()
-                .get_id()
-                .to_owned(),
+            consts::get_game_version().unwrap().get_id().to_owned(),
         );
         obj.add_section(
             "Operation System".to_string(),

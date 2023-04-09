@@ -6,28 +6,37 @@ pub mod resource;
 pub mod util;
 
 pub mod consts {
-    use once_cell::sync::Lazy;
-    use tokio::sync::RwLock;
+    use std::sync::Mutex;
 
-    use crate::version::{GameVersion, RimecraftVersion};
+    use once_cell::sync::Lazy;
+
+    use crate::version::RimecraftVersion;
 
     pub const SNBT_TOO_OLD_THRESHOLD: i64 = 3318;
 
-    pub static GAME_VERSION: Lazy<RwLock<Option<Box<dyn GameVersion + Send + Sync>>>> =
-        Lazy::new(|| RwLock::new(None));
+    static GAME_VERSION: Lazy<Mutex<GameVersionContainer>> =
+        Lazy::new(|| Mutex::new(GameVersionContainer { version: None }));
+
+    struct GameVersionContainer {
+        pub version: Option<RimecraftVersion>,
+    }
 
     pub fn get_protocol_version() -> i64 {
         762
     }
 
-    pub async fn set_game_version(game_version: impl GameVersion + Send + Sync + 'static) {
-        *GAME_VERSION.write().await = Some(Box::new(game_version));
+    pub fn set_game_version(game_version: RimecraftVersion) {
+        GAME_VERSION.lock().unwrap().version = Some(game_version);
     }
 
-    pub async fn create_game_version() {
-        if GAME_VERSION.read().await.is_none() {
-            *GAME_VERSION.write().await = Some(Box::new(RimecraftVersion::create().unwrap()));
+    pub fn create_game_version() {
+        if GAME_VERSION.lock().unwrap().version.is_none() {
+            GAME_VERSION.lock().unwrap().version = Some(RimecraftVersion::create().unwrap());
         }
+    }
+
+    pub fn get_game_version() -> Option<RimecraftVersion> {
+        GAME_VERSION.lock().unwrap().version.clone()
     }
 }
 
