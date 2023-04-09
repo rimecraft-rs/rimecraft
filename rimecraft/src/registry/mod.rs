@@ -1,8 +1,8 @@
 pub mod entry;
 pub mod registries;
+pub mod registry_keys;
 pub mod tag;
 pub mod wrapper;
-pub mod registry_keys;
 
 use self::entry::RegistryEntry;
 use crate::{
@@ -12,6 +12,33 @@ use crate::{
 use datafixerupper::serialization::Lifecycle;
 use log::error;
 use std::fmt::Display;
+
+pub mod events {
+    use std::sync::Mutex;
+
+    use once_cell::sync::Lazy;
+
+    use crate::util::{
+        event::{self, Event},
+        Identifier,
+    };
+
+    pub static INITIALIZE: Lazy<Mutex<Event<(), ()>>> = Lazy::new(|| {
+        Mutex::new(Event::new(
+            |c, _| {
+                for call in c {
+                    call(())
+                }
+                ()
+            },
+            |_| (),
+            vec![
+                event::default_phase(),
+                Identifier::parse("post".to_string()).unwrap(),
+            ],
+        ))
+    });
+}
 
 pub struct RegistryKey<T> {
     registry: Identifier,

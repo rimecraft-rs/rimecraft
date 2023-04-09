@@ -1,13 +1,15 @@
 use super::Identifier;
 
 pub struct Event<I, O> {
-    phases: Vec<(Identifier, Vec<Box<dyn Fn(I) -> O>>)>,
-    invoker: Box<dyn Fn(Vec<&dyn Fn(I) -> O>, I) -> O>,
-    default_impl: Box<dyn Fn(I) -> O>,
+    phases: Vec<(Identifier, Vec<Box<(dyn Fn(I) -> O + Send + Sync)>>)>,
+    invoker: Box<(dyn Fn(Vec<&(dyn Fn(I) -> O + Send + Sync)>, I) -> O + Send + Sync)>,
+    default_impl: Box<(dyn Fn(I) -> O + Send + Sync)>,
 }
 
 impl<I, O: Default> Event<I, O> {
-    pub fn new_default(invoker: impl Fn(Vec<&dyn Fn(I) -> O>, I) -> O + 'static) -> Self {
+    pub fn new_default(
+        invoker: impl Fn(Vec<&(dyn Fn(I) -> O + Send + Sync)>, I) -> O + 'static + Send + Sync,
+    ) -> Self {
         Self {
             phases: vec![(default_phase(), Vec::new())],
             invoker: Box::new(invoker),
@@ -18,8 +20,8 @@ impl<I, O: Default> Event<I, O> {
 
 impl<I, O> Event<I, O> {
     pub fn new(
-        invoker: impl Fn(Vec<&dyn Fn(I) -> O>, I) -> O + 'static,
-        empty_impl: impl Fn(I) -> O + 'static,
+        invoker: impl Fn(Vec<&(dyn Fn(I) -> O + Send + Sync)>, I) -> O + 'static + Send + Sync,
+        empty_impl: impl Fn(I) -> O + 'static + Send + Sync,
         mut phases: Vec<Identifier>,
     ) -> Self {
         if phases.is_empty() {
@@ -50,7 +52,11 @@ impl<I, O> Event<I, O> {
         }
     }
 
-    pub fn register(&mut self, callback: impl Fn(I) -> O + 'static, phase: &Identifier) -> bool {
+    pub fn register(
+        &mut self,
+        callback: impl Fn(I) -> O + 'static + Send + Sync,
+        phase: &Identifier,
+    ) -> bool {
         match self.phases.iter_mut().find(|p| p.0.eq(phase)) {
             Some(phase) => {
                 phase.1.push(Box::new(callback));
@@ -60,10 +66,7 @@ impl<I, O> Event<I, O> {
         }
     }
 
-    pub fn register_default<T>(&mut self, callback: Box<T>) -> bool
-    where
-        T: Fn(I) -> O + 'static,
-    {
+    pub fn register_default(&mut self, callback: impl Fn(I) -> O + 'static + Send + Sync) -> bool {
         self.register(callback, &default_phase())
     }
 

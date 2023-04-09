@@ -1,9 +1,9 @@
 pub mod collection;
 pub mod crash;
+pub mod event;
 pub mod json_helper;
 pub mod system_details;
 pub mod uuids;
-pub mod event;
 
 use std::{fmt::Display, process::Command};
 use url::Url;
