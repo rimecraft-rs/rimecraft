@@ -6,37 +6,16 @@ pub mod resource;
 pub mod util;
 
 pub mod consts {
-    use std::sync::Mutex;
-
-    use once_cell::sync::Lazy;
-
     use crate::version::RimecraftVersion;
+    use once_cell::sync::Lazy;
 
     pub const SNBT_TOO_OLD_THRESHOLD: i64 = 3318;
 
-    static GAME_VERSION: Lazy<Mutex<GameVersionContainer>> =
-        Lazy::new(|| Mutex::new(GameVersionContainer { version: None }));
-
-    struct GameVersionContainer {
-        pub version: Option<RimecraftVersion>,
-    }
+    pub static GAME_VERSION: Lazy<RimecraftVersion> =
+        Lazy::new(|| RimecraftVersion::create().unwrap());
 
     pub fn get_protocol_version() -> i64 {
         762
-    }
-
-    pub fn set_game_version(game_version: RimecraftVersion) {
-        GAME_VERSION.lock().unwrap().version = Some(game_version);
-    }
-
-    pub fn create_game_version() {
-        if GAME_VERSION.lock().unwrap().version.is_none() {
-            GAME_VERSION.lock().unwrap().version = Some(RimecraftVersion::create().unwrap());
-        }
-    }
-
-    pub fn get_game_version() -> Option<RimecraftVersion> {
-        GAME_VERSION.lock().unwrap().version.clone()
     }
 }
 

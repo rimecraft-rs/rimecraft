@@ -50,7 +50,6 @@ pub struct OptionSet {
 }
 
 pub fn main(options: Option<OptionSet>) {
-    crate::consts::create_game_version();
     let option_set = options.unwrap_or(OptionSet::parse());
     let mut proxy: Proxy = Proxy::NoProxy;
     if let Some(h) = &option_set.proxy_host {

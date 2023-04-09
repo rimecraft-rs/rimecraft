@@ -24,11 +24,11 @@ impl SystemDetails {
         let sys = System::new_all();
         obj.add_section(
             "Rimecraft Version".to_string(),
-            consts::get_game_version().unwrap().get_name().to_owned(),
+            consts::GAME_VERSION.get_name().to_owned(),
         );
         obj.add_section(
             "Rimecraft Version ID".to_string(),
-            consts::get_game_version().unwrap().get_id().to_owned(),
+            consts::GAME_VERSION.get_id().to_owned(),
         );
         obj.add_section(
             "Operation System".to_string(),
