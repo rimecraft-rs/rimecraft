@@ -3,6 +3,7 @@ pub mod registries;
 pub mod tag;
 pub mod wrapper;
 pub mod registry_keys;
+pub mod events;
 
 use self::entry::RegistryEntry;
 use crate::{

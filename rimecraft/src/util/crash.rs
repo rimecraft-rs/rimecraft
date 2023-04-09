@@ -13,12 +13,12 @@ pub struct CrashReport<T: Error> {
 }
 
 impl<T: Error> CrashReport<T> {
-    pub fn new(message: String, cause: T) -> Self {
+    pub async fn new(message: String, cause: T) -> Self {
         Self {
             message,
             cause,
             other_sections: Vec::new(),
-            system_details_section: SystemDetails::new(),
+            system_details_section: SystemDetails::new().await,
         }
     }
 
