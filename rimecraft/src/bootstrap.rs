@@ -1,20 +1,13 @@
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
-static INITIALIZED: Lazy<Mutex<InitSwitch>> = Lazy::new(|| {
-    Mutex::new(InitSwitch {
-        initialized: bool::default(),
-    })
-});
-
-struct InitSwitch {
-    pub initialized: bool,
-}
+static INITIALIZED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
 
 pub fn initialize() {
-    if INITIALIZED.lock().unwrap().initialized {
+    let mut initialized = *INITIALIZED.lock().unwrap();
+    if initialized {
         unreachable!()
     }
-    INITIALIZED.lock().unwrap().initialized = true;
+    initialized = true;
     // TODO: registries
 }
