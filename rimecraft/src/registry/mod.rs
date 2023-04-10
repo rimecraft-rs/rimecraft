@@ -127,19 +127,15 @@ impl<T> PartialEq for RegistryKey<T> {
 }
 
 pub trait Registry<T>: IndexedIterable<T> {
-    // fn keys<V>(&self, ops: &impl DynamicOps<V>) -> Iter<V> {
-    //     todo!()
-    // }
-
     fn get_self_key(&self) -> RegistryKey<Self>;
 
-    fn get_id<'a>(&'a self, obj: &'a T) -> Option<&'a Identifier>;
-    fn get_key<'a>(&'a self, obj: &'a T) -> Option<&'a RegistryKey<T>>;
+    fn get_raw_id_from_key(&self, key: &RegistryKey<T>) -> Option<usize>;
+    fn get_raw_id_from_id(&self, id: &Identifier) -> Option<usize>;
 
     fn get_from_key<'a>(&'a self, key: &RegistryKey<T>) -> Option<&'a T>;
     fn get_from_id<'a>(&'a self, id: &Identifier) -> Option<&'a T>;
 
-    fn get_entry_lifecycle<'a>(&'a self, entry: &'a T) -> Option<&Lifecycle>;
+    fn get_entry_lifecycle<'a>(&'a self, entry: usize) -> Option<&Lifecycle>;
     fn get_lifecycle(&self) -> &Lifecycle;
 
     fn get_ids(&self) -> Vec<&Identifier>;
@@ -153,10 +149,6 @@ pub trait Registry<T>: IndexedIterable<T> {
 }
 
 pub trait DefaultedRegistry<T>: Registry<T> {
-    fn get_id_default<'a>(&'a self, object: &'a T) -> &'a Identifier {
-        self.get_id(object).unwrap_or(self.get_default_id())
-    }
-
     fn get_from_id_default(&self, id: &Identifier) -> &T {
         self.get_from_id(id)
             .unwrap_or(self.get_from_id(self.get_default_id()).unwrap())
@@ -187,7 +179,7 @@ pub trait MutableRegistry<T>: Registry<T> {
     fn is_empty(&self) -> bool;
 }
 
-pub struct SimpleRegistry<T: PartialEq> {
+pub struct SimpleRegistry<T> {
     key: (Identifier, Identifier),
     entries: Vec<(RegistryEntry<T, Self>, Lifecycle)>,
     lifecycle: Lifecycle,
@@ -195,7 +187,7 @@ pub struct SimpleRegistry<T: PartialEq> {
     default_id: Option<Identifier>,
 }
 
-impl<T: PartialEq> SimpleRegistry<T> {
+impl<T> SimpleRegistry<T> {
     pub fn new(key: RegistryKey<Self>, lifecycle: Lifecycle, default: Option<Identifier>) -> Self {
         Self {
             key: (key.get_registry().clone(), key.get_value().clone()),
@@ -207,16 +199,7 @@ impl<T: PartialEq> SimpleRegistry<T> {
     }
 }
 
-impl<T: PartialEq> IndexedIterable<T> for SimpleRegistry<T> {
-    fn get_raw_id<'a>(&'a self, object: &'a T) -> Option<usize> {
-        for e in self.entries.iter().enumerate() {
-            if e.1 .0.value().is_some() && e.1 .0.value().unwrap() == object {
-                return Some(e.0);
-            }
-        }
-        None
-    }
-
+impl<T> IndexedIterable<T> for SimpleRegistry<T> {
     fn get_from_raw_id(&self, id: usize) -> Option<&T> {
         match self.entries.get(id).map(|t| t.0.value()) {
             Some(Some(a)) => Some(a),
@@ -254,28 +237,24 @@ impl<T: PartialEq> IndexedIterable<T> for SimpleRegistry<T> {
     }
 }
 
-impl<T: PartialEq> Registry<T> for SimpleRegistry<T> {
+impl<T> Registry<T> for SimpleRegistry<T> {
     fn get_self_key(&self) -> RegistryKey<Self> {
         RegistryKey::new(self.key.0.clone(), self.key.1.clone())
     }
 
-    fn get_id<'a>(&'a self, obj: &'a T) -> Option<&'a Identifier> {
-        for entry in &self.entries {
-            if let Some(v) = entry.0.value() {
-                if obj == v {
-                    return entry.0.get_key().map(|f| f.get_value());
-                }
+    fn get_raw_id_from_key(&self, key: &RegistryKey<T>) -> Option<usize> {
+        for entry in self.entries.iter().enumerate() {
+            if entry.1 .0.get_key().is_some() && entry.1 .0.get_key().unwrap().eq(key) {
+                return Some(entry.0);
             }
         }
         None
     }
 
-    fn get_key<'a>(&'a self, obj: &'a T) -> Option<&'a RegistryKey<T>> {
-        for entry in &self.entries {
-            if let Some(v) = entry.0.value() {
-                if obj == v {
-                    return entry.0.get_key();
-                }
+    fn get_raw_id_from_id(&self, id: &Identifier) -> Option<usize> {
+        for entry in self.entries.iter().enumerate() {
+            if entry.1 .0.get_key().is_some() && entry.1 .0.get_key().unwrap().get_value().eq(id) {
+                return Some(entry.0);
             }
         }
         None
@@ -283,7 +262,7 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<T> {
 
     fn get_from_key<'a>(&'a self, key: &RegistryKey<T>) -> Option<&'a T> {
         for entry in &self.entries {
-            if entry.0.get_key()? == key {
+            if entry.0.get_key().is_some() && entry.0.get_key().unwrap() == key {
                 return entry.0.value();
             }
         }
@@ -292,22 +271,15 @@ impl<T: PartialEq> Registry<T> for SimpleRegistry<T> {
 
     fn get_from_id<'a>(&'a self, id: &Identifier) -> Option<&'a T> {
         for entry in &self.entries {
-            if entry.0.get_key()?.get_value() == id {
+            if entry.0.get_key().is_some() && entry.0.get_key().unwrap().get_value() == id {
                 return entry.0.value();
             }
         }
         None
     }
 
-    fn get_entry_lifecycle<'a>(&'a self, entry: &'a T) -> Option<&Lifecycle> {
-        for e in &self.entries {
-            if let Some(v) = e.0.value() {
-                if entry == v {
-                    return Some(&e.1);
-                }
-            }
-        }
-        None
+    fn get_entry_lifecycle<'a>(&'a self, entry: usize) -> Option<&Lifecycle> {
+        self.entries.get(entry).map(|f| &f.1)
     }
 
     fn get_lifecycle(&self) -> &Lifecycle {
