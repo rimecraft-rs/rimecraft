@@ -5,8 +5,8 @@ pub struct RenderCall {
 }
 
 impl RenderCall {
-    pub fn new(executor: Box<impl Fn() + 'static>) -> Self {
-        Self { executor }
+    pub fn new(executor: impl Fn() + 'static) -> Self {
+        Self { executor: Box::new(executor) }
     }
 
     pub fn execute(&self) {

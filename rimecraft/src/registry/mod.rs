@@ -29,12 +29,11 @@ pub mod events {
                 for call in c {
                     call(())
                 }
-                ()
             },
             |_| (),
             vec![
                 event::default_phase(),
-                Identifier::parse("post".to_string()).unwrap(),
+                Identifier::parse("freeze".to_string()).unwrap(),
             ],
         ))
     });
