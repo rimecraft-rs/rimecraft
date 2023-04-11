@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use super::{NbtElement, NbtType};
 
-pub trait NbtScanner {
+pub trait  NbtScanner {
     fn visit_end(&mut self) -> ScannerResult;
     fn visit_string(&mut self, value: &str) -> ScannerResult;
     fn visit_u8(&mut self, value: u8) -> ScannerResult;
