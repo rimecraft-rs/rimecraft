@@ -5,8 +5,18 @@ pub mod json_helper;
 pub mod system_details;
 pub mod uuids;
 
-use std::{fmt::Display, process::Command};
+use std::{
+    fmt::Display,
+    io::{self, Read},
+    process::Command,
+};
 use url::Url;
+
+pub fn read_unsigned_short<R: Read>(reader: &mut R) -> io::Result<u16> {
+    let mut buf = [0; 2];
+    reader.read_exact(&mut buf)?;
+    Ok(((buf[0] as u16) << 8) + buf[1] as u16)
+}
 
 pub fn into_option<T, U>(result: Result<T, U>) -> Option<T> {
     match result {
@@ -154,4 +164,12 @@ pub fn option_is_some_and<T>(option: &Option<T>, predicate: impl Fn(&T) -> bool)
         Some(s) => predicate(s),
         None => false,
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Rarity {
+    Common,
+    Uncommon,
+    Rare,
+    Epic,
 }

@@ -1,5 +1,7 @@
 pub mod bootstrap;
 pub mod client;
+pub mod item;
+pub mod nbt;
 pub mod network;
 pub mod registry;
 pub mod resource;

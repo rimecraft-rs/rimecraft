@@ -129,6 +129,8 @@ impl<T> PartialEq for RegistryKey<T> {
 pub trait Registry<T>: IndexedIterable<T> {
     fn get_self_key(&self) -> RegistryKey<Self>;
 
+    fn get_entry_from_raw_id(&self, id: usize) -> Option<&RegistryEntry<T, Self>>;
+
     fn get_raw_id_from_key(&self, key: &RegistryKey<T>) -> Option<usize>;
     fn get_raw_id_from_id(&self, id: &Identifier) -> Option<usize>;
 
@@ -240,6 +242,10 @@ impl<T> IndexedIterable<T> for SimpleRegistry<T> {
 impl<T> Registry<T> for SimpleRegistry<T> {
     fn get_self_key(&self) -> RegistryKey<Self> {
         RegistryKey::new(self.key.0.clone(), self.key.1.clone())
+    }
+
+    fn get_entry_from_raw_id(&self, id: usize) -> Option<&RegistryEntry<T, Self>> {
+        self.entries.get(id).map(|f| &f.0)
     }
 
     fn get_raw_id_from_key(&self, key: &RegistryKey<T>) -> Option<usize> {
