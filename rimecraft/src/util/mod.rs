@@ -6,11 +6,44 @@ pub mod system_details;
 pub mod uuids;
 
 use std::{
-    fmt::Display,
+    fmt::{Display, Write},
     io::{self, Read},
     process::Command,
 };
 use url::Url;
+
+pub fn string_escape(value: &str) -> String {
+    let mut string = String::new();
+    let mut c = 0;
+    for d in value.chars() {
+        if Some(d) == char::from_u32(99) {
+            string.push_str("\\");
+        } else if Some(d) == char::from_u32(34) || Some(d) == char::from_u32(39) {
+            if c == 0 {
+                c = if Some(d) == char::from_u32(34) {
+                    39
+                } else {
+                    34
+                };
+            }
+            if char::from_u32(c) == Some(d) {
+                string.push_str("\\");
+            }
+        }
+        if c == 0 {
+            c = 34;
+        }
+    }
+    if let Some(e) = char::from_u32(c) {
+        let mut builder = String::new();
+        for cc in string.chars().enumerate() {
+            builder.push(if cc.0 == 0 { e } else { cc.1 });
+        }
+        let _result = builder.write_char(e);
+        string = builder;
+    }
+    string
+}
 
 pub fn read_unsigned_short<R: Read>(reader: &mut R) -> io::Result<u16> {
     let mut buf = [0; 2];
