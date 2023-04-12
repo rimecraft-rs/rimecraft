@@ -137,7 +137,7 @@ pub trait Registry<T>: IndexedIterable<T> {
     fn get_from_key<'a>(&'a self, key: &RegistryKey<T>) -> Option<&'a T>;
     fn get_from_id<'a>(&'a self, id: &Identifier) -> Option<&'a T>;
 
-    fn get_entry_lifecycle<'a>(&'a self, entry: usize) -> Option<&Lifecycle>;
+    fn get_entry_lifecycle(&self, entry: usize) -> Option<&Lifecycle>;
     fn get_lifecycle(&self) -> &Lifecycle;
 
     fn get_ids(&self) -> Vec<&Identifier>;
@@ -221,20 +221,13 @@ impl<T> IndexedIterable<T> for SimpleRegistry<T> {
     }
 
     fn vec(&self) -> Vec<&T> {
-        self.entries
-            .iter()
-            .map(|e| e.0.value())
-            .filter(|o| o.is_some())
-            .map(|o| o.unwrap())
-            .collect()
+        self.entries.iter().filter_map(|e| e.0.value()).collect()
     }
 
     fn vec_mut(&mut self) -> Vec<&mut T> {
         self.entries
             .iter_mut()
-            .map(|e| e.0.value_mut())
-            .filter(|o| o.is_some())
-            .map(|o| o.unwrap())
+            .filter_map(|e| e.0.value_mut())
             .collect()
     }
 }
@@ -284,7 +277,7 @@ impl<T> Registry<T> for SimpleRegistry<T> {
         None
     }
 
-    fn get_entry_lifecycle<'a>(&'a self, entry: usize) -> Option<&Lifecycle> {
+    fn get_entry_lifecycle(&self, entry: usize) -> Option<&Lifecycle> {
         self.entries.get(entry).map(|f| &f.1)
     }
 
@@ -309,11 +302,7 @@ impl<T> Registry<T> for SimpleRegistry<T> {
     }
 
     fn get_keys(&self) -> Vec<&RegistryKey<T>> {
-        self.entries
-            .iter()
-            .filter(|t| t.0.get_key().is_some())
-            .map(|t| t.0.get_key().unwrap())
-            .collect()
+        self.entries.iter().filter_map(|t| t.0.get_key()).collect()
     }
 
     fn contains_id(&self, id: &Identifier) -> bool {

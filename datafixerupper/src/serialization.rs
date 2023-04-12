@@ -99,10 +99,7 @@ impl<R> PartialResult<R> {
     pub fn map<R2>(&self, function: Box<impl Fn(&R) -> R2>) -> PartialResult<R2> {
         PartialResult::new(
             self.message.to_owned(),
-            match &self.partial_result {
-                Some(s) => Some(function(s)),
-                None => None,
-            },
+            self.partial_result.as_ref().map(function),
         )
     }
 
@@ -183,7 +180,7 @@ impl ToString for Lifecycle {
         match &self {
             Lifecycle::Stable => String::from("Stable"),
             Lifecycle::Experimental => String::from("Experimental"),
-            Lifecycle::Deprecated(_) => format!("Deprecated"),
+            Lifecycle::Deprecated(_) => "Deprecated".to_string(),
         }
     }
 }

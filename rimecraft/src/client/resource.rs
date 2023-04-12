@@ -20,7 +20,7 @@ pub fn build_resource_file_system(
     }))?;
     let json_object = json.as_object()?;
     drop(file);
-    if let Some(j) = into_option(json_helper::get_object(&json_object, "objects")) {
+    if let Some(j) = into_option(json_helper::get_object(json_object, "objects")) {
         for entry in j {
             let json_object_3 = entry.1.as_object()?;
             let list: Vec<&str> = entry.0.split('/').collect();

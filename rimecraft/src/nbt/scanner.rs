@@ -148,11 +148,11 @@ impl NbtScanner for NbtCollector {
         ScannerResult::Continue
     }
 
-    fn visit_list_meta(&mut self, nbt_type: NbtType, i: usize) -> ScannerResult {
+    fn visit_list_meta(&mut self, _nbt_type: NbtType, _i: usize) -> ScannerResult {
         ScannerResult::Continue
     }
 
-    fn visit_sub_nbt_type(&mut self, nbt_type: NbtType) -> ScannerNestedResult {
+    fn visit_sub_nbt_type(&mut self, _nbt_type: NbtType) -> ScannerNestedResult {
         ScannerNestedResult::Enter
     }
 
@@ -162,7 +162,7 @@ impl NbtScanner for NbtCollector {
         ScannerNestedResult::Enter
     }
 
-    fn start_list_item(&mut self, nbt_type: NbtType, i: usize) -> ScannerNestedResult {
+    fn start_list_item(&mut self, nbt_type: NbtType, _i: usize) -> ScannerNestedResult {
         self.push_stack(&nbt_type);
         ScannerNestedResult::Enter
     }
@@ -190,7 +190,7 @@ impl NbtScanner for NbtCollector {
                     _ => (),
                 }));
             }
-            _ => self.stack.push_back(Box::new(|a, b, c| {
+            _ => self.stack.push_back(Box::new(|a, b, _c| {
                 *b = Some(a.clone());
             })),
         }

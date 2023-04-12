@@ -59,8 +59,8 @@ pub fn main(options: Option<OptionSet>) {
                 SocketAddr::V4(SocketAddrV4::new(host, option_set.proxy_port)),
                 if option_set.proxy_user.is_some() && option_set.proxy_pass.is_some() {
                     Some(crate::network::ProxyPassword(
-                        option_set.proxy_user.unwrap().clone(),
-                        option_set.proxy_pass.unwrap().clone(),
+                        option_set.proxy_user.unwrap(),
+                        option_set.proxy_pass.unwrap(),
                     ))
                 } else {
                     None
@@ -85,7 +85,7 @@ pub fn main(options: Option<OptionSet>) {
         str_to_optional(option_set.client_id),
         account_type.unwrap_or_default(),
     );
-    let run_args = RunArgs::new(
+    let _run_args = RunArgs::new(
         args::Network::new(session, proxy),
         super::WindowSettings::new(option_set.width, option_set.height),
         args::Directions::new(

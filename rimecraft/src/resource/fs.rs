@@ -8,8 +8,7 @@ pub struct ResourceFileSystem {
 impl ResourceFileSystem {
     pub fn new(name: String, root: &Directory) -> Self {
         let mut storage = HashMap::new();
-        let e =
-            Self::to_resource_path(&root, String::new(), None, &mut storage, String::from("!r"));
+        let e = Self::to_resource_path(root, String::new(), None, &mut storage, String::from("!r"));
         storage.insert(String::from("/"), e);
         Self {
             store_name: name,
@@ -62,14 +61,13 @@ impl<'a> ResourceFileSystemBuilder<'a> {
 
     pub fn with_file(&mut self, directories: Vec<&str>, name: String, path: String) {
         for string in directories {
-            self.root = {
-                self.root
-                    .children
-                    .get(string)
-                    .unwrap_or(&&Directory::default())
-                    .clone()
-                    .clone()
-            };
+            self.root = self
+                .root
+                .children
+                .get(string)
+                .unwrap_or(&&Directory::default())
+                .clone()
+                .clone();
         }
         self.root.files.insert(name, path);
     }
@@ -98,19 +96,16 @@ impl<'a> ResourceFileSystemBuilder<'a> {
     }
 }
 
-#[derive(Clone)]
+impl Default for ResourceFileSystemBuilder<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct Directory<'a> {
     pub children: HashMap<String, &'a Directory<'a>>,
     pub files: HashMap<String, String>,
-}
-
-impl Default for Directory<'_> {
-    fn default() -> Self {
-        Self {
-            children: HashMap::new(),
-            files: HashMap::new(),
-        }
-    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -151,7 +146,7 @@ impl ResourcePath {
                 vec.append(&mut map.get(&self.parent.clone().unwrap()).unwrap().get_names())
             }
             vec.push(self.name.clone());
-            self.names = Some(vec.iter().map(|s| String::from(s.to_owned())).collect());
+            self.names = Some(vec.iter().map(|s| s.to_owned()).collect());
         }
     }
 
@@ -166,27 +161,21 @@ impl ResourcePath {
             n
         };
         match &self.file {
-            ResourceFile::Empty | ResourceFile::Relative => Self::new(
-                name.to_owned(),
-                Some(key.to_owned()),
-                self.file.clone(),
-                map,
-            ),
+            ResourceFile::Empty | ResourceFile::Relative => {
+                Self::new(name.to_owned(), Some(key), self.file.clone(), map)
+            }
             ResourceFile::Directory => map
                 .get(name)
                 .unwrap_or(&Self::new(
                     name.to_owned(),
-                    Some(key.to_owned()),
+                    Some(key),
                     ResourceFile::Empty,
                     map,
                 ))
                 .clone(),
-            ResourceFile::File(_) => Self::new(
-                name.to_owned(),
-                Some(key.to_owned()),
-                ResourceFile::Empty,
-                map,
-            ),
+            ResourceFile::File(_) => {
+                Self::new(name.to_owned(), Some(key), ResourceFile::Empty, map)
+            }
         }
     }
 
@@ -237,10 +226,7 @@ pub enum ResourceFile {
 
 impl ResourceFile {
     pub fn is_special(&self) -> bool {
-        match &self {
-            ResourceFile::Empty | ResourceFile::Relative => true,
-            _ => false,
-        }
+        matches!(&self, ResourceFile::Empty | ResourceFile::Relative)
     }
 }
 

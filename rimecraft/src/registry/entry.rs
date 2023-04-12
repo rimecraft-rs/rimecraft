@@ -97,10 +97,7 @@ impl<T, R: Registry<T>> RegistryEntry<T, R> {
     pub fn get_key_or_value(&self) -> Option<Either<&RegistryKey<T>, &T>> {
         match self {
             RegistryEntry::Direct(v) => Some(Either::Right(v)),
-            RegistryEntry::Reference(r) => match &r.registry_key {
-                Some(key) => Some(Either::Left(key)),
-                None => None,
-            },
+            RegistryEntry::Reference(r) => r.registry_key.as_ref().map(Either::Left),
         }
     }
 

@@ -94,11 +94,11 @@ impl NbtElement {
                 }
             }
             NbtElement::U8(byte) => {
-                let _ = output.write(&mut [*byte]);
+                let _ = output.write(&[*byte]);
             }
             NbtElement::I16(value) => {
                 let _ = output.write(&value.to_be_bytes());
-            },
+            }
             NbtElement::I32(_) => todo!(),
             NbtElement::I64(_) => todo!(),
             NbtElement::F32(_) => todo!(),
@@ -200,7 +200,7 @@ impl NbtType {
     pub fn read(
         &self,
         input: &mut impl Read,
-        i: usize,
+        _i: usize,
         tracker: &mut NbtTagSizeTracker,
     ) -> io::Result<NbtElement> {
         match self {
@@ -219,7 +219,7 @@ impl NbtType {
                 Ok(NbtElement::U8({
                     let mut arr = [0; 1];
                     input.read(&mut arr)?;
-                    match arr.get(0) {
+                    match arr.first() {
                         Some(e) => *e,
                         None => return Err(io::Error::new(ErrorKind::Other, "Can't read u8")),
                     }
@@ -260,7 +260,7 @@ impl NbtType {
             NbtType::U8 => Ok(scanner.visit_u8({
                 let mut arr = [0; 1];
                 input.read(&mut arr)?;
-                *arr.get(0).unwrap()
+                *arr.first().unwrap()
             })),
             NbtType::I16 => Ok(scanner.visit_i16({
                 let mut arr = [0; 2];
@@ -289,10 +289,7 @@ impl NbtType {
     }
 
     pub fn is_immutable(&self) -> bool {
-        match self {
-            NbtType::String | NbtType::U8 | NbtType::I16 => true,
-            _ => false,
-        }
+        matches!(self, NbtType::String | NbtType::U8 | NbtType::I16)
     }
     pub fn get_crash_report_name(&self) -> &str {
         match self {
@@ -385,9 +382,9 @@ impl NbtType {
 }
 
 impl Display for NbtElement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NbtElement::String(value) => (),
+            NbtElement::String(_value) => (),
             NbtElement::U8(_) => todo!(),
             NbtElement::I16(_) => todo!(),
             NbtElement::I32(_) => todo!(),
@@ -401,7 +398,7 @@ impl Display for NbtElement {
             NbtElement::Compound(_) => todo!(),
             NbtElement::End => todo!(),
         }
-        return Ok(());
+        Ok(())
     }
 }
 
