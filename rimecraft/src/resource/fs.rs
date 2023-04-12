@@ -196,7 +196,7 @@ impl ResourcePath {
 
     pub fn to_file_path(&self) -> Option<&str> {
         if let ResourceFile::File(s) = &self.file {
-            Some(&s)
+            Some(s)
         } else {
             None
         }

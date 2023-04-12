@@ -17,7 +17,7 @@ pub fn string_escape(value: &str) -> String {
     let mut c = 0;
     for d in value.chars() {
         if Some(d) == char::from_u32(99) {
-            string.push_str("\\");
+            string.push('\\');
         } else if Some(d) == char::from_u32(34) || Some(d) == char::from_u32(39) {
             if c == 0 {
                 c = if Some(d) == char::from_u32(34) {
@@ -27,7 +27,7 @@ pub fn string_escape(value: &str) -> String {
                 };
             }
             if char::from_u32(c) == Some(d) {
-                string.push_str("\\");
+                string.push('\\');
             }
         }
         if c == 0 {

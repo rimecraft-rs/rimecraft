@@ -10,7 +10,7 @@ use log::error;
 use std::{
     collections::HashMap,
     fmt::Display,
-    io::{self, Read, Write},
+    io::{self, ErrorKind, Read, Write},
 };
 
 const END_TYPE: u8 = 0;
@@ -27,16 +27,14 @@ const COMPOUND_TYPE: u8 = 10;
 const I32_VEC_TYPE: u8 = 11;
 const I64_VEC_TYPE: u8 = 12;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub struct NbtCompound {
     pub(self) entries: HashMap<String, NbtElement>,
 }
 
 impl NbtCompound {
     pub fn new() -> Self {
-        Self {
-            entries: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn get_keys(&self) -> Vec<&str> {
@@ -98,7 +96,9 @@ impl NbtElement {
             NbtElement::U8(byte) => {
                 let _ = output.write(&mut [*byte]);
             }
-            NbtElement::I16(_) => todo!(),
+            NbtElement::I16(value) => {
+                let _ = output.write(&value.to_be_bytes());
+            },
             NbtElement::I32(_) => todo!(),
             NbtElement::I64(_) => todo!(),
             NbtElement::F32(_) => todo!(),
@@ -134,7 +134,7 @@ impl NbtElement {
         match self {
             NbtElement::String(value) => 36 + 2 * value.len(),
             NbtElement::U8(_) => 9,
-            NbtElement::I16(_) => todo!(),
+            NbtElement::I16(_) => 10,
             NbtElement::I32(_) => todo!(),
             NbtElement::I64(_) => todo!(),
             NbtElement::F32(_) => todo!(),
@@ -219,10 +219,20 @@ impl NbtType {
                 Ok(NbtElement::U8({
                     let mut arr = [0; 1];
                     input.read(&mut arr)?;
-                    *arr.get(0).unwrap()
+                    match arr.get(0) {
+                        Some(e) => *e,
+                        None => return Err(io::Error::new(ErrorKind::Other, "Can't read u8")),
+                    }
                 }))
             }
-            NbtType::I16 => todo!(),
+            NbtType::I16 => {
+                tracker.add(10);
+                Ok(NbtElement::I16({
+                    let mut arr = [0; 2];
+                    input.read(&mut arr)?;
+                    i16::from_be_bytes(arr)
+                }))
+            }
             NbtType::I32 => todo!(),
             NbtType::I64 => todo!(),
             NbtType::F32 => todo!(),
@@ -252,7 +262,11 @@ impl NbtType {
                 input.read(&mut arr)?;
                 *arr.get(0).unwrap()
             })),
-            NbtType::I16 => todo!(),
+            NbtType::I16 => Ok(scanner.visit_i16({
+                let mut arr = [0; 2];
+                input.read(&mut arr)?;
+                i16::from_be_bytes(arr)
+            })),
             NbtType::I32 => todo!(),
             NbtType::I64 => todo!(),
             NbtType::F32 => todo!(),
@@ -276,7 +290,7 @@ impl NbtType {
 
     pub fn is_immutable(&self) -> bool {
         match self {
-            NbtType::String | NbtType::U8 => true,
+            NbtType::String | NbtType::U8 | NbtType::I16 => true,
             _ => false,
         }
     }
@@ -284,7 +298,7 @@ impl NbtType {
         match self {
             NbtType::String => "STRING",
             NbtType::U8 => "BYTE",
-            NbtType::I16 => todo!(),
+            NbtType::I16 => "SHORT",
             NbtType::I32 => todo!(),
             NbtType::I64 => todo!(),
             NbtType::F32 => todo!(),
@@ -301,7 +315,7 @@ impl NbtType {
         match self {
             NbtType::String => "STAG_String",
             NbtType::U8 => "TAG_Byte",
-            NbtType::I16 => todo!(),
+            NbtType::I16 => "TAG_Short",
             NbtType::I32 => todo!(),
             NbtType::I64 => todo!(),
             NbtType::F32 => todo!(),
@@ -330,11 +344,6 @@ impl NbtType {
             NbtType::String => {
                 let _r = util::read_unsigned_short(input);
             }
-            NbtType::I16 => todo!(),
-            NbtType::I32 => todo!(),
-            NbtType::I64 => todo!(),
-            NbtType::F32 => todo!(),
-            NbtType::F64 => todo!(),
             NbtType::U8Vec => todo!(),
             NbtType::I32Vec => todo!(),
             NbtType::I64Vec => todo!(),
@@ -369,6 +378,7 @@ impl NbtType {
     pub fn get_size_in_bytes(&self) -> Option<usize> {
         match self {
             NbtType::U8 => Some(1),
+            NbtType::I16 => Some(2),
             _ => None,
         }
     }

@@ -64,6 +64,12 @@ impl SystemDetails {
     }
 }
 
+impl Default for SystemDetails {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Display for SystemDetails {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("-- System Details --\nDetails:")?;

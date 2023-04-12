@@ -71,8 +71,8 @@ pub mod version {
         }
 
         fn new_from_json(json: &serde_json::Map<String, serde_json::Value>) -> Result<Self, Error> {
-            let id = json_helper::get_str(&json, "id")?;
-            let name = json_helper::get_str(&json, "name")?;
+            let id = json_helper::get_str(json, "id")?;
+            let name = json_helper::get_str(json, "name")?;
             let stable = json_helper::get_bool(json, "stable")?;
             let save_version = SaveVersion::new(
                 json_helper::get_i64(json, "world_version")?,
@@ -84,7 +84,6 @@ pub mod version {
             let json_object = json_helper::get_object(json, "pack_version")?;
             let resource_pack_version = json_helper::get_i64(json_object, "resource")?;
             let data_pack_version = json_helper::get_i64(json_object, "data")?;
-            drop(resource_pack_version);
 
             let build_time;
             let build_time_raw: Result<chrono::DateTime<Utc>, _> =
@@ -114,7 +113,7 @@ pub mod version {
     impl Default for RimecraftVersion {
         fn default() -> Self {
             Self {
-                id: uuid::Uuid::new_v4().to_string().replace("-", ""),
+                id: uuid::Uuid::new_v4().to_string().replace('-', ""),
                 name: String::from("1.19.4"),
                 stable: true,
                 save_version: SaveVersion::new(3337, String::from("main")),
