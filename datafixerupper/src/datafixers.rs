@@ -53,30 +53,26 @@ pub mod util {
         }
 
         pub fn if_left(&self, consumer: Box<impl Fn(&L)>) {
-            match self {
-                Either::Left(value) => consumer(value),
-                _ => (),
+            if let Either::Left(value) = self {
+                consumer(value)
             }
         }
 
         pub fn if_right(&self, consumer: Box<impl Fn(&R)>) {
-            match self {
-                Either::Right(value) => consumer(value),
-                _ => (),
+            if let Either::Right(value) = self {
+                consumer(value)
             }
         }
 
         pub fn if_left_mut(&mut self, consumer: Box<impl Fn(&mut L)>) {
-            match self {
-                Either::Left(value) => consumer(value),
-                _ => (),
+            if let Either::Left(value) = self {
+                consumer(value)
             }
         }
 
         pub fn if_right_mut(&mut self, consumer: Box<impl Fn(&mut R)>) {
-            match self {
-                Either::Right(value) => consumer(value),
-                _ => (),
+            if let Either::Right(value) = self {
+                consumer(value)
             }
         }
 

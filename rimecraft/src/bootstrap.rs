@@ -1,13 +1,11 @@
-use once_cell::sync::Lazy;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-static INITIALIZED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+static INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 pub fn initialize() {
-    let mut initialized = *INITIALIZED.lock().unwrap();
-    if initialized {
+    if INITIALIZED.load(Ordering::Relaxed) {
         unreachable!()
     }
-    initialized = true;
+    INITIALIZED.store(false, Ordering::Relaxed)
     // TODO: registries
 }
