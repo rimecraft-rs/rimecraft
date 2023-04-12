@@ -265,9 +265,74 @@ impl NbtType {
                     f64::from_be_bytes(arr)
                 }))
             }
-            NbtType::U8Vec => todo!(),
-            NbtType::I32Vec => todo!(),
-            NbtType::I64Vec => todo!(),
+            NbtType::U8Vec => {
+                tracker.add(24);
+                if let Ok(j) = {
+                    let mut arr = [0; 4];
+                    input.read(&mut arr)?;
+                    i32::from_be_bytes(arr)
+                }
+                .try_into()
+                {
+                    tracker.add(j);
+                    let mut bs: Vec<u8> = Vec::with_capacity(j);
+                    for _ in 0..j {
+                        let mut arr = [0; 1];
+                        input.read(&mut arr)?;
+                        bs.push(match arr.first() {
+                            Some(e) => *e,
+                            None => {
+                                return Err(io::Error::new(ErrorKind::Other, "Can't read u8 vec"))
+                            }
+                        })
+                    }
+                    Ok(NbtElement::U8Vec(bs))
+                } else {
+                    Err(io::Error::new(ErrorKind::Other, "Can't read u8 vec"))
+                }
+            }
+            NbtType::I32Vec => {
+                tracker.add(24);
+                if let Ok(j) = {
+                    let mut arr = [0; 4];
+                    input.read(&mut arr)?;
+                    i32::from_be_bytes(arr)
+                }
+                .try_into()
+                {
+                    tracker.add(4 * j);
+                    let mut is: Vec<i32> = Vec::with_capacity(j);
+                    for _ in 0..j {
+                        let mut arr = [0; 4];
+                        input.read(&mut arr)?;
+                        is.push(i32::from_be_bytes(arr));
+                    }
+                    Ok(NbtElement::I32Vec(is))
+                } else {
+                    Err(io::Error::new(ErrorKind::Other, "Can't read i32 vec"))
+                }
+            }
+            NbtType::I64Vec => {
+                tracker.add(24);
+                if let Ok(j) = {
+                    let mut arr = [0; 4];
+                    input.read(&mut arr)?;
+                    i32::from_be_bytes(arr)
+                }
+                .try_into()
+                {
+                    tracker.add(8 * j);
+                    let mut ls: Vec<i64> = Vec::with_capacity(j);
+                    for _ in 0..j {
+                        let mut arr = [0; 8];
+                        input.read(&mut arr)?;
+                        ls.push(i64::from_be_bytes(arr));
+                    }
+                    Ok(NbtElement::I64Vec(ls))
+                } else {
+                    Err(io::Error::new(ErrorKind::Other, "Can't read i32 vec"))
+                }
+            }
             NbtType::List => todo!(),
             NbtType::Compound => todo!(),
             NbtType::End => todo!(),
