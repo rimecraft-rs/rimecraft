@@ -233,10 +233,38 @@ impl NbtType {
                     i16::from_be_bytes(arr)
                 }))
             }
-            NbtType::I32 => todo!(),
-            NbtType::I64 => todo!(),
-            NbtType::F32 => todo!(),
-            NbtType::F64 => todo!(),
+            NbtType::I32 => {
+                tracker.add(12);
+                Ok(NbtElement::I32({
+                    let mut arr = [0; 4];
+                    input.read(&mut arr)?;
+                    i32::from_be_bytes(arr)
+                }))
+            }
+            NbtType::I64 => {
+                tracker.add(16);
+                Ok(NbtElement::I64({
+                    let mut arr = [0; 8];
+                    input.read(&mut arr)?;
+                    i64::from_be_bytes(arr)
+                }))
+            }
+            NbtType::F32 => {
+                tracker.add(12);
+                Ok(NbtElement::F32({
+                    let mut arr = [0; 4];
+                    input.read(&mut arr)?;
+                    f32::from_be_bytes(arr)
+                }))
+            }
+            NbtType::F64 => {
+                tracker.add(16);
+                Ok(NbtElement::F64({
+                    let mut arr = [0; 8];
+                    input.read(&mut arr)?;
+                    f64::from_be_bytes(arr)
+                }))
+            }
             NbtType::U8Vec => todo!(),
             NbtType::I32Vec => todo!(),
             NbtType::I64Vec => todo!(),
@@ -267,10 +295,26 @@ impl NbtType {
                 input.read(&mut arr)?;
                 i16::from_be_bytes(arr)
             })),
-            NbtType::I32 => todo!(),
-            NbtType::I64 => todo!(),
-            NbtType::F32 => todo!(),
-            NbtType::F64 => todo!(),
+            NbtType::I32 => Ok(scanner.visit_i32({
+                let mut arr = [0; 4];
+                input.read(&mut arr)?;
+                i32::from_be_bytes(arr)
+            })),
+            NbtType::I64 => Ok(scanner.visit_i64({
+                let mut arr = [0; 8];
+                input.read(&mut arr)?;
+                i64::from_be_bytes(arr)
+            })),
+            NbtType::F32 => Ok(scanner.visit_f32({
+                let mut arr = [0; 4];
+                input.read(&mut arr)?;
+                f32::from_be_bytes(arr)
+            })),
+            NbtType::F64 => Ok(scanner.visit_f64({
+                let mut arr = [0; 8];
+                input.read(&mut arr)?;
+                f64::from_be_bytes(arr)
+            })),
             NbtType::U8Vec => todo!(),
             NbtType::I32Vec => todo!(),
             NbtType::I64Vec => todo!(),
@@ -296,10 +340,10 @@ impl NbtType {
             NbtType::String => "STRING",
             NbtType::U8 => "BYTE",
             NbtType::I16 => "SHORT",
-            NbtType::I32 => todo!(),
-            NbtType::I64 => todo!(),
-            NbtType::F32 => todo!(),
-            NbtType::F64 => todo!(),
+            NbtType::I32 => "INT",
+            NbtType::I64 => "LONG",
+            NbtType::F32 => "FLOAT",
+            NbtType::F64 => "DOUBLE",
             NbtType::U8Vec => todo!(),
             NbtType::I32Vec => todo!(),
             NbtType::I64Vec => todo!(),
@@ -313,10 +357,10 @@ impl NbtType {
             NbtType::String => "STAG_String",
             NbtType::U8 => "TAG_Byte",
             NbtType::I16 => "TAG_Short",
-            NbtType::I32 => todo!(),
-            NbtType::I64 => todo!(),
-            NbtType::F32 => todo!(),
-            NbtType::F64 => todo!(),
+            NbtType::I32 => "TAG_Int",
+            NbtType::I64 => "TAG_Long",
+            NbtType::F32 => "TAG_Float",
+            NbtType::F64 => "TAG_Double",
             NbtType::U8Vec => todo!(),
             NbtType::I32Vec => todo!(),
             NbtType::I64Vec => todo!(),
@@ -376,6 +420,10 @@ impl NbtType {
         match self {
             NbtType::U8 => Some(1),
             NbtType::I16 => Some(2),
+            NbtType::I32 => Some(4),
+            NbtType::I64 => Some(8),
+            NbtType::F32 => Some(4),
+            NbtType::F64 => Some(8),
             _ => None,
         }
     }
