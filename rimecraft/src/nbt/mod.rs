@@ -219,10 +219,29 @@ impl NbtElement {
 }
 
 impl NbtType {
+    pub fn from_id(id: u8) -> Option<NbtType> {
+        match id {
+            0 => Some(Self::End),
+            1 => Some(Self::U8),
+            2 => Some(Self::I16),
+            3 => Some(Self::I32),
+            4 => Some(Self::I64),
+            5 => Some(Self::F32),
+            6 => Some(Self::F64),
+            7 => Some(Self::U8Vec),
+            8 => Some(Self::String),
+            9 => Some(Self::List),
+            10 => Some(Self::Compound),
+            11 => Some(Self::I32Vec),
+            12 => Some(Self::I64Vec),
+            _ => None,
+        }
+    }
+
     pub fn read(
         &self,
         input: &mut impl Read,
-        _i: usize,
+        i: usize,
         tracker: &mut NbtTagSizeTracker,
     ) -> io::Result<NbtElement> {
         match self {
@@ -355,7 +374,35 @@ impl NbtType {
                     Err(io::Error::new(ErrorKind::Other, "Can't read i64 vec"))
                 }
             }
-            NbtType::List => todo!(),
+            NbtType::List => {
+                tracker.add(37);
+                if i > 512 {
+                    return Err(io::Error::new(
+                        ErrorKind::Other,
+                        "Tried to read NBT tag with too high complexity, depth > 512",
+                    ));
+                }
+                let b = {
+                    let mut arr = [0; 1];
+                    input.read_exact(&mut arr)?;
+                    *arr.get(0).unwrap()
+                };
+                let j = {
+                    let mut arr = [0; 4];
+                    input.read_exact(&mut arr)?;
+                    i32::from_be_bytes(arr)
+                };
+                if b == 0 && j > 0 {
+                    return Err(io::Error::new(ErrorKind::Other, "Missing type on ListTag"));
+                }
+                tracker.add((4 * j) as usize);
+                let nbt_type = NbtType::from_id(b).unwrap();
+                let mut list: Vec<NbtElement> = Vec::with_capacity(j as usize);
+                for _ in 0..j {
+                    list.push(nbt_type.read(input, i + 1, tracker)?);
+                }
+                Ok(NbtElement::List(list, b))
+            }
             NbtType::Compound => todo!(),
             NbtType::End => todo!(),
         }
@@ -437,7 +484,60 @@ impl NbtType {
                 }
                 bs
             })),
-            NbtType::List => todo!(),
+            NbtType::List => {
+                let nbt_type = NbtType::from_id({
+                    let mut arr = [0; 1];
+                    input.read_exact(&mut arr)?;
+                    *arr.get(0).unwrap()
+                })
+                .unwrap();
+                let i = {
+                    let mut arr = [0; 4];
+                    input.read_exact(&mut arr)?;
+                    i32::from_be_bytes(arr) as usize
+                };
+                match scanner.visit_list_meta(nbt_type, i) {
+                    ScannerResult::Break => {
+                        nbt_type.skip_counted(input, i)?;
+                        Ok(scanner.end_nested())
+                    }
+                    ScannerResult::Halt => Ok(ScannerResult::Halt),
+                    _ => {
+                        let mut j = 0;
+                        loop {
+                            if j < i {
+                                match scanner.start_list_item(nbt_type, j) {
+                                    scanner::ScannerNestedResult::Skip => {
+                                        nbt_type.skip(input)?;
+                                        j += 1;
+                                        continue;
+                                    }
+                                    scanner::ScannerNestedResult::Break => {
+                                        nbt_type.skip(input)?;
+                                    }
+                                    scanner::ScannerNestedResult::Halt => {
+                                        return Ok(ScannerResult::Halt)
+                                    }
+                                    _ => match nbt_type.do_accept(input, scanner)? {
+                                        ScannerResult::Break => (),
+                                        ScannerResult::Halt => return Ok(ScannerResult::Halt),
+                                        _ => {
+                                            j += 1;
+                                            continue;
+                                        }
+                                    },
+                                }
+                            }
+
+                            let k = i - 1 - j;
+                            if k > 0 {
+                                nbt_type.skip_counted(input, k)?;
+                            }
+                            return Ok(scanner.end_nested());
+                        }
+                    }
+                }
+            }
             NbtType::Compound => todo!(),
             NbtType::End => todo!(),
         }
@@ -463,6 +563,7 @@ impl NbtType {
                 | NbtType::F64
         )
     }
+
     pub fn get_crash_report_name(&self) -> &str {
         match self {
             NbtType::String => "STRING",
@@ -475,11 +576,12 @@ impl NbtType {
             NbtType::U8Vec => "BYTE[]",
             NbtType::I32Vec => "INT[]",
             NbtType::I64Vec => "LONG[]",
-            NbtType::List => todo!(),
+            NbtType::List => "LIST",
             NbtType::Compound => todo!(),
             NbtType::End => todo!(),
         }
     }
+
     pub fn get_command_feedback_name(&self) -> &str {
         match self {
             NbtType::String => "STAG_String",
@@ -492,7 +594,7 @@ impl NbtType {
             NbtType::U8Vec => "TAG_Byte_Array",
             NbtType::I32Vec => "TAG_Int_Array",
             NbtType::I64Vec => "TAG_Long_Array",
-            NbtType::List => todo!(),
+            NbtType::List => "TAG_List",
             NbtType::Compound => todo!(),
             NbtType::End => todo!(),
         }
@@ -539,7 +641,20 @@ impl NbtType {
                 }
                 Ok(())
             }
-            NbtType::List => todo!(),
+            NbtType::List => {
+                let nbt_type = NbtType::from_id({
+                    let mut arr = [0; 1];
+                    input.read_exact(&mut arr)?;
+                    *arr.get(0).unwrap()
+                })
+                .unwrap();
+                let i = {
+                    let mut arr = [0; 4];
+                    input.read_exact(&mut arr)?;
+                    i32::from_be_bytes(arr)
+                } as usize;
+                nbt_type.skip_counted(input, i)
+            }
             NbtType::Compound => todo!(),
             NbtType::End => todo!(),
             _ => Ok(()),
@@ -556,7 +671,7 @@ impl NbtType {
         }
 
         match self {
-            NbtType::String | NbtType::I32Vec | NbtType::I64Vec => {
+            NbtType::String | NbtType::I32Vec | NbtType::I64Vec | NbtType::List => {
                 for _ in 0..count {
                     self.skip(input)?;
                 }
