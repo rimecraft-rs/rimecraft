@@ -92,39 +92,46 @@ impl NbtElement {
                     error!("{err}");
                     output.write("".as_bytes())?;
                 };
-                Ok(())
             }
             NbtElement::U8(byte) => {
                 output.write(&[*byte])?;
-                Ok(())
             }
             NbtElement::I16(value) => {
                 output.write(&value.to_be_bytes())?;
-                Ok(())
             }
             NbtElement::I32(value) => {
                 output.write(&value.to_be_bytes())?;
-                Ok(())
             }
             NbtElement::I64(value) => {
                 output.write(&value.to_be_bytes())?;
-                Ok(())
             }
             NbtElement::F32(value) => {
                 output.write(&value.to_be_bytes())?;
-                Ok(())
             }
             NbtElement::F64(value) => {
                 output.write(&value.to_be_bytes())?;
-                Ok(())
             }
-            NbtElement::U8Vec(_) => todo!(),
-            NbtElement::I32Vec(_) => todo!(),
-            NbtElement::I64Vec(_) => todo!(),
+            NbtElement::U8Vec(value) => {
+                output.write(&(value.len() as i32).to_be_bytes())?;
+                output.write(&value)?;
+            }
+            NbtElement::I32Vec(value) => {
+                output.write(&(value.len() as i32).to_be_bytes())?;
+                for i in value {
+                    output.write(&i.to_be_bytes())?;
+                }
+            }
+            NbtElement::I64Vec(value) => {
+                output.write(&(value.len() as i32).to_be_bytes())?;
+                for i in value {
+                    output.write(&i.to_be_bytes())?;
+                }
+            }
             NbtElement::List(_, _) => todo!(),
             NbtElement::Compound(_) => todo!(),
             NbtElement::End => todo!(),
         }
+        Ok(())
     }
 
     pub fn get_type(&self) -> u8 {
@@ -150,13 +157,13 @@ impl NbtElement {
             NbtElement::String(value) => 36 + 2 * value.len(),
             NbtElement::U8(_) => 9,
             NbtElement::I16(_) => 10,
-            NbtElement::I32(_) => todo!(),
-            NbtElement::I64(_) => todo!(),
-            NbtElement::F32(_) => todo!(),
-            NbtElement::F64(_) => todo!(),
-            NbtElement::U8Vec(_) => todo!(),
-            NbtElement::I32Vec(_) => todo!(),
-            NbtElement::I64Vec(_) => todo!(),
+            NbtElement::I32(_) => 12,
+            NbtElement::I64(_) => 16,
+            NbtElement::F32(_) => 12,
+            NbtElement::F64(_) => 16,
+            NbtElement::U8Vec(value) => 24 + value.len(),
+            NbtElement::I32Vec(value) => 24 + 4 * value.len(),
+            NbtElement::I64Vec(value) => 24 + 8 * value.len(),
             NbtElement::List(_, _) => todo!(),
             NbtElement::Compound(_) => todo!(),
             NbtElement::End => todo!(),
@@ -170,15 +177,15 @@ impl NbtElement {
     pub fn do_accept(&self, visitor: &mut impl NbtScanner) -> ScannerResult {
         match self {
             NbtElement::String(value) => visitor.visit_string(value),
-            NbtElement::U8(_) => todo!(),
-            NbtElement::I16(_) => todo!(),
-            NbtElement::I32(_) => todo!(),
-            NbtElement::I64(_) => todo!(),
-            NbtElement::F32(_) => todo!(),
-            NbtElement::F64(_) => todo!(),
-            NbtElement::U8Vec(_) => todo!(),
-            NbtElement::I32Vec(_) => todo!(),
-            NbtElement::I64Vec(_) => todo!(),
+            NbtElement::U8(value) => visitor.visit_u8(*value),
+            NbtElement::I16(value) => visitor.visit_i16(*value),
+            NbtElement::I32(value) => visitor.visit_i32(*value),
+            NbtElement::I64(value) => visitor.visit_i64(*value),
+            NbtElement::F32(value) => visitor.visit_f32(*value),
+            NbtElement::F64(value) => visitor.visit_f64(*value),
+            NbtElement::U8Vec(value) => visitor.visit_u8_arr(value.to_vec()),
+            NbtElement::I32Vec(value) => visitor.visit_i32_arr(value.to_vec()),
+            NbtElement::I64Vec(value) => visitor.visit_i64_arr(value.to_vec()),
             NbtElement::List(_, _) => todo!(),
             NbtElement::Compound(_) => todo!(),
             NbtElement::End => todo!(),
@@ -233,7 +240,7 @@ impl NbtType {
                 tracker.add(9);
                 Ok(NbtElement::U8({
                     let mut arr = [0; 1];
-                    input.read(&mut arr)?;
+                    input.read_exact(&mut arr)?;
                     match arr.first() {
                         Some(e) => *e,
                         None => return Err(io::Error::new(ErrorKind::Other, "Can't read u8")),
@@ -244,7 +251,7 @@ impl NbtType {
                 tracker.add(10);
                 Ok(NbtElement::I16({
                     let mut arr = [0; 2];
-                    input.read(&mut arr)?;
+                    input.read_exact(&mut arr)?;
                     i16::from_be_bytes(arr)
                 }))
             }
@@ -252,7 +259,7 @@ impl NbtType {
                 tracker.add(12);
                 Ok(NbtElement::I32({
                     let mut arr = [0; 4];
-                    input.read(&mut arr)?;
+                    input.read_exact(&mut arr)?;
                     i32::from_be_bytes(arr)
                 }))
             }
@@ -260,7 +267,7 @@ impl NbtType {
                 tracker.add(16);
                 Ok(NbtElement::I64({
                     let mut arr = [0; 8];
-                    input.read(&mut arr)?;
+                    input.read_exact(&mut arr)?;
                     i64::from_be_bytes(arr)
                 }))
             }
@@ -268,7 +275,7 @@ impl NbtType {
                 tracker.add(12);
                 Ok(NbtElement::F32({
                     let mut arr = [0; 4];
-                    input.read(&mut arr)?;
+                    input.read_exact(&mut arr)?;
                     f32::from_be_bytes(arr)
                 }))
             }
@@ -276,7 +283,7 @@ impl NbtType {
                 tracker.add(16);
                 Ok(NbtElement::F64({
                     let mut arr = [0; 8];
-                    input.read(&mut arr)?;
+                    input.read_exact(&mut arr)?;
                     f64::from_be_bytes(arr)
                 }))
             }
@@ -284,7 +291,7 @@ impl NbtType {
                 tracker.add(24);
                 if let Ok(j) = {
                     let mut arr = [0; 4];
-                    input.read(&mut arr)?;
+                    input.read_exact(&mut arr)?;
                     i32::from_be_bytes(arr)
                 }
                 .try_into()
@@ -293,7 +300,7 @@ impl NbtType {
                     let mut bs: Vec<u8> = Vec::with_capacity(j);
                     for _ in 0..j {
                         let mut arr = [0; 1];
-                        input.read(&mut arr)?;
+                        input.read_exact(&mut arr)?;
                         bs.push(match arr.first() {
                             Some(e) => *e,
                             None => {
@@ -310,7 +317,7 @@ impl NbtType {
                 tracker.add(24);
                 if let Ok(j) = {
                     let mut arr = [0; 4];
-                    input.read(&mut arr)?;
+                    input.read_exact(&mut arr)?;
                     i32::from_be_bytes(arr)
                 }
                 .try_into()
@@ -319,7 +326,7 @@ impl NbtType {
                     let mut is: Vec<i32> = Vec::with_capacity(j);
                     for _ in 0..j {
                         let mut arr = [0; 4];
-                        input.read(&mut arr)?;
+                        input.read_exact(&mut arr)?;
                         is.push(i32::from_be_bytes(arr));
                     }
                     Ok(NbtElement::I32Vec(is))
@@ -331,7 +338,7 @@ impl NbtType {
                 tracker.add(24);
                 if let Ok(j) = {
                     let mut arr = [0; 4];
-                    input.read(&mut arr)?;
+                    input.read_exact(&mut arr)?;
                     i32::from_be_bytes(arr)
                 }
                 .try_into()
@@ -340,12 +347,12 @@ impl NbtType {
                     let mut ls: Vec<i64> = Vec::with_capacity(j);
                     for _ in 0..j {
                         let mut arr = [0; 8];
-                        input.read(&mut arr)?;
+                        input.read_exact(&mut arr)?;
                         ls.push(i64::from_be_bytes(arr));
                     }
                     Ok(NbtElement::I64Vec(ls))
                 } else {
-                    Err(io::Error::new(ErrorKind::Other, "Can't read i32 vec"))
+                    Err(io::Error::new(ErrorKind::Other, "Can't read i64 vec"))
                 }
             }
             NbtType::List => todo!(),
@@ -367,37 +374,69 @@ impl NbtType {
             })),
             NbtType::U8 => Ok(scanner.visit_u8({
                 let mut arr = [0; 1];
-                input.read(&mut arr)?;
+                input.read_exact(&mut arr)?;
                 *arr.first().unwrap()
             })),
             NbtType::I16 => Ok(scanner.visit_i16({
                 let mut arr = [0; 2];
-                input.read(&mut arr)?;
+                input.read_exact(&mut arr)?;
                 i16::from_be_bytes(arr)
             })),
             NbtType::I32 => Ok(scanner.visit_i32({
                 let mut arr = [0; 4];
-                input.read(&mut arr)?;
+                input.read_exact(&mut arr)?;
                 i32::from_be_bytes(arr)
             })),
             NbtType::I64 => Ok(scanner.visit_i64({
                 let mut arr = [0; 8];
-                input.read(&mut arr)?;
+                input.read_exact(&mut arr)?;
                 i64::from_be_bytes(arr)
             })),
             NbtType::F32 => Ok(scanner.visit_f32({
                 let mut arr = [0; 4];
-                input.read(&mut arr)?;
+                input.read_exact(&mut arr)?;
                 f32::from_be_bytes(arr)
             })),
             NbtType::F64 => Ok(scanner.visit_f64({
                 let mut arr = [0; 8];
-                input.read(&mut arr)?;
+                input.read_exact(&mut arr)?;
                 f64::from_be_bytes(arr)
             })),
-            NbtType::U8Vec => todo!(),
-            NbtType::I32Vec => todo!(),
-            NbtType::I64Vec => todo!(),
+            NbtType::U8Vec => Ok(scanner.visit_u8_arr({
+                let mut bs: Vec<u8> = Vec::with_capacity({
+                    let mut arr = [0; 4];
+                    input.read_exact(&mut arr)?;
+                    i32::from_be_bytes(arr) as usize
+                });
+                input.read_exact(&mut bs)?;
+                bs
+            })),
+            NbtType::I32Vec => Ok(scanner.visit_i32_arr({
+                let mut bs: Vec<i32> = Vec::with_capacity({
+                    let mut arr = [0; 4];
+                    input.read_exact(&mut arr)?;
+                    i32::from_be_bytes(arr) as usize
+                });
+                for _ in 0..bs.capacity() {
+                    let mut arr = [0; 4];
+                    input.read_exact(&mut arr)?;
+                    bs.push(i32::from_be_bytes(arr));
+                }
+                bs
+            })),
+            NbtType::I64Vec => Ok(scanner.visit_i64_arr({
+                let mut bs: Vec<i64> = Vec::with_capacity({
+                    let mut arr = [0; 4];
+                    input.read_exact(&mut arr)?;
+                    i32::from_be_bytes(arr) as usize
+                });
+                for _ in 0..bs.capacity() {
+                    let mut arr = [0; 8];
+                    input.read_exact(&mut arr)?;
+                    bs.push(i64::from_be_bytes(arr));
+                }
+                bs
+            })),
             NbtType::List => todo!(),
             NbtType::Compound => todo!(),
             NbtType::End => todo!(),
@@ -413,7 +452,16 @@ impl NbtType {
     }
 
     pub fn is_immutable(&self) -> bool {
-        matches!(self, NbtType::String | NbtType::U8 | NbtType::I16)
+        matches!(
+            self,
+            NbtType::String
+                | NbtType::U8
+                | NbtType::I16
+                | NbtType::I32
+                | NbtType::I64
+                | NbtType::F32
+                | NbtType::F64
+        )
     }
     pub fn get_crash_report_name(&self) -> &str {
         match self {
@@ -454,7 +502,7 @@ impl NbtType {
         if let Some(size) = self.get_size_in_bytes() {
             for _ in 0..size {
                 let mut arr = [0; 1];
-                input.read(&mut arr)?;
+                input.read_exact(&mut arr)?;
             }
             return Ok(());
         }
@@ -466,15 +514,31 @@ impl NbtType {
             }
             NbtType::U8Vec => {
                 let mut arr = [0; 4];
-                input.read(&mut arr)?;
+                input.read_exact(&mut arr)?;
                 for _ in 0..i32::from_be_bytes(arr) {
                     let mut arr = [0; 1];
-                    input.read(&mut arr)?;
+                    input.read_exact(&mut arr)?;
                 }
                 Ok(())
             }
-            NbtType::I32Vec => todo!(),
-            NbtType::I64Vec => todo!(),
+            NbtType::I32Vec => {
+                let mut arr = [0; 4];
+                input.read_exact(&mut arr)?;
+                for _ in 0..i32::from_be_bytes(arr) * 4 {
+                    let mut arr = [0; 1];
+                    input.read_exact(&mut arr)?;
+                }
+                Ok(())
+            }
+            NbtType::I64Vec => {
+                let mut arr = [0; 4];
+                input.read_exact(&mut arr)?;
+                for _ in 0..i32::from_be_bytes(arr) * 8 {
+                    let mut arr = [0; 1];
+                    input.read_exact(&mut arr)?;
+                }
+                Ok(())
+            }
             NbtType::List => todo!(),
             NbtType::Compound => todo!(),
             NbtType::End => todo!(),
@@ -486,19 +550,19 @@ impl NbtType {
         if let Some(size) = self.get_size_in_bytes() {
             for _ in 0..(size * count) {
                 let mut arr = [0; 1];
-                input.read(&mut arr)?;
+                input.read_exact(&mut arr)?;
             }
             return Ok(());
         }
 
         match self {
-            NbtType::String => {
+            NbtType::String | NbtType::I32Vec | NbtType::I64Vec => {
                 for _ in 0..count {
                     self.skip(input)?;
                 }
                 Ok(())
             }
-            _ => Ok(()),
+            _ => unreachable!(),
         }
     }
 
@@ -562,23 +626,5 @@ impl NbtTagSizeTracker {
 
     pub fn get_allocated_bytes(&self) -> usize {
         self.allocated_bytes
-    }
-}
-
-pub mod string {
-    use crate::util;
-
-    use super::*;
-
-    pub struct Type;
-
-    pub fn skip(input: &mut impl Read) {
-        if let Ok(u) = util::read_unsigned_short(input) {
-            for _ in 0..u {
-                if input.read(&mut [0; 1]).is_err() {
-                    return;
-                }
-            }
-        }
     }
 }
