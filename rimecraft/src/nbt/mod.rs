@@ -86,48 +86,59 @@ pub enum NbtType {
 
 impl NbtElement {
     pub fn write(&self, output: &mut impl Write) -> io::Result<()> {
-        match &self {
+        match self {
             NbtElement::String(string) => {
-                if let Err(err) = output.write(string.as_bytes()) {
+                if let Err(err) = output.write_all(string.as_bytes()) {
                     error!("{err}");
-                    output.write("".as_bytes())?;
+                    output.write_all("".as_bytes())?;
                 };
             }
             NbtElement::U8(byte) => {
-                output.write(&[*byte])?;
+                output.write_all(&[*byte])?;
             }
             NbtElement::I16(value) => {
-                output.write(&value.to_be_bytes())?;
+                output.write_all(&value.to_be_bytes())?;
             }
             NbtElement::I32(value) => {
-                output.write(&value.to_be_bytes())?;
+                output.write_all(&value.to_be_bytes())?;
             }
             NbtElement::I64(value) => {
-                output.write(&value.to_be_bytes())?;
+                output.write_all(&value.to_be_bytes())?;
             }
             NbtElement::F32(value) => {
-                output.write(&value.to_be_bytes())?;
+                output.write_all(&value.to_be_bytes())?;
             }
             NbtElement::F64(value) => {
-                output.write(&value.to_be_bytes())?;
+                output.write_all(&value.to_be_bytes())?;
             }
             NbtElement::U8Vec(value) => {
-                output.write(&(value.len() as i32).to_be_bytes())?;
-                output.write(&value)?;
+                output.write_all(&(value.len() as i32).to_be_bytes())?;
+                output.write_all(&value)?;
             }
             NbtElement::I32Vec(value) => {
-                output.write(&(value.len() as i32).to_be_bytes())?;
+                output.write_all(&(value.len() as i32).to_be_bytes())?;
                 for i in value {
-                    output.write(&i.to_be_bytes())?;
+                    output.write_all(&i.to_be_bytes())?;
                 }
             }
             NbtElement::I64Vec(value) => {
-                output.write(&(value.len() as i32).to_be_bytes())?;
+                output.write_all(&(value.len() as i32).to_be_bytes())?;
                 for i in value {
-                    output.write(&i.to_be_bytes())?;
+                    output.write_all(&i.to_be_bytes())?;
                 }
             }
-            NbtElement::List(_, _) => todo!(),
+            NbtElement::List(value, _) => {
+                let type_u = if value.is_empty() {
+                    0
+                } else {
+                    value.get(0).unwrap().get_type()
+                };
+                output.write_all(&mut [type_u])?;
+                output.write_all(&mut (value.len() as i32).to_be_bytes())?;
+                for element in value {
+                    element.write(output)?;
+                }
+            }
             NbtElement::Compound(_) => todo!(),
             NbtElement::End => todo!(),
         }
@@ -164,7 +175,14 @@ impl NbtElement {
             NbtElement::U8Vec(value) => 24 + value.len(),
             NbtElement::I32Vec(value) => 24 + 4 * value.len(),
             NbtElement::I64Vec(value) => 24 + 8 * value.len(),
-            NbtElement::List(_, _) => todo!(),
+            NbtElement::List(value, _) => {
+                let mut i = 37;
+                i += 4 * value.len();
+                for element in value {
+                    i += element.get_size_in_bytes();
+                }
+                i
+            }
             NbtElement::Compound(_) => todo!(),
             NbtElement::End => todo!(),
         }
@@ -186,7 +204,36 @@ impl NbtElement {
             NbtElement::U8Vec(value) => visitor.visit_u8_arr(value.to_vec()),
             NbtElement::I32Vec(value) => visitor.visit_i32_arr(value.to_vec()),
             NbtElement::I64Vec(value) => visitor.visit_i64_arr(value.to_vec()),
-            NbtElement::List(_, _) => todo!(),
+            NbtElement::List(value, _) => {
+                match visitor.visit_list_meta(
+                    NbtType::from_id(if value.is_empty() {
+                        0
+                    } else {
+                        value.get(0).unwrap().get_type()
+                    })
+                    .unwrap(),
+                    value.len(),
+                ) {
+                    ScannerResult::Break => return visitor.end_nested(),
+                    ScannerResult::Halt => return ScannerResult::Halt,
+                    _ => (),
+                }
+                for i in 0..value.len() {
+                    let element = value.get(i).unwrap();
+                    match visitor.start_list_item(element.get_nbt_type(), i) {
+                        scanner::ScannerNestedResult::Skip => continue,
+                        scanner::ScannerNestedResult::Break => return visitor.end_nested(),
+                        scanner::ScannerNestedResult::Halt => return ScannerResult::Halt,
+                        _ => match element.do_accept(visitor) {
+                            ScannerResult::Break => return visitor.end_nested(),
+                            ScannerResult::Halt => return ScannerResult::Halt,
+                            _ => (),
+                        },
+                    }
+                }
+
+                visitor.end_nested()
+            }
             NbtElement::Compound(_) => todo!(),
             NbtElement::End => todo!(),
         }
@@ -671,7 +718,12 @@ impl NbtType {
         }
 
         match self {
-            NbtType::String | NbtType::I32Vec | NbtType::I64Vec | NbtType::List => {
+            NbtType::String
+            | NbtType::U8Vec
+            | NbtType::I32Vec
+            | NbtType::I64Vec
+            | NbtType::List
+            | NbtType::Compound => {
                 for _ in 0..count {
                     self.skip(input)?;
                 }
