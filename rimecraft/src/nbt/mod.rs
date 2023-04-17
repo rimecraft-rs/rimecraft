@@ -18,14 +18,14 @@ pub const U8_TYPE: u8 = 1;
 pub const I16_TYPE: u8 = 2;
 pub const I32_TYPE: u8 = 3;
 pub const I64_TYPE: u8 = 4;
-const F32_TYPE: u8 = 5;
-const F64_TYPE: u8 = 6;
-const U8_VEC_TYPE: u8 = 7;
-const STRING_TYPE: u8 = 8;
-const LIST_TYPE: u8 = 9;
-const COMPOUND_TYPE: u8 = 10;
-const I32_VEC_TYPE: u8 = 11;
-const I64_VEC_TYPE: u8 = 12;
+pub const F32_TYPE: u8 = 5;
+pub const F64_TYPE: u8 = 6;
+pub const U8_VEC_TYPE: u8 = 7;
+pub const STRING_TYPE: u8 = 8;
+pub const LIST_TYPE: u8 = 9;
+pub const COMPOUND_TYPE: u8 = 10;
+pub const I32_VEC_TYPE: u8 = 11;
+pub const I64_VEC_TYPE: u8 = 12;
 
 pub type NbtCompound = HashMap<String, NbtElement>;
 
