@@ -4,6 +4,7 @@ pub mod event;
 pub mod json_helper;
 pub mod system_details;
 pub mod uuids;
+pub mod read;
 
 use std::{
     fmt::{Display, Write},
@@ -43,12 +44,6 @@ pub fn string_escape(value: &str) -> String {
         string = builder;
     }
     string
-}
-
-pub fn read_unsigned_short<R: Read>(reader: &mut R) -> io::Result<u16> {
-    let mut buf = [0; 2];
-    reader.read_exact(&mut buf)?;
-    Ok(((buf[0] as u16) << 8) + buf[1] as u16)
 }
 
 pub fn into_option<T, U>(result: Result<T, U>) -> Option<T> {

@@ -185,7 +185,7 @@ impl NbtScanner for NbtCollector {
                 self.root = Some(NbtElement::Compound(NbtCompound::new()));
                 self.stack.push_back(Box::new(|a, b, r| match b {
                     Some(NbtElement::Compound(compound)) => {
-                        compound.put(r.to_owned(), a.clone());
+                        compound.insert(r.to_owned(), a.clone());
                     }
                     _ => (),
                 }));
