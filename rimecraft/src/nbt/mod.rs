@@ -130,7 +130,7 @@ impl NbtElement {
                 }
                 output.write_all(&[0])?;
             }
-            NbtElement::End => todo!(),
+            NbtElement::End => (),
         }
         Ok(())
     }
@@ -182,7 +182,7 @@ impl NbtElement {
                 }
                 i
             }
-            NbtElement::End => todo!(),
+            NbtElement::End => 8,
         }
     }
 
@@ -258,7 +258,7 @@ impl NbtElement {
                 }
                 visitor.end_nested()
             }
-            NbtElement::End => todo!(),
+            NbtElement::End => visitor.visit_end(),
         }
     }
 
@@ -433,7 +433,10 @@ impl NbtType {
                 }
                 Ok(NbtElement::Compound(map))
             }
-            NbtType::End => todo!(),
+            NbtType::End => {
+                tracker.add(8);
+                Ok(NbtElement::End)
+            }
         }
     }
 
@@ -570,7 +573,7 @@ impl NbtType {
                 }
                 Ok(scanner.end_nested())
             }
-            NbtType::End => todo!(),
+            NbtType::End => Ok(scanner.visit_end()),
         }
     }
 
@@ -592,6 +595,7 @@ impl NbtType {
                 | NbtType::I64
                 | NbtType::F32
                 | NbtType::F64
+                | NbtType::End
         )
     }
 
@@ -609,7 +613,7 @@ impl NbtType {
             NbtType::I64Vec => "LONG[]",
             NbtType::List => "LIST",
             NbtType::Compound => "COMPOUND",
-            NbtType::End => todo!(),
+            NbtType::End => "END",
         }
     }
 
@@ -627,7 +631,7 @@ impl NbtType {
             NbtType::I64Vec => "TAG_Long_Array",
             NbtType::List => "TAG_List",
             NbtType::Compound => "TAG_Compound",
-            NbtType::End => todo!(),
+            NbtType::End => "TAG_End",
         }
     }
 
@@ -699,6 +703,7 @@ impl NbtType {
                 }
                 Ok(())
             }
+            NbtType::End => Ok(()),
             _ => unreachable!(),
         }
     }
