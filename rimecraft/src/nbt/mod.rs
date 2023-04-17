@@ -729,22 +729,8 @@ impl NbtType {
 }
 
 impl Display for NbtElement {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NbtElement::String(_value) => (),
-            NbtElement::U8(_) => todo!(),
-            NbtElement::I16(_) => todo!(),
-            NbtElement::I32(_) => todo!(),
-            NbtElement::I64(_) => todo!(),
-            NbtElement::F32(_) => todo!(),
-            NbtElement::F64(_) => todo!(),
-            NbtElement::U8Vec(_) => todo!(),
-            NbtElement::I32Vec(_) => todo!(),
-            NbtElement::I64Vec(_) => todo!(),
-            NbtElement::List(_, _) => todo!(),
-            NbtElement::Compound(_) => todo!(),
-            NbtElement::End => todo!(),
-        }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.as_str())?;
         Ok(())
     }
 }
