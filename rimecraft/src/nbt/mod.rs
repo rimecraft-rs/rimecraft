@@ -3,7 +3,7 @@ pub mod visitor;
 
 use self::{
     scanner::{NbtScanner, ScannerResult},
-    visitor::NbtElementVisitor,
+    visitor::{NbtElementVisitor, StringNbtWriter},
 };
 use crate::util::read::ReadHelper;
 use log::error;
@@ -284,6 +284,13 @@ impl NbtElement {
             NbtElement::List(_, _) => NbtType::List,
             NbtElement::Compound(_) => NbtType::Compound,
             NbtElement::End => NbtType::End,
+        }
+    }
+
+    pub fn as_str(&self) -> String {
+        match self {
+            NbtElement::String(value) => value.to_string(),
+            _ => StringNbtWriter::new().apply(self).to_string(),
         }
     }
 }
