@@ -1,37 +1,46 @@
-use crate::util::Rarity;
+use crate::nbt::NbtCompound;
 
 pub struct Item {
-    settings: ItemSettings,
+    max_count: u32,
+    max_damage: Option<u32>,
 }
 
 impl Item {
-    pub fn new(settings: ItemSettings) -> Self {
-        Self { settings }
+    pub fn new(max_count: u32, max_damage: Option<u32>) -> Self {
+        Self {
+            max_count,
+            max_damage: match max_damage {
+                None | Some(0) => None,
+                Some(c) => Some(c),
+            },
+        }
     }
 
     pub fn get_max_count(&self) -> u32 {
-        self.settings.max_count
+        self.max_count
     }
 
     pub fn get_max_damage(&self) -> Option<u32> {
-        self.settings.max_damage
+        self.max_damage
     }
 
     pub fn is_damageable(&self) -> bool {
-        self.settings.max_damage.is_some()
-    }
-
-    pub fn get_recipe_remainder(&self) -> Option<usize> {
-        self.settings.recipe_remainder
+        self.max_damage.is_some()
     }
 }
 
-pub struct ItemSettings {
-    pub max_count: u32,
-    pub max_damage: Option<u32>,
-    pub recipe_remainder: Option<usize>,
-    pub fireproof: bool,
-    pub rarity: Rarity,
+impl Default for Item {
+    fn default() -> Self {
+        Self {
+            max_count: 64,
+            max_damage: None,
+        }
+    }
+}
+
+pub struct ItemStack {
+    item: usize,
+    nbt: NbtCompound,
 }
 
 pub struct FoodComponent {

@@ -1,3 +1,5 @@
+pub mod packet;
+
 use std::net::SocketAddr;
 
 #[derive(PartialEq)]

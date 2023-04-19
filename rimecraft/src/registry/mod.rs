@@ -13,32 +13,6 @@ use datafixerupper::serialization::Lifecycle;
 use log::error;
 use std::fmt::Display;
 
-pub mod events {
-    use std::sync::Mutex;
-
-    use once_cell::sync::Lazy;
-
-    use crate::util::{
-        event::{self, Event},
-        Identifier,
-    };
-
-    pub static INITIALIZE: Lazy<Mutex<Event<(), ()>>> = Lazy::new(|| {
-        Mutex::new(Event::new(
-            |c, _| {
-                for call in c {
-                    call(())
-                }
-            },
-            |_| (),
-            vec![
-                event::default_phase(),
-                Identifier::parse("freeze".to_string()).unwrap(),
-            ],
-        ))
-    });
-}
-
 pub struct RegistryKey<T> {
     registry: Identifier,
     value: Identifier,

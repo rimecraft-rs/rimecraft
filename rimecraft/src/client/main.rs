@@ -85,7 +85,7 @@ pub fn main(options: Option<OptionSet>) {
         str_to_optional(option_set.client_id),
         account_type.unwrap_or_default(),
     );
-    let _run_args = RunArgs::new(
+    let run_args = RunArgs::new(
         args::Network::new(session, proxy),
         super::WindowSettings::new(option_set.width, option_set.height),
         args::Directions::new(

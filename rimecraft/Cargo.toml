@@ -19,5 +19,7 @@ datafixerupper = { version = "*", path = "../datafixerupper" }
 md-5 = "0.10.5"
 substring = "1.4.5"
 url = "2.3.1"
-glium = "0.32.1"
+# glium = "0.32.1"
 sysinfo = "0.28.4"
+bytes = "1.4.0"
+glam = "0.23.0"

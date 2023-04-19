@@ -2,9 +2,9 @@ pub mod collection;
 pub mod crash;
 pub mod event;
 pub mod json_helper;
+pub mod read;
 pub mod system_details;
 pub mod uuids;
-pub mod read;
 
 use std::{
     fmt::{Display, Write},
@@ -200,4 +200,10 @@ pub enum Rarity {
     Uncommon,
     Rare,
     Epic,
+}
+
+impl Default for Rarity {
+    fn default() -> Self {
+        Self::Common
+    }
 }

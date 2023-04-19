@@ -1,12 +1,12 @@
 pub mod scanner;
 pub mod visitor;
+pub mod nbt_io;
 
 use self::{
     scanner::{NbtScanner, ScannerResult},
     visitor::{NbtElementVisitor, StringNbtWriter},
 };
 use crate::util::read::ReadHelper;
-use log::error;
 use std::{
     collections::HashMap,
     fmt::Display,
@@ -67,10 +67,8 @@ impl NbtElement {
     pub fn write(&self, output: &mut impl Write) -> io::Result<()> {
         match self {
             NbtElement::String(string) => {
-                if let Err(err) = output.write_all(string.as_bytes()) {
-                    error!("{err}");
-                    output.write_all("".as_bytes())?;
-                };
+                output.write_all(&(string.len() as u16).to_be_bytes())?;
+                output.write_all(string.as_bytes())?;
             }
             NbtElement::U8(byte) => {
                 output.write_all(&[*byte])?;
@@ -124,7 +122,7 @@ impl NbtElement {
                     if entry.1.get_type() == 0 {
                         return Ok(());
                     }
-                    output.write_all(&(entry.0.len() as i16).to_be_bytes())?;
+                    output.write_all(&(entry.0.len() as u16).to_be_bytes())?;
                     output.write_all(entry.0.as_bytes())?;
                     entry.1.write(output)?;
                 }
@@ -650,7 +648,7 @@ impl NbtType {
         }
         match self {
             NbtType::String => {
-                let s = reader.read_unsigned_i16()? as usize;
+                let s = reader.read_u16()? as usize;
                 reader.skip_bytes(s)?;
                 Ok(())
             }

@@ -22,14 +22,16 @@ impl<'a> ReadHelper<'a> {
         Ok(self.read_u8()? != 0)
     }
 
+    pub fn read_i8(&mut self) -> io::Result<i8> {
+        let mut arr = [0; 1];
+        self.read.read_exact(&mut arr)?;
+        Ok(i8::from_be_bytes(arr))
+    }
+
     pub fn read_u8(&mut self) -> io::Result<u8> {
         let mut arr = [0; 1];
         self.read.read_exact(&mut arr)?;
         Ok(arr[0])
-    }
-
-    pub fn read_unsigned_u8(&mut self) -> io::Result<i32> {
-        self.read_u8().map(|e| e as i32)
     }
 
     pub fn read_i16(&mut self) -> io::Result<i16> {
@@ -38,8 +40,10 @@ impl<'a> ReadHelper<'a> {
         Ok(i16::from_be_bytes(arr))
     }
 
-    pub fn read_unsigned_i16(&mut self) -> io::Result<i32> {
-        self.read_i16().map(|e| e as i32)
+    pub fn read_u16(&mut self) -> io::Result<u16> {
+        let mut arr = [0; 2];
+        self.read.read_exact(&mut arr)?;
+        Ok(u16::from_be_bytes(arr))
     }
 
     pub fn read_char(&mut self) -> io::Result<char> {
@@ -73,7 +77,7 @@ impl<'a> ReadHelper<'a> {
     }
 
     pub fn read_utf(&mut self) -> io::Result<String> {
-        let utf_len = self.read_unsigned_i16()? as usize;
+        let utf_len = self.read_u16()? as usize;
         let mut vec = Vec::with_capacity(utf_len);
         for _ in 0..utf_len {
             vec.push(self.read_u8()?)

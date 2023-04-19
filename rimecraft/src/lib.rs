@@ -5,7 +5,36 @@ pub mod nbt;
 pub mod network;
 pub mod registry;
 pub mod resource;
+pub mod transfer;
 pub mod util;
+
+mod error {
+    use std::{error, fmt::Display, io, result};
+
+    pub type Result<T> = result::Result<T, Error>;
+
+    #[derive(Debug)]
+    pub enum Error {
+        Runtime(String),
+        Encoder(io::Error),
+        Decoder(String),
+    }
+
+    impl Display for Error {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Error::Runtime(value) => f.write_str(value)?,
+                Error::Decoder(value) => f.write_str(value)?,
+                Error::Encoder(value) => value.fmt(f)?,
+            }
+            Ok(())
+        }
+    }
+
+    impl error::Error for Error {}
+}
+
+pub use error::*;
 
 pub mod consts {
     use crate::version::RimecraftVersion;
