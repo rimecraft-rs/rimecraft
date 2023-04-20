@@ -14,8 +14,8 @@ use log::error;
 use std::fmt::Display;
 
 pub struct RegistryKey<T> {
-    registry: Identifier,
-    value: Identifier,
+    pub registry: Identifier,
+    pub value: Identifier,
     _none: Option<T>,
 }
 
@@ -135,6 +135,10 @@ pub trait DefaultedRegistry<T>: Registry<T> {
             .unwrap_or(self.get_from_id(self.get_default_id()).unwrap())
     }
 
+    fn get_default_raw_id(&self) -> usize {
+        self.get_raw_id_from_id(self.get_default_id()).unwrap()
+    }
+
     fn get_default_id(&self) -> &Identifier;
 }
 
@@ -145,13 +149,8 @@ pub trait MutableRegistry<T>: Registry<T> {
         key: RegistryKey<T>,
         object: T,
         lifecycle: Lifecycle,
-    ) -> Option<&RegistryEntry<T, Self>>;
-    fn add(
-        &mut self,
-        key: RegistryKey<T>,
-        object: T,
-        lifecycle: Lifecycle,
-    ) -> Option<&RegistryEntry<T, Self>>;
+    ) -> Option<usize>;
+    fn add(&mut self, key: RegistryKey<T>, object: T, lifecycle: Lifecycle) -> Option<usize>;
     fn is_empty(&self) -> bool;
 }
 
@@ -303,7 +302,7 @@ impl<T: PartialEq> MutableRegistry<T> for SimpleRegistry<T> {
         key: RegistryKey<T>,
         object: T,
         lifecycle: Lifecycle,
-    ) -> Option<&RegistryEntry<T, Self>> {
+    ) -> Option<usize> {
         if self.frozen || self.entries.len() < id {
             error!("Registry is already frozen (trying to add key {})", key);
             return None;
@@ -323,15 +322,10 @@ impl<T: PartialEq> MutableRegistry<T> for SimpleRegistry<T> {
             ),
         );
         self.lifecycle = self.lifecycle + lifecycle;
-        self.entries.get(id).map(|t| &t.0)
+        Some(id)
     }
 
-    fn add(
-        &mut self,
-        key: RegistryKey<T>,
-        object: T,
-        lifecycle: Lifecycle,
-    ) -> Option<&RegistryEntry<T, Self>> {
+    fn add(&mut self, key: RegistryKey<T>, object: T, lifecycle: Lifecycle) -> Option<usize> {
         self.set(self.entries.len(), key, object, lifecycle)
     }
 
@@ -340,7 +334,7 @@ impl<T: PartialEq> MutableRegistry<T> for SimpleRegistry<T> {
     }
 }
 
-impl<T: PartialEq> DefaultedRegistry<T> for SimpleRegistry<T> {
+impl<T> DefaultedRegistry<T> for SimpleRegistry<T> {
     fn get_default_id(&self) -> &Identifier {
         self.default_id.as_ref().unwrap()
     }

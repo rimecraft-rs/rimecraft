@@ -1,14 +1,9 @@
+use super::{Registry, RegistryKey, SimpleRegistry};
+use crate::{item::Item, util::Identifier};
 use once_cell::sync::Lazy;
 
-use crate::util::Identifier;
+pub static ITEM: Lazy<RegistryKey<SimpleRegistry<Item>>> = Lazy::new(|| of("item"));
 
-use super::{Registry, RegistryKey, SimpleRegistry};
-
-pub static ITEM: Lazy<RegistryKey<SimpleRegistry<String>>> = Lazy::new(|| of("item"));
-
-fn of<T, R>(id: &str) -> RegistryKey<R>
-where
-    R: Registry<T>,
-{
+fn of<T, R: Registry<T>>(id: &str) -> RegistryKey<R> {
     RegistryKey::of_registry(Identifier::parse(id.to_string()).unwrap())
 }

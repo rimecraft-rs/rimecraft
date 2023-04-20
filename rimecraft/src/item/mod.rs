@@ -1,4 +1,4 @@
-use crate::nbt::NbtCompound;
+use crate::{nbt::NbtCompound, transfer::ItemVariant};
 
 pub struct Item {
     max_count: u32,
@@ -39,8 +39,31 @@ impl Default for Item {
 }
 
 pub struct ItemStack {
-    item: usize,
-    nbt: NbtCompound,
+    variant: ItemVariant,
+    count: u32,
+}
+
+impl ItemStack {
+    pub fn new(item: usize, count: u32, nbt: Option<NbtCompound>) -> Self {
+        Self {
+            variant: ItemVariant::new(item, nbt),
+            count,
+        }
+    }
+
+    pub fn get_variant(&self) -> &ItemVariant {
+        &self.variant
+    }
+
+    pub fn get_variant_mut(&mut self) -> &mut ItemVariant {
+        &mut self.variant
+    }
+}
+
+impl From<&mut NbtCompound> for ItemStack {
+    fn from(value: &mut NbtCompound) -> Self {
+        Self { variant: (), count: () }
+    }
 }
 
 pub struct FoodComponent {

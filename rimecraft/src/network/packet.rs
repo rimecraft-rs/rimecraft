@@ -1,11 +1,13 @@
-use std::{collections::HashMap, hash::Hash};
-
+use crate::{
+    nbt::{nbt_io, NbtCompound, NbtElement, NbtTagSizeTracker},
+    registry::{Registry, RegistryKey},
+    util::Identifier,
+};
 use bytes::{Buf, BufMut};
 use datafixerupper::datafixers::util::Either;
 use glam::{Quat, Vec3};
+use std::{collections::HashMap, hash::Hash, io::Write};
 use uuid::Uuid;
-
-use crate::nbt::{nbt_io, NbtCompound, NbtElement, NbtTagSizeTracker};
 
 pub struct PacketBytes<T: Buf + BufMut> {
     parent: T,
@@ -37,7 +39,7 @@ impl<T: Buf + BufMut> PacketBytes<T> {
     }
 
     pub fn get_vec<C>(&mut self, reader: PacketReader<C, T>) -> Vec<C> {
-        let i = self.get_var_u32();
+        let i = self.get_u32();
         let mut vec = Vec::with_capacity(i as usize);
         for _ in 0..i {
             vec.push(reader.apply(self));
@@ -57,7 +59,7 @@ impl<T: Buf + BufMut> PacketBytes<T> {
         key_reader: PacketReader<K, T>,
         value_reader: PacketReader<V, T>,
     ) -> HashMap<K, V> {
-        let i = self.get_var_u32();
+        let i = self.get_u32();
         let mut map = HashMap::new();
         for _ in 0..i {
             let obj = key_reader.apply(self);
@@ -81,7 +83,7 @@ impl<T: Buf + BufMut> PacketBytes<T> {
     }
 
     pub fn for_each_in_vec(&mut self, consumer: impl Fn(&mut Self)) {
-        let i = self.get_var_u32();
+        let i = self.get_u32();
         for _ in 0..i {
             consumer(self)
         }
@@ -126,22 +128,6 @@ impl<T: Buf + BufMut> PacketBytes<T> {
             Either::Left(value) => left_writer.accept(self, value),
             Either::Right(value) => right_writer.accept(self, value),
         }
-    }
-
-    pub fn get_var_u32(&mut self) -> u32 {
-        let mut b: u8;
-        let mut i: u32 = 0;
-        let mut j: u32 = 0;
-        loop {
-            b = self.get_u8();
-            j += 1;
-            i |= ((b & 0x7F) << j * 7) as u32;
-            assert!(j > 5);
-            if (b & 0x80) == 128 {
-                break;
-            }
-        }
-        i
     }
 
     pub fn get_vec3(&mut self) -> Vec3 {
@@ -193,7 +179,7 @@ impl<T: Buf + BufMut> PacketBytes<T> {
             return Ok(None);
         }
         nbt_io::read(&mut self.reader(), None, size_tracker)
-            .map_err(|o| crate::Error::Encoder(o))
+            .map_err(|o| crate::Error::Encoder(o.to_string()))
             .map(|e| {
                 if let NbtElement::Compound(c) = e {
                     Some(c)
@@ -206,23 +192,83 @@ impl<T: Buf + BufMut> PacketBytes<T> {
     pub fn put_nbt(&mut self, compound: Option<NbtCompound>) -> crate::Result<()> {
         if let Some(e) = compound {
             nbt_io::write(&NbtElement::Compound(e), &mut self.writer())
-                .map_err(|o| crate::Error::Encoder(o))?;
+                .map_err(|o| crate::Error::Encoder(o.to_string()))?;
         } else {
             self.put_u8(0)
         }
         Ok(())
     }
 
-    pub fn get_string(&mut self, max_len: Option<usize>) -> crate::Result<String> {
-        let ml = max_len.unwrap_or(32767);
+    pub fn get_string(&mut self, max_len: Option<u16>) -> crate::Result<String> {
+        let ml = max_len.unwrap_or(32767) as usize;
         let i = ml * 3;
-        let j = self.get_var_u32() as usize;
+        let j = self.get_u32() as usize;
         if j > i {
             return Err(crate::Error::Decoder(
-                format!("The received encoded string buffer length is longer than maximum allowed (\" + {j} + \" > \" + {i} + \")"),
+                format!("The received encoded string buffer length is longer than maximum allowed ({j} > {i})"),
             ));
         }
-        todo!()
+        let string = {
+            let mut vec = Vec::with_capacity(j);
+            for _ in 0..j {
+                vec.push(self.get_u8())
+            }
+            String::from_utf8(vec)
+        }
+        .map_err(|u| crate::Error::Decoder(u.to_string()))?;
+        if string.len() > ml {
+            return Err(crate::Error::Decoder(format!(
+                "The received string length is longer than maximum allowed ({} > {ml})",
+                string.len()
+            )));
+        }
+        Ok(string)
+    }
+
+    pub fn put_string(&mut self, string: String, max_len: Option<u16>) -> crate::Result<()> {
+        let ml = max_len.unwrap_or(32767) as usize;
+        let i = ml * 3;
+        if string.len() > ml {
+            return Err(crate::Error::Encoder(format!(
+                "String too big (was {} characters, max {ml})",
+                string.len()
+            )));
+        }
+        let bs = string.as_bytes();
+        if bs.len() > i {
+            return Err(crate::Error::Encoder(format!(
+                "String too big (was {} bytes encoded, max {i})",
+                bs.len()
+            )));
+        }
+        self.put_u32(bs.len() as u32);
+        self.writer()
+            .write_all(bs)
+            .map_err(|u| crate::Error::Encoder(u.to_string()))?;
+        Ok(())
+    }
+
+    pub fn get_identifier(&mut self) -> crate::Result<Identifier> {
+        match self.get_string(None).map(|s| Identifier::parse(s)) {
+            Ok(Some(e)) => Ok(e),
+            _ => Err(crate::Error::Decoder("Can't read identifier".to_string())),
+        }
+    }
+
+    pub fn put_identifier(&mut self, id: Identifier) -> crate::Result<()> {
+        self.put_string(id.to_string(), None)
+    }
+
+    pub fn get_registry_key<K, R: Registry<K>>(
+        &mut self,
+        registry_ref: &RegistryKey<R>,
+    ) -> crate::Result<RegistryKey<K>> {
+        let identifier = self.get_identifier()?;
+        Ok(RegistryKey::of(registry_ref, identifier))
+    }
+
+    pub fn put_registry_key<V>(&mut self, key: RegistryKey<V>) -> crate::Result<()> {
+        self.put_identifier(key.value)
     }
 }
 

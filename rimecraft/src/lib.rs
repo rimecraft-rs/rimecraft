@@ -16,7 +16,7 @@ mod error {
     #[derive(Debug)]
     pub enum Error {
         Runtime(String),
-        Encoder(io::Error),
+        Encoder(String),
         Decoder(String),
     }
 

@@ -1,6 +1,6 @@
+pub mod nbt_io;
 pub mod scanner;
 pub mod visitor;
-pub mod nbt_io;
 
 use self::{
     scanner::{NbtScanner, ScannerResult},
