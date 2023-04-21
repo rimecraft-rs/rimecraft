@@ -1,3 +1,4 @@
+pub mod compound;
 pub mod nbt_io;
 pub mod scanner;
 pub mod visitor;
@@ -28,6 +29,7 @@ pub const I32_VEC_TYPE: u8 = 11;
 pub const I64_VEC_TYPE: u8 = 12;
 
 pub type NbtCompound = HashMap<String, NbtElement>;
+pub type NbtList = (Vec<NbtElement>, u8);
 
 #[derive(Clone, PartialEq)]
 pub enum NbtElement {
@@ -41,7 +43,7 @@ pub enum NbtElement {
     U8Vec(Vec<u8>),
     I32Vec(Vec<i32>),
     I64Vec(Vec<i64>),
-    List(Vec<NbtElement>, u8),
+    List(NbtList),
     Compound(NbtCompound),
     End,
 }
@@ -104,15 +106,15 @@ impl NbtElement {
                     output.write_all(&i.to_be_bytes())?;
                 }
             }
-            NbtElement::List(value, _) => {
-                let type_u = if value.is_empty() {
+            NbtElement::List(value) => {
+                let type_u = if value.0.is_empty() {
                     0
                 } else {
-                    value.get(0).unwrap().get_type()
+                    value.0.get(0).unwrap().get_type()
                 };
                 output.write_all(&mut [type_u])?;
-                output.write_all(&mut (value.len() as i32).to_be_bytes())?;
-                for element in value {
+                output.write_all(&mut (value.0.len() as i32).to_be_bytes())?;
+                for element in value.0 {
                     element.write(output)?;
                 }
             }
@@ -145,7 +147,7 @@ impl NbtElement {
             NbtElement::U8Vec(_) => U8_VEC_TYPE,
             NbtElement::I32Vec(_) => I32_VEC_TYPE,
             NbtElement::I64Vec(_) => I64_VEC_TYPE,
-            NbtElement::List(_, _) => LIST_TYPE,
+            NbtElement::List(_) => LIST_TYPE,
             NbtElement::Compound(_) => COMPOUND_TYPE,
             NbtElement::End => END_TYPE,
         }
@@ -163,10 +165,10 @@ impl NbtElement {
             NbtElement::U8Vec(value) => 24 + value.len(),
             NbtElement::I32Vec(value) => 24 + 4 * value.len(),
             NbtElement::I64Vec(value) => 24 + 8 * value.len(),
-            NbtElement::List(value, _) => {
+            NbtElement::List(value) => {
                 let mut i = 37;
-                i += 4 * value.len();
-                for element in value {
+                i += 4 * value.0.len();
+                for element in value.0 {
                     i += element.get_size_in_bytes();
                 }
                 i
@@ -200,22 +202,22 @@ impl NbtElement {
             NbtElement::U8Vec(value) => visitor.visit_u8_arr(value.to_vec()),
             NbtElement::I32Vec(value) => visitor.visit_i32_arr(value.to_vec()),
             NbtElement::I64Vec(value) => visitor.visit_i64_arr(value.to_vec()),
-            NbtElement::List(value, _) => {
+            NbtElement::List(value) => {
                 match visitor.visit_list_meta(
-                    NbtType::from_id(if value.is_empty() {
+                    NbtType::from_id(if value.0.is_empty() {
                         0
                     } else {
-                        value.get(0).unwrap().get_type()
+                        value.0.get(0).unwrap().get_type()
                     })
                     .unwrap(),
-                    value.len(),
+                    value.0.len(),
                 ) {
                     ScannerResult::Break => return visitor.end_nested(),
                     ScannerResult::Halt => return ScannerResult::Halt,
                     _ => (),
                 }
-                for i in 0..value.len() {
-                    let element = value.get(i).unwrap();
+                for i in 0..value.0.len() {
+                    let element = value.0.get(i).unwrap();
                     match visitor.start_list_item(element.get_nbt_type(), i) {
                         scanner::ScannerNestedResult::Skip => continue,
                         scanner::ScannerNestedResult::Break => return visitor.end_nested(),
@@ -279,7 +281,7 @@ impl NbtElement {
             NbtElement::U8Vec(_) => NbtType::U8Vec,
             NbtElement::I32Vec(_) => NbtType::I32Vec,
             NbtElement::I64Vec(_) => NbtType::I64Vec,
-            NbtElement::List(_, _) => NbtType::List,
+            NbtElement::List(_) => NbtType::List,
             NbtElement::Compound(_) => NbtType::Compound,
             NbtElement::End => NbtType::End,
         }
@@ -409,7 +411,7 @@ impl NbtType {
                 for _ in 0..j {
                     list.push(nbt_type.read(input, i + 1, tracker)?);
                 }
-                Ok(NbtElement::List(list, b))
+                Ok(NbtElement::List((list, b)))
             }
             NbtType::Compound => {
                 let mut b: u8;
@@ -733,7 +735,6 @@ impl Display for NbtElement {
     }
 }
 
-#[derive(Default)]
 pub struct NbtTagSizeTracker {
     max_bytes: usize,
     allocated_bytes: usize,
@@ -759,5 +760,11 @@ impl NbtTagSizeTracker {
 
     pub fn get_allocated_bytes(&self) -> usize {
         self.allocated_bytes
+    }
+}
+
+impl Default for NbtTagSizeTracker {
+    fn default() -> Self {
+        Self::new(0x200000)
     }
 }
