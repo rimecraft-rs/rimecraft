@@ -8,7 +8,6 @@ pub mod uuids;
 
 use std::{
     fmt::{Display, Write},
-    io::{self, Read},
     process::Command,
 };
 use url::Url;

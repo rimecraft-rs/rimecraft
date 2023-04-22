@@ -114,7 +114,7 @@ impl NbtElement {
                 };
                 output.write_all(&mut [type_u])?;
                 output.write_all(&mut (value.0.len() as i32).to_be_bytes())?;
-                for element in value.0 {
+                for element in &value.0 {
                     element.write(output)?;
                 }
             }
@@ -168,7 +168,7 @@ impl NbtElement {
             NbtElement::List(value) => {
                 let mut i = 37;
                 i += 4 * value.0.len();
-                for element in value.0 {
+                for element in &value.0 {
                     i += element.get_size_in_bytes();
                 }
                 i

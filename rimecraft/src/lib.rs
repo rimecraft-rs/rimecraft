@@ -9,7 +9,7 @@ pub mod transfer;
 pub mod util;
 
 mod error {
-    use std::{error, fmt::Display, io, result};
+    use std::{error, fmt::Display, result};
 
     pub type Result<T> = result::Result<T, Error>;
 

@@ -80,14 +80,14 @@ impl NbtElementVisitor for StringNbtWriter {
                 }
                 self.result.push(']');
             }
-            NbtElement::List(value, _) => {
+            NbtElement::List(value) => {
                 self.result.push('[');
-                for i in 0..value.len() {
+                for i in 0..value.0.len() {
                     if i != 0 {
                         self.result.push(',');
                     }
                     self.result
-                        .push_str(StringNbtWriter::new().apply(value.get(i).unwrap()));
+                        .push_str(StringNbtWriter::new().apply(value.0.get(i).unwrap()));
                 }
                 self.result.push(']');
             }

@@ -126,17 +126,13 @@ impl TransferVariant<Item> for ItemVariant {
         let registry = registries::ITEM.lock().unwrap();
         let item = registry
             .get_raw_id_from_id(
-                match Identifier::parse(compound::get_str(tag, "item").to_string()) {
-                    Some(id) => &id,
-                    None => &registry.get_default_id(),
+                &match Identifier::parse(compound::get_str(tag, "item").to_string()) {
+                    Some(id) => id,
+                    None => registry.get_default_id().clone(),
                 },
             )
             .unwrap_or(registry.get_default_raw_id());
-        let nbt = if tag.contains_key("tag") {
-            Some(compound::get_compound(tag, "tag").clone())
-        } else {
-            None
-        };
+        let nbt = compound::get_compound(tag, "tag").map(|n| n.clone());
         Self::new(item, nbt)
     }
 

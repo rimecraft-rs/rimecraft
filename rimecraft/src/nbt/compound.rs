@@ -49,38 +49,38 @@ pub fn get_str<'a>(nbt: &'a NbtCompound, key: &str) -> &'a str {
     }
 }
 
-pub fn get_u8_vec<'a>(nbt: &'a NbtCompound, key: &str) -> &'a Vec<u8> {
+pub fn get_u8_vec<'a>(nbt: &'a NbtCompound, key: &str) -> Vec<&'a u8> {
     match nbt.get(key) {
-        Some(NbtElement::U8Vec(value)) => value,
-        _ => &Vec::new(),
+        Some(NbtElement::U8Vec(value)) => value.into_iter().collect(),
+        _ => Vec::new(),
     }
 }
 
-pub fn get_i32_vec<'a>(nbt: &'a NbtCompound, key: &str) -> &'a Vec<i32> {
+pub fn get_i32_vec<'a>(nbt: &'a NbtCompound, key: &str) -> Vec<&'a i32> {
     match nbt.get(key) {
-        Some(NbtElement::I32Vec(value)) => value,
-        _ => &Vec::new(),
+        Some(NbtElement::I32Vec(value)) => value.into_iter().collect(),
+        _ => Vec::new(),
     }
 }
 
-pub fn get_i64_vec<'a>(nbt: &'a NbtCompound, key: &str) -> &'a Vec<i64> {
+pub fn get_i64_vec<'a>(nbt: &'a NbtCompound, key: &str) -> Vec<&'a i64> {
     match nbt.get(key) {
-        Some(NbtElement::I64Vec(value)) => value,
-        _ => &Vec::new(),
+        Some(NbtElement::I64Vec(value)) => value.into_iter().collect(),
+        _ => Vec::new(),
     }
 }
 
-pub fn get_compound<'a>(nbt: &'a NbtCompound, key: &str) -> &'a NbtCompound {
+pub fn get_compound<'a>(nbt: &'a NbtCompound, key: &str) -> Option<&'a NbtCompound> {
     match nbt.get(key) {
-        Some(NbtElement::Compound(value)) => value,
-        _ => &NbtCompound::new(),
+        Some(NbtElement::Compound(value)) => Some(value),
+        _ => None,
     }
 }
 
-pub fn get_list<'a>(nbt: &'a NbtCompound, key: &str) -> &'a NbtList {
+pub fn get_list<'a>(nbt: &'a NbtCompound, key: &str) -> Option<&'a NbtList> {
     match nbt.get(key) {
-        Some(NbtElement::List(value)) => value,
-        _ => &(Vec::new(), 0),
+        Some(NbtElement::List(value)) => Some(value),
+        _ => None,
     }
 }
 

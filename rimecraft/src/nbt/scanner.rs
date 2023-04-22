@@ -81,9 +81,9 @@ impl NbtCollector {
     fn push_stack(&mut self, nbt_type: &NbtType) {
         match nbt_type {
             NbtType::List => {
-                self.root = Some(NbtElement::List(Vec::new(), super::END_TYPE));
+                self.root = Some(NbtElement::List((Vec::new(), super::END_TYPE)));
                 self.stack.push_back(Box::new(|e, s, _| match s {
-                    Some(NbtElement::List(ls, _)) => ls.push(e.to_owned()),
+                    Some(NbtElement::List(ls)) => ls.0.push(e.to_owned()),
                     _ => (),
                 }));
             }
@@ -175,9 +175,9 @@ impl NbtScanner for NbtCollector {
     fn start(&mut self, nbt_type: NbtType) -> ScannerResult {
         match nbt_type {
             NbtType::List => {
-                self.root = Some(NbtElement::List(Vec::new(), END_TYPE));
+                self.root = Some(NbtElement::List((Vec::new(), END_TYPE)));
                 self.stack.push_back(Box::new(|a, b, _| match b {
-                    Some(NbtElement::List(ls, _)) => ls.push(a.to_owned()),
+                    Some(NbtElement::List(ls)) => ls.0.push(a.to_owned()),
                     _ => (),
                 }));
             }

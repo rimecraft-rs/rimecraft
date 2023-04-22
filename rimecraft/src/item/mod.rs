@@ -121,18 +121,14 @@ impl From<&NbtCompound> for ItemStack {
         let registry = registries::ITEM.lock().unwrap();
         let item = registry
             .get_raw_id_from_id(
-                match Identifier::parse(compound::get_str(value, "id").to_string()) {
-                    Some(id) => &id,
-                    None => &registry.get_default_id(),
+                &match Identifier::parse(compound::get_str(value, "id").to_string()) {
+                    Some(id) => id,
+                    None => registry.get_default_id().clone(),
                 },
             )
             .unwrap_or(registry.get_default_raw_id());
         drop(registry);
-        let nbt = if value.contains_key("tag") {
-            Some(compound::get_compound(value, "tag").clone())
-        } else {
-            None
-        };
+        let nbt = compound::get_compound(value, "tag").map(|n| n.clone());
         Self {
             variant: ItemVariant::new(item, nbt),
             count: compound::get_u8(value, "Count") as u32,
