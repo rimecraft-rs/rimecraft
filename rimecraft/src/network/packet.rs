@@ -249,7 +249,7 @@ impl<T: Buf + BufMut> PacketBytes<T> {
     }
 
     pub fn get_identifier(&mut self) -> crate::Result<Identifier> {
-        match self.get_string(None).map(|s| Identifier::parse(s)) {
+        match self.get_string(None).map(Identifier::parse) {
             Ok(Some(e)) => Ok(e),
             _ => Err(crate::Error::Decoder("Can't read identifier".to_string())),
         }

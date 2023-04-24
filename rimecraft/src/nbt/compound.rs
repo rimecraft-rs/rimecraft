@@ -51,21 +51,21 @@ pub fn get_str<'a>(nbt: &'a NbtCompound, key: &str) -> &'a str {
 
 pub fn get_u8_vec<'a>(nbt: &'a NbtCompound, key: &str) -> Vec<&'a u8> {
     match nbt.get(key) {
-        Some(NbtElement::U8Vec(value)) => value.into_iter().collect(),
+        Some(NbtElement::U8Vec(value)) => value.iter().collect(),
         _ => Vec::new(),
     }
 }
 
 pub fn get_i32_vec<'a>(nbt: &'a NbtCompound, key: &str) -> Vec<&'a i32> {
     match nbt.get(key) {
-        Some(NbtElement::I32Vec(value)) => value.into_iter().collect(),
+        Some(NbtElement::I32Vec(value)) => value.iter().collect(),
         _ => Vec::new(),
     }
 }
 
 pub fn get_i64_vec<'a>(nbt: &'a NbtCompound, key: &str) -> Vec<&'a i64> {
     match nbt.get(key) {
-        Some(NbtElement::I64Vec(value)) => value.into_iter().collect(),
+        Some(NbtElement::I64Vec(value)) => value.iter().collect(),
         _ => Vec::new(),
     }
 }

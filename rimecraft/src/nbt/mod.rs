@@ -92,7 +92,7 @@ impl NbtElement {
             }
             NbtElement::U8Vec(value) => {
                 output.write_all(&(value.len() as i32).to_be_bytes())?;
-                output.write_all(&value)?;
+                output.write_all(value)?;
             }
             NbtElement::I32Vec(value) => {
                 output.write_all(&(value.len() as i32).to_be_bytes())?;

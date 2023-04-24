@@ -9,7 +9,7 @@ pub fn write(nbt: &NbtElement, output: &mut impl Write) -> io::Result<()> {
     if nbt.get_type() == 0 {
         return Ok(());
     }
-    output.write(&(0 as u16).to_be_bytes())?;
+    output.write(&0_u16.to_be_bytes())?;
     nbt.write(output)
 }
 

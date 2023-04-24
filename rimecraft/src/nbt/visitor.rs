@@ -24,7 +24,7 @@ impl StringNbtWriter {
 impl NbtElementVisitor for StringNbtWriter {
     fn visit(&mut self, element: &NbtElement) {
         match element {
-            NbtElement::String(value) => self.result.push_str(&string_escape(&value)),
+            NbtElement::String(value) => self.result.push_str(&string_escape(value)),
             NbtElement::U8(value) => {
                 self.result.push_str(&value.to_string());
                 self.result.push('b')
@@ -100,7 +100,7 @@ impl NbtElementVisitor for StringNbtWriter {
                         self.result.push(',');
                     }
                     self.result.push_str(&{
-                        if {
+                        let res = {
                             let mut b = true;
                             for c in string.chars() {
                                 if !(c <= 'Z'
@@ -118,7 +118,7 @@ impl NbtElementVisitor for StringNbtWriter {
                                 }
                             }
                             b
-                        } {
+                        }; if res {
                             string.to_string()
                         } else {
                             string_escape(string)
@@ -126,7 +126,7 @@ impl NbtElementVisitor for StringNbtWriter {
                     });
                     self.result.push(':');
                     self.result
-                        .push_str(&StringNbtWriter::new().apply(value.get(string).unwrap()));
+                        .push_str(StringNbtWriter::new().apply(value.get(string).unwrap()));
                 }
                 self.result.push('}');
             }

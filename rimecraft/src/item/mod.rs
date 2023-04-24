@@ -87,7 +87,7 @@ impl ItemStack {
         self.count -= count
     }
 
-    pub fn split(&mut self, amount: u32) -> Self {
+    pub fn split(&mut self, _amount: u32) -> Self {
         let i = min(self.count, self.count);
         let mut stack = self.clone();
         stack.set_count(i);
@@ -128,7 +128,7 @@ impl From<&NbtCompound> for ItemStack {
             )
             .unwrap_or(registry.get_default_raw_id());
         drop(registry);
-        let nbt = compound::get_compound(value, "tag").map(|n| n.clone());
+        let nbt = compound::get_compound(value, "tag").cloned();
         Self {
             variant: ItemVariant::new(item, nbt),
             count: compound::get_u8(value, "Count") as u32,

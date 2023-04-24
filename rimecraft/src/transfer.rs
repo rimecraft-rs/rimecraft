@@ -28,7 +28,7 @@ pub trait TransferVariant<O>: Sized {
     }
 
     fn clone_nbt(&self) -> Option<NbtCompound> {
-        self.get_nbt().map(|b| b.clone())
+        self.get_nbt().cloned()
     }
 
     fn clone_or_create_nbt(&self) -> NbtCompound {
@@ -118,7 +118,7 @@ impl TransferVariant<Item> for ItemVariant {
         } else {
             buf.put_bool(true);
             buf.put_u32(self.raw_id as u32);
-            let _ = buf.put_nbt(self.nbt.clone()).unwrap();
+            buf.put_nbt(self.nbt.clone()).unwrap();
         }
     }
 
@@ -132,7 +132,7 @@ impl TransferVariant<Item> for ItemVariant {
                 },
             )
             .unwrap_or(registry.get_default_raw_id());
-        let nbt = compound::get_compound(tag, "tag").map(|n| n.clone());
+        let nbt = compound::get_compound(tag, "tag").cloned();
         Self::new(item, nbt)
     }
 

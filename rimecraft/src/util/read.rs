@@ -49,7 +49,7 @@ impl<'a> ReadHelper<'a> {
     pub fn read_char(&mut self) -> io::Result<char> {
         let mut arr = [0; 2];
         self.read.read_exact(&mut arr)?;
-        Ok(((arr[0] << 8) | (arr[1] & 0xff)) as char)
+        Ok(((arr[0] << 8) | arr[1]) as char)
     }
 
     pub fn read_i32(&mut self) -> io::Result<i32> {
