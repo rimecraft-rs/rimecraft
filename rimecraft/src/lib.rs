@@ -40,13 +40,13 @@ pub mod consts {
     use crate::version::RimecraftVersion;
     use once_cell::sync::Lazy;
 
-    pub const SNBT_TOO_OLD_THRESHOLD: i64 = 3318;
+    pub const SNBT_TOO_OLD_THRESHOLD: i64 = 3437;
 
     pub static GAME_VERSION: Lazy<RimecraftVersion> =
         Lazy::new(|| RimecraftVersion::create().unwrap());
 
     pub fn get_protocol_version() -> i64 {
-        762
+        1073741955
     }
 }
 
@@ -143,12 +143,12 @@ pub mod version {
         fn default() -> Self {
             Self {
                 id: uuid::Uuid::new_v4().to_string().replace('-', ""),
-                name: String::from("1.19.4"),
-                stable: true,
-                save_version: SaveVersion::new(3337, String::from("main")),
+                name: String::from("23w16a"),
+                stable: false,
+                save_version: SaveVersion::new(3449, String::from("main")),
                 protocol_version: super::consts::get_protocol_version(),
-                resource_pack_version: 13,
-                data_pack_version: 12,
+                resource_pack_version: 14,
+                data_pack_version: 14,
                 build_time: NaiveDate::default(),
             }
         }
