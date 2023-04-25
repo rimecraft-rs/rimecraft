@@ -2,11 +2,10 @@ use crate::{
     item::Item,
     nbt::{compound, NbtCompound, NbtElement, NbtTagSizeTracker},
     network::packet::PacketBytes,
-    registry::{registries, tag::TagKey, DefaultedRegistry, Registry},
-    util::Identifier,
+    registry::{registries, tag::TagKey, Registry},
+    util::{Identifier, collection::IndexedIterable},
 };
 use bytes::{Buf, BufMut};
-use std::ops::Deref;
 
 pub trait TransferVariant<O>: Sized {
     fn is_blank(&self) -> bool;
@@ -19,8 +18,24 @@ pub trait TransferVariant<O>: Sized {
     fn from_nbt(nbt: &NbtCompound) -> Self;
     fn from_packet<T: Buf + BufMut>(buf: &mut PacketBytes<T>) -> Self;
 
+    fn set_nbt(&mut self, nbt: NbtCompound);
+
     fn has_nbt(&self) -> bool {
         self.get_nbt().is_some()
+    }
+
+    fn get_or_create_nbt(&mut self) -> &NbtCompound {
+        if !self.has_nbt() {
+            self.set_nbt(NbtCompound::new())
+        }
+        self.get_nbt().unwrap()
+    }
+
+    fn get_or_create_nbt_mut(&mut self) -> &mut NbtCompound {
+        if !self.has_nbt() {
+            self.set_nbt(NbtCompound::new())
+        }
+        self.get_nbt_mut().unwrap()
     }
 
     fn nbt_matches(&self, other: &NbtCompound) -> bool {
@@ -35,7 +50,7 @@ pub trait TransferVariant<O>: Sized {
         self.clone_nbt().unwrap_or(NbtCompound::new())
     }
 
-    fn get_from_registry<'a, T: Registry<O>>(&self, registry: &'a T) -> Option<&'a O> {
+    fn get_from_registry<'a>(&self, registry: &'a Registry<O>) -> Option<&'a O> {
         registry.get_from_raw_id(self.get_raw_id())
     }
 }
@@ -55,7 +70,7 @@ impl ItemVariant {
         self.nbt = nbt
     }
 
-    pub fn is_in<T: Registry<Item>>(&self, registry: &T, tag_key: &TagKey<Item, T>) -> bool {
+    pub fn is_in(&self, registry: &Registry<Item>, tag_key: &TagKey<Item>) -> bool {
         match registry.get_entry_from_raw_id(self.raw_id) {
             Some(entry) => entry.get_tags().iter().any(|t| t == &tag_key),
             _ => false,
@@ -63,14 +78,18 @@ impl ItemVariant {
     }
 }
 
+impl Default for ItemVariant {
+    fn default() -> Self {
+        Self {
+            raw_id: registries::ITEM.read().unwrap().get_default_raw_id(),
+            nbt: None,
+        }
+    }
+}
+
 impl TransferVariant<Item> for ItemVariant {
     fn is_blank(&self) -> bool {
-        self.raw_id
-            == registries::ITEM
-                .lock()
-                .unwrap()
-                .deref()
-                .get_default_raw_id()
+        self.raw_id == registries::ITEM.read().unwrap().get_default_raw_id()
     }
 
     fn get_raw_id(&self) -> usize {
@@ -91,13 +110,17 @@ impl TransferVariant<Item> for ItemVariant {
         }
     }
 
+    fn set_nbt(&mut self, nbt: NbtCompound) {
+        self.nbt = Some(nbt);
+    }
+
     fn to_nbt(&self) -> NbtCompound {
         let mut result = NbtCompound::new();
         result.insert(
             "item".to_string(),
             NbtElement::String(
                 registries::ITEM
-                    .lock()
+                    .read()
                     .unwrap()
                     .get_entry_from_raw_id(self.raw_id)
                     .unwrap()
@@ -127,7 +150,7 @@ impl TransferVariant<Item> for ItemVariant {
     }
 
     fn from_nbt(tag: &NbtCompound) -> Self {
-        let registry = registries::ITEM.lock().unwrap();
+        let registry = registries::ITEM.read().unwrap();
         let item = registry
             .get_raw_id_from_id(
                 &match Identifier::parse(compound::get_str(tag, "item").to_string()) {
@@ -150,15 +173,6 @@ impl TransferVariant<Item> for ItemVariant {
                 _ => None,
             };
             Self::new(item, nbt)
-        }
-    }
-}
-
-impl Default for ItemVariant {
-    fn default() -> Self {
-        Self {
-            raw_id: registries::ITEM.lock().unwrap().get_default_raw_id(),
-            nbt: None,
         }
     }
 }

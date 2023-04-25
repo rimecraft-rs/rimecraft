@@ -1,22 +1,22 @@
-use super::{tag::TagKey, Registry, RegistryKey};
+use super::{tag::TagKey, RegistryKey};
 use crate::util::Identifier;
 use datafixerupper::datafixers::util::Either;
 use std::fmt::Display;
 
-pub enum RegistryEntry<T, R: Registry<T>> {
+pub enum RegistryEntry<T> {
     Direct(T),
-    Reference(ReferenceEntry<T, R>),
+    Reference(ReferenceEntry<T>),
 }
 
-impl<T, R: Registry<T>> RegistryEntry<T, R> {
-    pub fn as_ref_entry(&self) -> Option<&ReferenceEntry<T, R>> {
+impl<T> RegistryEntry<T> {
+    pub fn as_ref_entry(&self) -> Option<&ReferenceEntry<T>> {
         match self {
             RegistryEntry::Direct(_) => None,
             RegistryEntry::Reference(r) => Some(r),
         }
     }
 
-    pub fn as_ref_entry_mut(&mut self) -> Option<&mut ReferenceEntry<T, R>> {
+    pub fn as_ref_entry_mut(&mut self) -> Option<&mut ReferenceEntry<T>> {
         match self {
             RegistryEntry::Direct(_) => None,
             RegistryEntry::Reference(r) => Some(r),
@@ -80,14 +80,14 @@ impl<T, R: Registry<T>> RegistryEntry<T, R> {
         }
     }
 
-    pub fn is_in(&self, tag: &TagKey<T, R>) -> bool {
+    pub fn is_in(&self, tag: &TagKey<T>) -> bool {
         match self {
             RegistryEntry::Direct(_) => false,
             RegistryEntry::Reference(r) => r.tags.contains(tag),
         }
     }
 
-    pub fn get_tags(&self) -> Vec<&TagKey<T, R>> {
+    pub fn get_tags(&self) -> Vec<&TagKey<T>> {
         match self {
             RegistryEntry::Direct(_) => Vec::new(),
             RegistryEntry::Reference(r) => r.tags.iter().collect(),
@@ -112,7 +112,7 @@ impl<T, R: Registry<T>> RegistryEntry<T, R> {
     }
 }
 
-impl<T: Display, R: Registry<T>> Display for RegistryEntry<T, R> {
+impl<T: Display> Display for RegistryEntry<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RegistryEntry::Direct(value) => {
@@ -139,14 +139,14 @@ impl<T: Display, R: Registry<T>> Display for RegistryEntry<T, R> {
     }
 }
 
-pub struct ReferenceEntry<T, R: Registry<T>> {
+pub struct ReferenceEntry<T> {
     pub value: Option<T>,
     pub registry_key: Option<RegistryKey<T>>,
     pub reference_type: ReferenceType,
-    pub tags: Vec<TagKey<T, R>>,
+    pub tags: Vec<TagKey<T>>,
 }
 
-impl<T, R: Registry<T>> ReferenceEntry<T, R> {
+impl<T> ReferenceEntry<T> {
     fn new(
         reference_type: ReferenceType,
         registry_key: Option<RegistryKey<T>>,
@@ -167,19 +167,8 @@ impl<T, R: Registry<T>> ReferenceEntry<T, R> {
     pub fn intrusive(value: Option<T>) -> Self {
         Self::new(ReferenceType::Intrusive, None, value)
     }
-}
 
-impl<T: PartialEq, R: Registry<T>> ReferenceEntry<T, R> {
-    pub fn set_value(&mut self, value: T) {
-        if !(self.reference_type == ReferenceType::Intrusive
-            && self.value.is_some()
-            && self.value.as_ref().unwrap() == &value)
-        {
-            self.value = Some(value)
-        }
-    }
-
-    pub fn set_tags(&mut self, tags: Vec<TagKey<T, R>>) {
+    pub fn set_tags(&mut self, tags: Vec<TagKey<T>>) {
         self.tags = tags
     }
 
@@ -197,10 +186,19 @@ impl<T: PartialEq, R: Registry<T>> ReferenceEntry<T, R> {
     }
 }
 
+impl<T: PartialEq> ReferenceEntry<T> {
+    pub fn set_value(&mut self, value: T) {
+        if !(self.reference_type == ReferenceType::Intrusive
+            && self.value.is_some()
+            && self.value.as_ref().unwrap() == &value)
+        {
+            self.value = Some(value)
+        }
+    }
+}
+
 #[derive(PartialEq, Eq)]
 pub enum ReferenceType {
     StandAlone,
     Intrusive,
 }
-
-pub trait RegistryEntryOwner<T> {}

@@ -259,9 +259,9 @@ impl<T: Buf + BufMut> PacketBytes<T> {
         self.put_string(id.to_string(), None)
     }
 
-    pub fn get_registry_key<K, R: Registry<K>>(
+    pub fn get_registry_key<K>(
         &mut self,
-        registry_ref: &RegistryKey<R>,
+        registry_ref: &RegistryKey<Registry<K>>,
     ) -> crate::Result<RegistryKey<K>> {
         let identifier = self.get_identifier()?;
         Ok(RegistryKey::of(registry_ref, identifier))
