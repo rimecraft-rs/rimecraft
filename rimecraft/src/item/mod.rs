@@ -1,12 +1,12 @@
-use std::cmp::min;
-
 use crate::{
     nbt::{compound, NbtCompound, NbtElement},
-    registry::{registries, DefaultedRegistry, Registry},
+    registry::DefaultedRegistry,
     transfer::{ItemVariant, TransferVariant},
     util::Identifier,
 };
+use std::cmp::min;
 
+#[derive(Clone)]
 pub struct Item {
     max_count: u32,
     max_damage: Option<u32>,
@@ -49,18 +49,53 @@ impl Default for Item {
 pub struct ItemStack {
     variant: ItemVariant,
     count: u32,
+    item_cache: Item,
 }
 
 impl ItemStack {
-    pub fn new(item: usize, count: u32, nbt: Option<NbtCompound>) -> Self {
+    const UNBREAKABLE_KEY: &str = "Unbreakable";
+    const DAMAGE_KEY: &str = "Damage";
+
+    pub fn new<T: DefaultedRegistry<Item>>(
+        item: usize,
+        registry: &T,
+        count: u32,
+        nbt: Option<NbtCompound>,
+    ) -> Self {
+        Self::from_variant(ItemVariant::new(item, nbt), registry, count)
+    }
+
+    pub fn from_variant<T: DefaultedRegistry<Item>>(
+        variant: ItemVariant,
+        registry: &T,
+        count: u32,
+    ) -> Self {
+        let item = registry
+            .get_from_raw_id_default(variant.get_raw_id())
+            .clone();
         Self {
-            variant: ItemVariant::new(item, nbt),
+            variant,
             count,
+            item_cache: item,
         }
     }
 
-    pub fn from_variant(variant: ItemVariant, count: u32) -> Self {
-        Self { variant, count }
+    pub fn from_nbt<T: DefaultedRegistry<Item>>(value: &NbtCompound, registry: &T) -> Self {
+        let item = registry
+            .get_raw_id_from_id(
+                &match Identifier::parse(compound::get_str(value, "id").to_string()) {
+                    Some(id) => id,
+                    None => registry.get_default_id().clone(),
+                },
+            )
+            .unwrap_or(registry.get_default_raw_id());
+        drop(registry);
+        let nbt = compound::get_compound(value, "tag").cloned();
+        Self::from_variant(
+            ItemVariant::new(item, nbt),
+            registry,
+            compound::get_u8(value, "Count") as u32,
+        )
     }
 
     pub fn get_variant(&self) -> &ItemVariant {
@@ -69,6 +104,10 @@ impl ItemStack {
 
     pub fn get_variant_mut(&mut self) -> &mut ItemVariant {
         &mut self.variant
+    }
+
+    pub fn get_cached_item(&self) -> &Item {
+        &self.item_cache
     }
 
     pub fn is_empty(&self) -> bool {
@@ -95,15 +134,52 @@ impl ItemStack {
         stack
     }
 
-    pub fn write_nbt(&self, nbt: &mut NbtCompound) {
-        let identifier = registries::ITEM
-            .lock()
-            .unwrap()
+    pub fn clone_and_empty(&mut self) -> ItemStack {
+        let stack = self.clone();
+        self.set_count(0);
+        stack
+    }
+
+    pub fn write_nbt<T: DefaultedRegistry<Item>>(&self, registry: &T, nbt: &mut NbtCompound) {
+        let identifier = registry
             .get_entry_from_raw_id(self.variant.get_raw_id())
             .map(|e| e.get_key().unwrap().value.to_string())
             .unwrap_or("rimecraft:air".to_string());
         nbt.insert("id".to_string(), NbtElement::String(identifier));
         nbt.insert("Count".to_string(), NbtElement::U8(self.count as u8));
+    }
+
+    pub fn get_max_count(&self) -> u32 {
+        self.item_cache.max_count
+    }
+
+    pub fn is_stackable(&self) -> bool {
+        self.get_max_count() > 1 && (!self.is_damageable() || !self.is_damaged())
+    }
+
+    pub fn is_damageable(&self) -> bool {
+        if self.is_empty()
+            || self
+                .get_cached_item()
+                .get_max_damage()
+                .map_or(true, |e| e <= 0)
+        {
+            false
+        } else {
+            self.get_variant()
+                .get_nbt()
+                .map_or(true, |e| !compound::get_bool(e, Self::UNBREAKABLE_KEY))
+        }
+    }
+
+    pub fn is_damaged(&self) -> bool {
+        self.is_damageable() && self.get_damage() > 0
+    }
+
+    pub fn get_damage(&self) -> u32 {
+        self.variant
+            .get_nbt()
+            .map_or(0, |nbt| compound::get_i32(nbt, Self::DAMAGE_KEY) as u32)
     }
 }
 
@@ -112,26 +188,7 @@ impl Default for ItemStack {
         Self {
             variant: ItemVariant::default(),
             count: 1,
-        }
-    }
-}
-
-impl From<&NbtCompound> for ItemStack {
-    fn from(value: &NbtCompound) -> Self {
-        let registry = registries::ITEM.lock().unwrap();
-        let item = registry
-            .get_raw_id_from_id(
-                &match Identifier::parse(compound::get_str(value, "id").to_string()) {
-                    Some(id) => id,
-                    None => registry.get_default_id().clone(),
-                },
-            )
-            .unwrap_or(registry.get_default_raw_id());
-        drop(registry);
-        let nbt = compound::get_compound(value, "tag").cloned();
-        Self {
-            variant: ItemVariant::new(item, nbt),
-            count: compound::get_u8(value, "Count") as u32,
+            item_cache: Item::default(),
         }
     }
 }

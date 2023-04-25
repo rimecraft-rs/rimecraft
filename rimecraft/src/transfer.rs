@@ -34,6 +34,10 @@ pub trait TransferVariant<O>: Sized {
     fn clone_or_create_nbt(&self) -> NbtCompound {
         self.clone_nbt().unwrap_or(NbtCompound::new())
     }
+
+    fn get_from_registry<'a, T: Registry<O>>(&self, registry: &'a T) -> Option<&'a O> {
+        registry.get_from_raw_id(self.get_raw_id())
+    }
 }
 
 #[derive(PartialEq, Clone)]

@@ -118,7 +118,8 @@ impl NbtElementVisitor for StringNbtWriter {
                                 }
                             }
                             b
-                        }; if res {
+                        };
+                        if res {
                             string.to_string()
                         } else {
                             string_escape(string)
