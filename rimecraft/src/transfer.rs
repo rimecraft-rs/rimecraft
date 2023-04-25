@@ -3,7 +3,7 @@ use crate::{
     nbt::{compound, NbtCompound, NbtElement, NbtTagSizeTracker},
     network::packet::PacketBytes,
     registry::{registries, tag::TagKey, Registry},
-    util::{Identifier, collection::IndexedIterable},
+    util::{collection::IndexedIterable, Identifier},
 };
 use bytes::{Buf, BufMut};
 
