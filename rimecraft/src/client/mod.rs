@@ -3,6 +3,14 @@ pub mod main;
 pub mod resource;
 pub mod util;
 
+pub struct RimecraftClient {
+    resource_pack_dir: String,
+}
+
+impl RimecraftClient {
+    const GL_ERROR_DIALOGUE: &str = "Please make sure you have up-to-date drivers.";
+}
+
 pub struct WindowSettings {
     pub width: u32,
     pub height: u32,

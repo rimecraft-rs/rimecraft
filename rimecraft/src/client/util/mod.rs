@@ -2,19 +2,23 @@ pub mod render;
 
 use std::str::FromStr;
 use uuid::Uuid;
+use winit::event_loop::EventLoop;
+
+pub struct Window {
+    inner: winit::window::Window,
+    event_loop: EventLoop<()>,
+}
 
 pub enum AccountType {
     Legacy,
     MSA,
-    MOJANG,
 }
 
 impl AccountType {
     pub fn get_name(&self) -> &str {
         match self {
             AccountType::Legacy => "legacy",
-            AccountType::MSA => "mojang",
-            AccountType::MOJANG => "msa",
+            AccountType::MSA => "msa",
         }
     }
 
@@ -22,7 +26,6 @@ impl AccountType {
         match name {
             "legacy" => Some(Self::Legacy),
             "msa" => Some(Self::MSA),
-            "mojang" => Some(Self::MOJANG),
             _ => None,
         }
     }
