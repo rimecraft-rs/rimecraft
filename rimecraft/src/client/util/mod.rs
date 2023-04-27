@@ -1,12 +1,42 @@
 pub mod render;
 
+use glium::glutin::{
+    event_loop::EventLoop,
+    window::{self, WindowBuilder},
+};
 use std::str::FromStr;
 use uuid::Uuid;
-use winit::event_loop::EventLoop;
 
 pub struct Window {
-    inner: winit::window::Window,
+    inner: Option<window::Window>,
     event_loop: EventLoop<()>,
+}
+
+impl Window {
+    pub fn new(builder: WindowBuilder) -> Self {
+        let mut s = Self {
+            inner: None,
+            event_loop: EventLoop::new(),
+        };
+        s.inner = Some(builder.build(&s.event_loop).unwrap());
+        s
+    }
+
+    pub fn get_window(&self) -> &window::Window {
+        self.inner.as_ref().unwrap()
+    }
+
+    pub fn get_window_mut(&mut self) -> &mut window::Window {
+        self.inner.as_mut().unwrap()
+    }
+
+    pub fn get_event_loop(&self) -> &EventLoop<()> {
+        &self.event_loop
+    }
+
+    pub fn get_evnt_loop_mut(&mut self) -> &mut EventLoop<()> {
+        &mut self.event_loop
+    }
 }
 
 pub enum AccountType {

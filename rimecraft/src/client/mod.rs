@@ -5,6 +5,7 @@ pub mod util;
 
 pub struct RimecraftClient {
     resource_pack_dir: String,
+    window: util::Window,
 }
 
 impl RimecraftClient {
