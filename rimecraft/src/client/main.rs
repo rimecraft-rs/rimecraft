@@ -102,7 +102,7 @@ pub fn main(options: Option<OptionSet>) {
         ),
         args::Game::new(option_set.version, option_set.version_type),
     );
-    let client = RimecraftClientUnsynced::new(&run_args);
+    let _client = RimecraftClientUnsynced::new(&run_args);
     loop {}
 }
 

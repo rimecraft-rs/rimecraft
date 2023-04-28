@@ -1,4 +1,4 @@
-use self::{args::RunArgs, option::GameOptions, util::Session};
+use self::{args::RunArgs, util::Session};
 use crate::{
     consts,
     network::Proxy,
@@ -102,7 +102,7 @@ impl RimecraftClientUnsynced {
                     .unwrap();
                 thread::spawn(move || {
                     let el = event_loop;
-                    el.inner.run(|a, b, c| {});
+                    el.inner.run(|_a, _b, _c| {});
                 });
                 window
             },

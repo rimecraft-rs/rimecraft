@@ -51,7 +51,7 @@ impl<'a> ReadHelper<'a> {
         self.read.read_exact(&mut arr)?;
         char::from_u32(u32::from_be_bytes(arr)).map_or(
             Err(io::Error::new(io::ErrorKind::Other, "Unable to get char")),
-            |ok| Ok(ok),
+            Ok,
         )
     }
 
