@@ -1,19 +1,48 @@
-use self::{args::RunArgs, util::Session};
-use crate::{consts, network::Proxy, version::GameVersion};
-use glium::glutin::{dpi::PhysicalSize, window::WindowBuilder};
+use self::{args::RunArgs, option::GameOptions, util::Session};
+use crate::{
+    consts,
+    network::Proxy,
+    util::event::{default_phase, Event},
+    version::GameVersion,
+};
+use glium::glutin::{
+    dpi::PhysicalSize,
+    event,
+    event_loop::{ControlFlow, EventLoop},
+    window::{Window, WindowBuilder},
+};
 use log::info;
-use once_cell::{sync, unsync};
-use std::sync::RwLock;
+use once_cell::sync::Lazy;
+use std::{sync::RwLock, thread};
 
 pub mod blaze3d;
 pub mod main;
+pub mod option;
 pub mod resource;
 pub mod util;
 
-pub static INSTANCE: sync::Lazy<RwLock<Option<RimecraftClientSynced>>> =
-    sync::Lazy::new(|| RwLock::new(None));
-pub static mut INSTANCE_UNSAFE: unsync::Lazy<Option<RimecraftClientUnsynced>> =
-    unsync::Lazy::new(|| None);
+pub static INSTANCE: Lazy<RwLock<Option<RimecraftClientSynced>>> = Lazy::new(|| RwLock::new(None));
+pub static mut INSTANCE_UNSAFE: Option<RimecraftClientUnsynced> = None;
+
+static mut EVENT_LOOP: Option<EventLoop<()>> = None;
+
+pub struct WindowEventInput<'a, 'b> {
+    event: event::Event<'b, ()>,
+    control: &'a mut ControlFlow,
+}
+
+pub static WINDOW_EVENT: Lazy<RwLock<Event<&&mut WindowEventInput<'_, '_>, ()>>> =
+    Lazy::new(|| {
+        RwLock::new(Event::new(
+            |a, b: &&mut WindowEventInput<'_, '_>| {
+                for callback in a {
+                    callback(b)
+                }
+            },
+            |_| (),
+            vec![default_phase()],
+        ))
+    });
 
 pub struct RimecraftClientSynced {
     run_dir: String,
@@ -22,10 +51,11 @@ pub struct RimecraftClientSynced {
     version_type: String,
     netowk_proxy: Proxy,
     session: Session,
+    // options: GameOptions,
 }
 
 pub struct RimecraftClientUnsynced {
-    window: util::Window,
+    window: Window,
 }
 
 impl RimecraftClientSynced {
@@ -44,16 +74,37 @@ impl RimecraftClientSynced {
     }
 }
 
+pub struct EventLoopContainer {
+    pub inner: EventLoop<()>,
+}
+
+impl EventLoopContainer {
+    pub fn new(event_loop: EventLoop<()>) -> Self {
+        Self { inner: event_loop }
+    }
+}
+
+unsafe impl Send for EventLoopContainer {}
+
 impl RimecraftClientUnsynced {
     pub const GL_ERROR_DIALOGUE: &str = "Please make sure you have up-to-date drivers.";
 
     pub fn new(args: &RunArgs) -> Self {
         let client = Self {
             window: {
-                self::util::Window::new(WindowBuilder::new().with_inner_size(PhysicalSize::new(
-                    args.window_settings.width,
-                    args.window_settings.height,
-                )))
+                let event_loop: EventLoopContainer = EventLoopContainer::new(EventLoop::new());
+                let window = WindowBuilder::new()
+                    .with_inner_size(PhysicalSize::new(
+                        args.window_settings.width,
+                        args.window_settings.height,
+                    ))
+                    .build(&event_loop.inner)
+                    .unwrap();
+                thread::spawn(move || {
+                    let el = event_loop;
+                    el.inner.run(|a, b, c| {});
+                });
+                window
             },
         };
         client.update_window_title();
@@ -61,7 +112,7 @@ impl RimecraftClientUnsynced {
     }
 
     pub fn update_window_title(&self) {
-        self.window.get_window().set_title(&self.get_window_title())
+        self.window.set_title(&self.get_window_title())
     }
 
     fn get_window_title(&self) -> String {
