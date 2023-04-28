@@ -2,6 +2,7 @@ pub mod render;
 
 use glium::glutin::{
     event_loop::EventLoop,
+    monitor::MonitorHandle,
     window::{self, WindowBuilder},
 };
 use std::str::FromStr;
@@ -36,6 +37,10 @@ impl Window {
 
     pub fn get_evnt_loop_mut(&mut self) -> &mut EventLoop<()> {
         &mut self.event_loop
+    }
+
+    pub fn monitor_handler(&self) -> Option<MonitorHandle> {
+        self.get_window().current_monitor()
     }
 }
 

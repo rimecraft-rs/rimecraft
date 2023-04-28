@@ -7,6 +7,7 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use super::{
     args::{self, RunArgs},
     util::{AccountType, Session},
+    RimecraftClientUnsynced,
 };
 
 #[derive(Debug, Parser)]
@@ -68,6 +69,7 @@ pub fn main(options: Option<OptionSet>) {
             );
         }
     }
+    bootstrap::initialize();
     let account_type = AccountType::by_name(&option_set.user_type);
     if account_type.is_none() {
         warn!("Unrecognized user type: {}", option_set.user_type)
@@ -85,7 +87,7 @@ pub fn main(options: Option<OptionSet>) {
         str_to_optional(option_set.client_id),
         account_type.unwrap_or_default(),
     );
-    let _run_args = RunArgs::new(
+    let run_args = RunArgs::new(
         args::Network::new(session, proxy),
         super::WindowSettings::new(option_set.width, option_set.height),
         args::Directions::new(
@@ -100,7 +102,8 @@ pub fn main(options: Option<OptionSet>) {
         ),
         args::Game::new(option_set.version, option_set.version_type),
     );
-    bootstrap::initialize();
+    let client = RimecraftClientUnsynced::new(&run_args);
+    loop {}
 }
 
 fn str_to_optional(string: String) -> Option<String> {

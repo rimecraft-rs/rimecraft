@@ -47,9 +47,12 @@ impl<'a> ReadHelper<'a> {
     }
 
     pub fn read_char(&mut self) -> io::Result<char> {
-        let mut arr = [0; 2];
+        let mut arr = [0; 4];
         self.read.read_exact(&mut arr)?;
-        Ok(((arr[0] << 8) | arr[1]) as char)
+        char::from_u32(u32::from_be_bytes(arr)).map_or(
+            Err(io::Error::new(io::ErrorKind::Other, "Unable to get char")),
+            |ok| Ok(ok),
+        )
     }
 
     pub fn read_i32(&mut self) -> io::Result<i32> {

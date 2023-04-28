@@ -1,15 +1,75 @@
+use self::{args::RunArgs, util::Session};
+use crate::{consts, network::Proxy, version::GameVersion};
+use glium::glutin::{dpi::PhysicalSize, window::WindowBuilder};
+use log::info;
+use once_cell::{sync, unsync};
+use std::sync::RwLock;
+
 pub mod blaze3d;
 pub mod main;
 pub mod resource;
 pub mod util;
 
-pub struct RimecraftClient {
+pub static INSTANCE: sync::Lazy<RwLock<Option<RimecraftClientSynced>>> =
+    sync::Lazy::new(|| RwLock::new(None));
+pub static mut INSTANCE_UNSAFE: unsync::Lazy<Option<RimecraftClientUnsynced>> =
+    unsync::Lazy::new(|| None);
+
+pub struct RimecraftClientSynced {
+    run_dir: String,
     resource_pack_dir: String,
+    game_version: String,
+    version_type: String,
+    netowk_proxy: Proxy,
+    session: Session,
+}
+
+pub struct RimecraftClientUnsynced {
     window: util::Window,
 }
 
-impl RimecraftClient {
-    const GL_ERROR_DIALOGUE: &str = "Please make sure you have up-to-date drivers.";
+impl RimecraftClientSynced {
+    pub fn new(args: RunArgs) -> Self {
+        let s = Self {
+            run_dir: args.directories.run_dir,
+            resource_pack_dir: args.directories.resource_pack_dir,
+            game_version: args.game.version,
+            version_type: args.game.version_type,
+            netowk_proxy: args.network.net_proxy,
+            session: args.network.session,
+        };
+        info!("Setting user: {}", s.session.get_username());
+        info!("(Session ID is {})", s.session.get_session_id());
+        s
+    }
+}
+
+impl RimecraftClientUnsynced {
+    pub const GL_ERROR_DIALOGUE: &str = "Please make sure you have up-to-date drivers.";
+
+    pub fn new(args: &RunArgs) -> Self {
+        let client = Self {
+            window: {
+                self::util::Window::new(WindowBuilder::new().with_inner_size(PhysicalSize::new(
+                    args.window_settings.width,
+                    args.window_settings.height,
+                )))
+            },
+        };
+        client.update_window_title();
+        client
+    }
+
+    pub fn update_window_title(&self) {
+        self.window.get_window().set_title(&self.get_window_title())
+    }
+
+    fn get_window_title(&self) -> String {
+        let mut string = "Rimecraft".to_string();
+        string.push(' ');
+        string.push_str(consts::GAME_VERSION.get_name());
+        string
+    }
 }
 
 pub struct WindowSettings {
