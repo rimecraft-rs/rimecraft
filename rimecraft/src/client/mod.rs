@@ -13,7 +13,7 @@ use glium::glutin::{
 };
 use log::info;
 use once_cell::sync::Lazy;
-use std::{sync::RwLock, thread};
+use std::{rc::Rc, sync::RwLock, thread};
 
 pub mod blaze3d;
 pub mod main;
@@ -24,22 +24,18 @@ pub mod util;
 pub static INSTANCE: Lazy<RwLock<Option<RimecraftClientSynced>>> = Lazy::new(|| RwLock::new(None));
 pub static mut INSTANCE_UNSAFE: Option<RimecraftClientUnsynced> = None;
 
-static mut EVENT_LOOP: Option<EventLoop<()>> = None;
-
-pub struct WindowEventInput<'a, 'b> {
-    event: event::Event<'b, ()>,
-    control: &'a mut ControlFlow,
-}
-
-pub static WINDOW_EVENT: Lazy<RwLock<Event<&&mut WindowEventInput<'_, '_>, ()>>> =
+pub static WINDOW_EVENT: Lazy<RwLock<Event<Rc<event::Event<'_, ()>>, Option<ControlFlow>>>> =
     Lazy::new(|| {
         RwLock::new(Event::new(
-            |a, b: &&mut WindowEventInput<'_, '_>| {
-                for callback in a {
-                    callback(b)
+            Box::new(|callbacks, event: Rc<event::Event<'_, ()>>| {
+                for callback in callbacks {
+                    if let Some(b) = callback(event.clone()) {
+                        return Some(b);
+                    }
                 }
-            },
-            |_| (),
+                None
+            }),
+            Box::new(|_| None),
             vec![default_phase()],
         ))
     });
@@ -102,7 +98,11 @@ impl RimecraftClientUnsynced {
                     .unwrap();
                 thread::spawn(move || {
                     let el = event_loop;
-                    el.inner.run(|_a, _b, _c| {});
+                    el.inner.run(|event, _, flow| {
+                        if let Some(flow_r) = WINDOW_EVENT.read().unwrap().invoke(Rc::new(event)) {
+                            *flow = flow_r;
+                        }
+                    });
                 });
                 window
             },

@@ -10,12 +10,12 @@ pub mod events {
 
     pub static INITIALIZE: Lazy<Mutex<Event<(), ()>>> = Lazy::new(|| {
         Mutex::new(Event::new(
-            |c, _| {
+            Box::new(|c, _| {
                 for call in c {
                     call(())
                 }
-            },
-            |_| (),
+            }),
+            Box::new(|_| ()),
             vec![
                 event::default_phase(),
                 Identifier::parse("final".to_string()).unwrap(),
@@ -33,6 +33,5 @@ pub fn initialize() {
         unreachable!()
     }
     INITIALIZED.store(false, Ordering::Relaxed);
-    events::INITIALIZE.lock().unwrap().register_default(|_| ());
     // TODO: registries
 }

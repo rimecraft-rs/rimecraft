@@ -8,11 +8,11 @@ pub struct Event<I, O> {
 
 impl<I, O: Default> Event<I, O> {
     pub fn new_default(
-        invoker: impl Fn(Vec<&(dyn Fn(I) -> O + Send + Sync)>, I) -> O + 'static + Send + Sync,
+        invoker: Box<dyn Fn(Vec<&(dyn Fn(I) -> O + Send + Sync)>, I) -> O + Send + Sync>,
     ) -> Self {
         Self {
             phases: vec![(default_phase(), Vec::new())],
-            invoker: Box::new(invoker),
+            invoker: invoker,
             default_impl: Box::new(|_i| O::default()),
         }
     }
@@ -20,8 +20,8 @@ impl<I, O: Default> Event<I, O> {
 
 impl<I, O> Event<I, O> {
     pub fn new(
-        invoker: impl Fn(Vec<&(dyn Fn(I) -> O + Send + Sync)>, I) -> O + 'static + Send + Sync,
-        empty_impl: impl Fn(I) -> O + 'static + Send + Sync,
+        invoker: Box<dyn Fn(Vec<&(dyn Fn(I) -> O + Send + Sync)>, I) -> O + Send + Sync>,
+        empty_impl: Box<dyn Fn(I) -> O + Send + Sync>,
         mut phases: Vec<Identifier>,
     ) -> Self {
         if phases.is_empty() {
@@ -30,8 +30,8 @@ impl<I, O> Event<I, O> {
 
         Self {
             phases: phases.iter().map(|id| (id.clone(), Vec::new())).collect(),
-            invoker: Box::new(invoker),
-            default_impl: Box::new(empty_impl),
+            invoker,
+            default_impl: empty_impl,
         }
     }
 
@@ -54,19 +54,19 @@ impl<I, O> Event<I, O> {
 
     pub fn register(
         &mut self,
-        callback: impl Fn(I) -> O + 'static + Send + Sync,
+        callback: Box<dyn Fn(I) -> O + Send + Sync>,
         phase: &Identifier,
     ) -> bool {
         match self.phases.iter_mut().find(|p| p.0.eq(phase)) {
             Some(phase) => {
-                phase.1.push(Box::new(callback));
+                phase.1.push(callback);
                 true
             }
             None => false,
         }
     }
 
-    pub fn register_default(&mut self, callback: impl Fn(I) -> O + 'static + Send + Sync) -> bool {
+    pub fn register_default(&mut self, callback: Box<dyn Fn(I) -> O + Send + Sync>) -> bool {
         self.register(callback, &default_phase())
     }
 
