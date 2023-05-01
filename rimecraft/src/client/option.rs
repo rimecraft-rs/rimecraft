@@ -4,9 +4,7 @@ pub struct GameOptions {
     container: GameOptionsSerializeContainer,
 }
 
-impl GameOptions {
-    
-}
+impl GameOptions {}
 
 impl<'a> Deserialize<'a> for GameOptions {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
