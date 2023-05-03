@@ -21,12 +21,7 @@ use glium::glutin::{
 };
 use log::{debug, info};
 use once_cell::sync::Lazy;
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{RwLock, RwLockReadGuard},
-    thread,
-};
+use std::{rc::Rc, sync::RwLock, thread};
 
 pub static INSTANCE: Lazy<RwLock<Option<RimecraftClient>>> = Lazy::new(|| RwLock::new(None));
 

@@ -7,6 +7,8 @@ pub mod registry;
 pub mod resource;
 pub mod transfer;
 pub mod util;
+#[cfg(test)]
+mod tests;
 
 mod error {
     use std::{error, fmt::Display, result};
