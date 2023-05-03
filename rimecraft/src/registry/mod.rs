@@ -11,12 +11,12 @@ use crate::{
 };
 use datafixerupper::serialization::Lifecycle;
 use log::error;
-use std::fmt::Display;
+use std::{fmt::Display, marker::PhantomData};
 
 pub struct RegistryKey<T> {
     pub registry: Identifier,
     pub value: Identifier,
-    _none: Option<T>,
+    _phantom: PhantomData<T>,
 }
 
 impl<T> RegistryKey<T> {
@@ -24,7 +24,7 @@ impl<T> RegistryKey<T> {
         Self {
             registry,
             value,
-            _none: None,
+            _phantom: PhantomData,
         }
     }
 
@@ -44,7 +44,7 @@ impl<T> RegistryKey<T> {
             Some(RegistryKey {
                 registry: self.registry.clone(),
                 value: self.value.clone(),
-                _none: None,
+                _phantom: PhantomData,
             })
         } else {
             None
@@ -82,7 +82,7 @@ impl<T> Clone for RegistryKey<T> {
         Self {
             registry: self.registry.clone(),
             value: self.value.clone(),
-            _none: None,
+            _phantom: PhantomData,
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, marker::PhantomData};
 
 use crate::util::Identifier;
 
@@ -7,7 +7,7 @@ use super::{Registry, RegistryKey};
 pub struct TagKey<T> {
     registry: RegistryKey<Registry<T>>,
     id: Identifier,
-    _none: Option<T>,
+    _phantom: PhantomData<T>,
 }
 
 impl<T> TagKey<T> {
@@ -15,7 +15,7 @@ impl<T> TagKey<T> {
         Self {
             registry,
             id,
-            _none: None,
+            _phantom: PhantomData,
         }
     }
 
@@ -47,7 +47,7 @@ impl<T> Clone for TagKey<T> {
         Self {
             registry: self.registry.clone(),
             id: self.id.clone(),
-            _none: None,
+            _phantom: PhantomData,
         }
     }
 }

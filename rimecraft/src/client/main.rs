@@ -7,7 +7,7 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use super::{
     args::{self, RunArgs},
     util::{AccountType, Session},
-    RimecraftClientUnsynced,
+    RimecraftClient,
 };
 
 #[derive(Debug, Parser)]
@@ -77,18 +77,20 @@ pub fn main(options: Option<OptionSet>) {
     let username = option_set
         .username
         .unwrap_or(format!("Player{}", Utc::now().timestamp_millis() & 1000));
-    let session = Session::new(
-        username.clone(),
-        option_set
-            .uuid
-            .unwrap_or(uuids::get_offline_player_uuid(&username).to_string()),
-        option_set.access_token,
-        str_to_optional(option_set.xuid),
-        str_to_optional(option_set.client_id),
-        account_type.unwrap_or_default(),
-    );
-    let run_args = RunArgs::new(
-        args::Network::new(session, proxy),
+    *super::INSTANCE.write().unwrap() = Some(RimecraftClient::new(RunArgs::new(
+        args::Network::new(
+            Session::new(
+                username.clone(),
+                option_set
+                    .uuid
+                    .unwrap_or(uuids::get_offline_player_uuid(&username).to_string()),
+                option_set.access_token,
+                str_to_optional(option_set.xuid),
+                str_to_optional(option_set.client_id),
+                account_type.unwrap_or_default(),
+            ),
+            proxy,
+        ),
         super::WindowSettings::new(option_set.width, option_set.height),
         args::Directions::new(
             option_set.game_dir.clone(),
@@ -101,8 +103,7 @@ pub fn main(options: Option<OptionSet>) {
             option_set.asset_index,
         ),
         args::Game::new(option_set.version, option_set.version_type),
-    );
-    let _client = RimecraftClientUnsynced::new(&run_args);
+    )));
     loop {}
 }
 

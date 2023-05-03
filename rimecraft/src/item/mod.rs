@@ -49,7 +49,6 @@ impl Default for Item {
 pub struct ItemStack {
     variant: ItemVariant,
     count: u32,
-    item_cache: Item,
 }
 
 impl ItemStack {
@@ -61,16 +60,7 @@ impl ItemStack {
     }
 
     pub fn from_variant(variant: ItemVariant, count: u32) -> Self {
-        let item = registries::ITEM
-            .read()
-            .unwrap()
-            .get_from_raw_id_default(variant.get_raw_id())
-            .clone();
-        Self {
-            variant,
-            count,
-            item_cache: item,
-        }
+        Self { variant, count }
     }
 
     pub fn from_nbt(value: &NbtCompound) -> Self {
@@ -96,10 +86,6 @@ impl ItemStack {
 
     pub fn get_variant_mut(&mut self) -> &mut ItemVariant {
         &mut self.variant
-    }
-
-    pub fn get_cached_item(&self) -> &Item {
-        &self.item_cache
     }
 
     pub fn is_empty(&self) -> bool {
@@ -144,7 +130,11 @@ impl ItemStack {
     }
 
     pub fn get_max_count(&self) -> u32 {
-        self.item_cache.max_count
+        registries::ITEM
+            .read()
+            .unwrap()
+            .get_from_raw_id_default(self.variant.get_raw_id())
+            .get_max_count()
     }
 
     pub fn is_stackable(&self) -> bool {
@@ -153,8 +143,10 @@ impl ItemStack {
 
     pub fn is_damageable(&self) -> bool {
         if self.is_empty()
-            || self
-                .get_cached_item()
+            || registries::ITEM
+                .read()
+                .unwrap()
+                .get_from_raw_id_default(self.variant.get_raw_id())
                 .get_max_damage()
                 .map_or(true, |e| e <= 0)
         {
@@ -194,7 +186,6 @@ impl Default for ItemStack {
         Self {
             variant: ItemVariant::default(),
             count: 1,
-            item_cache: Item::default(),
         }
     }
 }

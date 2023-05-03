@@ -1,10 +1,27 @@
+use std::{fs::File, io::Read, path::Path};
+
 use serde::{Deserialize, Serialize};
 
+#[derive(Default)]
 pub struct GameOptions {
-    container: GameOptionsSerializeContainer,
+    pub container: GameOptionsSerializeContainer,
 }
 
-impl GameOptions {}
+impl GameOptions {
+    pub fn new(path: &str) -> Self {
+        let buf = Path::new(path).join("options.toml");
+        if let Ok(mut file) = File::open(buf.clone()) {
+            toml::from_str(&{
+                let mut string = String::new();
+                file.read_to_string(&mut string).unwrap();
+                string
+            })
+            .unwrap()
+        } else {
+            Self::default()
+        }
+    }
+}
 
 impl<'a> Deserialize<'a> for GameOptions {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -27,7 +44,7 @@ impl Serialize for GameOptions {
 }
 
 #[derive(Deserialize, Serialize)]
-struct GameOptionsSerializeContainer {
+pub struct GameOptionsSerializeContainer {
     pub monochrome_logo: bool,
     pub hide_lightning_flashes: bool,
     pub mouse_sensitivity: f32,
@@ -72,4 +89,55 @@ struct GameOptionsSerializeContainer {
     pub sprint_toogled: bool,
     pub hide_matched_names: bool,
     pub show_autosave_indicator: bool,
+}
+
+impl Default for GameOptionsSerializeContainer {
+    fn default() -> Self {
+        Self {
+            monochrome_logo: true,
+            hide_lightning_flashes: Default::default(),
+            mouse_sensitivity: Default::default(),
+            view_distance: Default::default(),
+            simulation_distance: Default::default(),
+            entity_distance_scaling: Default::default(),
+            max_fps: Default::default(),
+            ao: Default::default(),
+            chat_opacity: Default::default(),
+            chat_line_spacing: Default::default(),
+            text_background_opacity: Default::default(),
+            panorama_speed: Default::default(),
+            high_constrace: Default::default(),
+            chat_scale: Default::default(),
+            chat_width: Default::default(),
+            chat_height_unfocused: Default::default(),
+            chat_height_focused: Default::default(),
+            chat_delay: Default::default(),
+            notification_display_time: Default::default(),
+            mipmap_levels: Default::default(),
+            biome_blend_radius: Default::default(),
+            mouse_wheel_sensitvity: Default::default(),
+            raw_mouse_input: Default::default(),
+            auto_jump: Default::default(),
+            operator_items_tab: Default::default(),
+            auto_suggestions: Default::default(),
+            chat_colors: Default::default(),
+            chat_links: Default::default(),
+            chat_links_prompt: Default::default(),
+            enable_vsync: Default::default(),
+            entity_shadows: Default::default(),
+            force_unicode_font: Default::default(),
+            invert_y_mouse: Default::default(),
+            discrete_mouse_scroll: Default::default(),
+            reduced_debug_info: Default::default(),
+            show_subtitles: Default::default(),
+            directional_audio: Default::default(),
+            background_for_chat_only: Default::default(),
+            touchscreen: Default::default(),
+            bobview: Default::default(),
+            sneak_toggled: Default::default(),
+            sprint_toogled: Default::default(),
+            hide_matched_names: Default::default(),
+            show_autosave_indicator: Default::default(),
+        }
+    }
 }

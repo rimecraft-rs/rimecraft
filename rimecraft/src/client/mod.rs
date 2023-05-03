@@ -1,10 +1,12 @@
 pub mod blaze3d;
+pub mod device;
+pub mod gui;
 pub mod main;
 pub mod option;
 pub mod resource;
 pub mod util;
 
-use self::{args::RunArgs, util::Session};
+use self::{args::RunArgs, device::Mouse, option::GameOptions, util::Session};
 use crate::{
     consts,
     network::Proxy,
@@ -17,12 +19,16 @@ use glium::glutin::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
-use log::info;
+use log::{debug, info};
 use once_cell::sync::Lazy;
-use std::{rc::Rc, sync::RwLock, thread};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{RwLock, RwLockReadGuard},
+    thread,
+};
 
-pub static INSTANCE: Lazy<RwLock<Option<RimecraftClientSynced>>> = Lazy::new(|| RwLock::new(None));
-pub static mut INSTANCE_UNSAFE: Option<RimecraftClientUnsynced> = None;
+pub static INSTANCE: Lazy<RwLock<Option<RimecraftClient>>> = Lazy::new(|| RwLock::new(None));
 
 pub static WINDOW_EVENT: Lazy<RwLock<Event<Rc<event::Event<'_, ()>>, Option<ControlFlow>>>> =
     Lazy::new(|| {
@@ -40,53 +46,40 @@ pub static WINDOW_EVENT: Lazy<RwLock<Event<Rc<event::Event<'_, ()>>, Option<Cont
         ))
     });
 
-pub struct RimecraftClientSynced {
+#[cfg(not(target_pointer_width = "64"))]
+pub const IS_64_BIT: bool = false;
+#[cfg(target_pointer_width = "64")]
+pub const IS_64_BIT: bool = true;
+
+#[cfg(not(target_os = "macos"))]
+pub const IS_MACOS: bool = false;
+#[cfg(target_os = "macos")]
+pub const IS_MACOS: bool = true;
+
+pub struct RimecraftClient {
     run_dir: String,
     resource_pack_dir: String,
     game_version: String,
     version_type: String,
     network_proxy: Proxy,
     session: Session,
-    // options: GameOptions,
-}
-
-pub struct RimecraftClientUnsynced {
     window: Window,
+    pub options: RwLock<GameOptions>,
+    pub mouse: RwLock<Mouse>,
 }
 
-impl RimecraftClientSynced {
+impl RimecraftClient {
+    pub const GL_ERROR_DIALOGUE: &str = "Please make sure you have up-to-date drivers.";
+
     pub fn new(args: RunArgs) -> Self {
         let s = Self {
+            options: RwLock::new(GameOptions::new(&args.directories.run_dir)),
             run_dir: args.directories.run_dir,
             resource_pack_dir: args.directories.resource_pack_dir,
             game_version: args.game.version,
             version_type: args.game.version_type,
             network_proxy: args.network.net_proxy,
             session: args.network.session,
-        };
-        info!("Setting user: {}", s.session.get_username());
-        info!("(Session ID is {})", s.session.get_session_id());
-        s
-    }
-}
-
-pub struct EventLoopContainer {
-    pub inner: EventLoop<()>,
-}
-
-impl EventLoopContainer {
-    pub fn new(event_loop: EventLoop<()>) -> Self {
-        Self { inner: event_loop }
-    }
-}
-
-unsafe impl Send for EventLoopContainer {}
-
-impl RimecraftClientUnsynced {
-    pub const GL_ERROR_DIALOGUE: &str = "Please make sure you have up-to-date drivers.";
-
-    pub fn new(args: &RunArgs) -> Self {
-        let client = Self {
             window: {
                 let event_loop: EventLoopContainer = EventLoopContainer::new(EventLoop::new());
                 let window = WindowBuilder::new()
@@ -96,6 +89,7 @@ impl RimecraftClientUnsynced {
                     ))
                     .build(&event_loop.inner)
                     .unwrap();
+
                 thread::spawn(move || {
                     let el = event_loop;
                     el.inner.run(|event, _, flow| {
@@ -109,9 +103,12 @@ impl RimecraftClientUnsynced {
                 });
                 window
             },
+            mouse: RwLock::new(Mouse::default()),
         };
-        client.update_window_title();
-        client
+        s.update_window_title();
+        info!("Setting user: {} ", s.session.get_username());
+        debug!("(Session ID is {})", s.session.get_session_id());
+        s
     }
 
     pub fn update_window_title(&self) {
@@ -124,7 +121,27 @@ impl RimecraftClientUnsynced {
         string.push_str(consts::GAME_VERSION.get_name());
         string
     }
+
+    pub fn get_window(&self) -> &Window {
+        &self.window
+    }
+
+    pub fn get_window_mut(&mut self) -> &mut Window {
+        &mut self.window
+    }
 }
+
+struct EventLoopContainer {
+    pub inner: EventLoop<()>,
+}
+
+impl EventLoopContainer {
+    pub fn new(event_loop: EventLoop<()>) -> Self {
+        Self { inner: event_loop }
+    }
+}
+
+unsafe impl Send for EventLoopContainer {}
 
 pub struct WindowSettings {
     pub width: u32,

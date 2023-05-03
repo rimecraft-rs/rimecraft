@@ -13,6 +13,7 @@ log = "*"
 once_cell = "*"
 serde = { version = "*", features = ["serde_derive"] }
 serde_json = "*"
+toml = "*"
 uuid = { version = "*", features = ["v3", "v4"] }
 datafixerupper = { version = "*", path = "../datafixerupper" }
 md-5 = "*"
