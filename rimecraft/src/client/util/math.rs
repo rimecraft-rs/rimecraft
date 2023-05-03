@@ -1,4 +1,4 @@
-use glam::{Mat3, Mat4, Quat, Vec2, Vec3, Vec4};
+use glam::{Mat3, Mat4, Quat, Vec2, Vec3};
 use std::collections::VecDeque;
 
 pub struct MatrixStack {
@@ -17,36 +17,36 @@ impl MatrixStack {
     }
 
     pub fn translate(&mut self, x: f32, y: f32, z: f32) {
-        let mut entry = self.stack.back_mut().unwrap();
-        entry.0 = Mat4::from_translation(Vec3::new(x, y, z)) * entry.0
+        let entry = self.stack.back_mut().unwrap();
+        entry.0 *= Mat4::from_translation(Vec3::new(x, y, z))
     }
 
     pub fn scale(&mut self, x: f32, y: f32, z: f32) {
-        let mut entry = self.stack.back_mut().unwrap();
-        entry.0 = Mat4::from_scale(Vec3::new(x, y, z)) * entry.0;
+        let entry = self.stack.back_mut().unwrap();
+        entry.0 *= Mat4::from_scale(Vec3::new(x, y, z));
         if x == y && y == z {
             if x > 0.0 {
                 return;
             }
-            entry.1 = Mat3::from_scale(Vec2::new(-1.0, -1.0)) * entry.1
+            entry.1 *= Mat3::from_scale(Vec2::new(-1.0, -1.0))
         }
         let f = 1.0 / x;
         let g = 1.0 / y;
         let h = 1.0 / z;
         let i = (f * g * h).cbrt();
-        entry.1 = Mat3::from_mat4(Mat4::from_scale(Vec3::new(i * f, i * g, i * h))) * entry.1;
+        entry.1 *= Mat3::from_mat4(Mat4::from_scale(Vec3::new(i * f, i * g, i * h)))
     }
 
     pub fn multiply(&mut self, quat: Quat) {
-        let mut entry = self.stack.back_mut().unwrap();
-        entry.0 = rotate_mat4(entry.0, quat);
-        entry.1 = rotate_mat3(entry.1, quat);
+        let entry = self.stack.back_mut().unwrap();
+        entry.0 *= Mat4::from_quat(quat);
+        entry.1 *= Mat3::from_quat(quat);
     }
 
     pub fn multiply_translated(&mut self, quat: Quat, origin_x: f32, origin_y: f32, origin_z: f32) {
-        let mut entry = self.stack.back_mut().unwrap();
-        entry.0 = rotate_mat4_translated(entry.0, quat, origin_x, origin_y, origin_z);
-        entry.1 = rotate_mat3(entry.1, quat);
+        let entry = self.stack.back_mut().unwrap();
+        entry.0 *= Mat4::from_rotation_translation(quat, Vec3::new(origin_x, origin_y, origin_z));
+        entry.1 *= Mat3::from_quat(quat);
     }
 
     pub fn push(&mut self) {
