@@ -45,7 +45,7 @@ pub struct RimecraftClientSynced {
     resource_pack_dir: String,
     game_version: String,
     version_type: String,
-    netowk_proxy: Proxy,
+    network_proxy: Proxy,
     session: Session,
     // options: GameOptions,
 }
@@ -61,7 +61,7 @@ impl RimecraftClientSynced {
             resource_pack_dir: args.directories.resource_pack_dir,
             game_version: args.game.version,
             version_type: args.game.version_type,
-            netowk_proxy: args.network.net_proxy,
+            network_proxy: args.network.net_proxy,
             session: args.network.session,
         };
         info!("Setting user: {}", s.session.get_username());
@@ -99,6 +99,7 @@ impl RimecraftClientUnsynced {
                 thread::spawn(move || {
                     let el = event_loop;
                     el.inner.run(|event, _, flow| {
+                        flow.set_wait();
                         if let Some(st) = event.to_static() {
                             if let Some(flow_r) = WINDOW_EVENT.read().unwrap().invoke(Rc::new(st)) {
                                 *flow = flow_r;
