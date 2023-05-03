@@ -1,3 +1,9 @@
+pub mod blaze3d;
+pub mod main;
+pub mod option;
+pub mod resource;
+pub mod util;
+
 use self::{args::RunArgs, util::Session};
 use crate::{
     consts,
@@ -14,12 +20,6 @@ use glium::glutin::{
 use log::info;
 use once_cell::sync::Lazy;
 use std::{rc::Rc, sync::RwLock, thread};
-
-pub mod blaze3d;
-pub mod main;
-pub mod option;
-pub mod resource;
-pub mod util;
 
 pub static INSTANCE: Lazy<RwLock<Option<RimecraftClientSynced>>> = Lazy::new(|| RwLock::new(None));
 pub static mut INSTANCE_UNSAFE: Option<RimecraftClientUnsynced> = None;
@@ -99,8 +99,10 @@ impl RimecraftClientUnsynced {
                 thread::spawn(move || {
                     let el = event_loop;
                     el.inner.run(|event, _, flow| {
-                        if let Some(flow_r) = WINDOW_EVENT.read().unwrap().invoke(Rc::new(event)) {
-                            *flow = flow_r;
+                        if let Some(st) = event.to_static() {
+                            if let Some(flow_r) = WINDOW_EVENT.read().unwrap().invoke(Rc::new(st)) {
+                                *flow = flow_r;
+                            }
                         }
                     });
                 });
