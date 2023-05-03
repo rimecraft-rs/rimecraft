@@ -10,7 +10,6 @@ chrono = { version = "*", features = ["serde"] }
 clap = { version = "*", features = ["derive"] }
 fast-socks5 = "*"
 log = "*"
-log4rs = "*"
 once_cell = "*"
 serde = { version = "*", features = ["serde_derive"] }
 serde_json = "*"
