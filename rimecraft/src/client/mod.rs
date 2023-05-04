@@ -5,6 +5,7 @@ pub mod main;
 pub mod option;
 pub mod resource;
 pub mod util;
+pub mod render;
 
 use self::{args::RunArgs, device::Mouse, option::GameOptions, util::Session};
 use crate::{

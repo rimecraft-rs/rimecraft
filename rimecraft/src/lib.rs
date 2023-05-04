@@ -5,10 +5,10 @@ pub mod nbt;
 pub mod network;
 pub mod registry;
 pub mod resource;
-pub mod transfer;
-pub mod util;
 #[cfg(test)]
 mod tests;
+pub mod transfer;
+pub mod util;
 
 mod error {
     use std::{error, fmt::Display, result};
