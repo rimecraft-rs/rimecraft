@@ -39,7 +39,7 @@ impl Mouse {
             }
             mouse.active_button = Some(button);
             mouse.instant = Some(Instant::now())
-        } else if !mouse.active_button.is_none() {
+        } else if mouse.active_button.is_some() {
             if client.options.read().unwrap().container.touchscreen && {
                 let mut wm = mouse.touchscreen_handle;
                 wm -= 1_f64;

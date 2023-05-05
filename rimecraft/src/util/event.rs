@@ -12,7 +12,7 @@ impl<I, O: Default> Event<I, O> {
     ) -> Self {
         Self {
             phases: vec![(default_phase(), Vec::new())],
-            invoker: invoker,
+            invoker,
             default_impl: Box::new(|_i| O::default()),
         }
     }

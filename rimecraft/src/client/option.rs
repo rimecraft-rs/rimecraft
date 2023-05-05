@@ -10,7 +10,7 @@ pub struct GameOptions {
 impl GameOptions {
     pub fn new(path: &str) -> Self {
         let buf = Path::new(path).join("options.toml");
-        if let Ok(mut file) = File::open(buf.clone()) {
+        if let Ok(mut file) = File::open(buf) {
             toml::from_str(&{
                 let mut string = String::new();
                 file.read_to_string(&mut string).unwrap();
