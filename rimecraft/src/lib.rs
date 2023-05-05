@@ -20,6 +20,7 @@ mod error {
         Runtime(String),
         Encoder(String),
         Decoder(String),
+        IllegalState(String),
     }
 
     impl Display for Error {
@@ -27,7 +28,8 @@ mod error {
             match self {
                 Error::Runtime(value) => f.write_str(value)?,
                 Error::Decoder(value) => f.write_str(value)?,
-                Error::Encoder(value) => value.fmt(f)?,
+                Error::Encoder(value) => f.write_str(value)?,
+                Error::IllegalState(value) => f.write_str(value)?,
             }
             Ok(())
         }

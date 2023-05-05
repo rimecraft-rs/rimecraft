@@ -5,6 +5,7 @@ pub mod json_helper;
 pub mod read;
 pub mod system_details;
 pub mod uuids;
+pub mod math;
 
 use std::{
     fmt::{Display, Write},

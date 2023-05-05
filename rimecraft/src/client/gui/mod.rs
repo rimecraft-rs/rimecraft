@@ -2,10 +2,49 @@ pub mod navigation;
 
 use self::navigation::{NavigationAxis, NavigationDirection};
 use super::util::math::MatrixStack;
-use std::{cmp, ops::Add};
+use std::{cmp, collections::VecDeque, ops::Add};
 
 pub struct DrawContext {
     matrices: MatrixStack,
+    scissor_stack: ScissorStack,
+}
+
+impl DrawContext {
+    pub fn new() -> Self {
+        Self {
+            matrices: MatrixStack::new(),
+            scissor_stack: ScissorStack::new(),
+        }
+    }
+}
+
+pub struct ScissorStack {
+    stack: VecDeque<ScreenRect>,
+}
+
+impl ScissorStack {
+    fn new() -> Self {
+        Self {
+            stack: VecDeque::new(),
+        }
+    }
+
+    pub fn push(&mut self, rect: ScreenRect) -> ScreenRect {
+        let screen_rect = self.stack.back();
+        if let Some(sr) = screen_rect {
+            let screen_rect_2 = rect.intersection(*sr).unwrap_or_default();
+            self.stack.push_back(screen_rect_2);
+            screen_rect_2
+        } else {
+            self.stack.push_back(rect);
+            rect
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<ScreenRect> {
+        self.stack.pop_back();
+        self.stack.back().map(|e| *e)
+    }
 }
 
 /// A rectangle on the screen.
