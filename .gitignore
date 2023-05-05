@@ -3,3 +3,4 @@
 /.tuffous/config_gui.json
 /.vscode
 /.VSCodeCounter
+/Cargo.lock

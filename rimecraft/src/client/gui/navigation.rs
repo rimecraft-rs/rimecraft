@@ -64,6 +64,12 @@ impl NavigationDirection {
         matches!(self, NavigationDirection::Down | NavigationDirection::Right)
     }
 
+    /// Whether the coordinate `a` comes after `b`
+    ///
+    /// For example, if navigating downwards, `2` comes after `1`, while the opposite is true if navigating upwards.
+    /// This always returns `false` if two arguments are equal.
+    ///
+    /// See [`Self::is_before()`]
     pub fn is_after(&self, a: i32, b: i32) -> bool {
         if self.is_positive() {
             a > b
@@ -72,6 +78,12 @@ impl NavigationDirection {
         }
     }
 
+    /// Whether the coordinate `a` comes before `b`
+    ///
+    /// For example, if navigating downwards, `1` comes before `2`, while the opposite is true if navigating upwards.
+    /// This always returns `false` if two arguments are equal.
+    ///
+    /// See [`Self::is_after()`]
     pub fn is_before(&self, a: i32, b: i32) -> bool {
         if self.is_positive() {
             a < b

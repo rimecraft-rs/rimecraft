@@ -8,6 +8,7 @@ pub struct DrawContext {
     matrices: MatrixStack,
 }
 
+/// A rectangle on the screen.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ScreenRect {
     pub pos: ScreenPos,
@@ -24,6 +25,15 @@ impl ScreenRect {
         }
     }
 
+    /// Create a new rect
+    ///
+    /// `other_axis_coord` the coordinate of the `axis`'s other axis
+    ///
+    /// `same_axis_coord` the coordinate of the `axis` axis
+    ///
+    /// `other_axis_len` the length of the edge whose axis is different from `axis`
+    ///
+    /// `same_axis_len` the length of the edge whose axis is same as `axis`
     pub fn of(
         axis: NavigationAxis,
         same_axis_coord: i32,
@@ -47,6 +57,7 @@ impl ScreenRect {
         }
     }
 
+    /// The length of the rect in the given `axis`
     pub fn len(&self, axis: NavigationAxis) -> u32 {
         match axis {
             NavigationAxis::Horizontal => self.width,
@@ -54,6 +65,7 @@ impl ScreenRect {
         }
     }
 
+    /// The coordinate of the bounding box in the given `direction`
     pub fn bounding_coord(&self, direction: NavigationDirection) -> i32 {
         let axis = direction.axis();
         if direction.is_positive() {
@@ -63,6 +75,9 @@ impl ScreenRect {
         }
     }
 
+    /// A rect representing the border of this rect in the given `direction`
+    ///
+    /// Borders are one pixel thick.
     pub fn border(&self, direction: NavigationDirection) -> Self {
         let i = self.bounding_coord(direction);
         let axis = direction.axis().other();
@@ -71,6 +86,9 @@ impl ScreenRect {
         Self::of(direction.axis(), i, j, 1, k) + direction
     }
 
+    /// Whether this rect overlaps with `rect` in `axis`
+    ///
+    /// If `axis` is `None`, it will check both horizontal and vertical axises.
     pub fn overlaps(&self, other: Self, axis: Option<NavigationAxis>) -> bool {
         if let Some(axis_r) = axis {
             cmp::max(
@@ -86,11 +104,13 @@ impl ScreenRect {
         }
     }
 
+    /// The center of this rect in the given `axis`
     pub fn center(&self, axis: NavigationAxis) -> i32 {
         self.bounding_coord(axis.positive_direction())
             + self.bounding_coord(axis.negative_direction()) / 2
     }
 
+    /// Return the rect that intersects with `other`, or `None` is they don't intersect
     pub fn intersection(&self, other: Self) -> Option<Self> {
         let i = cmp::max(self.left(), other.left());
         let j = cmp::max(self.top(), other.top());
@@ -123,6 +143,7 @@ impl ScreenRect {
 impl Add<NavigationDirection> for ScreenRect {
     type Output = ScreenRect;
 
+    /// A new rect of the same dimensions with the position incremented
     fn add(self, rhs: NavigationDirection) -> Self::Output {
         Self {
             pos: self.pos + rhs,
@@ -133,13 +154,15 @@ impl Add<NavigationDirection> for ScreenRect {
 }
 
 impl Default for ScreenRect {
+    /// Create an empty rect.
     fn default() -> Self {
         Self::new(0, 0, 0, 0)
     }
 }
 
+/// Represents the position of a [`ScreenRect`]
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct ScreenPos(i32, i32);
+pub struct ScreenPos(pub i32, pub i32);
 
 impl ScreenPos {
     pub fn of(axis: NavigationAxis, same_axis: i32, other_axis: i32) -> Self {
