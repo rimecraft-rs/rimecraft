@@ -82,6 +82,69 @@ pub trait VertexConsume {
     }
 }
 
+pub trait BufVertexConsume: VertexConsume {
+    fn current_element(&self) -> VertexFormatElement;
+    fn next_element(&mut self);
+
+    fn put_u8(&mut self, index: usize, value: u8);
+    fn put_i16(&mut self, index: usize, value: i16);
+    fn put_f32(&mut self, index: usize, value: f32);
+
+    fn pack_u8(f: f32) -> u8 {
+        (((crate::util::math::clamp_f32(f, -1.0, 1.0) * 127.0) as i32) & 0xFF) as u8
+    }
+
+    fn super_vertex(&mut self, x: f64, y: f64, z: f64) -> bool {
+        let e = self.current_element().3;
+        if !matches!(
+            e,
+            AttributeType::F16
+                | AttributeType::F16F16
+                | AttributeType::F16F16F16
+                | AttributeType::F16F16F16F16
+                | AttributeType::F16x2x2
+                | AttributeType::F16x2x3
+                | AttributeType::F16x2x4
+                | AttributeType::F16x3x2
+                | AttributeType::F16x3x3
+                | AttributeType::F16x3x4
+                | AttributeType::F16x4x2
+                | AttributeType::F16x4x3
+                | AttributeType::F16x4x4
+        ) || e.get_num_components() != 3
+        {
+            return false;
+        }
+
+        self.put_f32(0, x as f32);
+        self.put_f32(4, y as f32);
+        self.put_f32(8, z as f32);
+        self.next_element();
+        true
+    }
+
+    fn color(&mut self, red: u32, green: u32, blue: u32, alpha: u32) -> bool {
+        let e = self.current_element().3;
+        if !matches!(
+            e,
+            AttributeType::U8
+                | AttributeType::U8U8
+                | AttributeType::U8U8U8
+                | AttributeType::U8U8U8U8
+        ) || e.get_num_components() != 4
+        {
+            return false;
+        }
+
+        self.put_u8(0, red as u8);
+        self.put_u8(1, green as u8);
+        self.put_u8(2, blue as u8);
+        self.put_u8(3, alpha as u8);
+        self.next_element();
+        true
+    }
+}
+
 pub struct FixedColorVertexConsumer {
     pub color_fixed: bool,
     pub fixed_red: u32,
