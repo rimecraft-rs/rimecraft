@@ -92,6 +92,7 @@ impl NavigationDirection {
         }
     }
 
+    /// Compare coords in ascending order
     pub fn cmp_coord(&self, a: i32, b: i32) -> i32 {
         if a == b {
             0

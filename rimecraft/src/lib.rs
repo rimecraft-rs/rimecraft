@@ -36,16 +36,13 @@ mod error {
     impl error::Error for Error {}
 }
 
-pub use error::*;
-
 pub mod consts {
-    use crate::version::RimecraftVersion;
+    use crate::version::GameVersion;
     use once_cell::sync::Lazy;
 
     pub const SNBT_TOO_OLD_THRESHOLD: i64 = 3437;
 
-    pub static GAME_VERSION: Lazy<RimecraftVersion> =
-        Lazy::new(|| RimecraftVersion::create().unwrap());
+    pub static GAME_VERSION: Lazy<GameVersion> = Lazy::new(|| GameVersion::create().unwrap());
 
     pub fn get_protocol_version() -> i64 {
         1073741955
@@ -60,7 +57,7 @@ pub mod version {
     use log::warn;
 
     #[derive(Clone)]
-    pub struct RimecraftVersion {
+    pub struct GameVersion {
         id: String,
         name: String,
         stable: bool,
@@ -71,7 +68,7 @@ pub mod version {
         build_time: NaiveDate,
     }
 
-    impl RimecraftVersion {
+    impl GameVersion {
         pub fn create() -> Result<Self, Error> {
             if let Ok(mut file) = File::open("./version.json") {
                 if let Some(v) = {
@@ -106,9 +103,9 @@ pub mod version {
             let name = json_helper::get_str(json, "name")?;
             let stable = json_helper::get_bool(json, "stable")?;
             let save_version = SaveVersion::new(
-                json_helper::get_i64(json, "world_version")?,
+                json_helper::get_i64(json, "world_version")? as i32,
                 json_helper::get_str(json, "series_id")
-                    .unwrap_or(&SaveVersion::get_main_series())
+                    .unwrap_or(SaveVersion::MAIN_SERIES)
                     .to_owned(),
             );
             let protocol_version = json_helper::get_i64(json, "resource")?;
@@ -139,9 +136,41 @@ pub mod version {
                 build_time,
             })
         }
+
+        /// The save version information for this game version
+        pub fn get_save_version(&self) -> &SaveVersion {
+            &self.save_version
+        }
+
+        pub fn get_id(&self) -> &str {
+            &self.id
+        }
+
+        pub fn get_name(&self) -> &str {
+            &self.name
+        }
+
+        pub fn get_protocol_version(&self) -> i64 {
+            self.protocol_version
+        }
+
+        pub fn get_resource_version(&self, res: &ResourceType) -> i64 {
+            match res {
+                ResourceType::ClientResources => self.resource_pack_version,
+                ResourceType::ServerData => self.data_pack_version,
+            }
+        }
+
+        pub fn get_build_time(&self) -> NaiveDate {
+            self.build_time
+        }
+
+        pub fn is_stable(&self) -> bool {
+            self.stable
+        }
     }
 
-    impl Default for RimecraftVersion {
+    impl Default for GameVersion {
         fn default() -> Self {
             Self {
                 id: uuid::Uuid::new_v4().to_string().replace('-', ""),
@@ -156,85 +185,49 @@ pub mod version {
         }
     }
 
-    impl GameVersion for RimecraftVersion {
-        fn get_save_version(&self) -> &SaveVersion {
-            &self.save_version
-        }
-
-        fn get_id(&self) -> &str {
-            &self.id
-        }
-
-        fn get_name(&self) -> &str {
-            &self.name
-        }
-
-        fn get_protocol_version(&self) -> i64 {
-            self.protocol_version
-        }
-
-        fn get_resource_version(&self, res: &ResourceType) -> i64 {
-            match res {
-                ResourceType::ClientResources => self.resource_pack_version,
-                ResourceType::ServerData => self.data_pack_version,
-            }
-        }
-
-        fn get_build_time(&self) -> NaiveDate {
-            self.build_time
-        }
-
-        fn is_stable(&self) -> bool {
-            self.stable
-        }
-    }
-
-    pub trait GameVersion {
-        fn get_save_version(&self) -> &SaveVersion;
-        fn get_id(&self) -> &str;
-        fn get_name(&self) -> &str;
-        fn get_protocol_version(&self) -> i64;
-        fn get_resource_version(&self, res: &ResourceType) -> i64;
-        fn get_build_time(&self) -> NaiveDate;
-        fn is_stable(&self) -> bool;
-    }
-
+    /// The version components of Rimecraft that is used for identification in save games.
     #[derive(Clone)]
     pub struct SaveVersion {
-        id: i64,
+        id: i32,
         series: String,
     }
 
     impl SaveVersion {
-        pub fn get_main_series() -> String {
-            String::from("main")
-        }
+        /// The default series of a version, `main`, if a series is not specified.
+        pub const MAIN_SERIES: &str = "main";
 
-        pub fn new_default(id: i64) -> Self {
+        pub fn new_default(id: i32) -> Self {
             Self {
                 id,
-                series: Self::get_main_series(),
+                series: Self::MAIN_SERIES.to_string(),
             }
         }
 
-        pub fn new(id: i64, series: String) -> Self {
+        pub fn new(id: i32, series: String) -> Self {
             Self { id, series }
         }
 
         pub fn is_not_main_series(&self) -> bool {
-            !self.series.eq(&Self::get_main_series())
+            !self.series.eq(Self::MAIN_SERIES)
         }
 
-        pub fn get_series(&self) -> &str {
+        /// The series of this version
+        ///
+        /// This is stored in the `series` field within `level.dat`.
+        pub fn series(&self) -> &str {
             &self.series
         }
 
-        pub fn get_id(&self) -> i64 {
+        /// The integer data version of this save version
+        pub fn id(&self) -> i32 {
             self.id
         }
 
+        /// Whether this save version can be loaded by the `other` version
         pub fn is_available_to(&self, other: &SaveVersion) -> bool {
-            self.get_series().eq(other.get_series())
+            self.series().eq(other.series())
         }
     }
 }
+
+pub use error::*;

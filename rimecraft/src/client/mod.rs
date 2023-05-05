@@ -12,7 +12,6 @@ use crate::{
     consts,
     network::Proxy,
     util::event::{default_phase, Event},
-    version::GameVersion,
 };
 use glium::glutin::{
     dpi::PhysicalSize,
