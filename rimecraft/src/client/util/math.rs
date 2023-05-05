@@ -168,7 +168,12 @@ impl ArgbHelper {
     pub fn lerp(delta: f32, start: u32, end: u32) -> u32 {
         let s = Self(start);
         let e = Self(end);
-        Self::argb(lerp_f32_u32(delta, s.alpha(), e.alpha()), lerp_f32_u32(delta, s.red(), e.red()), lerp_f32_u32(delta, s.green(), e.green()), lerp_f32_u32(delta, s.blue(), e.blue()))
+        Self::argb(
+            lerp_f32_u32(delta, s.alpha(), e.alpha()),
+            lerp_f32_u32(delta, s.red(), e.red()),
+            lerp_f32_u32(delta, s.green(), e.green()),
+            lerp_f32_u32(delta, s.blue(), e.blue()),
+        )
     }
 }
 
