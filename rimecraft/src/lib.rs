@@ -42,21 +42,20 @@ pub mod consts {
     use crate::version::GameVersion;
     use once_cell::sync::Lazy;
 
-    pub const SNBT_TOO_OLD_THRESHOLD: i64 = 3437;
+    pub const SNBT_TOO_OLD_THRESHOLD: u32 = 3437;
 
     pub static GAME_VERSION: Lazy<GameVersion> = Lazy::new(|| GameVersion::create().unwrap());
 
-    pub fn get_protocol_version() -> i64 {
-        1073741955
+    pub fn get_protocol_version() -> u32 {
+        1073741957
     }
 }
 
 pub mod version {
-    use std::{fs::File, io::Error, io::Read, str::FromStr};
-
     use crate::{resource::ResourceType, util::json_helper};
     use chrono::{NaiveDate, Utc};
     use log::warn;
+    use std::{fs::File, io::Error, io::Read, str::FromStr};
 
     #[derive(Clone)]
     pub struct GameVersion {
@@ -64,9 +63,9 @@ pub mod version {
         name: String,
         stable: bool,
         save_version: SaveVersion,
-        protocol_version: i64,
-        resource_pack_version: i64,
-        data_pack_version: i64,
+        protocol_version: u32,
+        resource_pack_version: u32,
+        data_pack_version: u32,
         build_time: NaiveDate,
     }
 
@@ -132,9 +131,9 @@ pub mod version {
                 name: name.to_owned(),
                 stable,
                 save_version,
-                protocol_version,
-                resource_pack_version,
-                data_pack_version,
+                protocol_version: protocol_version as u32,
+                resource_pack_version: resource_pack_version as u32,
+                data_pack_version: data_pack_version as u32,
                 build_time,
             })
         }
@@ -152,11 +151,11 @@ pub mod version {
             &self.name
         }
 
-        pub fn get_protocol_version(&self) -> i64 {
+        pub fn get_protocol_version(&self) -> u32 {
             self.protocol_version
         }
 
-        pub fn get_resource_version(&self, res: &ResourceType) -> i64 {
+        pub fn get_resource_version(&self, res: &ResourceType) -> u32 {
             match res {
                 ResourceType::ClientResources => self.resource_pack_version,
                 ResourceType::ServerData => self.data_pack_version,
@@ -176,12 +175,12 @@ pub mod version {
         fn default() -> Self {
             Self {
                 id: uuid::Uuid::new_v4().to_string().replace('-', ""),
-                name: String::from("23w16a"),
+                name: String::from("23w18a"),
                 stable: false,
-                save_version: SaveVersion::new(3449, String::from("main")),
+                save_version: SaveVersion::new(3453, String::from("main")),
                 protocol_version: super::consts::get_protocol_version(),
-                resource_pack_version: 14,
-                data_pack_version: 14,
+                resource_pack_version: 15,
+                data_pack_version: 15,
                 build_time: NaiveDate::default(),
             }
         }

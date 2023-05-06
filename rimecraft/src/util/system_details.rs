@@ -1,8 +1,6 @@
-use std::{collections::HashMap, fmt::Display};
-
-use sysinfo::{CpuExt, System, SystemExt};
-
 use crate::consts;
+use std::{collections::HashMap, fmt::Display};
+use sysinfo::{CpuExt, System, SystemExt};
 
 fn get_operation_system_format() -> String {
     let sys = System::new_all();

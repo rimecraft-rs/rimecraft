@@ -4,3 +4,4 @@
 /.vscode
 /.VSCodeCounter
 /Cargo.lock
+*/Cargo.lock

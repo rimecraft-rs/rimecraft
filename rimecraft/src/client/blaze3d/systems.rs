@@ -1,3 +1,4 @@
+use glam::Vec3;
 use std::collections::VecDeque;
 
 pub struct RenderCall {
@@ -113,5 +114,57 @@ impl Default for RenderCallStorage {
             processing_index: usize::default() + 1,
             last_processed_index: Default::default(),
         }
+    }
+}
+
+pub struct VertexSorter {
+    inner: Box<dyn Fn(Vec<Vec3>) -> Vec<usize>>,
+}
+
+impl VertexSorter {
+    pub fn by_distance_default() -> Self {
+        Self::by_distance_xyz(0.0, 0.0, 0.0)
+    }
+
+    pub fn by_z_default() -> Self {
+        Self::of(|vec| -vec.z)
+    }
+
+    pub fn new(f: impl Fn(Vec<Vec3>) -> Vec<usize> + 'static) -> Self {
+        Self { inner: Box::new(f) }
+    }
+
+    pub fn by_distance_xyz(origin_x: f32, origin_y: f32, origin_z: f32) -> Self {
+        Self::by_distance(Vec3::new(origin_x, origin_y, origin_z))
+    }
+
+    pub fn by_distance(origin: Vec3) -> Self {
+        Self::of(move |vec| origin.distance_squared(vec))
+    }
+
+    pub fn of(mapper: impl Fn(Vec3) -> f32 + 'static) -> Self {
+        Self {
+            inner: Box::new(move |vec| {
+                let mut fs = Vec::with_capacity(vec.len());
+                let mut us: Vec<usize> = Vec::with_capacity(vec.len());
+                let mut ii: usize = 0;
+                for i in vec {
+                    fs.push(mapper(i));
+                    us.push(ii);
+                    ii += 1;
+                }
+                us.sort_by(|a, b| {
+                    fs.get(*b)
+                        .unwrap()
+                        .partial_cmp(fs.get(*a).unwrap())
+                        .unwrap()
+                });
+                us
+            }),
+        }
+    }
+
+    pub fn sort(&self, var1: Vec<Vec3>) -> Vec<usize> {
+        (self.inner)(var1)
     }
 }
