@@ -1,11 +1,19 @@
 use super::{blaze3d::systems::VertexSorter, util::math::ArgbHelper};
-use bytes::BytesMut;
+use bytes::{buf::Buf, BytesMut};
 use glam::{Mat3, Mat4, Vec3, Vec4};
 use glium::{program::OutputPrimitives, vertex::AttributeType, VertexFormat};
 use log::debug;
 use std::borrow::{Borrow, Cow};
 
 pub type VertexFormatElement = (Cow<'static, str>, usize, i32, AttributeType, bool);
+
+pub mod vertex_formats {
+    use glium::VertexFormat;
+    use once_cell::sync::Lazy;
+    use std::sync::Arc;
+
+    pub static BLIT_SCREEN: Lazy<Arc<VertexFormat>> = Lazy::new(|| todo!());
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum VertexFormatDrawMode {
@@ -80,7 +88,15 @@ impl Into<OutputPrimitives> for VertexFormatDrawMode {
     }
 }
 
-pub struct BufferBuilder {
+#[derive(Clone)]
+pub struct BufTransparentSortingData {
+    draw_mode: VertexFormatDrawMode,
+    vertex_count: usize,
+    primitive_centers: Option<Vec<Vec3>>,
+    sorter: Option<VertexSorter>,
+}
+
+pub struct BufBuilder {
     buffer: BytesMut,
     built_buf_count: usize,
     batch_offset: usize,
@@ -98,7 +114,7 @@ pub struct BufferBuilder {
     has_no_vertex_buffer: bool,
 }
 
-impl BufferBuilder {
+impl BufBuilder {
     pub fn new(init_capacity: usize) -> Self {
         Self {
             buffer: BytesMut::with_capacity(init_capacity * 6),
@@ -166,11 +182,93 @@ impl BufferBuilder {
             return;
         }
         self.sorter = Some(sorter);
-        if self.sorting_primitive_centers.is_none() {}
+        if self.sorting_primitive_centers.is_none() {
+            self.sorting_primitive_centers = Some(self.build_primitive_centers())
+        }
+    }
+
+    pub fn sorting_data(&self) -> Option<BufTransparentSortingData> {
+        if self.draw_mode.is_none() {
+            None
+        } else {
+            Some(BufTransparentSortingData {
+                draw_mode: self.draw_mode.unwrap(),
+                vertex_count: self.vertex_count,
+                primitive_centers: self.sorting_primitive_centers.clone(),
+                sorter: self.sorter.clone(),
+            })
+        }
+    }
+
+    pub fn begin_sorted_index_buffer(&mut self, state: BufTransparentSortingData) {
+        self.draw_mode = Some(state.draw_mode);
+        self.vertex_count = state.vertex_count;
+        self.element_offset = self.batch_offset;
+        self.sorting_primitive_centers = state.primitive_centers;
+        self.sorter = state.sorter;
+        self.has_no_vertex_buffer = true;
+    }
+
+    pub fn begin(&mut self, draw_mode: VertexFormatDrawMode, format: VertexFormat) {
+        if self.building {
+            return;
+        }
+        self.building = true;
+        self.draw_mode = Some(draw_mode);
+        todo!()
+    }
+
+    pub fn set_format(&mut self, format: VertexFormat) {
+        self.format = Some(format);
+        todo!()
     }
 
     fn build_primitive_centers(&self) -> Vec<Vec3> {
-        todo!()
+        let chunk = self.buffer.chunk();
+        let i = self.batch_offset / 4;
+        let fmt: &[(Cow<'static, str>, usize, i32, AttributeType, bool)] =
+            self.get_format().borrow();
+        let j: usize = fmt.into_iter().map(|e| e.3.get_size_bytes()).sum();
+        let k = j * self.draw_mode.unwrap().additional_vertex_count();
+        let l = self.vertex_count / self.draw_mode.unwrap().additional_vertex_count();
+        let mut vector3fs: Vec<Vec3> = Vec::with_capacity(l);
+        for m in 0..l {
+            let f = f32::from_be_bytes({
+                let e = (i + m * k + 0) * 4;
+                let c = &chunk[e..e + 4];
+                [c[0], c[1], c[2], c[3]]
+            });
+            let g = f32::from_be_bytes({
+                let e = (i + m * k + 1) * 4;
+                let c = &chunk[e..e + 4];
+                [c[0], c[1], c[2], c[3]]
+            });
+            let h = f32::from_be_bytes({
+                let e = (i + m * k + 2) * 4;
+                let c = &chunk[e..e + 4];
+                [c[0], c[1], c[2], c[3]]
+            });
+            let n = f32::from_be_bytes({
+                let e = (i + m * k + j * 2 + 0) * 4;
+                let c = &chunk[e..e + 4];
+                [c[0], c[1], c[2], c[3]]
+            });
+            let o = f32::from_be_bytes({
+                let e = (i + m * k + j * 2 + 1) * 4;
+                let c = &chunk[e..e + 4];
+                [c[0], c[1], c[2], c[3]]
+            });
+            let p = f32::from_be_bytes({
+                let e = (i + m * k + j * 2 + 2) * 4;
+                let c = &chunk[e..e + 4];
+                [c[0], c[1], c[2], c[3]]
+            });
+            let q = (f + n) / 2.0;
+            let r = (g + o) / 2.0;
+            let s = (h + p) / 2.0;
+            vector3fs.push(Vec3::new(q, r, s))
+        }
+        vector3fs
     }
 }
 

@@ -1,5 +1,5 @@
 use glam::Vec3;
-use std::collections::VecDeque;
+use std::{collections::VecDeque, rc::Rc};
 
 pub struct RenderCall {
     executor: Box<dyn Fn()>,
@@ -117,8 +117,9 @@ impl Default for RenderCallStorage {
     }
 }
 
+#[derive(Clone)]
 pub struct VertexSorter {
-    inner: Box<dyn Fn(Vec<Vec3>) -> Vec<usize>>,
+    inner: Rc<Box<dyn Fn(Vec<Vec3>) -> Vec<usize>>>,
 }
 
 impl VertexSorter {
@@ -131,7 +132,9 @@ impl VertexSorter {
     }
 
     pub fn new(f: impl Fn(Vec<Vec3>) -> Vec<usize> + 'static) -> Self {
-        Self { inner: Box::new(f) }
+        Self {
+            inner: Rc::new(Box::new(f)),
+        }
     }
 
     pub fn by_distance_xyz(origin_x: f32, origin_y: f32, origin_z: f32) -> Self {
@@ -144,7 +147,7 @@ impl VertexSorter {
 
     pub fn of(mapper: impl Fn(Vec3) -> f32 + 'static) -> Self {
         Self {
-            inner: Box::new(move |vec| {
+            inner: Rc::new(Box::new(move |vec| {
                 let mut fs = Vec::with_capacity(vec.len());
                 let mut us: Vec<usize> = Vec::with_capacity(vec.len());
                 let mut ii: usize = 0;
@@ -160,7 +163,7 @@ impl VertexSorter {
                         .unwrap()
                 });
                 us
-            }),
+            })),
         }
     }
 
