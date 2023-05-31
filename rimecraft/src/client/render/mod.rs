@@ -8,11 +8,101 @@ use std::borrow::{Borrow, Cow};
 pub type VertexFormatElement = (Cow<'static, str>, usize, i32, AttributeType, bool);
 
 pub mod vertex_formats {
-    use glium::VertexFormat;
+    use super::VertexFormatElement;
+    use glium::{vertex::AttributeType, VertexFormat};
     use once_cell::sync::Lazy;
-    use std::sync::Arc;
+    use std::{borrow::Cow, sync::Arc};
 
-    pub static BLIT_SCREEN: Lazy<Arc<VertexFormat>> = Lazy::new(|| todo!());
+    pub static BLIT_SCREEN: Lazy<Arc<VertexFormat>> = Lazy::new(|| {
+        Arc::new({
+            let mut builder = VertexFormatBuilder::new();
+            builder.put(
+                Cow::Borrowed("Position"),
+                (0, AttributeType::F16F16F16, false),
+            );
+            builder.put(Cow::Borrowed("UV"), (0, AttributeType::F16F16, false));
+            builder.put(Cow::Borrowed("Color"), (0, AttributeType::U8U8U8U8, true));
+            builder.build()
+        })
+    });
+
+    pub static POSITION_COLOR_TEXTURE_LIGHT_NORMAL: Lazy<Arc<VertexFormat>> = Lazy::new(|| {
+        Arc::new({
+            let mut builder = VertexFormatBuilder::new();
+            builder.put(
+                Cow::Borrowed("Position"),
+                (0, AttributeType::F16F16F16, false),
+            );
+            builder.put(Cow::Borrowed("Color"), (0, AttributeType::U8U8U8U8, true));
+            builder.put(Cow::Borrowed("UV0"), (0, AttributeType::F16F16, false));
+            builder.put(Cow::Borrowed("UV2"), (2, AttributeType::F16F16, false));
+            builder.put(Cow::Borrowed("Normal"), (0, AttributeType::I8I8I8, true));
+            builder.put(Cow::Borrowed("Padding"), (0, AttributeType::I8, true));
+            builder.build()
+        })
+    });
+
+    pub static POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL: Lazy<Arc<VertexFormat>> =
+        Lazy::new(|| {
+            Arc::new({
+                let mut builder = VertexFormatBuilder::new();
+                builder.put(
+                    Cow::Borrowed("Position"),
+                    (0, AttributeType::F16F16F16, false),
+                );
+                builder.put(Cow::Borrowed("Color"), (0, AttributeType::U8U8U8U8, true));
+                builder.put(Cow::Borrowed("UV0"), (0, AttributeType::F16F16, false));
+                builder.put(Cow::Borrowed("UV1"), (1, AttributeType::F16F16, false));
+                builder.put(Cow::Borrowed("UV2"), (2, AttributeType::F16F16, false));
+                builder.put(Cow::Borrowed("Normal"), (0, AttributeType::I8I8I8, true));
+                builder.put(Cow::Borrowed("Padding"), (0, AttributeType::I8, true));
+                builder.build()
+            })
+        });
+
+    pub static POSITION_TEXTURE_COLOR_LIGHT: Lazy<Arc<VertexFormat>> = Lazy::new(|| {
+        Arc::new({
+            let mut builder = VertexFormatBuilder::new();
+            builder.put(
+                Cow::Borrowed("Position"),
+                (0, AttributeType::F16F16F16, false),
+            );
+            builder.put(Cow::Borrowed("UV0"), (0, AttributeType::F16F16, false));
+            builder.put(Cow::Borrowed("Color"), (0, AttributeType::U8U8U8U8, true));
+            builder.put(Cow::Borrowed("UV2"), (2, AttributeType::F16F16, false));
+            builder.build()
+        })
+    });
+
+    #[derive(Default)]
+    struct VertexFormatBuilder {
+        elements: Vec<(Cow<'static, str>, usize, (i32, AttributeType, bool))>,
+    }
+
+    impl VertexFormatBuilder {
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        pub fn put(&mut self, name: Cow<'static, str>, format: (i32, AttributeType, bool)) {
+            let offset: usize = self.elements.iter().map(|t| t.2 .1.get_size_bytes()).sum();
+            self.elements.push((name, offset, format));
+        }
+
+        pub fn build(self) -> VertexFormat {
+            let mut vec: Vec<VertexFormatElement> = Vec::new();
+            for e in self.elements {
+                vec.push((e.0, e.1, e.2 .0, e.2 .1, e.2 .2));
+            }
+            Cow::Owned(vec)
+        }
+    }
+
+    impl Into<VertexFormat> for VertexFormatBuilder {
+        fn into(self) -> VertexFormat {
+            self.build()
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
