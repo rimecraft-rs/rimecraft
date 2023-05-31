@@ -40,9 +40,8 @@ mod error {
 
 pub mod consts {
     use crate::version::GameVersion;
-    use once_cell::sync::Lazy;
 
-    pub const SNBT_TOO_OLD_THRESHOLD: u32 = 3437;
+    use once_cell::sync::Lazy;
 
     pub static GAME_VERSION: Lazy<GameVersion> = Lazy::new(|| GameVersion::create().unwrap());
 
@@ -53,6 +52,7 @@ pub mod consts {
 
 pub mod version {
     use crate::{resource::ResourceType, util::json_helper};
+
     use chrono::{NaiveDate, Utc};
     use log::warn;
     use std::{fs::File, io::Error, io::Read, str::FromStr};
@@ -103,12 +103,14 @@ pub mod version {
             let id = json_helper::get_str(json, "id")?;
             let name = json_helper::get_str(json, "name")?;
             let stable = json_helper::get_bool(json, "stable")?;
+
             let save_version = SaveVersion::new(
                 json_helper::get_i64(json, "world_version")? as i32,
                 json_helper::get_str(json, "series_id")
                     .unwrap_or(SaveVersion::MAIN_SERIES)
                     .to_owned(),
             );
+
             let protocol_version = json_helper::get_i64(json, "resource")?;
             let json_object = json_helper::get_object(json, "pack_version")?;
             let resource_pack_version = json_helper::get_i64(json_object, "resource")?;
@@ -175,9 +177,9 @@ pub mod version {
         fn default() -> Self {
             Self {
                 id: uuid::Uuid::new_v4().to_string().replace('-', ""),
-                name: String::from("23w18a"),
+                name: String::from("1.20-pre7"),
                 stable: false,
-                save_version: SaveVersion::new(3453, String::from("main")),
+                save_version: SaveVersion::new(3461, String::from("main")),
                 protocol_version: super::consts::get_protocol_version(),
                 resource_pack_version: 15,
                 data_pack_version: 15,
