@@ -39,11 +39,12 @@ mod error {
 }
 
 pub mod consts {
-    use crate::version::GameVersion;
+    use crate::version::RimecraftVersion;
 
     use once_cell::sync::Lazy;
 
-    pub static GAME_VERSION: Lazy<GameVersion> = Lazy::new(|| GameVersion::create().unwrap());
+    pub static GAME_VERSION: Lazy<RimecraftVersion> =
+        Lazy::new(|| RimecraftVersion::create().unwrap());
 
     pub fn get_protocol_version() -> u32 {
         1073741957
@@ -58,7 +59,7 @@ pub mod version {
     use std::{fs::File, io::Error, io::Read, str::FromStr};
 
     #[derive(Clone)]
-    pub struct GameVersion {
+    pub struct RimecraftVersion {
         id: String,
         name: String,
         stable: bool,
@@ -69,7 +70,7 @@ pub mod version {
         build_time: NaiveDate,
     }
 
-    impl GameVersion {
+    impl RimecraftVersion {
         pub fn create() -> Result<Self, Error> {
             if let Ok(mut file) = File::open("./version.json") {
                 if let Some(v) = {
@@ -173,13 +174,13 @@ pub mod version {
         }
     }
 
-    impl Default for GameVersion {
+    impl Default for RimecraftVersion {
         fn default() -> Self {
             Self {
                 id: uuid::Uuid::new_v4().to_string().replace('-', ""),
-                name: String::from("1.20-pre7"),
-                stable: false,
-                save_version: SaveVersion::new(3461, String::from("main")),
+                name: String::from("1.20"),
+                stable: true,
+                save_version: SaveVersion::new(3463, String::from("main")),
                 protocol_version: super::consts::get_protocol_version(),
                 resource_pack_version: 15,
                 data_pack_version: 15,
