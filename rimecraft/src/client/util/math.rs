@@ -3,11 +3,13 @@ use std::{collections::VecDeque, ops::Add};
 
 use crate::util::math::lerp_f32_u32;
 
-/// A stack of transformation matrices used to specify how 3D objects are [`Self::translate()`] translated, [`Self::scale()`] scaled or [`Self::multiply()`] rotated in 3D space.
+/// A stack of transformation matrices used to specify how 3D objects are [`Self::translate()`] translated,
+/// [`Self::scale()`] scaled or [`Self::multiply()`] rotated in 3D space.
 /// Each entry consists of a position matrix and its corresponding normal matrix.
 ///
 /// By putting matrices in a stack, a transformation can be expressed relative to another.
-/// You can [`Self::push()`], transform, render and [`Self::pop()`] pop, which allows you to restore the original matrix after rendering.
+/// You can [`Self::push()`], transform, render and [`Self::pop()`] pop, which allows you to
+/// restore the original matrix after rendering.
 ///
 /// An entry of identity matrix is pushed when a stack is created.
 /// This means that a stack is [`Self::is_empty()`] if and only if the stack contains exactly one entry.
