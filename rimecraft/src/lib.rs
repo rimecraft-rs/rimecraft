@@ -55,7 +55,6 @@ pub mod version {
     use crate::{resource::ResourceType, util::json_helper};
 
     use chrono::{NaiveDate, Utc};
-    use log::warn;
     use std::{fs::File, io::Error, io::Read, str::FromStr};
 
     #[derive(Clone)]
@@ -96,7 +95,7 @@ pub mod version {
                 }
             }
 
-            warn!("Missing version information!");
+            tracing::warn!("Missing version information!");
             Ok(Self::default())
         }
 

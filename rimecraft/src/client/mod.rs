@@ -3,7 +3,6 @@ pub mod device;
 pub mod gui;
 pub mod main;
 pub mod option;
-pub mod render;
 pub mod resource;
 pub mod util;
 
@@ -13,33 +12,27 @@ use crate::{
     network::Proxy,
     util::event::{default_phase, Event},
 };
-use glium::glutin::{
-    dpi::PhysicalSize,
-    event,
-    event_loop::{ControlFlow, EventLoop},
-    window::{Window, WindowBuilder},
-};
-use log::{debug, info};
 use once_cell::sync::Lazy;
 use std::{rc::Rc, sync::RwLock, thread};
 
 pub static INSTANCE: Lazy<RwLock<Option<RimecraftClient>>> = Lazy::new(|| RwLock::new(None));
 
-pub static WINDOW_EVENT: Lazy<RwLock<Event<Rc<event::Event<'_, ()>>, Option<ControlFlow>>>> =
-    Lazy::new(|| {
-        RwLock::new(Event::new(
-            Box::new(|callbacks, event: Rc<event::Event<'_, ()>>| {
-                for callback in callbacks {
-                    if let Some(b) = callback(event.clone()) {
-                        return Some(b);
-                    }
+pub static WINDOW_EVENT: Lazy<
+    RwLock<Event<Rc<winit::event::Event<'_, ()>>, Option<winit::event_loop::ControlFlow>>>,
+> = Lazy::new(|| {
+    RwLock::new(Event::new(
+        Box::new(|callbacks, event: Rc<winit::event::Event<'_, ()>>| {
+            for callback in callbacks {
+                if let Some(b) = callback(event.clone()) {
+                    return Some(b);
                 }
-                None
-            }),
-            Box::new(|_| None),
-            vec![default_phase()],
-        ))
-    });
+            }
+            None
+        }),
+        Box::new(|_| None),
+        vec![default_phase()],
+    ))
+});
 
 #[cfg(not(target_pointer_width = "64"))]
 pub const IS_64_BIT: bool = false;
@@ -58,7 +51,7 @@ pub struct RimecraftClient {
     version_type: String,
     network_proxy: Proxy,
     session: Session,
-    window: Window,
+    window: winit::window::Window,
     pub options: RwLock<GameOptions>,
     pub mouse: RwLock<Mouse>,
 }
@@ -76,9 +69,10 @@ impl RimecraftClient {
             network_proxy: args.network.net_proxy,
             session: args.network.session,
             window: {
-                let event_loop: EventLoopContainer = EventLoopContainer::new(EventLoop::new());
-                let window = WindowBuilder::new()
-                    .with_inner_size(PhysicalSize::new(
+                let event_loop: EventLoopContainer =
+                    EventLoopContainer::new(winit::event_loop::EventLoop::new());
+                let window = winit::window::WindowBuilder::new()
+                    .with_inner_size(winit::dpi::PhysicalSize::new(
                         args.window_settings.width,
                         args.window_settings.height,
                     ))
@@ -101,8 +95,8 @@ impl RimecraftClient {
             mouse: RwLock::new(Mouse::default()),
         };
         s.update_window_title();
-        info!("Setting user: {} ", s.session.get_username());
-        debug!("(Session ID is {})", s.session.get_session_id());
+        tracing::info!("Setting user: {} ", s.session.get_username());
+        tracing::debug!("(Session ID is {})", s.session.get_session_id());
         s
     }
 
@@ -117,21 +111,21 @@ impl RimecraftClient {
         string
     }
 
-    pub fn get_window(&self) -> &Window {
+    pub fn get_window(&self) -> &winit::window::Window {
         &self.window
     }
 
-    pub fn get_window_mut(&mut self) -> &mut Window {
+    pub fn get_window_mut(&mut self) -> &mut winit::window::Window {
         &mut self.window
     }
 }
 
 struct EventLoopContainer {
-    pub inner: EventLoop<()>,
+    pub inner: winit::event_loop::EventLoop<()>,
 }
 
 impl EventLoopContainer {
-    pub fn new(event_loop: EventLoop<()>) -> Self {
+    pub fn new(event_loop: winit::event_loop::EventLoop<()>) -> Self {
         Self { inner: event_loop }
     }
 }

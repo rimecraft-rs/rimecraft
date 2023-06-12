@@ -1,26 +1,24 @@
 use std::time::Instant;
 
-use glium::glutin::{
-    dpi::PhysicalPosition,
-    event::{ElementState, MouseButton},
-    window::WindowId,
-};
-
 #[derive(Default)]
 pub struct Mouse {
     left_button_clicked: bool,
     middle_button_clicked: bool,
     right_button_clicked: bool,
-    position: PhysicalPosition<f64>,
+    position: winit::dpi::PhysicalPosition<f64>,
     cursor_locked: bool,
     touchscreen_handle: f64,
-    active_button: Option<MouseButton>,
+    active_button: Option<winit::event::MouseButton>,
     instant: Option<Instant>,
 }
 
 impl Mouse {
-    fn on_mouse_button(window: WindowId, button: MouseButton, state: ElementState) {
-        let bl = matches!(state, ElementState::Pressed);
+    fn on_mouse_button(
+        window: winit::window::WindowId,
+        button: winit::event::MouseButton,
+        state: winit::event::ElementState,
+    ) {
+        let bl = matches!(state, winit::event::ElementState::Pressed);
         let binding = super::INSTANCE.read().unwrap();
         let client = binding.as_ref().unwrap();
         if window != client.get_window().id() {

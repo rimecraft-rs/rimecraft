@@ -10,7 +10,6 @@ use crate::{
     util::{collection::IndexedIterable, Identifier},
 };
 use datafixerupper::serialization::Lifecycle;
-use log::error;
 use std::{fmt::Display, marker::PhantomData};
 
 pub struct RegistryKey<T> {
@@ -93,11 +92,12 @@ impl<T> PartialEq for RegistryKey<T> {
     }
 }
 
+pub struct RegistryBuilder<T> {}
+
 pub struct Registry<T> {
     key: (Identifier, Identifier),
     entries: Vec<(RegistryEntry<T>, Lifecycle)>,
     lifecycle: Lifecycle,
-    frozen: bool,
     default_id: Option<Identifier>,
 }
 
@@ -107,7 +107,6 @@ impl<T> Registry<T> {
             key: (key.get_registry().clone(), key.get_value().clone()),
             entries: Vec::new(),
             lifecycle,
-            frozen: false,
             default_id: default,
         }
     }
@@ -208,7 +207,7 @@ impl<T> Registry<T> {
         lifecycle: Lifecycle,
     ) -> Option<usize> {
         if self.frozen || self.entries.len() < id {
-            error!("Registry is already frozen (trying to add key {})", key);
+            tracing::error!("Registry is already frozen (trying to add key {})", key);
             return None;
         }
         if self.entries.len() != id {

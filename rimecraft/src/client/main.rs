@@ -1,14 +1,12 @@
-use crate::{bootstrap, network::Proxy, util::uuids};
-use chrono::Utc;
-use clap::Parser;
-use log::warn;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-
 use super::{
     args::{self, RunArgs},
     util::{AccountType, Session},
     RimecraftClient,
 };
+use crate::{bootstrap, network::Proxy, util::uuids};
+use chrono::Utc;
+use clap::Parser;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 #[derive(Debug, Parser)]
 pub struct OptionSet {
@@ -72,7 +70,7 @@ pub fn main(options: Option<OptionSet>) {
     bootstrap::initialize();
     let account_type = AccountType::by_name(&option_set.user_type);
     if account_type.is_none() {
-        warn!("Unrecognized user type: {}", option_set.user_type)
+        tracing::warn!("Unrecognized user type: {}", option_set.user_type)
     }
     let username = option_set
         .username
