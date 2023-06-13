@@ -94,13 +94,3 @@ impl<'de> serde::Deserialize<'de> for Identifier {
         Ok(Self::parse(String::deserialize(deserializer)?.as_str()))
     }
 }
-
-/// A trait for call from an input and return an output,
-/// mostly used by events.
-pub trait Call {
-    type Input;
-    type Output;
-
-    /// Call this handler.
-    fn call(&self, input: Self::Input) -> Self::Output;
-}

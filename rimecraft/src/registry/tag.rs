@@ -16,6 +16,7 @@ impl<T> TagKey<T> {
         self.inner.0.inner == reg.inner
     }
 
+    /// Return `Some(_)` if the key is of reg, otherwise `None`.
     pub fn cast<E>(&self, reg: &super::RegistryKey<super::Registry<E>>) -> Option<TagKey<E>> {
         if self.is_of(reg) {
             Some(TagKey {

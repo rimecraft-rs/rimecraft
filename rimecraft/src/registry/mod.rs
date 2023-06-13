@@ -93,7 +93,7 @@ pub struct RegistryBuilder<T> {
 }
 
 impl<T> RegistryBuilder<T> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             entries: Vec::new(),
         }
@@ -171,7 +171,7 @@ impl<T> RegistryKey<T> {
         self.inner.0 == reg.inner.1
     }
 
-    /// Return `Some(_)` if the key is of ref, otherwise `None`.
+    /// Return `Some(_)` if the key is of reg, otherwise `None`.
     pub fn cast<E>(&self, reg: &RegistryKey<Registry<E>>) -> Option<RegistryKey<E>> {
         if self.is_of(&reg) {
             Some(RegistryKey {
@@ -235,5 +235,58 @@ impl<T> Eq for RegistryKey<T> {}
 impl<T> std::hash::Hash for RegistryKey<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.inner.hash(state)
+    }
+}
+
+/// Lazy registry for building and freezing registries,
+/// just like what vanilla Minecraft's `Registry` do.
+///
+/// Can be used in static instances.
+pub struct LazyRegistry<T> {
+    builder: tokio::sync::Mutex<Option<RegistryBuilder<T>>>,
+    registry: std::sync::OnceLock<Registry<T>>,
+}
+
+impl<T> LazyRegistry<T> {
+    pub const fn new() -> Self {
+        Self {
+            builder: tokio::sync::Mutex::const_new(None),
+            registry: std::sync::OnceLock::new(),
+        }
+    }
+
+    pub fn register(&self, value: T, id: Identifier) -> anyhow::Result<usize> {
+        self.builder
+            .blocking_lock()
+            .as_mut()
+            .expect("Registry has already been freezed")
+            .register(value, id)
+    }
+
+    pub async fn async_register(&self, value: T, id: Identifier) -> anyhow::Result<usize> {
+        self.builder
+            .lock()
+            .await
+            .as_mut()
+            .expect("Registry has already been freezed")
+            .register(value, id)
+    }
+
+    /// Freeze this registry into an immutable [`Registry`] instance with a registry key.
+    pub fn freeze(&self, registry: RegistryKey<Registry<T>>) {
+        if self.registry.get().is_some() {
+            return;
+        }
+
+        let registry = self.builder.blocking_lock().take().unwrap().build(registry);
+        self.registry.get_or_init(|| registry);
+    }
+}
+
+impl<T> Deref for LazyRegistry<T> {
+    type Target = Registry<T>;
+
+    fn deref(&self) -> &Self::Target {
+        self.registry.get().expect("Registry has not been built")
     }
 }
