@@ -1,146 +1,36 @@
-pub mod collection;
-pub mod crash;
-pub mod event;
-pub mod json_helper;
-pub mod math;
-pub mod read;
-pub mod system_details;
-pub mod uuids;
-
-use std::{
-    fmt::{Display, Write},
-    process::Command,
-};
-use url::Url;
-
-pub fn string_escape(value: &str) -> String {
-    let mut string = String::new();
-    let mut c = 0;
-    for d in value.chars() {
-        if Some(d) == char::from_u32(99) {
-            string.push('\\');
-        } else if Some(d) == char::from_u32(34) || Some(d) == char::from_u32(39) {
-            if c == 0 {
-                c = if Some(d) == char::from_u32(34) {
-                    39
-                } else {
-                    34
-                };
-            }
-            if char::from_u32(c) == Some(d) {
-                string.push('\\');
-            }
-        }
-        if c == 0 {
-            c = 34;
-        }
-    }
-    if let Some(e) = char::from_u32(c) {
-        let mut builder = String::new();
-        for cc in string.chars().enumerate() {
-            builder.push(if cc.0 == 0 { e } else { cc.1 });
-        }
-        let _result = builder.write_char(e);
-        string = builder;
-    }
-    string
-}
-
-pub fn into_option<T, U>(result: Result<T, U>) -> Option<T> {
-    match result {
-        Ok(obj) => Some(obj),
-        Err(_) => None,
-    }
-}
-
-pub fn get_operation_system() -> OperationSystem {
-    match std::env::consts::OS {
-        "linux" => OperationSystem::GnuLinux,
-        "macos" => OperationSystem::MacOS,
-        "windows" => OperationSystem::Windows,
-        "solaris" => OperationSystem::Solaris,
-        _ => OperationSystem::Unknown,
-    }
-}
-
-pub enum OperationSystem {
-    GnuLinux,
-    Solaris,
-    Windows,
-    MacOS,
-    Unknown,
-}
-
-impl OperationSystem {
-    pub fn get_name(&self) -> String {
-        match &self {
-            OperationSystem::GnuLinux => String::from("linux"),
-            OperationSystem::Solaris => String::from("solaris"),
-            OperationSystem::Windows => String::from("windows"),
-            OperationSystem::MacOS => String::from("mac"),
-            OperationSystem::Unknown => String::from("unknown"),
-        }
-    }
-
-    pub fn open_url(&self, url: Url) {
-        let _output = self.get_url_open_command(&url).output();
-    }
-
-    fn get_url_open_command(&self, url: &Url) -> Command {
-        match &self {
-            OperationSystem::Windows => {
-                let mut command = Command::new("rundll32");
-                command.arg("url.dll,FileProtocolHandler");
-                command.arg(url.as_str());
-                command
-            }
-            OperationSystem::MacOS => {
-                let mut command = Command::new("open");
-                command.arg(url.as_str());
-                command
-            }
-            _ => {
-                let mut string = url.as_str().to_owned();
-                if let Some(s) = string.strip_prefix("file:") {
-                    string = format!("file://{s}");
-                }
-                let mut command = Command::new("xdg-open");
-                command.arg(string);
-                command
-            }
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(PartialEq, Eq, Clone, Hash)]
 pub struct Identifier {
     namespace: String,
     path: String,
 }
 
 impl Identifier {
-    pub fn new(namespace: String, path: String) -> Option<Self> {
-        if Self::is_namespace_valid(&namespace) && Self::is_path_valid(&path) {
-            Some(Self::new_unchecked(namespace, path))
+    pub fn new(namespace: &str, path: &str) -> anyhow::Result<Self> {
+        if Self::is_namespace_valid(namespace) && Self::is_path_valid(path) {
+            Ok(Self {
+                namespace: namespace.to_string(),
+                path: path.to_string(),
+            })
         } else {
-            None
+            Err(anyhow::anyhow!(
+                "Non [a-z0-9/._-] character in identifier: {namespace}:{path}"
+            ))
         }
     }
 
-    pub fn parse(id: String) -> Option<Self> {
+    pub fn parse(id: &str) -> Self {
+        Self::try_parse(id).unwrap()
+    }
+
+    pub fn try_parse(id: &str) -> anyhow::Result<Self> {
         Self::split_on(id, ':')
     }
 
-    pub fn split_on(id: String, delimiter: char) -> Option<Self> {
-        if let Some(arr) = id.split_once(delimiter) {
-            Self::new(arr.0.to_string(), arr.1.to_string())
-        } else {
-            Self::new(String::from("rimecraft"), id)
+    pub fn split_on(id: &str, delimiter: char) -> anyhow::Result<Self> {
+        match id.split_once(delimiter) {
+            Some(arr) => Self::new(arr.0, arr.1),
+            None => Self::new("rimecraft", id),
         }
-    }
-
-    fn new_unchecked(namespace: String, path: String) -> Self {
-        Self { namespace, path }
     }
 
     fn is_namespace_valid(namespace: &str) -> bool {
@@ -169,16 +59,16 @@ impl Identifier {
         true
     }
 
-    pub fn get_namespace(&self) -> &str {
+    pub fn namespace(&self) -> &str {
         &self.namespace
     }
 
-    pub fn get_path(&self) -> &str {
+    pub fn path(&self) -> &str {
         &self.path
     }
 }
 
-impl Display for Identifier {
+impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.namespace)?;
         f.write_str(":")?;
@@ -187,23 +77,30 @@ impl Display for Identifier {
     }
 }
 
-pub fn option_is_some_and<T>(option: &Option<T>, predicate: impl Fn(&T) -> bool) -> bool {
-    match option {
-        Some(s) => predicate(s),
-        None => false,
+impl serde::Serialize for Identifier {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_string().serialize(serializer)
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Rarity {
-    Common,
-    Uncommon,
-    Rare,
-    Epic,
+impl<'de> serde::Deserialize<'de> for Identifier {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Self::parse(String::deserialize(deserializer)?.as_str()))
+    }
 }
 
-impl Default for Rarity {
-    fn default() -> Self {
-        Self::Common
-    }
+/// A trait for call from an input and return an output,
+/// mostly used by events.
+pub trait Call {
+    type Input;
+    type Output;
+
+    /// Call this handler.
+    fn call(&self, input: Self::Input) -> Self::Output;
 }
