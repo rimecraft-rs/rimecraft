@@ -88,11 +88,11 @@ impl<T> std::ops::Index<usize> for Registry<T> {
 }
 
 /// Mutable registry builder for building [`Registry`].
-pub struct RegistryBuilder<T> {
+pub struct Builder<T> {
     entries: Vec<(T, Identifier)>,
 }
 
-impl<T> RegistryBuilder<T> {
+impl<T> Builder<T> {
     pub const fn new() -> Self {
         Self {
             entries: Vec::new(),
@@ -242,12 +242,12 @@ impl<T> std::hash::Hash for RegistryKey<T> {
 /// just like what vanilla Minecraft's `Registry` do.
 ///
 /// Can be used in static instances.
-pub struct LazyRegistry<T> {
-    builder: tokio::sync::Mutex<Option<RegistryBuilder<T>>>,
+pub struct Lazy<T> {
+    builder: tokio::sync::Mutex<Option<Builder<T>>>,
     registry: std::sync::OnceLock<Registry<T>>,
 }
 
-impl<T> LazyRegistry<T> {
+impl<T> Lazy<T> {
     pub const fn new() -> Self {
         Self {
             builder: tokio::sync::Mutex::const_new(None),
@@ -283,7 +283,7 @@ impl<T> LazyRegistry<T> {
     }
 }
 
-impl<T> Deref for LazyRegistry<T> {
+impl<T> Deref for Lazy<T> {
     type Target = Registry<T>;
 
     fn deref(&self) -> &Self::Target {

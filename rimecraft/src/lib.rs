@@ -3,5 +3,5 @@ pub mod server;
 pub mod util;
 
 pub mod prelude {
-    pub use crate::util::Identifier;
+    pub use crate::{registry::RegistryKey, util::Identifier};
 }
