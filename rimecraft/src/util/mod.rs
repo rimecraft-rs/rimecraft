@@ -91,6 +91,14 @@ impl<'de> serde::Deserialize<'de> for Identifier {
     where
         D: serde::Deserializer<'de>,
     {
-        Ok(Self::parse(String::deserialize(deserializer)?.as_str()))
+        use serde::de::Error;
+
+        let str = String::deserialize(deserializer)?;
+        Self::try_parse(str.as_str()).map_err(|_| {
+            D::Error::invalid_value(
+                serde::de::Unexpected::Str(str.as_str()),
+                &"string with a ':' separated and which chars are in [a-z0-9/._-]",
+            )
+        })
     }
 }

@@ -1,9 +1,11 @@
-pub mod registries;
+mod registries;
 pub mod tag;
 
 use std::ops::Deref;
 
 use crate::prelude::*;
+
+pub use registries::*;
 
 /// Represents a registration and its id and tags.
 pub struct Holder<T> {
@@ -29,7 +31,7 @@ impl<T> Holder<T> {
 }
 
 impl<T> Deref for Holder<T> {
-    type Target = T;
+    type Target = std::sync::Arc<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.value
@@ -38,6 +40,7 @@ impl<T> Deref for Holder<T> {
 
 /// Immutable registry with mutable tag bindings.
 pub struct Registry<T> {
+    default: Option<usize>,
     entries: Vec<Holder<T>>,
     id_map: std::collections::HashMap<Identifier, usize>,
     pub key: RegistryKey<Self>,
@@ -74,6 +77,11 @@ impl<T> Registry<T> {
         self.id_map.contains_key(id)
     }
 
+    pub fn default(&self) -> (usize, &Holder<T>) {
+        let def = self.default.unwrap();
+        (def, self.get_from_raw(def).unwrap())
+    }
+
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -88,11 +96,11 @@ impl<T> std::ops::Index<usize> for Registry<T> {
 }
 
 /// Mutable registry builder for building [`Registry`].
-pub struct Builder<T> {
+pub struct Builder<T: Registration> {
     entries: Vec<(T, Identifier)>,
 }
 
-impl<T> Builder<T> {
+impl<T: Registration> Builder<T> {
     pub const fn new() -> Self {
         Self {
             entries: Vec::new(),
@@ -110,18 +118,31 @@ impl<T> Builder<T> {
     }
 
     /// Build this builder into a [`Registry`] with target registry key.
-    pub fn build(self, reg: RegistryKey<Registry<T>>) -> Registry<T> {
+    pub fn build(self, reg: RegistryKey<Registry<T>>, def: Option<Identifier>) -> Registry<T> {
         let arc_entries = self
             .entries
             .into_iter()
-            .map(|e| Holder {
-                value: std::sync::Arc::new(e.0),
-                key: RegistryKey::new(&reg, e.1.clone()),
-                tags: tokio::sync::RwLock::new(Vec::new()),
+            .enumerate()
+            .map(|mut e| {
+                e.1 .0.accept(e.0);
+                Holder {
+                    value: std::sync::Arc::new(e.1 .0),
+                    key: RegistryKey::new(&reg, e.1 .1.clone()),
+                    tags: tokio::sync::RwLock::new(Vec::new()),
+                }
             })
             .collect::<Vec<_>>();
 
+        let id_map = {
+            let mut map = std::collections::HashMap::new();
+            for e in arc_entries.iter().enumerate() {
+                map.insert(e.1.key.value().clone(), e.0);
+            }
+            map
+        };
+
         Registry {
+            default: def.map(|e| id_map.get(&e).copied()).flatten(),
             entries: arc_entries
                 .iter()
                 .map(|e| Holder {
@@ -130,13 +151,7 @@ impl<T> Builder<T> {
                     tags: tokio::sync::RwLock::new(Vec::new()),
                 })
                 .collect(),
-            id_map: {
-                let mut map = std::collections::HashMap::new();
-                for e in arc_entries.iter().enumerate() {
-                    map.insert(e.1.key.value().clone(), e.0);
-                }
-                map
-            },
+            id_map,
             key: reg,
             key_map: {
                 let mut map = std::collections::HashMap::new();
@@ -148,6 +163,11 @@ impl<T> Builder<T> {
             tags: tokio::sync::RwLock::new(std::collections::HashMap::new()),
         }
     }
+}
+
+/// Registratio for accepting raw_id.
+pub trait Registration {
+    fn accept(&mut self, id: usize);
 }
 
 /// Represents a key for a value in a registry in a context where
@@ -242,12 +262,12 @@ impl<T> std::hash::Hash for RegistryKey<T> {
 /// just like what vanilla Minecraft's `Registry` do.
 ///
 /// Can be used in static instances.
-pub struct Lazy<T> {
+pub struct Lazy<T: Registration> {
     builder: tokio::sync::Mutex<Option<Builder<T>>>,
     registry: std::sync::OnceLock<Registry<T>>,
 }
 
-impl<T> Lazy<T> {
+impl<T: Registration> Lazy<T> {
     pub const fn new() -> Self {
         Self {
             builder: tokio::sync::Mutex::const_new(None),
@@ -273,17 +293,26 @@ impl<T> Lazy<T> {
     }
 
     /// Freeze this registry into an immutable [`Registry`] instance with a registry key.
-    pub fn freeze(&self, registry: RegistryKey<Registry<T>>) {
+    pub fn freeze(
+        &self,
+        registry: RegistryKey<Registry<T>>,
+        default_registration: Option<Identifier>,
+    ) {
         if self.registry.get().is_some() {
             return;
         }
 
-        let registry = self.builder.blocking_lock().take().unwrap().build(registry);
+        let registry = self
+            .builder
+            .blocking_lock()
+            .take()
+            .unwrap()
+            .build(registry, default_registration);
         self.registry.get_or_init(|| registry);
     }
 }
 
-impl<T> Deref for Lazy<T> {
+impl<T: Registration> Deref for Lazy<T> {
     type Target = Registry<T>;
 
     fn deref(&self) -> &Self::Target {

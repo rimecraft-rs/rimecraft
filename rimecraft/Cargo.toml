@@ -24,6 +24,8 @@ tokio = { version = "1.28", features = ["full"] }
 winit = { version = "0.28", optional = true }
 wgpu = { version = "0.16", optional = true }
 anyhow = "*"
+fastnbt = "2.4"
+fastsnbt = "0.1"
 
 [features]
 # Developing server for now
