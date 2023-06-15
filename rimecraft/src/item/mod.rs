@@ -46,14 +46,14 @@ impl<'de> serde::Deserialize<'de> for Item {
     where
         D: serde::Deserializer<'de>,
     {
-        use serde::de::Error;
-
         let id = Identifier::deserialize(deserializer)?;
-
-        crate::registry::ITEM
-            .get_from_id(&id)
-            .map(|e| Self(e.0))
-            .ok_or(D::Error::custom(format!("unknown item id {id}")))
+        Ok(crate::registry::ITEM.get_from_id(&id).map_or_else(
+            || {
+                tracing::debug!("Tried to load invalid item: {id}");
+                crate::registry::ITEM.default().1.as_item()
+            },
+            |e| Self(e.0),
+        ))
     }
 }
 
@@ -82,7 +82,7 @@ impl AsItem for crate::registry::Holder<Item> {
 /// Represents a stack of items.
 /// This is a data container that holds the
 /// item count and the stack's NBT.
-#[derive(Default, Clone)]
+#[derive(Default, Clone, PartialEq)]
 pub struct ItemStack {
     /// Count of this stack.
     pub count: u8,
@@ -122,17 +122,14 @@ impl ItemStack {
         self.take(self.count)
     }
 
-    /// Whether the item of this stack is in the target tag key.
-    pub fn is_in(&self, tag: &crate::registry::tag::TagKey<Item>) -> bool {
-        crate::registry::ITEM
-            .get_from_raw(self.item.id())
-            .unwrap()
-            .is_in(tag)
-    }
-
     /// Get [`Item`] inside this stack.
     pub fn item(&self) -> &Item {
         &self.item
+    }
+
+    /// Whether the target item holder matches the provided predicate.
+    pub fn matches<F: Fn(&crate::registry::Holder<Item>) -> bool>(&self, f: F) -> bool {
+        f(crate::registry::ITEM.get_from_raw(self.item.id()).unwrap())
     }
 
     pub fn nbt(&self) -> Option<&crate::nbt::NbtCompound> {
@@ -144,16 +141,14 @@ impl ItemStack {
     }
 
     pub fn get_or_init_nbt(&mut self) -> &mut crate::nbt::NbtCompound {
-        if self.nbt.is_none() {
-            self.set_nbt(Some(crate::nbt::NbtCompound::new()));
-        }
-        self.nbt.as_mut().unwrap()
+        self.nbt
+            .get_or_insert_with(|| crate::nbt::NbtCompound::new())
     }
 
     pub fn set_nbt(&mut self, nbt: Option<crate::nbt::NbtCompound>) {
         self.nbt = nbt;
         if self.is_damageable() {
-            self.set_damage(self.get_damage());
+            self.set_damage(self.damage());
         }
 
         if let Some(nbt) = &mut self.nbt {
@@ -177,37 +172,37 @@ impl ItemStack {
         if self.is_empty() || self.max_damage() == 0 {
             false
         } else {
-            self.nbt
-                .as_ref()
-                .map(|nbt| {
-                    self.max_count() > 1
-                        && nbt.get(Self::UNBREAKABLE_KEY).map_or(false, |e| match e {
-                            fastnbt::Value::Byte(b) => b == &0_i8,
-                            _ => false,
-                        })
-                })
-                .unwrap_or_default()
+            self.nbt.as_ref().map_or(true, |nbt| {
+                !nbt.get_bool(Self::UNBREAKABLE_KEY).unwrap_or_default()
+            })
         }
     }
 
     pub fn is_damaged(&self) -> bool {
-        self.is_damageable() && self.get_damage() > 0
+        self.is_damageable() && self.damage() > 0
     }
 
-    pub fn get_damage(&self) -> u32 {
+    /// Get damage of this satck based on this
+    pub fn damage(&self) -> u32 {
         self.nbt.as_ref().map_or(0, |nbt| {
-            nbt.get(Self::DAMAGE_KEY).map_or(0, |e| match e {
-                fastnbt::Value::Int(int) => *int as u32,
-                _ => 0,
-            })
+            nbt.get_int(Self::DAMAGE_KEY).unwrap_or_default() as u32
         })
     }
 
     pub fn set_damage(&mut self, damage: u32) {
-        self.get_or_init_nbt().insert(
-            Self::DAMAGE_KEY.to_string(),
-            fastnbt::Value::Int(damage as i32),
-        );
+        self.get_or_init_nbt()
+            .insert_int(Self::DAMAGE_KEY, damage as i32);
+    }
+
+    /// Whether the given item stack's items and NBT are equal with this stack.
+    pub fn can_combine(&self, other: &Self) -> bool {
+        if self.item() != other.item() {
+            false
+        } else if self.is_empty() && other.is_empty() {
+            true
+        } else {
+            self.nbt == other.nbt
+        }
     }
 }
 
@@ -222,6 +217,28 @@ impl serde::Serialize for ItemStack {
             tag: self.nbt.clone(),
         }
         .serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ItemStack {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut raw = RawItemStack::deserialize(deserializer)?;
+        let item = raw.id;
+        if let Some(nbt) = &mut raw.tag {
+            EVENTS.blocking_read().post_process_nbt(item, nbt);
+        }
+        let mut stack = Self {
+            count: raw.count as u8,
+            item: raw.id,
+            nbt: raw.tag,
+        };
+        if stack.is_damageable() {
+            stack.set_damage(stack.damage());
+        }
+        Ok(stack)
     }
 }
 
