@@ -26,6 +26,7 @@ wgpu = { version = "0.16", optional = true }
 anyhow = "*"
 fastnbt = "2.4"
 fastsnbt = "0.1"
+parking_lot = "0.12"
 
 [features]
 # Developing server for now

@@ -2,26 +2,26 @@ use crate::prelude::*;
 
 /// Represents a tag key.
 pub struct TagKey<T> {
-    inner: std::sync::Arc<(RegistryKey<super::Registry<T>>, Identifier)>,
+    inner: std::sync::Arc<(super::RegistryKey<super::Registry<T>>, Identifier)>,
 }
 
 impl<T> TagKey<T> {
-    pub fn new(reg: RegistryKey<super::Registry<T>>, id: Identifier) -> Self {
+    pub fn new(reg: super::RegistryKey<super::Registry<T>>, id: Identifier) -> Self {
         Self {
             inner: std::sync::Arc::new((reg, id)),
         }
     }
 
-    pub fn is_of<T1>(&self, reg: &RegistryKey<super::Registry<T1>>) -> bool {
+    pub fn is_of<T1>(&self, reg: &super::RegistryKey<super::Registry<T1>>) -> bool {
         self.inner.0.inner == reg.inner
     }
 
     /// Return `Some(_)` if the key is of reg, otherwise `None`.
-    pub fn cast<E>(&self, reg: &RegistryKey<super::Registry<E>>) -> Option<TagKey<E>> {
+    pub fn cast<E>(&self, reg: &super::RegistryKey<super::Registry<E>>) -> Option<TagKey<E>> {
         if self.is_of(reg) {
             Some(TagKey {
                 inner: std::sync::Arc::new((
-                    RegistryKey {
+                    super::RegistryKey {
                         _type: std::marker::PhantomData,
                         inner: self.inner.0.inner.clone(),
                     },
@@ -33,7 +33,7 @@ impl<T> TagKey<T> {
         }
     }
 
-    pub fn reg(&self) -> &RegistryKey<super::Registry<T>> {
+    pub fn reg(&self) -> &super::RegistryKey<super::Registry<T>> {
         &self.inner.0
     }
 

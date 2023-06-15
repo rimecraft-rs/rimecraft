@@ -263,36 +263,28 @@ impl<T> std::hash::Hash for RegistryKey<T> {
 ///
 /// Can be used in static instances.
 pub struct Lazy<T: Registration> {
-    builder: tokio::sync::Mutex<Option<Builder<T>>>,
+    builder: parking_lot::Mutex<Option<Builder<T>>>,
     registry: std::sync::OnceLock<Registry<T>>,
 }
 
 impl<T: Registration> Lazy<T> {
     pub const fn new() -> Self {
         Self {
-            builder: tokio::sync::Mutex::const_new(None),
+            builder: parking_lot::Mutex::new(None),
             registry: std::sync::OnceLock::new(),
         }
     }
 
     pub fn register(&self, value: T, id: Identifier) -> anyhow::Result<usize> {
         self.builder
-            .blocking_lock()
-            .as_mut()
-            .expect("Registry has already been freezed")
-            .register(value, id)
-    }
-
-    pub async fn async_register(&self, value: T, id: Identifier) -> anyhow::Result<usize> {
-        self.builder
             .lock()
-            .await
             .as_mut()
             .expect("Registry has already been freezed")
             .register(value, id)
     }
 
-    /// Freeze this registry into an immutable [`Registry`] instance with a registry key.
+    /// Freeze this registry into an immutable [`Registry`] instance
+    /// with a registry key.
     pub fn freeze(
         &self,
         registry: RegistryKey<Registry<T>>,
@@ -304,7 +296,7 @@ impl<T: Registration> Lazy<T> {
 
         let registry = self
             .builder
-            .blocking_lock()
+            .lock()
             .take()
             .unwrap()
             .build(registry, default_registration);

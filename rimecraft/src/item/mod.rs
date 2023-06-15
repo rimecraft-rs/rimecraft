@@ -69,13 +69,26 @@ impl AsItem for Item {
     }
 }
 
+/// A trait for converting into [`Item`].
 pub trait AsItem {
     fn as_item(&self) -> Item;
 }
 
 impl AsItem for crate::registry::Holder<Item> {
+    /// Convert this object into an item.
     fn as_item(&self) -> Item {
         *self.deref().deref()
+    }
+}
+
+impl std::fmt::Display for Item {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        crate::registry::ITEM
+            .get_from_raw(self.id())
+            .ok_or(std::fmt::Error)?
+            .key()
+            .value()
+            .fmt(f)
     }
 }
 
@@ -123,8 +136,8 @@ impl ItemStack {
     }
 
     /// Get [`Item`] inside this stack.
-    pub fn item(&self) -> &Item {
-        &self.item
+    pub fn item(&self) -> Item {
+        self.item
     }
 
     /// Whether the target item holder matches the provided predicate.
@@ -152,12 +165,12 @@ impl ItemStack {
         }
 
         if let Some(nbt) = &mut self.nbt {
-            EVENTS.blocking_read().post_process_nbt(self.item, nbt);
+            EVENTS.read().post_process_nbt(self.item, nbt);
         }
     }
 
     pub fn max_count(&self) -> u8 {
-        EVENTS.blocking_read().get_max_count(self)
+        EVENTS.read().get_max_count(self)
     }
 
     pub fn is_stackable(&self) -> bool {
@@ -165,7 +178,7 @@ impl ItemStack {
     }
 
     pub fn max_damage(&self) -> u32 {
-        EVENTS.blocking_read().get_max_damage(self)
+        EVENTS.read().get_max_damage(self)
     }
 
     pub fn is_damageable(&self) -> bool {
@@ -182,7 +195,7 @@ impl ItemStack {
         self.is_damageable() && self.damage() > 0
     }
 
-    /// Get damage of this satck based on this
+    /// Get damage of this satck from the nbt tags.
     pub fn damage(&self) -> u32 {
         self.nbt.as_ref().map_or(0, |nbt| {
             nbt.get_int(Self::DAMAGE_KEY).unwrap_or_default() as u32
@@ -228,7 +241,7 @@ impl<'de> serde::Deserialize<'de> for ItemStack {
         let mut raw = RawItemStack::deserialize(deserializer)?;
         let item = raw.id;
         if let Some(nbt) = &mut raw.tag {
-            EVENTS.blocking_read().post_process_nbt(item, nbt);
+            EVENTS.read().post_process_nbt(item, nbt);
         }
         let mut stack = Self {
             count: raw.count as u8,
@@ -239,6 +252,20 @@ impl<'de> serde::Deserialize<'de> for ItemStack {
             stack.set_damage(stack.damage());
         }
         Ok(stack)
+    }
+}
+
+impl AsItem for ItemStack {
+    fn as_item(&self) -> Item {
+        self.item()
+    }
+}
+
+impl std::fmt::Display for ItemStack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.count.fmt(f)?;
+        f.write_str(" ")?;
+        self.item.fmt(f)
     }
 }
 

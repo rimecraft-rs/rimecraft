@@ -1,9 +1,15 @@
-pub static EVENTS: once_cell::sync::Lazy<tokio::sync::RwLock<VanillaItemEvents>> =
-    once_cell::sync::Lazy::new(|| tokio::sync::RwLock::new(VanillaItemEvents(Vec::new())));
+/// Vanilla item events for perform item actions and obtain item settings.
+pub static EVENTS: parking_lot::RwLock<VanillaItemEvents> =
+    parking_lot::RwLock::new(VanillaItemEvents(vec![]));
 
+/// Manager for item events.
 pub struct VanillaItemEvents(Vec<(Option<usize>, VanillaItemCallback)>);
 
 impl VanillaItemEvents {
+    /// Register a callback into this instance.
+    ///
+    /// The required `item` can be `None` for some events
+    /// so that all items will be affected by this callback.
     pub fn register(&mut self, item: Option<super::Item>, callback: VanillaItemCallback) {
         self.0.push((item.map(|e| e.id()), callback));
     }
@@ -51,6 +57,7 @@ impl VanillaItemEvents {
     }
 }
 
+/// An item event callback variant.
 pub enum VanillaItemCallback {
     GetMaxCount(Box<dyn Fn(&super::ItemStack) -> u8 + 'static + Send + Sync>),
     GetMaxDamage(Box<dyn Fn(&super::ItemStack) -> u32 + 'static + Send + Sync>),
