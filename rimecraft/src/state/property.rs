@@ -1,66 +1,46 @@
-pub struct Property<T, D: PropertyData<T>> {
+#[derive(Eq, Clone, Debug)]
+pub struct Property {
     name: String,
-    data: D,
-    _type: std::marker::PhantomData<T>,
+    range: (u8, u8),
+    type_id: std::any::TypeId,
 }
 
-impl<T, D: PropertyData<T>> Property<T, D> {
-    pub fn new(name: String, data: D::Params) -> Self {
+impl Property {
+    pub fn new<T: Into<u8> + 'static>(name: String, range: (T, T)) -> Self {
         Self {
-            data: D::new(&name, data),
             name,
-            _type: std::marker::PhantomData,
+            range: (range.0.into(), range.1.into()),
+            type_id: std::any::TypeId::of::<T>(),
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn range(&self) -> (u8, u8) {
+        self.range
+    }
+
+    pub fn values<T: From<u8>>(&self) -> Vec<T> {
+        let mut vec = Vec::new();
+        for i in self.range.0..=self.range.1 {
+            vec.push(i.into())
+        }
+        vec
     }
 }
 
-pub type EmptyData<T> = std::marker::PhantomData<T>;
-
-pub trait PropertyData<T> {
-    type Params;
-
-    fn new(name: &str, params: Self::Params) -> Self;
-
-    fn values(&self) -> Vec<T>;
-    fn parse(&self, str: &str) -> Option<T>;
-    fn name(&self, value: T) -> String;
+impl std::hash::Hash for Property {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.type_id.hash(state);
+    }
 }
 
-pub struct IntPropertyData {
-    min: i32,
-    max: i32,
-}
-
-impl PropertyData<i32> for IntPropertyData {
-    type Params = (i32, i32);
-
-    fn new(name: &str, (mut min, mut max): Self::Params) -> Self {
-        if min < 0 {
-            min = 0;
-            tracing::error!("Min value of {name} must be 0 or greater");
-        }
-        if max <= min {
-            max = min + 1;
-            tracing::error!("Max value of {name} should be greater than min (\"{min}\")");
-        }
-        Self { min, max }
-    }
-
-    fn values(&self) -> Vec<i32> {
-        (self.min..=self.max).into_iter().collect()
-    }
-
-    fn parse(&self, str: &str) -> Option<i32> {
-        str.parse::<i32>().map_or(None, |e| {
-            if e >= self.min && e <= self.max {
-                Some(e)
-            } else {
-                None
-            }
-        })
-    }
-
-    fn name(&self, value: i32) -> String {
-        value.to_string()
+impl PartialEq for Property {
+    fn eq(&self, other: &Self) -> bool {
+        // impl [`Eq`] for property just for hash mapping. based
+        other.name == self.name && self.type_id == other.type_id
     }
 }
