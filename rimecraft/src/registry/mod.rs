@@ -264,14 +264,14 @@ impl<T> std::hash::Hash for RegistryKey<T> {
 /// Can be used in static instances.
 pub struct Lazy<T: Registration> {
     builder: parking_lot::Mutex<Option<Builder<T>>>,
-    registry: std::sync::OnceLock<Registry<T>>,
+    registry: once_cell::sync::OnceCell<Registry<T>>,
 }
 
 impl<T: Registration> Lazy<T> {
     pub const fn new() -> Self {
         Self {
             builder: parking_lot::Mutex::new(None),
-            registry: std::sync::OnceLock::new(),
+            registry: once_cell::sync::OnceCell::new(),
         }
     }
 

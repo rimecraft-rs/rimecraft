@@ -7,7 +7,7 @@ pub mod property;
 pub struct RawState {
     id: usize,
     entries: std::collections::HashMap<property::Property, u8>,
-    table: std::sync::OnceLock<std::collections::HashMap<property::Property, Vec<usize>>>,
+    table: once_cell::sync::OnceCell<std::collections::HashMap<property::Property, Vec<usize>>>,
 }
 
 impl RawState {
@@ -164,7 +164,11 @@ impl<T: Deref<Target = RawState> + From<RawState>> States<T> {
             for e in list2 {
                 m.insert(e.0, e.1);
             }
-            let state = RawState { id: 0, entries: todo!(), table: todo!() }
+            let state = RawState {
+                id: 0,
+                entries: todo!(),
+                table: todo!(),
+            };
         }
 
         states_raw.iter_mut().enumerate().for_each(|e| e.1.id = e.0);
