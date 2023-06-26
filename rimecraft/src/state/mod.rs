@@ -2,8 +2,6 @@ use std::ops::Deref;
 
 pub mod property;
 
-// id: index inside a state manager.
-
 pub struct RawState {
     id: usize,
     entries: std::collections::HashMap<property::Property, u8>,
@@ -137,58 +135,6 @@ pub struct States<T: Deref<Target = RawState>> {
     states: Vec<T>,
 }
 
-impl<T: Deref<Target = RawState> + From<RawState>> States<T> {
-    fn new(
-        def_state: std::collections::HashMap<property::Property, u8>,
-        properties: std::collections::HashMap<String, property::Property>,
-    ) -> Self {
-        let mut states_raw: Vec<RawState> = Vec::new();
-        let mut temp: Vec<Vec<(property::Property, u8)>> = Vec::new();
-
-        for property in properties.values() {
-            temp = temp
-                .iter()
-                .flat_map(|list| {
-                    property.values::<u8>().into_iter().map(|i| {
-                        let mut list2 = list.clone();
-                        list2.push((property.clone(), i));
-                        list2
-                    })
-                })
-                .collect()
-        }
-
-        for list2 in temp {
-            let mut m: std::collections::HashMap<property::Property, u8> =
-                std::collections::HashMap::new();
-            for e in list2 {
-                m.insert(e.0, e.1);
-            }
-            let state = RawState {
-                id: 0,
-                entries: todo!(),
-                table: todo!(),
-            };
-        }
-
-        states_raw.iter_mut().enumerate().for_each(|e| e.1.id = e.0);
-        let states: Vec<T> = states_raw.into_iter().map(T::from).collect();
-        Self {
-            def: states
-                .iter()
-                .enumerate()
-                .find(|e| {
-                    def_state
-                        .iter()
-                        .all(|ee| ee.1 == e.1.deref().entries.get(ee.0).unwrap())
-                })
-                .map_or(0, |e| e.0),
-            properties,
-            states,
-        }
-    }
-}
-
 impl<T: Deref<Target = RawState>> States<T> {
     pub fn states(&self) -> &[T] {
         &self.states
@@ -204,5 +150,107 @@ impl<T: Deref<Target = RawState>> States<T> {
 
     pub fn get_property(&self, name: &str) -> Option<&property::Property> {
         self.properties.get(name)
+    }
+}
+
+fn new_states<E: Clone, T: Deref<Target = RawState> + From<(E, RawState)>>(
+    data: E,
+    def_state: std::collections::HashMap<property::Property, u8>,
+    properties: std::collections::HashMap<String, property::Property>,
+) -> States<T> {
+    let mut states_raw: Vec<RawState> = Vec::new();
+    let mut temp: Vec<Vec<(property::Property, u8)>> = Vec::new();
+
+    for property in properties.values() {
+        temp = temp
+            .iter()
+            .flat_map(|list| {
+                property.values::<u8>().into_iter().map(|i| {
+                    let mut list2 = list.clone();
+                    list2.push((property.clone(), i));
+                    list2
+                })
+            })
+            .collect()
+    }
+
+    for list2 in temp {
+        let mut entries: std::collections::HashMap<property::Property, u8> =
+            std::collections::HashMap::new();
+
+        for e in list2 {
+            entries.insert(e.0, e.1);
+        }
+
+        states_raw.push(RawState {
+            id: 0,
+            entries,
+            table: once_cell::sync::OnceCell::new(),
+        });
+    }
+
+    states_raw.iter_mut().enumerate().for_each(|e| e.1.id = e.0);
+    let states: Vec<T> = states_raw
+        .into_iter()
+        .map(|e| T::from((data.clone(), e)))
+        .collect();
+    states.iter().for_each(|e| e.init_table(&states));
+    States {
+        def: states
+            .iter()
+            .enumerate()
+            .find(|e| {
+                def_state
+                    .iter()
+                    .all(|ee| ee.1 == e.1.deref().entries.get(ee.0).unwrap())
+            })
+            .map_or(0, |e| e.0),
+        properties,
+        states,
+    }
+}
+
+#[derive(Default)]
+pub struct StatesBuilder {
+    properties: std::collections::HashMap<String, property::Property>,
+}
+
+impl StatesBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, property: property::Property) -> anyhow::Result<()> {
+        let name = property.name();
+
+        {
+            let matcher = lazy_regex::regex!("^[a-z0-9_]+$");
+            if matcher.is_match(name) {
+                return Err(anyhow::anyhow!("Invalidly named property: {name}"));
+            }
+
+            let c = property.values::<u8>();
+            if c.len() <= 1 {
+                return Err(anyhow::anyhow!(
+                    "Attempted use property {name} with <= 1 possible values"
+                ));
+            }
+
+            if self.properties.contains_key(name) {
+                return Err(anyhow::anyhow!("Duplicated property: {name}"));
+            }
+        }
+
+        self.properties.insert(name.to_string(), property);
+
+        Ok(())
+    }
+
+    pub fn build<E: Clone, S: Deref<Target = RawState> + From<(E, RawState)>>(
+        self,
+        data: E,
+        def_state: std::collections::HashMap<property::Property, u8>,
+    ) -> States<S> {
+        new_states(data, def_state, self.properties)
     }
 }

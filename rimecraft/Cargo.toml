@@ -27,6 +27,7 @@ anyhow = "*"
 fastnbt = "2.4"
 fastsnbt = "0.1"
 parking_lot = "0.12"
+lazy-regex = "2"
 
 [features]
 # Developing server for now

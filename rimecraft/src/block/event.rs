@@ -14,18 +14,18 @@ impl VanillaBlockEvents {
         self.0.push((item.map(|e| e.id()), callback));
     }
 
-    pub fn block_item_map(&self, block: super::Block) -> crate::item::ItemStack {
-        let id = block.id();
+    pub fn block_item_map(&self, state: super::BlockState) -> crate::item::ItemStack {
+        let id = state.block().id();
         self.0
             .iter()
             .find(|e| {
                 e.0.map_or(false, |ee| ee == id)
-                    && matches!(e.1, VanillaBlockCallback::BlockItemMap(_))
+                    && matches!(e.1, VanillaBlockCallback::BlockStateItemMap(_))
             })
             .map_or_else(
                 || crate::item::ItemStack::default(),
                 |e| match &e.1 {
-                    VanillaBlockCallback::BlockItemMap(c) => c(block),
+                    VanillaBlockCallback::BlockStateItemMap(c) => c(state),
                     _ => unreachable!(),
                 },
             )
@@ -34,5 +34,7 @@ impl VanillaBlockEvents {
 
 /// An item event callback variant.
 pub enum VanillaBlockCallback {
-    BlockItemMap(Box<dyn Fn(super::Block) -> crate::item::ItemStack + 'static + Send + Sync>),
+    BlockStateItemMap(
+        Box<dyn Fn(super::BlockState) -> crate::item::ItemStack + 'static + Send + Sync>,
+    ),
 }
