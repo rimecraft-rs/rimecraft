@@ -1,6 +1,6 @@
-use std::ops::Deref;
-
 pub mod property;
+
+use std::ops::Deref;
 
 pub use property::Property;
 
@@ -83,7 +83,7 @@ impl State {
         }
     }
 
-    pub fn init_table<T: Deref<Target = Self>>(&self, states: &[T]) {
+    fn init_table<T: Deref<Target = Self>>(&self, states: &[T]) {
         assert!(self.table.get().is_none());
         let mut table = std::collections::HashMap::new();
         for p in self.entries.keys() {
