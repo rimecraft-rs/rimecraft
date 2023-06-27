@@ -2,13 +2,15 @@ use std::ops::Deref;
 
 pub mod property;
 
-pub struct RawState {
+pub use property::Property;
+
+pub struct State {
     id: usize,
     entries: std::collections::HashMap<property::Property, u8>,
     table: once_cell::sync::OnceCell<std::collections::HashMap<property::Property, Vec<usize>>>,
 }
 
-impl RawState {
+impl State {
     pub fn cycle(&self, property: &property::Property) -> anyhow::Result<usize> {
         self.with(property, {
             let range = property.range();
@@ -129,13 +131,13 @@ impl RawState {
     }
 }
 
-pub struct States<T: Deref<Target = RawState>> {
+pub struct States<T: Deref<Target = State>> {
     def: usize,
     properties: std::collections::HashMap<String, property::Property>,
     states: Vec<T>,
 }
 
-impl<T: Deref<Target = RawState>> States<T> {
+impl<T: Deref<Target = State>> States<T> {
     pub fn states(&self) -> &[T] {
         &self.states
     }
@@ -153,12 +155,12 @@ impl<T: Deref<Target = RawState>> States<T> {
     }
 }
 
-fn new_states<E: Clone, T: Deref<Target = RawState> + From<(E, RawState)>>(
+fn new_states<E: Clone, T: Deref<Target = State> + From<(E, State)>>(
     data: E,
     def_state: std::collections::HashMap<property::Property, u8>,
     properties: std::collections::HashMap<String, property::Property>,
 ) -> States<T> {
-    let mut states_raw: Vec<RawState> = Vec::new();
+    let mut states_raw: Vec<State> = Vec::new();
     let mut temp: Vec<Vec<(property::Property, u8)>> = Vec::new();
 
     for property in properties.values() {
@@ -182,7 +184,7 @@ fn new_states<E: Clone, T: Deref<Target = RawState> + From<(E, RawState)>>(
             entries.insert(e.0, e.1);
         }
 
-        states_raw.push(RawState {
+        states_raw.push(State {
             id: 0,
             entries,
             table: once_cell::sync::OnceCell::new(),
@@ -246,7 +248,7 @@ impl StatesBuilder {
         Ok(())
     }
 
-    pub fn build<E: Clone, S: Deref<Target = RawState> + From<(E, RawState)>>(
+    pub fn build<E: Clone, S: Deref<Target = State> + From<(E, State)>>(
         self,
         data: E,
         def_state: std::collections::HashMap<property::Property, u8>,

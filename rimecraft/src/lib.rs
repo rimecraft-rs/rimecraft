@@ -7,8 +7,9 @@ pub mod registry;
 pub mod server;
 pub mod state;
 pub mod util;
+pub mod world;
 
-/// Core utils of rimecraft.
+/// Core utils of Rimecraft.
 pub mod prelude {
     pub use crate::{nbt::NbtCompoundExt, util::Identifier};
 }

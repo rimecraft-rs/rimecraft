@@ -24,7 +24,7 @@ impl Block {
                     builder.add(state.0.clone())?;
                     map.insert(state.0, state.1);
                 }
-                builder.build(0, map)
+                builder.build((), map)
             }),
         })
     }
@@ -74,16 +74,16 @@ impl<'de> serde::Deserialize<'de> for Block {
         Ok(crate::registry::BLOCK.get_from_id(&id).map_or_else(
             || {
                 tracing::debug!("Tried to load invalid block: {id}");
-                crate::registry::BLOCK.default().1.deref().deref().clone()
+                crate::registry::BLOCK.default().1.deref().clone()
             },
-            |e| e.1.deref().deref().clone(),
+            |e| e.1.deref().clone(),
         ))
     }
 }
 
 impl Default for Block {
     fn default() -> Self {
-        crate::registry::BLOCK.default().1.deref().deref().clone()
+        crate::registry::BLOCK.default().1.deref().clone()
     }
 }
 
@@ -103,7 +103,7 @@ impl Hash for Block {
 
 pub struct BlockState {
     block: std::sync::atomic::AtomicUsize,
-    state: crate::state::RawState,
+    state: crate::state::State,
 }
 
 impl BlockState {
@@ -113,22 +113,21 @@ impl BlockState {
             .get_from_raw(self.block.load(std::sync::atomic::Ordering::Relaxed))
             .unwrap()
             .deref()
-            .deref()
             .clone()
     }
 }
 
-impl From<(usize, crate::state::RawState)> for BlockState {
-    fn from(value: (usize, crate::state::RawState)) -> Self {
+impl From<((), crate::state::State)> for BlockState {
+    fn from((_, value): ((), crate::state::State)) -> Self {
         Self {
-            block: std::sync::atomic::AtomicUsize::new(value.0),
-            state: value.1,
+            block: std::sync::atomic::AtomicUsize::new(0),
+            state: value,
         }
     }
 }
 
 impl Deref for BlockState {
-    type Target = crate::state::RawState;
+    type Target = crate::state::State;
 
     fn deref(&self) -> &Self::Target {
         &self.state

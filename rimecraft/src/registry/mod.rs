@@ -11,7 +11,7 @@ pub use registries::*;
 pub struct Holder<T> {
     key: RegistryKey<T>,
     pub tags: tokio::sync::RwLock<Vec<tag::TagKey<T>>>,
-    value: std::sync::Arc<T>,
+    value: T,
 }
 
 impl<T> Holder<T> {
@@ -31,7 +31,7 @@ impl<T> Holder<T> {
 }
 
 impl<T> Deref for Holder<T> {
-    type Target = std::sync::Arc<T>;
+    type Target = T;
 
     fn deref(&self) -> &Self::Target {
         &self.value
@@ -119,14 +119,14 @@ impl<T: Registration> Builder<T> {
 
     /// Build this builder into a [`Registry`] with target registry key.
     pub fn build(self, reg: RegistryKey<Registry<T>>, def: Option<Identifier>) -> Registry<T> {
-        let arc_entries = self
+        let entries = self
             .entries
             .into_iter()
             .enumerate()
             .map(|mut e| {
                 e.1 .0.accept(e.0);
                 Holder {
-                    value: std::sync::Arc::new(e.1 .0),
+                    value: e.1 .0,
                     key: RegistryKey::new(&reg, e.1 .1.clone()),
                     tags: tokio::sync::RwLock::new(Vec::new()),
                 }
@@ -135,7 +135,7 @@ impl<T: Registration> Builder<T> {
 
         let id_map = {
             let mut map = std::collections::HashMap::new();
-            for e in arc_entries.iter().enumerate() {
+            for e in entries.iter().enumerate() {
                 map.insert(e.1.key.value().clone(), e.0);
             }
             map
@@ -143,23 +143,16 @@ impl<T: Registration> Builder<T> {
 
         Registry {
             default: def.map(|e| id_map.get(&e).copied()).flatten(),
-            entries: arc_entries
-                .iter()
-                .map(|e| Holder {
-                    value: e.value.clone(),
-                    key: e.key.clone(),
-                    tags: tokio::sync::RwLock::new(Vec::new()),
-                })
-                .collect(),
-            id_map,
-            key: reg,
             key_map: {
                 let mut map = std::collections::HashMap::new();
-                for e in arc_entries.iter().enumerate() {
+                for e in entries.iter().enumerate() {
                     map.insert(e.1.key.clone(), e.0);
                 }
                 map
             },
+            entries,
+            id_map,
+            key: reg,
             tags: tokio::sync::RwLock::new(std::collections::HashMap::new()),
         }
     }

@@ -1,3 +1,5 @@
+pub mod math;
+
 #[derive(PartialEq, Eq, Clone, Hash)]
 pub struct Identifier {
     namespace: String,
