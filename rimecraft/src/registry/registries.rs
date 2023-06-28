@@ -6,3 +6,4 @@ pub fn root_key() -> Identifier {
 
 pub static ITEM: super::Lazy<crate::item::Item> = super::Lazy::new();
 pub static BLOCK: super::Lazy<crate::block::Block> = super::Lazy::new();
+pub static FLUID: super::Lazy<crate::fluid::Fluid> = super::Lazy::new();

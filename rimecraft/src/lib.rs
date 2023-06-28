@@ -1,4 +1,5 @@
 pub mod block;
+pub mod fluid;
 pub mod item;
 /// Thin wrapper between Minecraft code structure and [`fastnbt`] and [`fastsnbt`].
 pub mod nbt;
