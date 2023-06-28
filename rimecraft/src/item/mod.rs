@@ -1,200 +1,279 @@
-use crate::{
-    nbt::{compound, NbtCompound, NbtElement},
-    registry::registries,
-    transfer::{ItemVariant, TransferVariant},
-    util::Identifier,
-};
-use std::cmp::min;
+mod event;
 
-#[derive(Clone)]
-pub struct Item {
-    max_count: u32,
-    max_damage: Option<u32>,
-}
+use std::ops::Deref;
+
+use crate::prelude::*;
+
+pub use event::*;
+
+/// Represents an item.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Item(usize);
 
 impl Item {
-    pub fn new(max_count: u32, max_damage: Option<u32>) -> Self {
-        Self {
-            max_count,
-            max_damage: match max_damage {
-                None | Some(0) => None,
-                Some(c) => Some(c),
+    pub fn new() -> Self {
+        Self(0)
+    }
+
+    /// Raw id of this item.
+    pub fn id(&self) -> usize {
+        self.0
+    }
+}
+
+impl crate::registry::Registration for Item {
+    fn accept(&mut self, id: usize) {
+        self.0 = id
+    }
+}
+
+impl serde::Serialize for Item {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        crate::registry::ITEM
+            .get_from_raw(self.id())
+            .unwrap()
+            .key()
+            .value()
+            .serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Item {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let id = Identifier::deserialize(deserializer)?;
+        Ok(crate::registry::ITEM.get_from_id(&id).map_or_else(
+            || {
+                tracing::debug!("Tried to load invalid item: {id}");
+                crate::registry::ITEM.default().1.as_item()
             },
-        }
-    }
-
-    pub fn get_max_count(&self) -> u32 {
-        self.max_count
-    }
-
-    pub fn get_max_damage(&self) -> Option<u32> {
-        self.max_damage
-    }
-
-    pub fn is_damageable(&self) -> bool {
-        self.max_damage.is_some()
+            |e| Self(e.0),
+        ))
     }
 }
 
 impl Default for Item {
     fn default() -> Self {
-        Self {
-            max_count: 64,
-            max_damage: None,
-        }
+        Self(crate::registry::ITEM.default().0)
     }
 }
 
-#[derive(Clone)]
+impl AsItem for Item {
+    fn as_item(&self) -> Item {
+        *self
+    }
+}
+
+/// A trait for converting into [`Item`].
+pub trait AsItem {
+    fn as_item(&self) -> Item;
+}
+
+impl AsItem for crate::registry::Holder<Item> {
+    /// Convert this object into an item.
+    fn as_item(&self) -> Item {
+        *self.deref().deref()
+    }
+}
+
+impl std::fmt::Display for Item {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        crate::registry::ITEM
+            .get_from_raw(self.id())
+            .ok_or(std::fmt::Error)?
+            .key()
+            .value()
+            .fmt(f)
+    }
+}
+
+/// Represents a stack of items.
+/// This is a data container that holds the
+/// item count and the stack's NBT.
+#[derive(Default, Clone, PartialEq)]
 pub struct ItemStack {
-    variant: ItemVariant,
-    count: u32,
+    /// Count of this stack.
+    pub count: u8,
+    item: Item,
+    nbt: Option<crate::nbt::NbtCompound>,
 }
 
 impl ItemStack {
     const UNBREAKABLE_KEY: &str = "Unbreakable";
     const DAMAGE_KEY: &str = "Damage";
 
-    pub fn new(item: usize, count: u32, nbt: Option<NbtCompound>) -> Self {
-        Self::from_variant(ItemVariant::new(item, nbt), count)
+    pub fn new(item: &impl AsItem, count: u8) -> Self {
+        Self {
+            count,
+            item: item.as_item(),
+            nbt: None,
+        }
     }
 
-    pub fn from_variant(variant: ItemVariant, count: u32) -> Self {
-        Self { variant, count }
-    }
-
-    pub fn from_nbt(value: &NbtCompound) -> Self {
-        let registry = registries::ITEM.read().unwrap();
-        let item = registry
-            .get_raw_id_from_id(
-                &match Identifier::parse(compound::get_str(value, "id").to_string()) {
-                    Some(id) => id,
-                    None => registry.get_default_id().clone(),
-                },
-            )
-            .unwrap_or(registry.get_default_raw_id());
-        let nbt = compound::get_compound(value, "tag").cloned();
-        Self::from_variant(
-            ItemVariant::new(item, nbt),
-            compound::get_u8(value, "Count") as u32,
-        )
-    }
-
-    pub fn get_variant(&self) -> &ItemVariant {
-        &self.variant
-    }
-
-    pub fn get_variant_mut(&mut self) -> &mut ItemVariant {
-        &mut self.variant
-    }
-
+    /// Whether this item stack is empty.
     pub fn is_empty(&self) -> bool {
-        self.count == 0 || self.variant.is_blank()
+        self.item == Item::default() || self.count == 0
     }
 
-    pub fn get_count(&self) -> u32 {
-        self.count
-    }
-
-    pub fn set_count(&mut self, count: u32) {
-        self.count = count
-    }
-
-    pub fn decrement(&mut self, count: u32) {
-        self.count -= count
-    }
-
-    pub fn split(&mut self, _amount: u32) -> Self {
-        let i = min(self.count, self.count);
+    /// Take amount of items from this stack into
+    /// a new cloned stack with the taken amount.
+    pub fn take(&mut self, amount: u8) -> Self {
+        let i = std::cmp::min(amount, self.count);
         let mut stack = self.clone();
-        stack.set_count(i);
-        self.decrement(i);
+        stack.count = i;
+        self.count -= i;
         stack
     }
 
-    pub fn clone_and_empty(&mut self) -> ItemStack {
-        let stack = self.clone();
-        self.set_count(0);
-        stack
+    /// Take all items from this stack into a new stack.
+    pub fn take_all(&mut self) -> Self {
+        self.take(self.count)
     }
 
-    pub fn write_nbt(&self, nbt: &mut NbtCompound) {
-        let identifier = registries::ITEM
-            .read()
-            .unwrap()
-            .get_entry_from_raw_id(self.variant.get_raw_id())
-            .map(|e| e.get_key().unwrap().value.to_string())
-            .unwrap_or("rimecraft:air".to_string());
-        nbt.insert("id".to_string(), NbtElement::String(identifier));
-        nbt.insert("Count".to_string(), NbtElement::U8(self.count as u8));
+    /// Get [`Item`] inside this stack.
+    pub fn item(&self) -> Item {
+        self.item
     }
 
-    pub fn get_max_count(&self) -> u32 {
-        registries::ITEM
-            .read()
-            .unwrap()
-            .get_from_raw_id_default(self.variant.get_raw_id())
-            .get_max_count()
+    /// Whether the target item holder matches the provided predicate.
+    pub fn matches<F: Fn(&crate::registry::Holder<Item>) -> bool>(&self, f: F) -> bool {
+        f(crate::registry::ITEM.get_from_raw(self.item.id()).unwrap())
+    }
+
+    pub fn nbt(&self) -> Option<&crate::nbt::NbtCompound> {
+        self.nbt.as_ref()
+    }
+
+    pub fn nbt_mut(&mut self) -> Option<&mut crate::nbt::NbtCompound> {
+        self.nbt.as_mut()
+    }
+
+    pub fn get_or_init_nbt(&mut self) -> &mut crate::nbt::NbtCompound {
+        self.nbt
+            .get_or_insert_with(|| crate::nbt::NbtCompound::new())
+    }
+
+    pub fn set_nbt(&mut self, nbt: Option<crate::nbt::NbtCompound>) {
+        self.nbt = nbt;
+        if self.is_damageable() {
+            self.set_damage(self.damage());
+        }
+
+        if let Some(nbt) = &mut self.nbt {
+            EVENTS.read().post_process_nbt(self.item, nbt);
+        }
+    }
+
+    pub fn max_count(&self) -> u8 {
+        EVENTS.read().get_max_count(self)
     }
 
     pub fn is_stackable(&self) -> bool {
-        self.get_max_count() > 1
+        self.max_count() > 1
+    }
+
+    pub fn max_damage(&self) -> u32 {
+        EVENTS.read().get_max_damage(self)
     }
 
     pub fn is_damageable(&self) -> bool {
-        if self.is_empty()
-            || registries::ITEM
-                .read()
-                .unwrap()
-                .get_from_raw_id_default(self.variant.get_raw_id())
-                .get_max_damage()
-                .map_or(true, |e| e <= 0)
-        {
+        if self.is_empty() || self.max_damage() == 0 {
             false
         } else {
-            self.get_variant()
-                .get_nbt()
-                .map_or(true, |e| !compound::get_bool(e, Self::UNBREAKABLE_KEY))
+            self.nbt.as_ref().map_or(true, |nbt| {
+                !nbt.get_bool(Self::UNBREAKABLE_KEY).unwrap_or_default()
+            })
         }
     }
 
     pub fn is_damaged(&self) -> bool {
-        self.is_damageable() && self.get_damage() > 0
+        self.is_damageable() && self.damage() > 0
     }
 
-    pub fn get_damage(&self) -> u32 {
-        self.variant
-            .get_nbt()
-            .map_or(0, |nbt| compound::get_i32(nbt, Self::DAMAGE_KEY) as u32)
+    /// Get damage of this satck from the nbt tags.
+    pub fn damage(&self) -> u32 {
+        self.nbt.as_ref().map_or(0, |nbt| {
+            nbt.get_int(Self::DAMAGE_KEY).unwrap_or_default() as u32
+        })
     }
 
     pub fn set_damage(&mut self, damage: u32) {
-        self.variant
-            .get_or_create_nbt_mut()
-            .insert(Self::DAMAGE_KEY.to_string(), NbtElement::I32(damage as i32));
+        self.get_or_init_nbt()
+            .insert_int(Self::DAMAGE_KEY, damage as i32);
     }
 
-    pub fn clone_with_count(&self, count: u32) -> Self {
-        let mut stack = self.clone();
-        stack.set_count(count);
-        stack
-    }
-}
-
-impl Default for ItemStack {
-    fn default() -> Self {
-        Self {
-            variant: ItemVariant::default(),
-            count: 1,
+    /// Whether the given item stack's items and NBT are equal with this stack.
+    pub fn can_combine(&self, other: &Self) -> bool {
+        if self.item() != other.item() {
+            false
+        } else if self.is_empty() && other.is_empty() {
+            true
+        } else {
+            self.nbt == other.nbt
         }
     }
 }
 
-pub struct FoodComponent {
-    pub hunger: i32,
-    pub saturation_modifier: f32,
-    pub meat: bool,
-    pub always_edible: bool,
-    pub snack: bool,
-    //TODO: statuseffect
+impl serde::Serialize for ItemStack {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        RawItemStack {
+            id: self.item,
+            count: self.count as i8,
+            tag: self.nbt.clone(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ItemStack {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut raw = RawItemStack::deserialize(deserializer)?;
+        let item = raw.id;
+        if let Some(nbt) = &mut raw.tag {
+            EVENTS.read().post_process_nbt(item, nbt);
+        }
+        let mut stack = Self {
+            count: raw.count as u8,
+            item: raw.id,
+            nbt: raw.tag,
+        };
+        if stack.is_damageable() {
+            stack.set_damage(stack.damage());
+        }
+        Ok(stack)
+    }
+}
+
+impl AsItem for ItemStack {
+    fn as_item(&self) -> Item {
+        self.item()
+    }
+}
+
+impl std::fmt::Display for ItemStack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.count.fmt(f)?;
+        f.write_str(" ")?;
+        self.item.fmt(f)
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct RawItemStack {
+    id: Item,
+    #[serde(rename = "Count")]
+    count: i8,
+    #[serde(default)]
+    tag: Option<crate::nbt::NbtCompound>,
 }

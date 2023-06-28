@@ -1,64 +1,75 @@
-use std::{fmt::Display, marker::PhantomData};
+use crate::prelude::*;
 
-use crate::util::Identifier;
-
-use super::{Registry, RegistryKey};
-
+/// Represents a tag key.
 pub struct TagKey<T> {
-    registry: RegistryKey<Registry<T>>,
-    id: Identifier,
-    _phantom: PhantomData<T>,
+    inner: std::sync::Arc<(super::RegistryKey<super::Registry<T>>, Identifier)>,
 }
 
 impl<T> TagKey<T> {
-    pub fn new(registry: RegistryKey<Registry<T>>, id: Identifier) -> Self {
+    pub fn new(reg: super::RegistryKey<super::Registry<T>>, id: Identifier) -> Self {
         Self {
-            registry,
-            id,
-            _phantom: PhantomData,
+            inner: std::sync::Arc::new((reg, id)),
         }
     }
 
-    pub fn get_id(&self) -> &Identifier {
-        &self.id
+    pub fn is_of<T1>(&self, reg: &super::RegistryKey<super::Registry<T1>>) -> bool {
+        self.inner.0.inner == reg.inner
     }
 
-    pub fn get_registry(&self) -> &RegistryKey<Registry<T>> {
-        &self.registry
+    /// Return `Some(_)` if the key is of reg, otherwise `None`.
+    pub fn cast<E>(&self, reg: &super::RegistryKey<super::Registry<E>>) -> Option<TagKey<E>> {
+        if self.is_of(reg) {
+            Some(TagKey {
+                inner: std::sync::Arc::new((
+                    super::RegistryKey {
+                        _type: std::marker::PhantomData,
+                        inner: self.inner.0.inner.clone(),
+                    },
+                    self.inner.1.clone(),
+                )),
+            })
+        } else {
+            None
+        }
     }
 
-    pub fn is_of(&self, other_registry: &RegistryKey<Registry<T>>) -> bool {
-        self.registry.is_of(other_registry)
+    pub fn reg(&self) -> &super::RegistryKey<super::Registry<T>> {
+        &self.inner.0
     }
 
-    pub fn try_cast<E>(&self, registry_key: RegistryKey<Registry<E>>) -> TagKey<E> {
-        TagKey::<E>::new(registry_key, self.id.clone())
-    }
-}
-
-impl<T> PartialEq for TagKey<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id && self.registry == other.registry
+    pub fn id(&self) -> &Identifier {
+        &self.inner.1
     }
 }
 
 impl<T> Clone for TagKey<T> {
     fn clone(&self) -> Self {
         Self {
-            registry: self.registry.clone(),
-            id: self.id.clone(),
-            _phantom: PhantomData,
+            inner: self.inner.clone(),
         }
     }
 }
 
-impl<T> Display for TagKey<T> {
+impl<T> PartialEq for TagKey<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<T> Eq for TagKey<T> {}
+
+impl<T> std::fmt::Display for TagKey<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("TagKey[")?;
-        self.registry.get_value().fmt(f)?;
+        self.inner.0.fmt(f)?;
         f.write_str(" / ")?;
-        self.id.fmt(f)?;
-        f.write_str("]")?;
-        std::fmt::Result::Ok(())
+        self.inner.1.fmt(f)?;
+        f.write_str("]")
+    }
+}
+
+impl<T> std::hash::Hash for TagKey<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.inner.hash(state)
     }
 }
