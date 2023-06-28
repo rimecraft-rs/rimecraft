@@ -142,6 +142,10 @@ impl<T: Deref<Target = State>> States<T> {
         &self.states
     }
 
+    pub fn from_id(&self, id: usize) -> Option<&T> {
+        self.states.get(id)
+    }
+
     pub fn default_state(&self) -> &T {
         self.states.get(self.def).unwrap()
     }

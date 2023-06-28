@@ -10,7 +10,7 @@ pub use event::*;
 #[derive(Clone)]
 pub struct Block {
     id: usize,
-    states: std::sync::Arc<crate::state::States<BlockState>>,
+    pub states: std::sync::Arc<crate::state::States<BlockState>>,
 }
 
 impl Block {

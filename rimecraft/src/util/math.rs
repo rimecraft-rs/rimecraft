@@ -14,14 +14,17 @@ pub struct Box {
 
 impl Box {
     /// Creates a box of the given positions (in (x, y, z)) as corners.
-    pub fn new(pos1: (f64, f64, f64), pos2: (f64, f64, f64)) -> Self {
+    pub fn new<T: Into<(f64, f64, f64)>>(pos1: T, pos2: T) -> Self {
+        let p1 = pos1.into();
+        let p2 = pos2.into();
+
         Self {
-            min_x: if pos1.0 > pos2.0 { pos2.0 } else { pos1.0 },
-            min_y: if pos1.1 > pos2.1 { pos2.1 } else { pos1.1 },
-            min_z: if pos1.2 > pos2.2 { pos2.2 } else { pos1.2 },
-            max_x: if pos1.0 < pos2.0 { pos2.0 } else { pos1.0 },
-            max_y: if pos1.1 < pos2.1 { pos2.1 } else { pos1.1 },
-            max_z: if pos1.2 < pos2.2 { pos2.2 } else { pos1.2 },
+            min_x: if p1.0 > p2.0 { p2.0 } else { p1.0 },
+            min_y: if p1.1 > p2.1 { p2.1 } else { p1.1 },
+            min_z: if p1.2 > p2.2 { p2.2 } else { p1.2 },
+            max_x: if p1.0 < p2.0 { p2.0 } else { p1.0 },
+            max_y: if p1.1 < p2.1 { p2.1 } else { p1.1 },
+            max_z: if p1.2 < p2.2 { p2.2 } else { p1.2 },
         }
     }
 
@@ -241,4 +244,10 @@ impl Into<glam::IVec3> for BlockPos {
     fn into(self) -> glam::IVec3 {
         self.0
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ChunkPos {
+    x: i32,
+    z: i32,
 }
