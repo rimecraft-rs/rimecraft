@@ -1,6 +1,6 @@
 [package]
 name = "rimecraft"
-version = "1.19.4"
+version = "20.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -24,10 +24,11 @@ tokio = { version = "1.28", features = ["full"] }
 winit = { version = "0.28", optional = true }
 wgpu = { version = "0.16", optional = true }
 anyhow = "*"
-fastnbt = "2.4"
-fastsnbt = "0.1"
+fastsnbt = "*"
+fastnbt = { git = "https://github.com/rimecraft-rs/fastnbt" }
 parking_lot = "0.12"
 lazy-regex = "2"
+cesu8 = "*"
 
 [features]
 # Developing server for now

@@ -11,6 +11,8 @@ pub use fastnbt::value::to_value as to_nbt;
 
 pub use fastsnbt::from_str;
 
+use serde::de::Error;
+
 pub type NbtCompound = std::collections::HashMap<String, NbtElement>;
 
 pub trait NbtCompoundExt {
@@ -223,5 +225,82 @@ impl NbtCompoundExt for NbtCompound {
                 _ => None,
             })
             .flatten()
+    }
+}
+
+pub struct BufInput<'a, T: bytes::Buf>(pub &'a mut T);
+
+impl<'de, T: bytes::Buf> fastnbt::input::Input<'de> for BufInput<'de, T> {
+    fn consume_byte(&mut self) -> fastnbt::error::Result<u8> {
+        Ok(self.0.get_u8())
+    }
+
+    fn ignore_str(&mut self) -> fastnbt::error::Result<()> {
+        let len = self.0.get_u16() as usize;
+        self.ignore_bytes(len)
+    }
+
+    fn ignore_bytes(&mut self, size: usize) -> fastnbt::error::Result<()> {
+        for _ in 0..size {
+            self.0.get_u8();
+        }
+        Ok(())
+    }
+
+    fn consume_str<'s>(
+        &'s mut self,
+        scratch: &'s mut Vec<u8>,
+    ) -> fastnbt::error::Result<fastnbt::input::Reference<'de, 's, str>> {
+        let n = self.0.get_u16() as usize;
+        scratch.clear();
+        for i in 0..n {
+            scratch[i] = self.0.get_u8();
+        }
+
+        let str = cesu8::from_java_cesu8(scratch).map_err(|_| {
+            fastnbt::error::Error::custom(format!("Non-unicode string: {:?}", scratch))
+        })?;
+
+        Ok(match str {
+            std::borrow::Cow::Borrowed(_) => {
+                fastnbt::input::Reference::Copied(unsafe { std::str::from_utf8_unchecked(scratch) })
+            }
+            std::borrow::Cow::Owned(s) => {
+                *scratch = s.into_bytes();
+                fastnbt::input::Reference::Copied(unsafe { std::str::from_utf8_unchecked(scratch) })
+            }
+        })
+    }
+
+    fn consume_bytes<'s>(
+        &'s mut self,
+        n: usize,
+        scratch: &'s mut Vec<u8>,
+    ) -> fastnbt::error::Result<fastnbt::input::Reference<'de, 's, [u8]>> {
+        scratch.clear();
+        for i in 0..n {
+            scratch[i] = self.0.get_u8();
+        }
+        Ok(fastnbt::input::Reference::Copied(scratch.as_slice()))
+    }
+
+    fn consume_i16(&mut self) -> fastnbt::error::Result<i16> {
+        Ok(self.0.get_i16())
+    }
+
+    fn consume_i32(&mut self) -> fastnbt::error::Result<i32> {
+        Ok(self.0.get_i32())
+    }
+
+    fn consume_i64(&mut self) -> fastnbt::error::Result<i64> {
+        Ok(self.0.get_i64())
+    }
+
+    fn consume_f32(&mut self) -> fastnbt::error::Result<f32> {
+        Ok(self.0.get_f32())
+    }
+
+    fn consume_f64(&mut self) -> fastnbt::error::Result<f64> {
+        Ok(self.0.get_f64())
     }
 }
