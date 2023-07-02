@@ -221,6 +221,21 @@ impl std::fmt::Display for Box {
 pub struct BlockPos(glam::IVec3);
 
 impl BlockPos {
+    pub const ORIGIN: Self = Self(glam::IVec3::ZERO);
+
+    const SIZE_BITS_Z: i32 =
+        1 + impl_helper::floor_log_2(impl_helper::smallest_encompassing_power_of_two(30000000));
+    const SIZE_BITS_X: i32 = Self::SIZE_BITS_Z;
+    const SIZE_BITS_Y: i32 = 64 - Self::SIZE_BITS_X - Self::SIZE_BITS_Z;
+
+    // mysterious unused const
+    // const BITS_X: i64 = (1 << Self::SIZE_BITS_X) - 1;
+
+    const BITS_Y: i64 = (1 << Self::SIZE_BITS_Y) - 1;
+    const BITS_Z: i64 = (1 << Self::SIZE_BITS_Z) - 1;
+    const BIT_SHIFT_Z: i32 = Self::SIZE_BITS_Y;
+    const BIT_SHIFT_X: i32 = Self::SIZE_BITS_Y + Self::SIZE_BITS_Z;
+
     pub fn new(x: i32, y: i32, z: i32) -> Self {
         Self(glam::IVec3 { x, y, z })
     }
@@ -246,8 +261,65 @@ impl Into<glam::IVec3> for BlockPos {
     }
 }
 
+impl Into<i64> for BlockPos {
+    fn into(self) -> i64 {
+        let mut l = 0_i64;
+        l |= (self.x as i64 & Self::BITS_Z) << Self::BIT_SHIFT_Z;
+        l |= (self.y as i64 & Self::BITS_Y) << 0;
+        l | (self.z as i64 & Self::BITS_Z) << Self::BIT_SHIFT_Z
+    }
+}
+
+impl From<i64> for BlockPos {
+    fn from(value: i64) -> Self {
+        Self(glam::IVec3 {
+            x: (value << 64 - Self::BIT_SHIFT_X - Self::SIZE_BITS_X >> 64 - Self::SIZE_BITS_X)
+                as i32,
+            y: (value << 64 - Self::SIZE_BITS_Y >> 64 - Self::SIZE_BITS_Y) as i32,
+            z: (value << 64 - Self::BIT_SHIFT_Z - Self::SIZE_BITS_Z >> 64 - Self::SIZE_BITS_Z)
+                as i32,
+        })
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkPos {
     x: i32,
     z: i32,
+}
+
+/// Some translations from Minecraft: Java Edition to Rust.
+pub(crate) mod impl_helper {
+    const MULTIPLY_DE_BRUIJN_BIT_POSITION: [i32; 32] = [
+        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 31, 27, 13, 23, 21, 19, 16, 7,
+        26, 12, 18, 6, 11, 5, 10, 9,
+    ];
+
+    pub const fn is_power_of_two(value: i32) -> bool {
+        value != 0 && (value & value - 1) == 0
+    }
+
+    pub const fn ceil_log_2(value: i32) -> i32 {
+        let v = if is_power_of_two(value) {
+            value
+        } else {
+            smallest_encompassing_power_of_two(value)
+        };
+
+        MULTIPLY_DE_BRUIJN_BIT_POSITION[(((value as i64) * 125613361 >> 27) & 0x1F) as usize]
+    }
+
+    pub const fn floor_log_2(value: i32) -> i32 {
+        ceil_log_2(value) - if is_power_of_two(value) { 0 } else { 1 }
+    }
+
+    pub const fn smallest_encompassing_power_of_two(value: i32) -> i32 {
+        let mut i = value - 1;
+        i |= i >> 1;
+        i |= i >> 2;
+        i |= i >> 4;
+        i |= i >> 8;
+        i |= i >> 16;
+        i + 1
+    }
 }

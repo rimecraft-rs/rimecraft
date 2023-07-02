@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Describes types that can be encoded into a packet buffer.
 pub trait Encode {
     /// Encode into a buffer.
@@ -653,6 +655,27 @@ mod packet_buf_impl {
             } else {
                 None
             })
+        }
+    }
+
+    impl Encode for BlockPos {
+        fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+        where
+            B: bytes::BufMut,
+        {
+            buf.put_i64((*self).into());
+            Ok(())
+        }
+    }
+
+    impl<'de> Decode<'de> for BlockPos {
+        type Output = BlockPos;
+
+        fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+        where
+            B: bytes::Buf,
+        {
+            Ok(buf.get_i64().into())
         }
     }
 }
