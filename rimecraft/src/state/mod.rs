@@ -6,8 +6,8 @@ pub use property::Property;
 
 pub struct State {
     id: usize,
-    entries: std::collections::HashMap<property::Property, u8>,
-    table: once_cell::sync::OnceCell<std::collections::HashMap<property::Property, Vec<usize>>>,
+    entries: hashbrown::HashMap<property::Property, u8>,
+    table: once_cell::sync::OnceCell<hashbrown::HashMap<property::Property, Vec<usize>>>,
 }
 
 impl State {
@@ -85,7 +85,7 @@ impl State {
 
     fn init_table<T: Deref<Target = Self>>(&self, states: &[T]) {
         assert!(self.table.get().is_none());
-        let mut table = std::collections::HashMap::new();
+        let mut table = hashbrown::HashMap::new();
         for p in self.entries.keys() {
             let range = p.range();
             let mut vec = Vec::new();
@@ -126,14 +126,14 @@ impl State {
         self.entries.get(property).copied().map(T::from)
     }
 
-    pub fn entries(&self) -> &std::collections::HashMap<property::Property, u8> {
+    pub fn entries(&self) -> &hashbrown::HashMap<property::Property, u8> {
         &self.entries
     }
 }
 
 pub struct States<T: Deref<Target = State>> {
     def: usize,
-    properties: std::collections::HashMap<String, property::Property>,
+    properties: hashbrown::HashMap<String, property::Property>,
     states: Vec<T>,
 }
 
@@ -161,8 +161,8 @@ impl<T: Deref<Target = State>> States<T> {
 
 fn new_states<E: Clone, T: Deref<Target = State> + From<(E, State)>>(
     data: E,
-    def_state: std::collections::HashMap<property::Property, u8>,
-    properties: std::collections::HashMap<String, property::Property>,
+    def_state: hashbrown::HashMap<property::Property, u8>,
+    properties: hashbrown::HashMap<String, property::Property>,
 ) -> States<T> {
     let mut states_raw: Vec<State> = Vec::new();
     let mut temp: Vec<Vec<(property::Property, u8)>> = Vec::new();
@@ -181,8 +181,7 @@ fn new_states<E: Clone, T: Deref<Target = State> + From<(E, State)>>(
     }
 
     for list2 in temp {
-        let mut entries: std::collections::HashMap<property::Property, u8> =
-            std::collections::HashMap::new();
+        let mut entries: hashbrown::HashMap<property::Property, u8> = hashbrown::HashMap::new();
 
         for e in list2 {
             entries.insert(e.0, e.1);
@@ -218,7 +217,7 @@ fn new_states<E: Clone, T: Deref<Target = State> + From<(E, State)>>(
 
 #[derive(Default)]
 pub struct StatesBuilder {
-    properties: std::collections::HashMap<String, property::Property>,
+    properties: hashbrown::HashMap<String, property::Property>,
 }
 
 impl StatesBuilder {
@@ -255,7 +254,7 @@ impl StatesBuilder {
     pub fn build<E: Clone, S: Deref<Target = State> + From<(E, State)>>(
         self,
         data: E,
-        def_state: std::collections::HashMap<property::Property, u8>,
+        def_state: hashbrown::HashMap<property::Property, u8>,
     ) -> States<S> {
         new_states(data, def_state, self.properties)
     }

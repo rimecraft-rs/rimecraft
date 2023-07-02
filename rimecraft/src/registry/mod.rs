@@ -42,10 +42,10 @@ impl<T> Deref for Holder<T> {
 pub struct Registry<T> {
     default: Option<usize>,
     entries: Vec<Holder<T>>,
-    id_map: std::collections::HashMap<Identifier, usize>,
+    id_map: hashbrown::HashMap<Identifier, usize>,
     pub key: RegistryKey<Self>,
-    key_map: std::collections::HashMap<RegistryKey<T>, usize>,
-    pub tags: tokio::sync::RwLock<std::collections::HashMap<tag::TagKey<T>, Vec<usize>>>,
+    key_map: hashbrown::HashMap<RegistryKey<T>, usize>,
+    pub tags: tokio::sync::RwLock<hashbrown::HashMap<tag::TagKey<T>, Vec<usize>>>,
 }
 
 impl<T> Registry<T> {
@@ -138,7 +138,7 @@ impl<T: Registration> Builder<T> {
             .collect::<Vec<_>>();
 
         let id_map = {
-            let mut map = std::collections::HashMap::new();
+            let mut map = hashbrown::HashMap::new();
             for e in entries.iter().enumerate() {
                 map.insert(e.1.key.value().clone(), e.0);
             }
@@ -148,7 +148,7 @@ impl<T: Registration> Builder<T> {
         Registry {
             default: def.map(|e| id_map.get(&e).copied()).flatten(),
             key_map: {
-                let mut map = std::collections::HashMap::new();
+                let mut map = hashbrown::HashMap::new();
                 for e in entries.iter().enumerate() {
                     map.insert(e.1.key.clone(), e.0);
                 }
@@ -157,7 +157,7 @@ impl<T: Registration> Builder<T> {
             entries,
             id_map,
             key: reg,
-            tags: tokio::sync::RwLock::new(std::collections::HashMap::new()),
+            tags: tokio::sync::RwLock::new(hashbrown::HashMap::new()),
         }
     }
 }
