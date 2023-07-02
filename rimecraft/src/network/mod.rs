@@ -678,4 +678,213 @@ mod packet_buf_impl {
             Ok(buf.get_i64().into())
         }
     }
+
+    impl Encode for crate::util::math::ChunkPos {
+        fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+        where
+            B: bytes::BufMut,
+        {
+            buf.put_i64((*self).into());
+            Ok(())
+        }
+    }
+
+    impl<'de> Decode<'de> for crate::util::math::ChunkPos {
+        type Output = crate::util::math::ChunkPos;
+
+        fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+        where
+            B: bytes::Buf,
+        {
+            Ok(buf.get_i64().into())
+        }
+    }
+
+    impl Encode for uuid::Uuid {
+        fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+        where
+            B: bytes::BufMut,
+        {
+            let (a, b) = self.as_u64_pair();
+            buf.put_u64(a);
+            buf.put_u64(b);
+            Ok(())
+        }
+    }
+
+    impl<'de> Decode<'de> for uuid::Uuid {
+        type Output = uuid::Uuid;
+
+        fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+        where
+            B: bytes::Buf,
+        {
+            let a = buf.get_u64();
+            let b = buf.get_u64();
+            Ok(uuid::Uuid::from_u64_pair(a, b))
+        }
+    }
+
+    impl Encode for crate::nbt::NbtCompound {
+        fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+        where
+            B: bytes::BufMut,
+        {
+            Nbt(self).encode(buf)
+        }
+    }
+
+    impl<'de> Decode<'de> for crate::nbt::NbtCompound {
+        type Output = crate::nbt::NbtCompound;
+
+        fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+        where
+            B: bytes::Buf,
+        {
+            Nbt::decode(buf)
+        }
+    }
+
+    impl Encode for glam::Vec3 {
+        fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+        where
+            B: bytes::BufMut,
+        {
+            buf.put_f32(self.x);
+            buf.put_f32(self.y);
+            buf.put_f32(self.z);
+            Ok(())
+        }
+    }
+
+    impl<'de> Decode<'de> for glam::Vec3 {
+        type Output = glam::Vec3;
+
+        fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+        where
+            B: bytes::Buf,
+        {
+            let x = buf.get_f32();
+            let y = buf.get_f32();
+            let z = buf.get_f32();
+            Ok(glam::Vec3 { x, y, z })
+        }
+    }
+
+    impl Encode for glam::Quat {
+        fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+        where
+            B: bytes::BufMut,
+        {
+            buf.put_f32(self.x);
+            buf.put_f32(self.y);
+            buf.put_f32(self.z);
+            buf.put_f32(self.w);
+            Ok(())
+        }
+    }
+
+    impl<'de> Decode<'de> for glam::Quat {
+        type Output = glam::Quat;
+
+        fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+        where
+            B: bytes::Buf,
+        {
+            let x = buf.get_f32();
+            let y = buf.get_f32();
+            let z = buf.get_f32();
+            let w = buf.get_f32();
+            Ok(glam::Quat::from_xyzw(x, y, z, w))
+        }
+    }
+
+    impl Encode for crate::item::ItemStack {
+        fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+        where
+            B: bytes::BufMut,
+        {
+            if self.is_empty() {
+                false.encode(buf)
+            } else {
+                true.encode(buf)?;
+                self.item().encode(buf)?;
+                buf.put_u8(self.count);
+
+                match self.nbt() {
+                    Some(map) => {
+                        if self.is_damageable() || self.item().descriptor().sync_nbt {
+                            return Nbt(map).encode(buf);
+                        }
+                    }
+                    _ => (),
+                }
+
+                buf.put_u8(0);
+                Ok(())
+            }
+        }
+    }
+
+    impl<'de> Decode<'de> for crate::item::ItemStack {
+        type Output = crate::item::ItemStack;
+
+        fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+        where
+            B: bytes::Buf,
+        {
+            if !bool::decode(buf)? {
+                Ok(crate::item::ItemStack::default())
+            } else {
+                let item = crate::item::Item::decode(buf)?;
+                let mut stack = crate::item::ItemStack::new(&item, buf.get_u8());
+                stack.set_nbt(Some(Nbt::decode(buf)?));
+                Ok(stack)
+            }
+        }
+    }
+
+    impl Encode for Identifier {
+        fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+        where
+            B: bytes::BufMut,
+        {
+            self.to_string().encode(buf)
+        }
+    }
+
+    impl<'de> Decode<'de> for Identifier {
+        type Output = Identifier;
+
+        fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+        where
+            B: bytes::Buf,
+        {
+            Identifier::try_parse(&String::decode(buf)?)
+        }
+    }
+
+    impl<T> Encode for crate::registry::RegistryKey<T> {
+        fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+        where
+            B: bytes::BufMut,
+        {
+            self.value().encode(buf)
+        }
+    }
+
+    impl<'de, T> Decode<'de> for crate::registry::RegistryKey<T>
+    where
+        T: RegistryAccess + 'static,
+    {
+        type Output = crate::registry::RegistryKey<T>;
+
+        fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+        where
+            B: bytes::Buf,
+        {
+            let id = Identifier::decode(buf)?;
+            Ok(crate::registry::RegistryKey::new(&T::registry().key, id))
+        }
+    }
 }

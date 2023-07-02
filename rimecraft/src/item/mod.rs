@@ -10,27 +10,44 @@ use crate::{
 pub use event::*;
 
 /// Represents an item.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Item(usize);
+#[derive(Clone, Copy)]
+pub struct Item {
+    id: usize,
+    properties: ItemDescriptor,
+}
+
+/// Describes some basic properties of an item.
+#[derive(Clone, Copy)]
+pub struct ItemDescriptor {
+    pub sync_nbt: bool,
+}
+
+impl Default for ItemDescriptor {
+    fn default() -> Self {
+        Self { sync_nbt: true }
+    }
+}
 
 impl Item {
-    pub fn new() -> Self {
-        Self(0)
+    pub fn new(descriptor: ItemDescriptor) -> Self {
+        Self {
+            id: 0,
+            properties: descriptor,
+        }
     }
 
-    /// Raw id of this item.
-    pub fn id(&self) -> usize {
-        self.0
+    pub fn descriptor(&self) -> &ItemDescriptor {
+        &self.properties
     }
 }
 
 impl Registration for Item {
     fn accept(&mut self, id: usize) {
-        self.0 = id
+        self.id = id
     }
 
     fn raw_id(&self) -> usize {
-        self.0
+        self.id
     }
 }
 
@@ -46,7 +63,7 @@ impl serde::Serialize for Item {
         S: serde::Serializer,
     {
         crate::registry::ITEM
-            .get_from_raw(self.id())
+            .get_from_raw(self.raw_id())
             .unwrap()
             .key()
             .value()
@@ -65,14 +82,14 @@ impl<'de> serde::Deserialize<'de> for Item {
                 tracing::debug!("Tried to load invalid item: {id}");
                 crate::registry::ITEM.default().1.as_item()
             },
-            |e| Self(e.0),
+            |e| *e.1.deref(),
         ))
     }
 }
 
 impl Default for Item {
     fn default() -> Self {
-        Self(crate::registry::ITEM.default().0)
+        *crate::registry::ITEM.default().1.deref()
     }
 }
 
@@ -97,11 +114,25 @@ impl AsItem for crate::registry::Holder<Item> {
 impl std::fmt::Display for Item {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         crate::registry::ITEM
-            .get_from_raw(self.id())
+            .get_from_raw(self.raw_id())
             .ok_or(std::fmt::Error)?
             .key()
             .value()
             .fmt(f)
+    }
+}
+
+impl Eq for Item {}
+
+impl PartialEq for Item {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl std::hash::Hash for Item {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        state.write_usize(self.id)
     }
 }
 
@@ -155,7 +186,9 @@ impl ItemStack {
 
     /// Whether the target item holder matches the provided predicate.
     pub fn matches<F: Fn(&crate::registry::Holder<Item>) -> bool>(&self, f: F) -> bool {
-        f(crate::registry::ITEM.get_from_raw(self.item.id()).unwrap())
+        f(crate::registry::ITEM
+            .get_from_raw(self.item.raw_id())
+            .unwrap())
     }
 
     pub fn nbt(&self) -> Option<&crate::nbt::NbtCompound> {

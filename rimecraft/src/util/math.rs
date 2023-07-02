@@ -282,10 +282,27 @@ impl From<i64> for BlockPos {
     }
 }
 
+/// An immutable pair of two integers representing
+/// the X and Z coords of a chunk.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkPos {
     x: i32,
     z: i32,
+}
+
+impl From<i64> for ChunkPos {
+    fn from(value: i64) -> Self {
+        Self {
+            x: value as i32,
+            z: (value >> 32) as i32,
+        }
+    }
+}
+
+impl Into<i64> for ChunkPos {
+    fn into(self) -> i64 {
+        self.x as i64 & 0xFFFFFFFF | (self.z as i64 & 0xFFFFFFFF) << 32
+    }
 }
 
 /// Some translations from Minecraft: Java Edition to Rust.
@@ -306,7 +323,7 @@ pub(crate) mod impl_helper {
             smallest_encompassing_power_of_two(value)
         };
 
-        MULTIPLY_DE_BRUIJN_BIT_POSITION[(((value as i64) * 125613361 >> 27) & 0x1F) as usize]
+        MULTIPLY_DE_BRUIJN_BIT_POSITION[(((v as i64) * 125613361 >> 27) & 0x1F) as usize]
     }
 
     pub const fn floor_log_2(value: i32) -> i32 {

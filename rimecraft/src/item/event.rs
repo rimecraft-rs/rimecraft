@@ -1,3 +1,5 @@
+use crate::registry::Registration;
+
 /// Vanilla item events for perform item actions and obtain item settings.
 pub static EVENTS: parking_lot::RwLock<VanillaItemEvents> =
     parking_lot::RwLock::new(VanillaItemEvents(vec![]));
@@ -11,11 +13,11 @@ impl VanillaItemEvents {
     /// The required `item` can be `None` for some events
     /// so that all items will be affected by this callback.
     pub fn register(&mut self, item: Option<super::Item>, callback: VanillaItemCallback) {
-        self.0.push((item.map(|e| e.id()), callback));
+        self.0.push((item.map(|e| e.raw_id()), callback));
     }
 
     pub fn get_max_damage(&self, stack: &super::ItemStack) -> u32 {
-        let id = stack.item.id();
+        let id = stack.item.raw_id();
         self.0
             .iter()
             .find(|e| {
@@ -29,7 +31,7 @@ impl VanillaItemEvents {
     }
 
     pub fn get_max_count(&self, stack: &super::ItemStack) -> u8 {
-        let id = stack.item.id();
+        let id = stack.item.raw_id();
         self.0
             .iter()
             .find(|e| {
@@ -43,7 +45,7 @@ impl VanillaItemEvents {
     }
 
     pub fn post_process_nbt(&self, item: super::Item, nbt: &mut crate::nbt::NbtCompound) {
-        let id = item.id();
+        let id = item.raw_id();
         self.0
             .iter()
             .filter(|e| {
