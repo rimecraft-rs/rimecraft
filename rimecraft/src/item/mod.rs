@@ -2,7 +2,10 @@ mod event;
 
 use std::ops::Deref;
 
-use crate::{prelude::*, registry::Registration};
+use crate::{
+    prelude::*,
+    registry::{Registration, RegistryAccess},
+};
 
 pub use event::*;
 
@@ -28,6 +31,12 @@ impl Registration for Item {
 
     fn raw_id(&self) -> usize {
         self.0
+    }
+}
+
+impl RegistryAccess for Item {
+    fn registry() -> &'static crate::registry::Registry<Self> {
+        crate::registry::ITEM.deref()
     }
 }
 

@@ -85,6 +85,10 @@ impl<T> Registry<T> {
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+
+    pub fn is_defaulted(&self) -> bool {
+        self.default.is_some()
+    }
 }
 
 impl<T> std::ops::Index<usize> for Registry<T> {
@@ -164,6 +168,10 @@ pub trait Registration {
     fn accept(&mut self, id: usize);
     /// Return the raw id.
     fn raw_id(&self) -> usize;
+}
+
+pub trait RegistryAccess: Sized {
+    fn registry() -> &'static Registry<Self>;
 }
 
 /// Represents a key for a value in a registry in a context where

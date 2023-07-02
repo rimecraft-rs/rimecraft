@@ -1,6 +1,9 @@
 use std::{hash::Hash, ops::Deref};
 
-use crate::{prelude::*, registry::Registration};
+use crate::{
+    prelude::*,
+    registry::{Registration, RegistryAccess},
+};
 
 /// Represents a type of fluid.
 #[derive(Clone)]
@@ -42,6 +45,12 @@ impl Registration for Fluid {
 
     fn raw_id(&self) -> usize {
         self.id
+    }
+}
+
+impl RegistryAccess for Fluid {
+    fn registry() -> &'static crate::registry::Registry<Self> {
+        crate::registry::FLUID.deref()
     }
 }
 

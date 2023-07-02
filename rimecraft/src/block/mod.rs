@@ -2,7 +2,10 @@ mod event;
 
 use std::{hash::Hash, ops::Deref};
 
-use crate::{prelude::*, registry::Registration};
+use crate::{
+    prelude::*,
+    registry::{Registration, RegistryAccess},
+};
 
 pub use event::*;
 
@@ -41,6 +44,12 @@ impl Registration for Block {
 
     fn raw_id(&self) -> usize {
         self.id
+    }
+}
+
+impl RegistryAccess for Block {
+    fn registry() -> &'static crate::registry::Registry<Self> {
+        crate::registry::BLOCK.deref()
     }
 }
 
