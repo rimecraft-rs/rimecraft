@@ -290,6 +290,12 @@ pub struct ChunkPos {
     z: i32,
 }
 
+impl ChunkPos {
+    pub fn new(x: i32, z: i32) -> Self {
+        Self { x, z }
+    }
+}
+
 impl From<i64> for ChunkPos {
     fn from(value: i64) -> Self {
         Self {
@@ -302,6 +308,22 @@ impl From<i64> for ChunkPos {
 impl Into<i64> for ChunkPos {
     fn into(self) -> i64 {
         self.x as i64 & 0xFFFFFFFF | (self.z as i64 & 0xFFFFFFFF) << 32
+    }
+}
+
+pub struct ChunkSectionPos(glam::IVec3);
+
+impl ChunkSectionPos {
+    pub fn new(x: i32, y: i32, z: i32) -> Self {
+        Self(glam::IVec3 { x, y, z })
+    }
+}
+
+impl Deref for ChunkSectionPos {
+    type Target = glam::IVec3;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 

@@ -40,7 +40,6 @@ impl std::hash::Hash for Property {
 
 impl PartialEq for Property {
     fn eq(&self, other: &Self) -> bool {
-        // impl [`Eq`] for property just for hash mapping. based
         other.name == self.name && self.type_id == other.type_id
     }
 }
