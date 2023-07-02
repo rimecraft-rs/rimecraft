@@ -2,7 +2,7 @@ mod event;
 
 use std::{hash::Hash, ops::Deref};
 
-use crate::prelude::*;
+use crate::{prelude::*, registry::Registration};
 
 pub use event::*;
 
@@ -28,20 +28,19 @@ impl Block {
             }),
         })
     }
-
-    /// Raw id of this block.
-    pub fn id(&self) -> usize {
-        self.id
-    }
 }
 
-impl crate::registry::Registration for Block {
+impl Registration for Block {
     fn accept(&mut self, id: usize) {
         self.id = id;
         self.states
             .states()
             .iter()
             .for_each(|state| state.block.store(id, std::sync::atomic::Ordering::Relaxed))
+    }
+
+    fn raw_id(&self) -> usize {
+        self.id
     }
 }
 
@@ -57,7 +56,7 @@ impl serde::Serialize for Block {
         S: serde::Serializer,
     {
         crate::registry::BLOCK
-            .get_from_raw(self.id())
+            .get_from_raw(self.raw_id())
             .unwrap()
             .key()
             .value()

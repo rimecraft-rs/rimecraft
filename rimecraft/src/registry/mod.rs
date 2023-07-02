@@ -158,9 +158,12 @@ impl<T: Registration> Builder<T> {
     }
 }
 
-/// Registratio for accepting raw_id.
+/// Registratio for storing raw_id.
 pub trait Registration {
+    /// Accept a raw id.
     fn accept(&mut self, id: usize);
+    /// Return the raw id.
+    fn raw_id(&self) -> usize;
 }
 
 /// Represents a key for a value in a registry in a context where
@@ -188,7 +191,7 @@ impl<T> RegistryKey<T> {
     pub fn cast<E>(&self, reg: &RegistryKey<Registry<E>>) -> Option<RegistryKey<E>> {
         if self.is_of(&reg) {
             Some(RegistryKey {
-                inner: self.inner.clone(),
+                inner: std::sync::Arc::clone(&self.inner),
                 _type: std::marker::PhantomData,
             })
         } else {
@@ -231,7 +234,7 @@ impl<T> std::fmt::Display for RegistryKey<T> {
 impl<T> Clone for RegistryKey<T> {
     fn clone(&self) -> Self {
         Self {
-            inner: self.inner.clone(),
+            inner: std::sync::Arc::clone(&self.inner),
             _type: std::marker::PhantomData,
         }
     }

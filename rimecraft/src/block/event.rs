@@ -1,3 +1,5 @@
+use crate::registry::Registration;
+
 /// Vanilla block events for perform item actions and obtain block settings.
 pub static EVENTS: parking_lot::RwLock<VanillaBlockEvents> =
     parking_lot::RwLock::new(VanillaBlockEvents(Vec::new()));
@@ -11,11 +13,11 @@ impl VanillaBlockEvents {
     /// The required `item` can be `None` for some events
     /// so that all items will be affected by this callback.
     pub fn register(&mut self, item: Option<super::Block>, callback: VanillaBlockCallback) {
-        self.0.push((item.map(|e| e.id()), callback));
+        self.0.push((item.map(|e| e.raw_id()), callback));
     }
 
     pub fn block_item_map(&self, state: super::BlockState) -> crate::item::ItemStack {
-        let id = state.block().id();
+        let id = state.block().raw_id();
         self.0
             .iter()
             .find(|e| {

@@ -1,6 +1,6 @@
 use std::{hash::Hash, ops::Deref};
 
-use crate::prelude::*;
+use crate::{prelude::*, registry::Registration};
 
 /// Represents a type of fluid.
 #[derive(Clone)]
@@ -31,13 +31,17 @@ impl Fluid {
     }
 }
 
-impl crate::registry::Registration for Fluid {
+impl Registration for Fluid {
     fn accept(&mut self, id: usize) {
         self.id = id;
         self.states
             .states()
             .iter()
             .for_each(|state| state.fluid.store(id, std::sync::atomic::Ordering::Relaxed))
+    }
+
+    fn raw_id(&self) -> usize {
+        self.id
     }
 }
 

@@ -104,3 +104,6 @@ impl<'de> serde::Deserialize<'de> for Identifier {
         })
     }
 }
+
+/// Describes a var int.
+pub struct VarI32(pub i32);

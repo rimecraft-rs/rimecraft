@@ -2,7 +2,7 @@ mod event;
 
 use std::ops::Deref;
 
-use crate::prelude::*;
+use crate::{prelude::*, registry::Registration};
 
 pub use event::*;
 
@@ -21,9 +21,13 @@ impl Item {
     }
 }
 
-impl crate::registry::Registration for Item {
+impl Registration for Item {
     fn accept(&mut self, id: usize) {
         self.0 = id
+    }
+
+    fn raw_id(&self) -> usize {
+        self.0
     }
 }
 
