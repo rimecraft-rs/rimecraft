@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use super::EnumValues;
+
 /// A box with double-valued coords.
 /// The box is axis-aligned and the coords are minimum inclusive and maximum exclusive.
 #[derive(Clone, Copy, PartialEq)]
@@ -317,6 +319,14 @@ impl ChunkSectionPos {
     pub fn new(x: i32, y: i32, z: i32) -> Self {
         Self(glam::IVec3 { x, y, z })
     }
+
+    pub fn section_coord(coord: i32) -> i32 {
+        coord >> 4
+    }
+
+    pub fn f64_section_coord(coord: f64) -> i32 {
+        Self::section_coord(coord.floor() as i32)
+    }
 }
 
 impl Deref for ChunkSectionPos {
@@ -327,7 +337,112 @@ impl Deref for ChunkSectionPos {
     }
 }
 
-/// Some translations from Minecraft: Java Edition to Rust.
+/// An enum representing 6 cardinal directions in Rimecraft.
+#[repr(u8)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Direction {
+    Down = 0,
+    Up = 1,
+    North = 2,
+    South = 3,
+    West = 4,
+    East = 5,
+}
+
+impl Direction {
+    const VALUES: [Self; 6] = [
+        Self::Down,
+        Self::Up,
+        Self::North,
+        Self::South,
+        Self::West,
+        Self::East,
+    ];
+
+    pub fn opposite(self) -> Self {
+        match self {
+            Direction::Down => Self::Up,
+            Direction::Up => Self::Down,
+            Direction::North => Self::South,
+            Direction::South => Self::North,
+            Direction::West => Self::East,
+            Direction::East => Self::West,
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Direction::Down => "down",
+            Direction::Up => "up",
+            Direction::North => "north",
+            Direction::South => "south",
+            Direction::West => "west",
+            Direction::East => "east",
+        }
+    }
+}
+
+impl EnumValues<6> for Direction {
+    fn values() -> [Self; 6] {
+        Self::VALUES
+    }
+}
+
+impl From<u8> for Direction {
+    fn from(value: u8) -> Self {
+        Self::VALUES
+            .into_iter()
+            .find(|e| *e as u8 == value)
+            .unwrap()
+    }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EightWayDirection {
+    North = 0,
+    NorthEast,
+    East,
+    SouthEast,
+    South,
+    SouthWest,
+    West,
+    NorthWest,
+}
+
+impl EightWayDirection {
+    const VALUES: [Self; 8] = [
+        Self::North,
+        Self::NorthEast,
+        Self::East,
+        Self::SouthEast,
+        Self::South,
+        Self::SouthWest,
+        Self::West,
+        Self::NorthWest,
+    ];
+
+    pub fn directions(self) -> Vec<Direction> {
+        match self {
+            EightWayDirection::North => vec![Direction::North],
+            EightWayDirection::NorthEast => vec![Direction::North, Direction::East],
+            EightWayDirection::East => vec![Direction::East],
+            EightWayDirection::SouthEast => vec![Direction::South, Direction::East],
+            EightWayDirection::South => vec![Direction::South],
+            EightWayDirection::SouthWest => vec![Direction::South, Direction::West],
+            EightWayDirection::West => vec![Direction::West],
+            EightWayDirection::NorthWest => vec![Direction::North, Direction::West],
+        }
+    }
+}
+
+impl EnumValues<8> for EightWayDirection {
+    fn values() -> [Self; 8] {
+        Self::VALUES
+    }
+}
+
+/// Some translations from MCJE's `MathHelper` to Rust.
 pub(crate) mod impl_helper {
     const MULTIPLY_DE_BRUIJN_BIT_POSITION: [i32; 32] = [
         0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 31, 27, 13, 23, 21, 19, 16, 7,

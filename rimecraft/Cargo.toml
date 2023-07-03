@@ -30,6 +30,7 @@ parking_lot = "0.12"
 lazy-regex = "2"
 cesu8 = "*"
 hashbrown = "0.14"
+dashmap = "5.4"
 
 [features]
 # Developing server for now

@@ -4,13 +4,13 @@ use std::ops::Deref;
 
 pub use property::Property;
 
-pub struct State {
+pub struct RawState {
     id: usize,
     entries: hashbrown::HashMap<property::Property, u8>,
     table: once_cell::sync::OnceCell<hashbrown::HashMap<property::Property, Vec<usize>>>,
 }
 
-impl State {
+impl RawState {
     pub fn cycle(&self, property: &property::Property) -> anyhow::Result<usize> {
         self.with(property, {
             let range = property.range();
@@ -131,13 +131,13 @@ impl State {
     }
 }
 
-pub struct States<T: Deref<Target = State>> {
+pub struct States<T: Deref<Target = RawState>> {
     def: usize,
     properties: hashbrown::HashMap<String, property::Property>,
     states: Vec<T>,
 }
 
-impl<T: Deref<Target = State>> States<T> {
+impl<T: Deref<Target = RawState>> States<T> {
     pub fn states(&self) -> &[T] {
         &self.states
     }
@@ -159,12 +159,12 @@ impl<T: Deref<Target = State>> States<T> {
     }
 }
 
-fn new_states<E: Clone, T: Deref<Target = State> + From<(E, State)>>(
+fn new_states<E: Clone, T: Deref<Target = RawState> + From<(E, RawState)>>(
     data: E,
     def_state: hashbrown::HashMap<property::Property, u8>,
     properties: hashbrown::HashMap<String, property::Property>,
 ) -> States<T> {
-    let mut states_raw: Vec<State> = Vec::new();
+    let mut states_raw: Vec<RawState> = Vec::new();
     let mut temp: Vec<Vec<(property::Property, u8)>> = Vec::new();
 
     for property in properties.values() {
@@ -187,7 +187,7 @@ fn new_states<E: Clone, T: Deref<Target = State> + From<(E, State)>>(
             entries.insert(e.0, e.1);
         }
 
-        states_raw.push(State {
+        states_raw.push(RawState {
             id: 0,
             entries,
             table: once_cell::sync::OnceCell::new(),
@@ -251,7 +251,7 @@ impl StatesBuilder {
         Ok(())
     }
 
-    pub fn build<E: Clone, S: Deref<Target = State> + From<(E, State)>>(
+    pub fn build<E: Clone, S: Deref<Target = RawState> + From<(E, RawState)>>(
         self,
         data: E,
         def_state: hashbrown::HashMap<property::Property, u8>,

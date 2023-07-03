@@ -107,3 +107,8 @@ impl<'de> serde::Deserialize<'de> for Identifier {
 
 /// Describes a var int.
 pub struct VarI32(pub i32);
+
+/// Represents types of enum that can be itered with values, like Java.
+pub trait EnumValues<const N: usize>: Sized + Clone + Copy + PartialEq + Eq {
+    fn values() -> [Self; N];
+}

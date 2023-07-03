@@ -111,7 +111,7 @@ impl Hash for Block {
 
 pub struct BlockState {
     block: std::sync::atomic::AtomicUsize,
-    state: crate::state::State,
+    state: crate::state::RawState,
 }
 
 impl BlockState {
@@ -125,8 +125,8 @@ impl BlockState {
     }
 }
 
-impl From<((), crate::state::State)> for BlockState {
-    fn from((_, value): ((), crate::state::State)) -> Self {
+impl From<((), crate::state::RawState)> for BlockState {
+    fn from((_, value): ((), crate::state::RawState)) -> Self {
         Self {
             block: std::sync::atomic::AtomicUsize::new(0),
             state: value,
@@ -135,7 +135,7 @@ impl From<((), crate::state::State)> for BlockState {
 }
 
 impl Deref for BlockState {
-    type Target = crate::state::State;
+    type Target = crate::state::RawState;
 
     fn deref(&self) -> &Self::Target {
         &self.state

@@ -244,13 +244,13 @@ impl ItemStack {
     /// Get damage of this satck from the nbt tags.
     pub fn damage(&self) -> u32 {
         self.nbt.as_ref().map_or(0, |nbt| {
-            nbt.get_int(Self::DAMAGE_KEY).unwrap_or_default() as u32
+            nbt.get_i32(Self::DAMAGE_KEY).unwrap_or_default() as u32
         })
     }
 
     pub fn set_damage(&mut self, damage: u32) {
         self.get_or_init_nbt()
-            .insert_int(Self::DAMAGE_KEY, damage as i32);
+            .insert_i32(Self::DAMAGE_KEY, damage as i32);
     }
 
     /// Whether the given item stack's items and NBT are equal with this stack.

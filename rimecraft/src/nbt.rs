@@ -15,19 +15,22 @@ use serde::de::Error;
 
 pub type NbtCompound = std::collections::HashMap<String, NbtElement>;
 
+pub type NbtList = Vec<NbtElement>;
+
+/// Some extensions for [`NbtCompound`].
 pub trait NbtCompoundExt {
-    fn insert_byte(&mut self, key: &str, value: i8);
-    fn insert_short(&mut self, key: &str, value: i16);
-    fn insert_int(&mut self, key: &str, value: i32);
-    fn insert_long(&mut self, key: &str, value: i64);
-    fn insert_float(&mut self, key: &str, value: f32);
-    fn insert_double(&mut self, key: &str, value: f64);
-    fn insert_string(&mut self, key: &str, value: &str);
-    fn insert_byte_array(&mut self, key: &str, value: &[i8]);
-    fn insert_int_array(&mut self, key: &str, value: &[i32]);
-    fn insert_long_array(&mut self, key: &str, value: &[i64]);
+    fn insert_i8(&mut self, key: &str, value: i8);
+    fn insert_i16(&mut self, key: &str, value: i16);
+    fn insert_i32(&mut self, key: &str, value: i32);
+    fn insert_i64(&mut self, key: &str, value: i64);
+    fn insert_f32(&mut self, key: &str, value: f32);
+    fn insert_f64(&mut self, key: &str, value: f64);
+    fn insert_str(&mut self, key: &str, value: &str);
+    fn insert_i8_slice(&mut self, key: &str, value: &[i8]);
+    fn insert_i32_slice(&mut self, key: &str, value: &[i32]);
+    fn insert_i64_slice(&mut self, key: &str, value: &[i64]);
     fn insert_bool(&mut self, key: &str, value: bool) {
-        self.insert_byte(key, if value { 1 } else { 0 })
+        self.insert_i8(key, if value { 1 } else { 0 })
     }
 
     fn get_type(&self, key: &str) -> Option<NbtType>;
@@ -35,67 +38,67 @@ pub trait NbtCompoundExt {
         self.get_type(key).map_or(false, |e| e == nbt_type)
     }
 
-    fn get_byte(&self, key: &str) -> Option<i8>;
-    fn get_short(&self, key: &str) -> Option<i16>;
-    fn get_int(&self, key: &str) -> Option<i32>;
-    fn get_long(&self, key: &str) -> Option<i64>;
-    fn get_float(&self, key: &str) -> Option<f32>;
-    fn get_double(&self, key: &str) -> Option<f64>;
+    fn get_i8(&self, key: &str) -> Option<i8>;
+    fn get_i16(&self, key: &str) -> Option<i16>;
+    fn get_i32(&self, key: &str) -> Option<i32>;
+    fn get_i64(&self, key: &str) -> Option<i64>;
+    fn get_f32(&self, key: &str) -> Option<f32>;
+    fn get_f64(&self, key: &str) -> Option<f64>;
     fn get_str(&self, key: &str) -> Option<&str>;
-    fn get_byte_array(&self, key: &str) -> Option<&[i8]>;
-    fn get_int_array(&self, key: &str) -> Option<&[i32]>;
-    fn get_long_array(&self, key: &str) -> Option<&[i64]>;
+    fn get_i8_slice(&self, key: &str) -> Option<&[i8]>;
+    fn get_i32_slice(&self, key: &str) -> Option<&[i32]>;
+    fn get_i64_slice(&self, key: &str) -> Option<&[i64]>;
     fn get_compound(&self, key: &str) -> Option<&NbtCompound>;
-    fn get_list(&self, key: &str) -> Option<&[NbtElement]>;
+    fn get_slice(&self, key: &str) -> Option<&[NbtElement]>;
     fn get_bool(&self, key: &str) -> Option<bool> {
-        self.get_byte(key).map(|e| e != 0)
+        self.get_i8(key).map(|e| e != 0)
     }
 }
 
 impl NbtCompoundExt for NbtCompound {
-    fn insert_byte(&mut self, key: &str, value: i8) {
+    fn insert_i8(&mut self, key: &str, value: i8) {
         self.insert(key.to_string(), NbtElement::Byte(value));
     }
 
-    fn insert_short(&mut self, key: &str, value: i16) {
+    fn insert_i16(&mut self, key: &str, value: i16) {
         self.insert(key.to_string(), NbtElement::Short(value));
     }
 
-    fn insert_int(&mut self, key: &str, value: i32) {
+    fn insert_i32(&mut self, key: &str, value: i32) {
         self.insert(key.to_string(), NbtElement::Int(value));
     }
 
-    fn insert_long(&mut self, key: &str, value: i64) {
+    fn insert_i64(&mut self, key: &str, value: i64) {
         self.insert(key.to_string(), NbtElement::Long(value));
     }
 
-    fn insert_float(&mut self, key: &str, value: f32) {
+    fn insert_f32(&mut self, key: &str, value: f32) {
         self.insert(key.to_string(), NbtElement::Float(value));
     }
 
-    fn insert_double(&mut self, key: &str, value: f64) {
+    fn insert_f64(&mut self, key: &str, value: f64) {
         self.insert(key.to_string(), NbtElement::Double(value));
     }
 
-    fn insert_string(&mut self, key: &str, value: &str) {
+    fn insert_str(&mut self, key: &str, value: &str) {
         self.insert(key.to_string(), NbtElement::String(value.to_string()));
     }
 
-    fn insert_byte_array(&mut self, key: &str, value: &[i8]) {
+    fn insert_i8_slice(&mut self, key: &str, value: &[i8]) {
         self.insert(
             key.to_string(),
             NbtElement::ByteArray(ByteArray::new(Vec::from(value))),
         );
     }
 
-    fn insert_int_array(&mut self, key: &str, value: &[i32]) {
+    fn insert_i32_slice(&mut self, key: &str, value: &[i32]) {
         self.insert(
             key.to_string(),
             NbtElement::IntArray(IntArray::new(Vec::from(value))),
         );
     }
 
-    fn insert_long_array(&mut self, key: &str, value: &[i64]) {
+    fn insert_i64_slice(&mut self, key: &str, value: &[i64]) {
         self.insert(
             key.to_string(),
             NbtElement::LongArray(LongArray::new(Vec::from(value))),
@@ -119,7 +122,7 @@ impl NbtCompoundExt for NbtCompound {
         })
     }
 
-    fn get_byte(&self, key: &str) -> Option<i8> {
+    fn get_i8(&self, key: &str) -> Option<i8> {
         self.get(key)
             .map(|e| match e {
                 NbtElement::Byte(value) => Some(*value),
@@ -128,7 +131,7 @@ impl NbtCompoundExt for NbtCompound {
             .flatten()
     }
 
-    fn get_short(&self, key: &str) -> Option<i16> {
+    fn get_i16(&self, key: &str) -> Option<i16> {
         self.get(key)
             .map(|e| match e {
                 NbtElement::Short(value) => Some(*value),
@@ -137,7 +140,7 @@ impl NbtCompoundExt for NbtCompound {
             .flatten()
     }
 
-    fn get_int(&self, key: &str) -> Option<i32> {
+    fn get_i32(&self, key: &str) -> Option<i32> {
         self.get(key)
             .map(|e| match e {
                 NbtElement::Int(value) => Some(*value),
@@ -146,7 +149,7 @@ impl NbtCompoundExt for NbtCompound {
             .flatten()
     }
 
-    fn get_long(&self, key: &str) -> Option<i64> {
+    fn get_i64(&self, key: &str) -> Option<i64> {
         self.get(key)
             .map(|e| match e {
                 NbtElement::Long(value) => Some(*value),
@@ -155,7 +158,7 @@ impl NbtCompoundExt for NbtCompound {
             .flatten()
     }
 
-    fn get_float(&self, key: &str) -> Option<f32> {
+    fn get_f32(&self, key: &str) -> Option<f32> {
         self.get(key)
             .map(|e| match e {
                 NbtElement::Float(value) => Some(*value),
@@ -164,7 +167,7 @@ impl NbtCompoundExt for NbtCompound {
             .flatten()
     }
 
-    fn get_double(&self, key: &str) -> Option<f64> {
+    fn get_f64(&self, key: &str) -> Option<f64> {
         self.get(key)
             .map(|e| match e {
                 NbtElement::Double(value) => Some(*value),
@@ -182,7 +185,7 @@ impl NbtCompoundExt for NbtCompound {
             .flatten()
     }
 
-    fn get_byte_array(&self, key: &str) -> Option<&[i8]> {
+    fn get_i8_slice(&self, key: &str) -> Option<&[i8]> {
         self.get(key)
             .map(|e| match e {
                 NbtElement::ByteArray(value) => Some(value.iter().as_slice()),
@@ -191,7 +194,7 @@ impl NbtCompoundExt for NbtCompound {
             .flatten()
     }
 
-    fn get_int_array(&self, key: &str) -> Option<&[i32]> {
+    fn get_i32_slice(&self, key: &str) -> Option<&[i32]> {
         self.get(key)
             .map(|e| match e {
                 NbtElement::IntArray(value) => Some(value.iter().as_slice()),
@@ -200,7 +203,7 @@ impl NbtCompoundExt for NbtCompound {
             .flatten()
     }
 
-    fn get_long_array(&self, key: &str) -> Option<&[i64]> {
+    fn get_i64_slice(&self, key: &str) -> Option<&[i64]> {
         self.get(key)
             .map(|e| match e {
                 NbtElement::LongArray(value) => Some(value.iter().as_slice()),
@@ -218,7 +221,7 @@ impl NbtCompoundExt for NbtCompound {
             .flatten()
     }
 
-    fn get_list(&self, key: &str) -> Option<&[NbtElement]> {
+    fn get_slice(&self, key: &str) -> Option<&[NbtElement]> {
         self.get(key)
             .map(|e| match e {
                 NbtElement::List(value) => Some(value.as_slice()),
@@ -228,6 +231,7 @@ impl NbtCompoundExt for NbtCompound {
     }
 }
 
+/// [`fastnbt::input::Input`] implementation for [`bytes::Buf`].
 pub struct BufInput<'a, T: bytes::Buf>(pub &'a mut T);
 
 impl<'de, T: bytes::Buf> fastnbt::input::Input<'de> for BufInput<'de, T> {

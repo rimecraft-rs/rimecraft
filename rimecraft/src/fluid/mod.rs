@@ -73,15 +73,10 @@ impl<'de> serde::Deserialize<'de> for Fluid {
     where
         D: serde::Deserializer<'de>,
     {
-        use serde::de::Error;
-
         let id = Identifier::deserialize(deserializer)?;
         match crate::registry::FLUID.get_from_id(&id) {
             Some(e) => Ok(e.1.deref().clone()),
-            None => Err(D::Error::invalid_value(
-                serde::de::Unexpected::Other(&id.to_string()),
-                &"a valid fluid identifier",
-            )),
+            None => Ok(crate::registry::FLUID.default().1.deref().clone()),
         }
     }
 }
@@ -100,9 +95,15 @@ impl Hash for Fluid {
     }
 }
 
+impl Default for Fluid {
+    fn default() -> Self {
+        crate::registry::FLUID.default().1.deref().clone()
+    }
+}
+
 pub struct FluidState {
     fluid: std::sync::atomic::AtomicUsize,
-    state: crate::state::State,
+    state: crate::state::RawState,
 }
 
 impl FluidState {
@@ -116,8 +117,8 @@ impl FluidState {
     }
 }
 
-impl From<((), crate::state::State)> for FluidState {
-    fn from((_, value): ((), crate::state::State)) -> Self {
+impl From<((), crate::state::RawState)> for FluidState {
+    fn from((_, value): ((), crate::state::RawState)) -> Self {
         Self {
             fluid: std::sync::atomic::AtomicUsize::new(0),
             state: value,
@@ -126,7 +127,7 @@ impl From<((), crate::state::State)> for FluidState {
 }
 
 impl Deref for FluidState {
-    type Target = crate::state::State;
+    type Target = crate::state::RawState;
 
     fn deref(&self) -> &Self::Target {
         &self.state

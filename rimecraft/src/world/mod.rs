@@ -1,4 +1,5 @@
 pub mod chunk;
+pub mod tick;
 
 use crate::prelude::*;
 
@@ -16,6 +17,21 @@ pub trait HeightLimitView {
     fn bottom_y(&self) -> i32;
     /// The top Y level, or height, exclusive, of this view.
     fn top_y(&self) -> i32;
+
+    /// The number of sections, vertically, within this view.
+    fn count_vertical_sections(&self) -> i32 {
+        self.top_section_coord() - self.bottom_section_coord()
+    }
+
+    /// The bottom section coord, inclusive, of this view.
+    fn top_section_coord(&self) -> i32 {
+        crate::util::math::ChunkSectionPos::section_coord(self.top_y() - 1) + 1
+    }
+
+    /// The top section coord, exclusive, of this view.
+    fn bottom_section_coord(&self) -> i32 {
+        crate::util::math::ChunkSectionPos::section_coord(self.bottom_y())
+    }
 }
 
 /// Represents a scoped, read-only view of block states,
