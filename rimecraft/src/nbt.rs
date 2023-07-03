@@ -1,13 +1,13 @@
-pub use fastnbt::Tag as NbtType;
-pub use fastnbt::Value as NbtElement;
+pub use fastnbt_rc::Tag as NbtType;
+pub use fastnbt_rc::Value as NbtElement;
 
-pub use fastnbt::{
+pub use fastnbt_rc::{
     from_bytes, from_bytes_with_opts, from_reader, nbt, to_bytes, to_writer, ByteArray, DeOpts,
     IntArray, LongArray,
 };
 
-pub use fastnbt::value::from_value as from_nbt;
-pub use fastnbt::value::to_value as to_nbt;
+pub use fastnbt_rc::value::from_value as from_nbt;
+pub use fastnbt_rc::value::to_value as to_nbt;
 
 pub use fastsnbt::from_str;
 
@@ -234,17 +234,17 @@ impl NbtCompoundExt for NbtCompound {
 /// [`fastnbt::input::Input`] implementation for [`bytes::Buf`].
 pub struct BufInput<'a, T: bytes::Buf>(pub &'a mut T);
 
-impl<'de, T: bytes::Buf> fastnbt::input::Input<'de> for BufInput<'de, T> {
-    fn consume_byte(&mut self) -> fastnbt::error::Result<u8> {
+impl<'de, T: bytes::Buf> fastnbt_rc::input::Input<'de> for BufInput<'de, T> {
+    fn consume_byte(&mut self) -> fastnbt_rc::error::Result<u8> {
         Ok(self.0.get_u8())
     }
 
-    fn ignore_str(&mut self) -> fastnbt::error::Result<()> {
+    fn ignore_str(&mut self) -> fastnbt_rc::error::Result<()> {
         let len = self.0.get_u16() as usize;
         self.ignore_bytes(len)
     }
 
-    fn ignore_bytes(&mut self, size: usize) -> fastnbt::error::Result<()> {
+    fn ignore_bytes(&mut self, size: usize) -> fastnbt_rc::error::Result<()> {
         for _ in 0..size {
             self.0.get_u8();
         }
@@ -254,7 +254,7 @@ impl<'de, T: bytes::Buf> fastnbt::input::Input<'de> for BufInput<'de, T> {
     fn consume_str<'s>(
         &'s mut self,
         scratch: &'s mut Vec<u8>,
-    ) -> fastnbt::error::Result<fastnbt::input::Reference<'de, 's, str>> {
+    ) -> fastnbt_rc::error::Result<fastnbt_rc::input::Reference<'de, 's, str>> {
         let n = self.0.get_u16() as usize;
         scratch.clear();
         for i in 0..n {
@@ -262,16 +262,18 @@ impl<'de, T: bytes::Buf> fastnbt::input::Input<'de> for BufInput<'de, T> {
         }
 
         let str = cesu8::from_java_cesu8(scratch).map_err(|_| {
-            fastnbt::error::Error::custom(format!("Non-unicode string: {:?}", scratch))
+            fastnbt_rc::error::Error::custom(format!("Non-unicode string: {:?}", scratch))
         })?;
 
         Ok(match str {
-            std::borrow::Cow::Borrowed(_) => {
-                fastnbt::input::Reference::Copied(unsafe { std::str::from_utf8_unchecked(scratch) })
-            }
+            std::borrow::Cow::Borrowed(_) => fastnbt_rc::input::Reference::Copied(unsafe {
+                std::str::from_utf8_unchecked(scratch)
+            }),
             std::borrow::Cow::Owned(s) => {
                 *scratch = s.into_bytes();
-                fastnbt::input::Reference::Copied(unsafe { std::str::from_utf8_unchecked(scratch) })
+                fastnbt_rc::input::Reference::Copied(unsafe {
+                    std::str::from_utf8_unchecked(scratch)
+                })
             }
         })
     }
@@ -280,31 +282,31 @@ impl<'de, T: bytes::Buf> fastnbt::input::Input<'de> for BufInput<'de, T> {
         &'s mut self,
         n: usize,
         scratch: &'s mut Vec<u8>,
-    ) -> fastnbt::error::Result<fastnbt::input::Reference<'de, 's, [u8]>> {
+    ) -> fastnbt_rc::error::Result<fastnbt_rc::input::Reference<'de, 's, [u8]>> {
         scratch.clear();
         for i in 0..n {
             scratch[i] = self.0.get_u8();
         }
-        Ok(fastnbt::input::Reference::Copied(scratch.as_slice()))
+        Ok(fastnbt_rc::input::Reference::Copied(scratch.as_slice()))
     }
 
-    fn consume_i16(&mut self) -> fastnbt::error::Result<i16> {
+    fn consume_i16(&mut self) -> fastnbt_rc::error::Result<i16> {
         Ok(self.0.get_i16())
     }
 
-    fn consume_i32(&mut self) -> fastnbt::error::Result<i32> {
+    fn consume_i32(&mut self) -> fastnbt_rc::error::Result<i32> {
         Ok(self.0.get_i32())
     }
 
-    fn consume_i64(&mut self) -> fastnbt::error::Result<i64> {
+    fn consume_i64(&mut self) -> fastnbt_rc::error::Result<i64> {
         Ok(self.0.get_i64())
     }
 
-    fn consume_f32(&mut self) -> fastnbt::error::Result<f32> {
+    fn consume_f32(&mut self) -> fastnbt_rc::error::Result<f32> {
         Ok(self.0.get_f32())
     }
 
-    fn consume_f64(&mut self) -> fastnbt::error::Result<f64> {
+    fn consume_f64(&mut self) -> fastnbt_rc::error::Result<f64> {
         Ok(self.0.get_f64())
     }
 }

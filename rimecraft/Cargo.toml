@@ -25,7 +25,7 @@ winit = { version = "0.28", optional = true }
 wgpu = { version = "0.16", optional = true }
 anyhow = "*"
 fastsnbt = "*"
-fastnbt = { version = "*", git = "https://github.com/rimecraft-rs/fastnbt" }
+fastnbt-rc = { version = "*", git = "https://github.com/rimecraft-rs/fastnbt" }
 parking_lot = "0.12"
 lazy-regex = "2"
 cesu8 = "*"

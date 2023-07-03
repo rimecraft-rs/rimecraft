@@ -315,7 +315,7 @@ mod packet_buf_impl {
             B: bytes::BufMut,
         {
             let mut vec = Vec::new();
-            fastnbt::to_writer(&mut vec, self.0)?;
+            fastnbt_rc::to_writer(&mut vec, self.0)?;
             buf.put_slice(&vec);
             Ok(())
         }
@@ -331,9 +331,9 @@ mod packet_buf_impl {
         where
             B: bytes::Buf,
         {
-            Ok(T::deserialize(&mut fastnbt::de::Deserializer::new(
+            Ok(T::deserialize(&mut fastnbt_rc::de::Deserializer::new(
                 crate::nbt::BufInput(buf),
-                fastnbt::DeOpts::new(),
+                fastnbt_rc::DeOpts::new(),
             ))?)
         }
     }
