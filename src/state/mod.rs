@@ -157,6 +157,34 @@ impl<T: Deref<Target = RawState>> States<T> {
     pub fn get_property(&self, name: &str) -> Option<&property::Property> {
         self.properties.get(name)
     }
+
+    pub fn get_shared(arc: &std::sync::Arc<Self>, id: usize) -> Shared<T> {
+        Shared(arc.clone(), id)
+    }
+}
+
+/// A shared state with states reference count and the index
+/// which is cheap to clone.
+#[derive(Clone)]
+pub struct Shared<T: Deref<Target = RawState>>(std::sync::Arc<crate::state::States<T>>, usize);
+
+impl<T: Deref<Target = RawState>> Shared<T> {}
+
+impl<T: Deref<Target = RawState>> Deref for Shared<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.states().get(self.1).unwrap()
+    }
+}
+
+impl<T: Deref<Target = RawState>> Eq for Shared<T> {}
+
+impl<T: Deref<Target = RawState>> PartialEq for Shared<T> {
+    fn eq(&self, other: &Self) -> bool {
+        std::sync::Arc::as_ptr(&self.0) as usize == std::sync::Arc::as_ptr(&other.0) as usize
+            && self.1 == other.1
+    }
 }
 
 fn new_states<E: Clone, T: Deref<Target = RawState> + From<(E, RawState)>>(

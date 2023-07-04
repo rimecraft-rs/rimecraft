@@ -76,7 +76,7 @@ impl<'de> serde::Deserialize<'de> for Fluid {
         let id = Identifier::deserialize(deserializer)?;
         match crate::registry::FLUID.get_from_id(&id) {
             Some(e) => Ok(e.1.deref().clone()),
-            None => Ok(crate::registry::FLUID.default().1.deref().clone()),
+            None => Ok(crate::registry::FLUID.default_entry().1.deref().clone()),
         }
     }
 }
@@ -97,7 +97,7 @@ impl Hash for Fluid {
 
 impl Default for Fluid {
     fn default() -> Self {
-        crate::registry::FLUID.default().1.deref().clone()
+        crate::registry::FLUID.default_entry().1.deref().clone()
     }
 }
 

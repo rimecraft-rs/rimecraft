@@ -80,7 +80,7 @@ impl<'de> serde::Deserialize<'de> for Item {
         Ok(crate::registry::ITEM.get_from_id(&id).map_or_else(
             || {
                 tracing::debug!("Tried to load invalid item: {id}");
-                crate::registry::ITEM.default().1.as_item()
+                crate::registry::ITEM.default_entry().1.as_item()
             },
             |e| *e.1.deref(),
         ))
@@ -89,7 +89,7 @@ impl<'de> serde::Deserialize<'de> for Item {
 
 impl Default for Item {
     fn default() -> Self {
-        *crate::registry::ITEM.default().1.deref()
+        *crate::registry::ITEM.default_entry().1.deref()
     }
 }
 

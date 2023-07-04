@@ -77,13 +77,9 @@ impl<T> Registry<T> {
         self.id_map.contains_key(id)
     }
 
-    pub fn default(&self) -> (usize, &Holder<T>) {
+    pub fn default_entry(&self) -> (usize, &Holder<T>) {
         let def = self.default.unwrap();
         (def, self.get_from_raw(def).unwrap())
-    }
-
-    pub fn len(&self) -> usize {
-        self.entries.len()
     }
 
     pub fn is_defaulted(&self) -> bool {
@@ -92,10 +88,28 @@ impl<T> Registry<T> {
 }
 
 impl<T> std::ops::Index<usize> for Registry<T> {
-    type Output = T;
+    type Output = Holder<T>;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.entries.get(index).unwrap().value
+        self.get_from_raw(index).unwrap()
+    }
+}
+
+impl<T: PartialEq + Eq> crate::util::collections::Indexed<T> for Registry<T> {
+    fn get_raw_id(&self, value: &T) -> Option<usize> {
+        self.entries
+            .iter()
+            .enumerate()
+            .find(|e| &e.1.value == value)
+            .map(|e| e.0)
+    }
+
+    fn get(&self, index: usize) -> Option<&T> {
+        self.get_from_raw(index).map(|e| &e.value)
+    }
+
+    fn len(&self) -> usize {
+        self.entries.len()
     }
 }
 

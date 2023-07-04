@@ -82,7 +82,7 @@ impl<'de> serde::Deserialize<'de> for Block {
         Ok(crate::registry::BLOCK.get_from_id(&id).map_or_else(
             || {
                 tracing::debug!("Tried to load invalid block: {id}");
-                crate::registry::BLOCK.default().1.deref().clone()
+                crate::registry::BLOCK.default_entry().1.deref().clone()
             },
             |e| e.1.deref().clone(),
         ))
@@ -91,7 +91,7 @@ impl<'de> serde::Deserialize<'de> for Block {
 
 impl Default for Block {
     fn default() -> Self {
-        crate::registry::BLOCK.default().1.deref().clone()
+        crate::registry::BLOCK.default_entry().1.deref().clone()
     }
 }
 
@@ -109,6 +109,7 @@ impl Hash for Block {
     }
 }
 
+/// An immutable state for a [`Block`].
 pub struct BlockState {
     block: std::sync::atomic::AtomicUsize,
     state: crate::state::RawState,
@@ -141,3 +142,6 @@ impl Deref for BlockState {
         &self.state
     }
 }
+
+/// A shared [`BlockState`] with states reference count and the index.
+pub type SharedBlockState = crate::state::Shared<BlockState>;

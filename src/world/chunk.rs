@@ -1,4 +1,7 @@
-use std::ops::Deref;
+use std::{
+    ops::{Deref, Index},
+    sync::atomic::AtomicU16,
+};
 
 use crate::{prelude::*, util::math::ChunkPos};
 
@@ -7,6 +10,15 @@ use super::HeightLimitView;
 pub struct RawChunk<W: HeightLimitView> {
     pub pos: ChunkPos,
     pub height_limit_view: std::sync::Arc<W>,
+    pub upgrade_data: UpgradeData,
+}
+
+impl<W: HeightLimitView> RawChunk<W> {}
+
+pub struct ChunkSection {
+    non_empty_block_count: AtomicU16,
+    random_tickable_block_count: AtomicU16,
+    non_empty_fluid_count: AtomicU16,
 }
 
 pub struct UpgradeData {
@@ -101,5 +113,49 @@ impl UpgradeData {
                 }
             }
         }
+    }
+}
+
+pub mod palette {
+    /// A palette maps objects from and to small integer IDs that uses less
+    /// number of bits to make storage smaller.
+    ///
+    /// While the objects palettes handle are already represented by integer
+    /// IDs, shrinking IDs in cases where only a few appear can further reduce
+    /// storage space and network traffic volume.
+    pub trait Palette<T>:
+        crate::network::Encode + for<'de> crate::network::Decode<'de> + Clone
+    {
+        /// The id of an object is this palette.
+        ///
+        /// If the object does not yet exist in this palette, this palette will
+        /// register the object. If the palette is too small to include this object,
+        /// a [`ResizeListen`] will be called and
+        /// this palette may be discarded.
+        fn get_index(&self, value: &T) -> i32;
+
+        /// True if any entry in this palette passes the `predicate`.
+        fn any<P>(&self, p: P) -> bool
+        where
+            P: Fn(&T) -> bool;
+
+        /// The object associated with the given `id`.
+        fn get(&self, index: i32) -> Option<&T>;
+
+        /// The serialized lenth of this palette in a byte buf, in bytes.
+        fn packet_len(&self) -> usize;
+    }
+
+    /// Listan for palette that requires more bits to hold a newly indexed
+    /// object. A no-op listener may be used if the palette does not have to
+    /// resize.
+    pub trait ResizeListen<T> {
+        /// Callback for a palette's request to resize to at least `new_bits`
+        /// for each entry and to update the storage correspondingly in order to
+        /// accommodate the new object. After the resize is completed in this method,
+        /// returns the ID assigned to the `object` in the updated palette.
+        ///
+        /// Return the ID for the `object` in the (possibly new) palette.
+        fn on_resize(new_bits: i32, object: &T) -> i32;
     }
 }

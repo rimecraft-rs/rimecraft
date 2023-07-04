@@ -1,3 +1,4 @@
+pub mod collections;
 pub mod math;
 
 #[derive(PartialEq, Eq, Clone, Hash)]
