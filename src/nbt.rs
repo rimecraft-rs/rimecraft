@@ -231,7 +231,7 @@ impl NbtCompoundExt for NbtCompound {
     }
 }
 
-/// [`fastnbt::input::Input`] implementation for [`bytes::Buf`].
+/// [`fastnbt_rc::input::Input`] implementation for [`bytes::Buf`].
 pub struct BufInput<'a, T: bytes::Buf>(pub &'a mut T);
 
 impl<'de, T: bytes::Buf> fastnbt_rc::input::Input<'de> for BufInput<'de, T> {

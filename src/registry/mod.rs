@@ -162,7 +162,7 @@ impl<T: Registration> Builder<T> {
     }
 }
 
-/// Registratio for storing raw_id.
+/// Registration for storing raw_id.
 pub trait Registration {
     /// Accept a raw id.
     fn accept(&mut self, id: usize);
