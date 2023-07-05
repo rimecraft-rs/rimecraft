@@ -131,19 +131,19 @@ impl RawState {
     }
 }
 
-pub struct States<T: Deref<Target = RawState>> {
+pub struct States<T: Deref<Target = RawState> + 'static> {
     def: usize,
     properties: hashbrown::HashMap<String, property::Property>,
-    states: Vec<T>,
+    states: Vec<crate::util::StaticRef<T>>,
 }
 
-impl<T: Deref<Target = RawState>> States<T> {
-    pub fn states(&self) -> &[T] {
+impl<T: Deref<Target = RawState> + 'static> States<T> {
+    pub fn states(&self) -> &[crate::util::StaticRef<T>] {
         &self.states
     }
 
-    pub fn from_id(&self, id: usize) -> Option<&T> {
-        self.states.get(id)
+    pub fn from_id(&self, id: usize) -> Option<crate::util::StaticRef<T>> {
+        self.states.get(id).copied()
     }
 
     pub fn default_state(&self) -> &T {
@@ -158,32 +158,30 @@ impl<T: Deref<Target = RawState>> States<T> {
         self.properties.get(name)
     }
 
-    pub fn get_shared(arc: &std::sync::Arc<Self>, id: usize) -> Shared<T> {
-        Shared(arc.clone(), id)
+    pub fn get_shared(
+        shared: crate::util::StaticRef<crate::state::States<T>>,
+        id: usize,
+    ) -> Shared<T> {
+        Shared {
+            entries: shared,
+            value: shared.states[id],
+        }
     }
 }
 
 /// A shared state with states reference count and the index
 /// which is cheap to clone.
-#[derive(Clone)]
-pub struct Shared<T: Deref<Target = RawState>>(std::sync::Arc<crate::state::States<T>>, usize);
-
-impl<T: Deref<Target = RawState>> Shared<T> {}
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Shared<T: Deref<Target = RawState> + 'static> {
+    entries: crate::util::StaticRef<crate::state::States<T>>,
+    value: crate::util::StaticRef<T>,
+}
 
 impl<T: Deref<Target = RawState>> Deref for Shared<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        self.0.states().get(self.1).unwrap()
-    }
-}
-
-impl<T: Deref<Target = RawState>> Eq for Shared<T> {}
-
-impl<T: Deref<Target = RawState>> PartialEq for Shared<T> {
-    fn eq(&self, other: &Self) -> bool {
-        std::sync::Arc::as_ptr(&self.0) as usize == std::sync::Arc::as_ptr(&other.0) as usize
-            && self.1 == other.1
+        self.value.0
     }
 }
 
@@ -228,6 +226,7 @@ fn new_states<E: Clone, T: Deref<Target = RawState> + From<(E, RawState)>>(
         .map(|e| T::from((data.clone(), e)))
         .collect();
     states.iter().for_each(|e| e.init_table(&states));
+
     States {
         def: states
             .iter()
@@ -239,7 +238,10 @@ fn new_states<E: Clone, T: Deref<Target = RawState> + From<(E, RawState)>>(
             })
             .map_or(0, |e| e.0),
         properties,
-        states,
+        states: states
+            .into_iter()
+            .map(crate::util::StaticRef::from)
+            .collect(),
     }
 }
 

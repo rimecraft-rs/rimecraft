@@ -1,3 +1,5 @@
+use std::{hash::Hash, ops::Deref};
+
 pub mod collections;
 pub mod math;
 
@@ -112,4 +114,36 @@ pub struct VarI32(pub i32);
 /// Represents types of enum that can be itered with values, like Java.
 pub trait EnumValues<const N: usize>: Sized + Clone + Copy + PartialEq + Eq {
     fn values() -> [Self; N];
+}
+
+pub struct StaticRef<T: 'static + ?Sized>(pub &'static T);
+
+impl<T: 'static + ?Sized> Copy for StaticRef<T> {}
+
+impl<T: 'static + ?Sized> Clone for StaticRef<T> {
+    fn clone(&self) -> Self {
+        Self(self.0)
+    }
+}
+
+impl<T: 'static + ?Sized> Deref for StaticRef<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+impl<T: 'static> From<T> for StaticRef<T> {
+    fn from(value: T) -> Self {
+        Self(Box::leak(Box::new(value)))
+    }
+}
+
+impl<T: 'static> Eq for StaticRef<T> {}
+
+impl<T: 'static> PartialEq for StaticRef<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 as *const T as usize == other.0 as *const T as usize
+    }
 }

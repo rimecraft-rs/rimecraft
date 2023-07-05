@@ -10,17 +10,17 @@ use crate::{
 pub use event::*;
 
 /// Represents a block.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Block {
     id: usize,
-    pub states: std::sync::Arc<crate::state::States<BlockState>>,
+    pub states: crate::util::StaticRef<crate::state::States<BlockState>>,
 }
 
 impl Block {
     pub fn new(states: Vec<(crate::state::property::Property, u8)>) -> anyhow::Result<Self> {
         Ok(Self {
             id: 0,
-            states: std::sync::Arc::new({
+            states: {
                 let mut builder = crate::state::StatesBuilder::new();
                 let mut map = hashbrown::HashMap::new();
                 for state in states {
@@ -28,7 +28,8 @@ impl Block {
                     map.insert(state.0, state.1);
                 }
                 builder.build((), map)
-            }),
+            }
+            .into(),
         })
     }
 }
@@ -82,7 +83,7 @@ impl<'de> serde::Deserialize<'de> for Block {
         Ok(crate::registry::BLOCK.get_from_id(&id).map_or_else(
             || {
                 tracing::debug!("Tried to load invalid block: {id}");
-                crate::registry::BLOCK.default_entry().1.deref().clone()
+                *crate::registry::BLOCK.default_entry().1.deref()
             },
             |e| e.1.deref().clone(),
         ))
@@ -118,11 +119,10 @@ pub struct BlockState {
 impl BlockState {
     /// Get block of this state.
     pub fn block(&self) -> Block {
-        crate::registry::BLOCK
+        *crate::registry::BLOCK
             .get_from_raw(self.block.load(std::sync::atomic::Ordering::Relaxed))
             .unwrap()
             .deref()
-            .clone()
     }
 }
 
