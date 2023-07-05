@@ -88,10 +88,10 @@ impl<T> Registry<T> {
 }
 
 impl<T> std::ops::Index<usize> for Registry<T> {
-    type Output = Holder<T>;
+    type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
-        self.get_from_raw(index).unwrap()
+        &self.get_from_raw(index).unwrap().value
     }
 }
 
@@ -106,6 +106,24 @@ impl<T: PartialEq + Eq> crate::util::collections::Indexed<T> for Registry<T> {
 
     fn get(&self, index: usize) -> Option<&T> {
         self.get_from_raw(index).map(|e| &e.value)
+    }
+
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+impl<T: PartialEq + Eq> crate::util::collections::Indexed<Holder<T>> for Registry<T> {
+    fn get_raw_id(&self, value: &Holder<T>) -> Option<usize> {
+        self.entries
+            .iter()
+            .enumerate()
+            .find(|e| e.1 as *const Holder<T> as usize == value as *const Holder<T> as usize)
+            .map(|e| e.0)
+    }
+
+    fn get(&self, index: usize) -> Option<&Holder<T>> {
+        self.get_from_raw(index)
     }
 
     fn len(&self) -> usize {
@@ -134,9 +152,12 @@ impl<T: Registration> Builder<T> {
             Ok(self.entries.len() - 1)
         }
     }
+}
 
-    /// Build this builder into a [`Registry`] with target registry key.
-    pub fn build(self, reg: RegistryKey<Registry<T>>, def: Option<Identifier>) -> Registry<T> {
+impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
+    type Opts = (RegistryKey<Registry<T>>, Option<Identifier>);
+
+    fn build(self, opts: Self::Opts) -> Registry<T> {
         let entries = self
             .entries
             .into_iter()
@@ -145,7 +166,7 @@ impl<T: Registration> Builder<T> {
                 e.1 .0.accept(e.0);
                 Holder {
                     value: e.1 .0,
-                    key: RegistryKey::new(&reg, e.1 .1.clone()),
+                    key: RegistryKey::new(&opts.0, e.1 .1.clone()),
                     tags: tokio::sync::RwLock::new(Vec::new()),
                 }
             })
@@ -160,7 +181,7 @@ impl<T: Registration> Builder<T> {
         };
 
         Registry {
-            default: def.map(|e| id_map.get(&e).copied()).flatten(),
+            default: opts.1.map(|e| id_map.get(&e).copied()).flatten(),
             key_map: {
                 let mut map = hashbrown::HashMap::new();
                 for e in entries.iter().enumerate() {
@@ -170,7 +191,7 @@ impl<T: Registration> Builder<T> {
             },
             entries,
             id_map,
-            key: reg,
+            key: opts.0,
             tags: tokio::sync::RwLock::new(hashbrown::HashMap::new()),
         }
     }
@@ -280,52 +301,4 @@ impl<T> std::hash::Hash for RegistryKey<T> {
 /// just like what vanilla Minecraft's `Registry` do.
 ///
 /// Can be used in static instances.
-pub struct Lazy<T: Registration> {
-    builder: parking_lot::Mutex<Option<Builder<T>>>,
-    registry: once_cell::sync::OnceCell<Registry<T>>,
-}
-
-impl<T: Registration> Lazy<T> {
-    pub const fn new() -> Self {
-        Self {
-            builder: parking_lot::Mutex::new(None),
-            registry: once_cell::sync::OnceCell::new(),
-        }
-    }
-
-    pub fn register(&self, value: T, id: Identifier) -> anyhow::Result<usize> {
-        self.builder
-            .lock()
-            .as_mut()
-            .expect("Registry has already been freezed")
-            .register(value, id)
-    }
-
-    /// Freeze this registry into an immutable [`Registry`] instance
-    /// with a registry key.
-    pub fn freeze(
-        &self,
-        registry: RegistryKey<Registry<T>>,
-        default_registration: Option<Identifier>,
-    ) {
-        if self.registry.get().is_some() {
-            return;
-        }
-
-        let registry = self
-            .builder
-            .lock()
-            .take()
-            .unwrap()
-            .build(registry, default_registration);
-        self.registry.get_or_init(|| registry);
-    }
-}
-
-impl<T: Registration> Deref for Lazy<T> {
-    type Target = Registry<T>;
-
-    fn deref(&self) -> &Self::Target {
-        self.registry.get().expect("Registry has not been built")
-    }
-}
+pub type Lazy<T: Registration> = crate::util::FreezeLazy<Registry<T>, Builder<T>>;

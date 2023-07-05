@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
 /// An extended version of [`std::ops::Index`].
-pub trait Indexed<T>: std::ops::Index<usize> {
+pub trait Indexed<T> {
     fn get_raw_id(&self, value: &T) -> Option<usize>;
     fn get(&self, index: usize) -> Option<&T>;
     fn len(&self) -> usize;
@@ -78,4 +78,9 @@ impl<T: Hash + PartialEq + Eq + Clone> std::ops::Index<usize> for IdList<T> {
     fn index(&self, index: usize) -> &Self::Output {
         self.get(index).unwrap()
     }
+}
+
+/// A storage whose values are raw IDs held by palettes.
+pub trait PaletteStoragge {
+    fn swap(&mut self, index: u32, value: i32);
 }

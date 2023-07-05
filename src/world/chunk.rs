@@ -1,7 +1,4 @@
-use std::{
-    ops::{Deref, Index},
-    sync::atomic::AtomicU16,
-};
+use std::{ops::Deref, sync::atomic::AtomicU16};
 
 use crate::{prelude::*, util::math::ChunkPos};
 
@@ -156,6 +153,42 @@ pub mod palette {
         /// returns the ID assigned to the `object` in the updated palette.
         ///
         /// Return the ID for the `object` in the (possibly new) palette.
-        fn on_resize(new_bits: i32, object: &T) -> i32;
+        fn on_resize(&self, new_bits: i32, object: &T) -> i32;
+    }
+
+    pub struct Paletted<T: 'static, P, S>
+    where
+        P: Palette<T>,
+        S: crate::util::collections::PaletteStoragge,
+    {
+        index: crate::util::StaticRef<dyn crate::util::collections::Indexed<T>>,
+        data: ContainerData<T, P, S>,
+    }
+
+    struct ContainerData<T, P, S>
+    where
+        P: Palette<T>,
+        S: crate::util::collections::PaletteStoragge,
+    {
+        configuration: Box<ContainerDataProvider<T, P>>,
+        palette: P,
+        storage: S,
+    }
+
+    struct ContainerDataProvider<T, P> {
+        bits: usize,
+        factory: dyn Factory<T, Palette = P>,
+    }
+
+    pub trait Factory<A> {
+        type Palette: Palette<A>;
+
+        fn create(
+            &self,
+            bits: usize,
+            index: &dyn crate::util::collections::Indexed<A>,
+            listener: &dyn ResizeListen<A>,
+            var4: &[A],
+        ) -> Self::Palette;
     }
 }

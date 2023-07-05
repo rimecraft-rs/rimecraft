@@ -147,3 +147,53 @@ impl<T: 'static> PartialEq for StaticRef<T> {
         self.0 as *const T as usize == other.0 as *const T as usize
     }
 }
+
+pub struct FreezeLazy<I, M = I>
+where
+    M: Freeze<I>,
+{
+    immutable: once_cell::sync::OnceCell<I>,
+    pub mutable: parking_lot::Mutex<Option<M>>,
+}
+
+impl<I, M: Freeze<I>> FreezeLazy<I, M> {
+    pub const fn new(mutable: M) -> Self {
+        Self {
+            immutable: once_cell::sync::OnceCell::new(),
+            mutable: parking_lot::Mutex::new(Some(mutable)),
+        }
+    }
+
+    pub fn freeze(&self, opts: M::Opts) {
+        assert!(!self.is_freezed());
+        let _ = self
+            .immutable
+            .set(self.mutable.lock().take().unwrap().build(opts));
+    }
+
+    pub fn is_freezed(&self) -> bool {
+        self.immutable.get().is_some()
+    }
+}
+
+impl<I, M: Freeze<I>> Deref for FreezeLazy<I, M> {
+    type Target = I;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.immutable.get_unchecked() }
+    }
+}
+
+pub trait Freeze<T> {
+    type Opts;
+
+    fn build(self, opts: Self::Opts) -> T;
+}
+
+impl<T> Freeze<T> for T {
+    type Opts = ();
+
+    fn build(self, _opts: Self::Opts) -> T {
+        self
+    }
+}
