@@ -109,13 +109,26 @@ impl<'de> serde::Deserialize<'de> for Identifier {
 }
 
 /// Describes a var int.
-pub struct VarI32(pub i32);
+pub struct VarInt(pub i32);
+
+impl VarInt {
+    pub fn len(self) -> usize {
+        for i in 1..5 {
+            if (self.0 & -1 << i * 7) == 0 {
+                return i as usize;
+            }
+        }
+
+        5
+    }
+}
 
 /// Represents types of enum that can be itered with values, like Java.
 pub trait EnumValues<const N: usize>: Sized + Clone + Copy + PartialEq + Eq {
     fn values() -> [Self; N];
 }
 
+/// Represents a static reference with enhancements based on `&'static`.
 pub struct StaticRef<T: 'static + ?Sized>(pub &'static T);
 
 impl<T: 'static + ?Sized> Copy for StaticRef<T> {}
@@ -140,6 +153,12 @@ impl<T: 'static> From<T> for StaticRef<T> {
     }
 }
 
+impl<T: 'static> From<&'static T> for StaticRef<T> {
+    fn from(value: &'static T) -> Self {
+        Self(value)
+    }
+}
+
 impl<T: 'static> Eq for StaticRef<T> {}
 
 impl<T: 'static> PartialEq for StaticRef<T> {
@@ -148,15 +167,21 @@ impl<T: 'static> PartialEq for StaticRef<T> {
     }
 }
 
-pub struct FreezeLazy<I, M = I>
+impl<T: 'static> Hash for StaticRef<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        (self.0 as *const T as usize).hash(state)
+    }
+}
+
+pub struct Freezer<I, M = I>
 where
     M: Freeze<I>,
 {
     immutable: once_cell::sync::OnceCell<I>,
-    pub mutable: parking_lot::Mutex<Option<M>>,
+    mutable: parking_lot::Mutex<Option<M>>,
 }
 
-impl<I, M: Freeze<I>> FreezeLazy<I, M> {
+impl<I, M: Freeze<I>> Freezer<I, M> {
     pub const fn new(mutable: M) -> Self {
         Self {
             immutable: once_cell::sync::OnceCell::new(),
@@ -176,7 +201,7 @@ impl<I, M: Freeze<I>> FreezeLazy<I, M> {
     }
 }
 
-impl<I, M: Freeze<I>> Deref for FreezeLazy<I, M> {
+impl<I, M: Freeze<I>> Deref for Freezer<I, M> {
     type Target = I;
 
     fn deref(&self) -> &Self::Target {

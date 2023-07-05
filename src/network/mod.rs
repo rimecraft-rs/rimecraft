@@ -360,7 +360,7 @@ mod packet_buf_impl {
         where
             B: bytes::Buf,
         {
-            let len = crate::util::VarI32::decode(buf)? as usize;
+            let len = crate::util::VarInt::decode(buf)? as usize;
             let mut vec = Vec::new();
 
             for _ in 0..len {
@@ -370,7 +370,7 @@ mod packet_buf_impl {
         }
     }
 
-    impl Encode for crate::util::VarI32 {
+    impl Encode for crate::util::VarInt {
         fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
         where
             B: bytes::BufMut,
@@ -391,7 +391,7 @@ mod packet_buf_impl {
         }
     }
 
-    impl<'de> Decode<'de> for crate::util::VarI32 {
+    impl<'de> Decode<'de> for crate::util::VarInt {
         type Output = i32;
 
         fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
@@ -424,7 +424,7 @@ mod packet_buf_impl {
             B: bytes::BufMut,
         {
             let bs = self.as_bytes();
-            crate::util::VarI32(bs.len() as i32).encode(buf)?;
+            crate::util::VarInt(bs.len() as i32).encode(buf)?;
             buf.put_slice(bs);
             Ok(())
         }
@@ -446,7 +446,7 @@ mod packet_buf_impl {
         where
             B: bytes::Buf,
         {
-            let len = crate::util::VarI32::decode(buf)? as usize;
+            let len = crate::util::VarInt::decode(buf)? as usize;
             let mut vec = Vec::new();
 
             for _ in 0..len {
@@ -465,7 +465,7 @@ mod packet_buf_impl {
         where
             B: bytes::BufMut,
         {
-            crate::util::VarI32(self.raw_id() as i32).encode(buf)
+            crate::util::VarInt(self.raw_id() as i32).encode(buf)
         }
     }
 
@@ -479,7 +479,7 @@ mod packet_buf_impl {
         where
             B: bytes::Buf,
         {
-            let id = crate::util::VarI32::decode(buf)? as usize;
+            let id = crate::util::VarInt::decode(buf)? as usize;
             match T::registry().get_from_raw(id) {
                 Some(value) => Ok(value.deref().clone()),
                 None => {
@@ -501,7 +501,7 @@ mod packet_buf_impl {
         where
             B: bytes::BufMut,
         {
-            crate::util::VarI32(self.len() as i32).encode(buf)?;
+            crate::util::VarInt(self.len() as i32).encode(buf)?;
 
             for object in self.iter() {
                 object.encode(buf)?;
@@ -521,7 +521,7 @@ mod packet_buf_impl {
         where
             B: bytes::Buf,
         {
-            let len = crate::util::VarI32::decode(buf)? as usize;
+            let len = crate::util::VarInt::decode(buf)? as usize;
             let mut vec = Vec::with_capacity(len);
 
             for _ in 0..len {
@@ -541,7 +541,7 @@ mod packet_buf_impl {
         where
             B: bytes::BufMut,
         {
-            crate::util::VarI32(self.len() as i32).encode(buf)?;
+            crate::util::VarInt(self.len() as i32).encode(buf)?;
 
             for (key, value) in self.iter() {
                 key.encode(buf)?;
@@ -564,7 +564,7 @@ mod packet_buf_impl {
         where
             B: bytes::Buf,
         {
-            let len = crate::util::VarI32::decode(buf)? as usize;
+            let len = crate::util::VarInt::decode(buf)? as usize;
             let mut map = std::collections::HashMap::with_capacity(len);
 
             for _ in 0..len {
@@ -586,7 +586,7 @@ mod packet_buf_impl {
         where
             B: bytes::BufMut,
         {
-            crate::util::VarI32(self.len() as i32).encode(buf)?;
+            crate::util::VarInt(self.len() as i32).encode(buf)?;
 
             for (key, value) in self.iter() {
                 key.encode(buf)?;
@@ -609,7 +609,7 @@ mod packet_buf_impl {
         where
             B: bytes::Buf,
         {
-            let len = crate::util::VarI32::decode(buf)? as usize;
+            let len = crate::util::VarInt::decode(buf)? as usize;
             let mut map = hashbrown::HashMap::with_capacity(len);
 
             for _ in 0..len {

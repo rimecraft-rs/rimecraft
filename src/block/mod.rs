@@ -9,6 +9,13 @@ use crate::{
 
 pub use event::*;
 
+//TODO: Build and freeze STATE_IDS
+
+/// An `ID <-> BlockState` list.
+pub static STATE_IDS: once_cell::sync::Lazy<
+    crate::util::Freezer<crate::collections::IdList<SharedBlockState>>,
+> = once_cell::sync::Lazy::new(|| crate::util::Freezer::new(crate::collections::IdList::new()));
+
 /// Represents a block.
 #[derive(Clone, Copy)]
 pub struct Block {
@@ -113,7 +120,7 @@ impl Hash for Block {
 /// An immutable state for a [`Block`].
 pub struct BlockState {
     block: std::sync::atomic::AtomicUsize,
-    state: crate::state::RawState,
+    state: crate::state::State,
 }
 
 impl BlockState {
@@ -126,8 +133,8 @@ impl BlockState {
     }
 }
 
-impl From<((), crate::state::RawState)> for BlockState {
-    fn from((_, value): ((), crate::state::RawState)) -> Self {
+impl From<((), crate::state::State)> for BlockState {
+    fn from((_, value): ((), crate::state::State)) -> Self {
         Self {
             block: std::sync::atomic::AtomicUsize::new(0),
             state: value,
@@ -136,7 +143,7 @@ impl From<((), crate::state::RawState)> for BlockState {
 }
 
 impl Deref for BlockState {
-    type Target = crate::state::RawState;
+    type Target = crate::state::State;
 
     fn deref(&self) -> &Self::Target {
         &self.state

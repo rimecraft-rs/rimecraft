@@ -297,8 +297,8 @@ impl<T> std::hash::Hash for RegistryKey<T> {
     }
 }
 
-/// Lazy registry for building and freezing registries,
+/// Freezeable registry for building and freezing registries,
 /// just like what vanilla Minecraft's `Registry` do.
 ///
 /// Can be used in static instances.
-pub type Lazy<T: Registration> = crate::util::FreezeLazy<Registry<T>, Builder<T>>;
+pub type Freezer<T> = crate::util::Freezer<Registry<T>, Builder<T>>;

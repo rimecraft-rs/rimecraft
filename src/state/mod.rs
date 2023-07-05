@@ -1,16 +1,16 @@
 pub mod property;
 
-use std::ops::Deref;
+use std::{hash::Hash, ops::Deref};
 
 pub use property::Property;
 
-pub struct RawState {
+pub struct State {
     id: usize,
     entries: hashbrown::HashMap<property::Property, u8>,
     table: once_cell::sync::OnceCell<hashbrown::HashMap<property::Property, Vec<usize>>>,
 }
 
-impl RawState {
+impl State {
     pub fn cycle(&self, property: &property::Property) -> anyhow::Result<usize> {
         self.with(property, {
             let range = property.range();
@@ -131,13 +131,13 @@ impl RawState {
     }
 }
 
-pub struct States<T: Deref<Target = RawState> + 'static> {
+pub struct States<T: Deref<Target = State> + 'static> {
     def: usize,
     properties: hashbrown::HashMap<String, property::Property>,
     states: Vec<crate::util::StaticRef<T>>,
 }
 
-impl<T: Deref<Target = RawState> + 'static> States<T> {
+impl<T: Deref<Target = State> + 'static> States<T> {
     pub fn states(&self) -> &[crate::util::StaticRef<T>] {
         &self.states
     }
@@ -171,13 +171,12 @@ impl<T: Deref<Target = RawState> + 'static> States<T> {
 
 /// A shared state with states reference count and the index
 /// which is cheap to clone.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct Shared<T: Deref<Target = RawState> + 'static> {
-    entries: crate::util::StaticRef<crate::state::States<T>>,
+pub struct Shared<T: Deref<Target = State> + 'static> {
+    pub entries: crate::util::StaticRef<crate::state::States<T>>,
     value: crate::util::StaticRef<T>,
 }
 
-impl<T: Deref<Target = RawState>> Deref for Shared<T> {
+impl<T: Deref<Target = State>> Deref for Shared<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -185,12 +184,34 @@ impl<T: Deref<Target = RawState>> Deref for Shared<T> {
     }
 }
 
-fn new_states<E: Clone, T: Deref<Target = RawState> + From<(E, RawState)>>(
+impl<T: Deref<Target = State>> Copy for Shared<T> {}
+
+impl<T: Deref<Target = State>> Clone for Shared<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T: Deref<Target = State>> Eq for Shared<T> {}
+
+impl<T: Deref<Target = State>> PartialEq for Shared<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl<T: Deref<Target = State>> Hash for Shared<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.value.hash(state)
+    }
+}
+
+fn new_states<E: Clone, T: Deref<Target = State> + From<(E, State)>>(
     data: E,
     def_state: hashbrown::HashMap<property::Property, u8>,
     properties: hashbrown::HashMap<String, property::Property>,
 ) -> States<T> {
-    let mut states_raw: Vec<RawState> = Vec::new();
+    let mut states_raw: Vec<State> = Vec::new();
     let mut temp: Vec<Vec<(property::Property, u8)>> = Vec::new();
 
     for property in properties.values() {
@@ -213,7 +234,7 @@ fn new_states<E: Clone, T: Deref<Target = RawState> + From<(E, RawState)>>(
             entries.insert(e.0, e.1);
         }
 
-        states_raw.push(RawState {
+        states_raw.push(State {
             id: 0,
             entries,
             table: once_cell::sync::OnceCell::new(),
@@ -281,7 +302,7 @@ impl StatesBuilder {
         Ok(())
     }
 
-    pub fn build<E: Clone, S: Deref<Target = RawState> + From<(E, RawState)>>(
+    pub fn build<E: Clone, S: Deref<Target = State> + From<(E, State)>>(
         self,
         data: E,
         def_state: hashbrown::HashMap<property::Property, u8>,

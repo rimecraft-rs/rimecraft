@@ -114,22 +114,22 @@ impl UpgradeData {
 }
 
 pub mod palette {
+    use std::hash::Hash;
+
     /// A palette maps objects from and to small integer IDs that uses less
     /// number of bits to make storage smaller.
     ///
     /// While the objects palettes handle are already represented by integer
     /// IDs, shrinking IDs in cases where only a few appear can further reduce
     /// storage space and network traffic volume.
-    pub trait Palette<T>:
-        crate::network::Encode + for<'de> crate::network::Decode<'de> + Clone
-    {
+    pub trait Palette<T>: Clone {
         /// The id of an object is this palette.
         ///
         /// If the object does not yet exist in this palette, this palette will
         /// register the object. If the palette is too small to include this object,
         /// a [`ResizeListen`] will be called and
         /// this palette may be discarded.
-        fn get_index(&self, value: &T) -> i32;
+        fn get_index(&self, value: &T) -> u32;
 
         /// True if any entry in this palette passes the `predicate`.
         fn any<P>(&self, p: P) -> bool
@@ -137,10 +137,25 @@ pub mod palette {
             P: Fn(&T) -> bool;
 
         /// The object associated with the given `id`.
-        fn get(&self, index: i32) -> Option<&T>;
+        fn get(&self, index: u32) -> Option<&T>;
 
         /// The serialized lenth of this palette in a byte buf, in bytes.
         fn packet_len(&self) -> usize;
+
+        fn create(
+            bits: usize,
+            index: &'static impl crate::collections::Indexed<T>,
+            listener: &impl ResizeListen<T>,
+            var4: &[T],
+        ) -> Self;
+
+        fn read_buf<B>(&mut self, buf: &mut B)
+        where
+            B: bytes::Buf;
+
+        fn write_buf<B>(&self, buf: &mut B)
+        where
+            B: bytes::BufMut;
     }
 
     /// Listan for palette that requires more bits to hold a newly indexed
@@ -170,25 +185,51 @@ pub mod palette {
         P: Palette<T>,
         S: crate::util::collections::PaletteStoragge,
     {
-        configuration: Box<ContainerDataProvider<T, P>>,
+        bits: usize,
         palette: P,
         storage: S,
+        _t: std::marker::PhantomData<T>,
     }
 
-    struct ContainerDataProvider<T, P> {
-        bits: usize,
-        factory: dyn Factory<T, Palette = P>,
-    }
+    impl<T> Palette<T> for crate::util::StaticRef<dyn crate::collections::Indexed<T>> {
+        fn get_index(&self, value: &T) -> u32 {
+            self.get_raw_id(value).unwrap_or_default() as u32
+        }
 
-    pub trait Factory<A> {
-        type Palette: Palette<A>;
+        fn any<P>(&self, _p: P) -> bool
+        where
+            P: Fn(&T) -> bool,
+        {
+            true
+        }
+
+        fn get(&self, index: u32) -> Option<&T> {
+            crate::collections::Indexed::get(self.0, index as usize)
+        }
+
+        fn packet_len(&self) -> usize {
+            crate::util::VarInt(0).len()
+        }
 
         fn create(
-            &self,
-            bits: usize,
-            index: &dyn crate::util::collections::Indexed<A>,
-            listener: &dyn ResizeListen<A>,
-            var4: &[A],
-        ) -> Self::Palette;
+            _bits: usize,
+            index: &'static impl crate::collections::Indexed<T>,
+            _listener: &impl ResizeListen<T>,
+            _var4: &[T],
+        ) -> Self {
+            Self(index)
+        }
+
+        fn read_buf<B>(&mut self, _buf: &mut B)
+        where
+            B: bytes::Buf,
+        {
+        }
+
+        fn write_buf<B>(&self, _buf: &mut B)
+        where
+            B: bytes::BufMut,
+        {
+        }
     }
 }

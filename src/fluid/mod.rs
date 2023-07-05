@@ -103,7 +103,7 @@ impl Default for Fluid {
 
 pub struct FluidState {
     fluid: std::sync::atomic::AtomicUsize,
-    state: crate::state::RawState,
+    state: crate::state::State,
 }
 
 impl FluidState {
@@ -117,8 +117,8 @@ impl FluidState {
     }
 }
 
-impl From<((), crate::state::RawState)> for FluidState {
-    fn from((_, value): ((), crate::state::RawState)) -> Self {
+impl From<((), crate::state::State)> for FluidState {
+    fn from((_, value): ((), crate::state::State)) -> Self {
         Self {
             fluid: std::sync::atomic::AtomicUsize::new(0),
             state: value,
@@ -127,7 +127,7 @@ impl From<((), crate::state::RawState)> for FluidState {
 }
 
 impl Deref for FluidState {
-    type Target = crate::state::RawState;
+    type Target = crate::state::State;
 
     fn deref(&self) -> &Self::Target {
         &self.state

@@ -12,6 +12,8 @@ pub mod state;
 pub mod util;
 pub mod world;
 
+pub use util::collections;
+
 /// Core utils of Rimecraft.
 pub mod prelude {
     pub use crate::{

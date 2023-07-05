@@ -10,6 +10,7 @@ pub trait Indexed<T> {
 /// An id list, just targeting the `IdList` in MCJE.
 ///
 /// Type `T` should be cheaply cloned (for example, an [`std::sync::Arc`]).
+#[derive(Clone)]
 pub struct IdList<T: Hash + PartialEq + Eq + Clone> {
     next_id: u32,
     id_map: hashbrown::HashMap<T, u32>,
@@ -18,7 +19,11 @@ pub struct IdList<T: Hash + PartialEq + Eq + Clone> {
 
 impl<T: Hash + PartialEq + Eq + Clone> IdList<T> {
     pub fn new() -> Self {
-        Self::with_capacity(512)
+        Self {
+            next_id: 0,
+            id_map: hashbrown::HashMap::new(),
+            vec: vec![],
+        }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
