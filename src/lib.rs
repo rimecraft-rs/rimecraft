@@ -1,7 +1,7 @@
 pub mod block;
 pub mod fluid;
 pub mod item;
-/// Thin wrapper between Minecraft code structurs
+/// Thin wrapper between Rimecraft modules
 /// and [`fastnbt_rc`] and [`fastsnbt`].
 pub mod nbt;
 pub mod network;
@@ -9,10 +9,10 @@ pub mod network;
 pub mod registry;
 pub mod server;
 pub mod state;
-pub mod util;
+mod util;
 pub mod world;
 
-pub use util::collections;
+pub use util::*;
 
 /// Core utils of Rimecraft.
 pub mod prelude {

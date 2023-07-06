@@ -113,9 +113,7 @@ impl UpgradeData {
     }
 }
 
-pub mod palette {
-    use std::hash::Hash;
-
+mod palette {
     /// A palette maps objects from and to small integer IDs that uses less
     /// number of bits to make storage smaller.
     ///
@@ -123,13 +121,14 @@ pub mod palette {
     /// IDs, shrinking IDs in cases where only a few appear can further reduce
     /// storage space and network traffic volume.
     pub trait Palette<T>: Clone {
+        type Index: crate::collections::Indexed<T> + ?Sized;
+
         /// The id of an object is this palette.
         ///
         /// If the object does not yet exist in this palette, this palette will
         /// register the object. If the palette is too small to include this object,
-        /// a [`ResizeListen`] will be called and
-        /// this palette may be discarded.
-        fn get_index(&self, value: &T) -> u32;
+        /// a [`ResizeListen`] will be called and this palette may be discarded.
+        fn get_index(&mut self, value: &T) -> u32;
 
         /// True if any entry in this palette passes the `predicate`.
         fn any<P>(&self, p: P) -> bool
@@ -144,7 +143,7 @@ pub mod palette {
 
         fn create(
             bits: usize,
-            index: &'static impl crate::collections::Indexed<T>,
+            index: &'static Self::Index,
             listener: &impl ResizeListen<T>,
             var4: &[T],
         ) -> Self;
@@ -191,8 +190,10 @@ pub mod palette {
         _t: std::marker::PhantomData<T>,
     }
 
-    impl<T> Palette<T> for crate::util::StaticRef<dyn crate::collections::Indexed<T>> {
-        fn get_index(&self, value: &T) -> u32 {
+    impl<T, I: crate::collections::Indexed<T>> Palette<T> for crate::util::StaticRef<I> {
+        type Index = I;
+
+        fn get_index(&mut self, value: &T) -> u32 {
             self.get_raw_id(value).unwrap_or_default() as u32
         }
 
@@ -211,15 +212,6 @@ pub mod palette {
             crate::util::VarInt(0).len()
         }
 
-        fn create(
-            _bits: usize,
-            index: &'static impl crate::collections::Indexed<T>,
-            _listener: &impl ResizeListen<T>,
-            _var4: &[T],
-        ) -> Self {
-            Self(index)
-        }
-
         fn read_buf<B>(&mut self, _buf: &mut B)
         where
             B: bytes::Buf,
@@ -230,6 +222,86 @@ pub mod palette {
         where
             B: bytes::BufMut,
         {
+        }
+
+        fn create(
+            _bits: usize,
+            index: &'static Self::Index,
+            _listener: &impl ResizeListen<T>,
+            _var4: &[T],
+        ) -> Self {
+            Self(index)
+        }
+    }
+
+    pub struct Singular<T, I: 'static>
+    where
+        I: crate::collections::Indexed<T>,
+    {
+        id_list: crate::util::StaticRef<I>,
+        entry: Option<T>,
+    }
+
+    impl<T, I: 'static> Clone for Singular<T, I>
+    where
+        T: Clone,
+        I: crate::collections::Indexed<T>,
+    {
+        fn clone(&self) -> Self {
+            Self {
+                id_list: self.id_list,
+                entry: self.entry.clone(),
+            }
+        }
+    }
+
+    impl<T, I: 'static> Palette<T> for Singular<T, I>
+    where
+        T: Clone,
+        I: crate::collections::Indexed<T>,
+    {
+        type Index = I;
+
+        fn get_index(&mut self, value: &T) -> u32 {
+            todo!()
+        }
+
+        fn any<P>(&self, p: P) -> bool
+        where
+            P: Fn(&T) -> bool,
+        {
+            todo!()
+        }
+
+        fn get(&self, index: u32) -> Option<&T> {
+            todo!()
+        }
+
+        fn packet_len(&self) -> usize {
+            todo!()
+        }
+
+        fn create(
+            bits: usize,
+            index: &'static Self::Index,
+            listener: &impl ResizeListen<T>,
+            var4: &[T],
+        ) -> Self {
+            todo!()
+        }
+
+        fn read_buf<B>(&mut self, buf: &mut B)
+        where
+            B: bytes::Buf,
+        {
+            todo!()
+        }
+
+        fn write_buf<B>(&self, buf: &mut B)
+        where
+            B: bytes::BufMut,
+        {
+            todo!()
         }
     }
 }

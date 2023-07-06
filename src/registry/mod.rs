@@ -10,7 +10,7 @@ pub use registries::*;
 /// Represents a registration and its id and tags.
 pub struct Holder<T> {
     key: RegistryKey<T>,
-    pub tags: tokio::sync::RwLock<Vec<tag::TagKey<T>>>,
+    pub tags: parking_lot::RwLock<Vec<tag::TagKey<T>>>,
     value: T,
 }
 
@@ -21,12 +21,7 @@ impl<T> Holder<T> {
 
     /// If this registration is in target tag.
     pub fn is_in(&self, tag: &tag::TagKey<T>) -> bool {
-        self.tags.blocking_read().contains(tag)
-    }
-
-    /// If this registration is in target tag, executed in async.
-    pub async fn async_is_in(&self, tag: &tag::TagKey<T>) -> bool {
-        self.tags.read().await.contains(tag)
+        self.tags.read().contains(tag)
     }
 }
 
@@ -38,52 +33,71 @@ impl<T> Deref for Holder<T> {
     }
 }
 
-/// Immutable registry with mutable tag bindings.
+/// Immutable registry storing entries with mutable tag bindings.
+///
+/// You're not able to create a registry directly, use a [`Builder`] instead.
 pub struct Registry<T> {
     default: Option<usize>,
     entries: Vec<Holder<T>>,
     id_map: hashbrown::HashMap<Identifier, usize>,
+    /// Key of this registry.
     pub key: RegistryKey<Self>,
     key_map: hashbrown::HashMap<RegistryKey<T>, usize>,
-    pub tags: tokio::sync::RwLock<hashbrown::HashMap<tag::TagKey<T>, Vec<usize>>>,
+    /// Tag to entries mapping of this registry.
+    pub tags: parking_lot::RwLock<hashbrown::HashMap<tag::TagKey<T>, Vec<usize>>>,
 }
 
 impl<T> Registry<T> {
-    pub fn iter(&self) -> std::slice::Iter<'_, Holder<T>> {
-        self.entries.iter()
+    /// Whether this registry contains an entry with the target registry key.
+    pub fn contains_ket(&self, key: &RegistryKey<T>) -> bool {
+        self.key_map.contains_key(key)
     }
 
-    pub fn get_from_raw(&self, raw_id: usize) -> Option<&Holder<T>> {
-        self.entries.get(raw_id)
+    /// Whether this registry contains an entry with the target id.
+    pub fn contains_id(&self, id: &Identifier) -> bool {
+        self.id_map.contains_key(id)
     }
 
-    pub fn get(&self, key: &RegistryKey<T>) -> Option<(usize, &Holder<T>)> {
+    /// Returns the default entry of this reigstry.
+    ///
+    /// # Panics
+    ///
+    /// Panic if a default entry don't exist.
+    /// See [`Self::is_defaulted`].
+    pub fn default_entry(&self) -> (usize, &Holder<T>) {
+        let def = self
+            .default
+            .expect("trying to get a default entry that don't exist");
+        (def, self.get_from_raw(def).unwrap())
+    }
+
+    /// Get an entry from a [`RegistryKey`].
+    pub fn get_from_key(&self, key: &RegistryKey<T>) -> Option<(usize, &Holder<T>)> {
         self.key_map
             .get(key)
             .map(|e| (*e, self.entries.get(*e).unwrap()))
     }
 
+    /// Get an entry from an [`Identifier`].
     pub fn get_from_id(&self, id: &Identifier) -> Option<(usize, &Holder<T>)> {
         self.id_map
             .get(id)
             .map(|e| (*e, self.entries.get(*e).unwrap()))
     }
 
-    pub fn contains(&self, key: &RegistryKey<T>) -> bool {
-        self.key_map.contains_key(key)
+    /// Get an entry from its raw id.
+    pub fn get_from_raw(&self, raw_id: usize) -> Option<&Holder<T>> {
+        self.entries.get(raw_id)
     }
 
-    pub fn contains_id(&self, id: &Identifier) -> bool {
-        self.id_map.contains_key(id)
-    }
-
-    pub fn default_entry(&self) -> (usize, &Holder<T>) {
-        let def = self.default.unwrap();
-        (def, self.get_from_raw(def).unwrap())
-    }
-
+    /// Whether a default entry exist in this registry.
     pub fn is_defaulted(&self) -> bool {
         self.default.is_some()
+    }
+
+    /// Returns an iterator over the slice of entries.
+    pub fn iter(&self) -> std::slice::Iter<'_, Holder<T>> {
+        self.entries.iter()
     }
 }
 
@@ -143,7 +157,7 @@ impl<T: Registration> Builder<T> {
         }
     }
 
-    /// Put a new value and its id into this registry builder and return its raw id.
+    /// Register a new value and its id into this builder and return its raw id.
     pub fn register(&mut self, value: T, id: Identifier) -> anyhow::Result<usize> {
         if self.entries.iter().any(|e| e.1 == id) {
             Err(anyhow::anyhow!("Registration with id {id} already exist!"))
@@ -167,7 +181,7 @@ impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
                 Holder {
                     value: e.1 .0,
                     key: RegistryKey::new(&opts.0, e.1 .1.clone()),
-                    tags: tokio::sync::RwLock::new(Vec::new()),
+                    tags: parking_lot::RwLock::new(Vec::new()),
                 }
             })
             .collect::<Vec<_>>();
@@ -192,7 +206,7 @@ impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
             entries,
             id_map,
             key: opts.0,
-            tags: tokio::sync::RwLock::new(hashbrown::HashMap::new()),
+            tags: parking_lot::RwLock::new(hashbrown::HashMap::new()),
         }
     }
 }
@@ -211,6 +225,8 @@ pub trait RegistryAccess: Sized {
 
 /// Represents a key for a value in a registry in a context where
 /// a root registry is available.
+///
+/// This type is driven by [`std::sync::Arc`] so it's cheap to clone.
 pub struct RegistryKey<T> {
     _type: std::marker::PhantomData<T>,
     /// (reg, value)
@@ -298,7 +314,5 @@ impl<T> std::hash::Hash for RegistryKey<T> {
 }
 
 /// Freezeable registry for building and freezing registries,
-/// just like what vanilla Minecraft's `Registry` do.
-///
-/// Can be used in static instances.
+/// just like what MCJE's `Registry` do.
 pub type Freezer<T> = crate::util::Freezer<Registry<T>, Builder<T>>;

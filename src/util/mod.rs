@@ -173,12 +173,20 @@ impl<T: 'static> Hash for StaticRef<T> {
     }
 }
 
+/// A static instance that can be created with a type in a [`parking_lot::Mutex`]
+/// to be mutable and be freezed into (maybe) another type inside a once cell.
+/// Which the freezed instance can be accessed without a lock and be borrowed
+/// outlives static.
+///
+/// The freezed instance can be accessed directly with the deref trait
+/// implemented by this type.
 pub struct Freezer<I, M = I>
 where
     M: Freeze<I>,
 {
     immutable: once_cell::sync::OnceCell<I>,
-    mutable: parking_lot::Mutex<Option<M>>,
+    /// The mutable instance.
+    pub mutable: parking_lot::Mutex<Option<M>>,
 }
 
 impl<I, M: Freeze<I>> Freezer<I, M> {
@@ -189,6 +197,7 @@ impl<I, M: Freeze<I>> Freezer<I, M> {
         }
     }
 
+    /// Freeze this instance with provided options.
     pub fn freeze(&self, opts: M::Opts) {
         assert!(!self.is_freezed());
         let _ = self
@@ -196,6 +205,7 @@ impl<I, M: Freeze<I>> Freezer<I, M> {
             .set(self.mutable.lock().take().unwrap().build(opts));
     }
 
+    /// Whether this instance has been already freezed.
     pub fn is_freezed(&self) -> bool {
         self.immutable.get().is_some()
     }
@@ -209,9 +219,16 @@ impl<I, M: Freeze<I>> Deref for Freezer<I, M> {
     }
 }
 
+/// Describes a type that can be used for mutable instance (`M`) in a [`Freezer`].
+/// The generic type `T` is the freeze output type of this type.
+///
+/// By default, all types will can be freezed into themselves
+/// with empty tuple options.
 pub trait Freeze<T> {
+    /// Options for the freeze operation.
     type Opts;
 
+    /// Build and freeze this value into `T` with options.
     fn build(self, opts: Self::Opts) -> T;
 }
 
