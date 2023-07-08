@@ -113,49 +113,14 @@ impl UpgradeData {
     }
 }
 
-mod palette {
+pub mod palette {
     /// A palette maps objects from and to small integer IDs that uses less
     /// number of bits to make storage smaller.
     ///
     /// While the objects palettes handle are already represented by integer
     /// IDs, shrinking IDs in cases where only a few appear can further reduce
     /// storage space and network traffic volume.
-    pub trait Palette<T>: Clone {
-        type Index: crate::collections::Indexed<T> + ?Sized;
-
-        /// The id of an object is this palette.
-        ///
-        /// If the object does not yet exist in this palette, this palette will
-        /// register the object. If the palette is too small to include this object,
-        /// a [`ResizeListen`] will be called and this palette may be discarded.
-        fn get_index(&mut self, value: &T) -> u32;
-
-        /// True if any entry in this palette passes the `predicate`.
-        fn any<P>(&self, p: P) -> bool
-        where
-            P: Fn(&T) -> bool;
-
-        /// The object associated with the given `id`.
-        fn get(&self, index: u32) -> Option<&T>;
-
-        /// The serialized lenth of this palette in a byte buf, in bytes.
-        fn packet_len(&self) -> usize;
-
-        fn create(
-            bits: usize,
-            index: &'static Self::Index,
-            listener: &impl ResizeListen<T>,
-            var4: &[T],
-        ) -> Self;
-
-        fn read_buf<B>(&mut self, buf: &mut B)
-        where
-            B: bytes::Buf;
-
-        fn write_buf<B>(&self, buf: &mut B)
-        where
-            B: bytes::BufMut;
-    }
+    pub struct Palette<T>();
 
     /// Listan for palette that requires more bits to hold a newly indexed
     /// object. A no-op listener may be used if the palette does not have to
@@ -167,141 +132,10 @@ mod palette {
         /// returns the ID assigned to the `object` in the updated palette.
         ///
         /// Return the ID for the `object` in the (possibly new) palette.
-        fn on_resize(&self, new_bits: i32, object: &T) -> i32;
+        fn on_resize(&self, new_bits: u32, object: &T) -> u32;
     }
 
-    pub struct Paletted<T: 'static, P, S>
-    where
-        P: Palette<T>,
-        S: crate::util::collections::PaletteStoragge,
-    {
-        index: crate::util::StaticRef<dyn crate::util::collections::Indexed<T>>,
-        data: ContainerData<T, P, S>,
-    }
-
-    struct ContainerData<T, P, S>
-    where
-        P: Palette<T>,
-        S: crate::util::collections::PaletteStoragge,
-    {
-        bits: usize,
-        palette: P,
-        storage: S,
-        _t: std::marker::PhantomData<T>,
-    }
-
-    impl<T, I: crate::collections::Indexed<T>> Palette<T> for crate::util::StaticRef<I> {
-        type Index = I;
-
-        fn get_index(&mut self, value: &T) -> u32 {
-            self.get_raw_id(value).unwrap_or_default() as u32
-        }
-
-        fn any<P>(&self, _p: P) -> bool
-        where
-            P: Fn(&T) -> bool,
-        {
-            true
-        }
-
-        fn get(&self, index: u32) -> Option<&T> {
-            crate::collections::Indexed::get(self.0, index as usize)
-        }
-
-        fn packet_len(&self) -> usize {
-            crate::util::VarInt(0).len()
-        }
-
-        fn read_buf<B>(&mut self, _buf: &mut B)
-        where
-            B: bytes::Buf,
-        {
-        }
-
-        fn write_buf<B>(&self, _buf: &mut B)
-        where
-            B: bytes::BufMut,
-        {
-        }
-
-        fn create(
-            _bits: usize,
-            index: &'static Self::Index,
-            _listener: &impl ResizeListen<T>,
-            _var4: &[T],
-        ) -> Self {
-            Self(index)
-        }
-    }
-
-    pub struct Singular<T, I: 'static>
-    where
-        I: crate::collections::Indexed<T>,
-    {
-        id_list: crate::util::StaticRef<I>,
-        entry: Option<T>,
-    }
-
-    impl<T, I: 'static> Clone for Singular<T, I>
-    where
-        T: Clone,
-        I: crate::collections::Indexed<T>,
-    {
-        fn clone(&self) -> Self {
-            Self {
-                id_list: self.id_list,
-                entry: self.entry.clone(),
-            }
-        }
-    }
-
-    impl<T, I: 'static> Palette<T> for Singular<T, I>
-    where
-        T: Clone,
-        I: crate::collections::Indexed<T>,
-    {
-        type Index = I;
-
-        fn get_index(&mut self, value: &T) -> u32 {
-            todo!()
-        }
-
-        fn any<P>(&self, p: P) -> bool
-        where
-            P: Fn(&T) -> bool,
-        {
-            todo!()
-        }
-
-        fn get(&self, index: u32) -> Option<&T> {
-            todo!()
-        }
-
-        fn packet_len(&self) -> usize {
-            todo!()
-        }
-
-        fn create(
-            bits: usize,
-            index: &'static Self::Index,
-            listener: &impl ResizeListen<T>,
-            var4: &[T],
-        ) -> Self {
-            todo!()
-        }
-
-        fn read_buf<B>(&mut self, buf: &mut B)
-        where
-            B: bytes::Buf,
-        {
-            todo!()
-        }
-
-        fn write_buf<B>(&self, buf: &mut B)
-        where
-            B: bytes::BufMut,
-        {
-            todo!()
-        }
+    mod inner {
+        pub enum PaletteInner
     }
 }
