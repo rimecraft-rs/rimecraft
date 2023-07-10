@@ -138,11 +138,11 @@ pub struct States<T: Deref<Target = State> + 'static> {
 }
 
 impl<T: Deref<Target = State> + 'static> States<T> {
-    pub fn states(&self) -> &[crate::util::StaticRef<T>] {
+    pub fn states(&self) -> &[crate::util::Ref<T>] {
         &self.states
     }
 
-    pub fn from_id(&self, id: usize) -> Option<crate::util::StaticRef<T>> {
+    pub fn from_id(&self, id: usize) -> Option<crate::util::Ref<T>> {
         self.states.get(id).copied()
     }
 
@@ -259,10 +259,7 @@ fn new_states<E: Clone, T: Deref<Target = State> + From<(E, State)>>(
             })
             .map_or(0, |e| e.0),
         properties,
-        states: states
-            .into_iter()
-            .map(crate::util::StaticRef::from)
-            .collect(),
+        states: states.into_iter().map(crate::util::Ref::from).collect(),
     }
 }
 

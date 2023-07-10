@@ -128,18 +128,20 @@ pub trait EnumValues<const N: usize>: Sized + Clone + Copy + PartialEq + Eq {
     fn values() -> [Self; N];
 }
 
-/// Represents a static reference with enhancements based on `&'static`.
-pub struct StaticRef<T: 'static + ?Sized>(pub &'static T);
+pub type StaticRef<T> = Ref<'static, T>;
 
-impl<T: 'static + ?Sized> Copy for StaticRef<T> {}
+/// Represents a reference with enhancements based on `&'a`.
+pub struct Ref<'a, T: 'a + ?Sized>(pub &'a T);
 
-impl<T: 'static + ?Sized> Clone for StaticRef<T> {
+impl<'a, T: 'a + ?Sized> Copy for Ref<'a, T> {}
+
+impl<'a, T: 'a + ?Sized> Clone for Ref<'a, T> {
     fn clone(&self) -> Self {
         Self(self.0)
     }
 }
 
-impl<T: 'static + ?Sized> Deref for StaticRef<T> {
+impl<'a, T: 'a + ?Sized> Deref for Ref<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -147,27 +149,27 @@ impl<T: 'static + ?Sized> Deref for StaticRef<T> {
     }
 }
 
-impl<T: 'static> From<T> for StaticRef<T> {
+impl<'a, T: 'a> From<T> for Ref<'a, T> {
     fn from(value: T) -> Self {
         Self(Box::leak(Box::new(value)))
     }
 }
 
-impl<T: 'static> From<&'static T> for StaticRef<T> {
-    fn from(value: &'static T) -> Self {
+impl<'a, T: 'a> From<&'a T> for Ref<'a, T> {
+    fn from(value: &'a T) -> Self {
         Self(value)
     }
 }
 
-impl<T: 'static> Eq for StaticRef<T> {}
+impl<'a, T: 'a> Eq for Ref<'a, T> {}
 
-impl<T: 'static> PartialEq for StaticRef<T> {
+impl<'a, T: 'a> PartialEq for Ref<'a, T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 as *const T as usize == other.0 as *const T as usize
     }
 }
 
-impl<T: 'static> Hash for StaticRef<T> {
+impl<'a, T: 'a> Hash for Ref<'a, T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         (self.0 as *const T as usize).hash(state)
     }

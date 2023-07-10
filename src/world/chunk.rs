@@ -120,7 +120,7 @@ pub mod palette {
     /// While the objects palettes handle are already represented by integer
     /// IDs, shrinking IDs in cases where only a few appear can further reduce
     /// storage space and network traffic volume.
-    pub struct Palette<T>();
+    pub struct Palette<T>(imp::Palette<T>);
 
     /// Listan for palette that requires more bits to hold a newly indexed
     /// object. A no-op listener may be used if the palette does not have to
@@ -135,7 +135,9 @@ pub mod palette {
         fn on_resize(&self, new_bits: u32, object: &T) -> u32;
     }
 
-    mod inner {
-        pub enum PaletteInner
+    mod imp {
+        pub enum Palette<T> {
+            Singular { entry: T },
+        }
     }
 }
