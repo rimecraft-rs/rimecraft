@@ -112,32 +112,3 @@ impl UpgradeData {
         }
     }
 }
-
-pub mod palette {
-    /// A palette maps objects from and to small integer IDs that uses less
-    /// number of bits to make storage smaller.
-    ///
-    /// While the objects palettes handle are already represented by integer
-    /// IDs, shrinking IDs in cases where only a few appear can further reduce
-    /// storage space and network traffic volume.
-    pub struct Palette<T>(imp::Palette<T>);
-
-    /// Listan for palette that requires more bits to hold a newly indexed
-    /// object. A no-op listener may be used if the palette does not have to
-    /// resize.
-    pub trait ResizeListen<T> {
-        /// Callback for a palette's request to resize to at least `new_bits`
-        /// for each entry and to update the storage correspondingly in order to
-        /// accommodate the new object. After the resize is completed in this method,
-        /// returns the ID assigned to the `object` in the updated palette.
-        ///
-        /// Return the ID for the `object` in the (possibly new) palette.
-        fn on_resize(&self, new_bits: u32, object: &T) -> u32;
-    }
-
-    mod imp {
-        pub enum Palette<T> {
-            Singular { entry: T },
-        }
-    }
-}

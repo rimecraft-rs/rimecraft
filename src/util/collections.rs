@@ -1,5 +1,7 @@
 use std::hash::Hash;
 
+pub const DEFAULT_INDEXED_INDEX: i32 = -1;
+
 /// An extended version of [`std::ops::Index`].
 pub trait Indexed<T> {
     fn get_raw_id(&self, value: &T) -> Option<usize>;

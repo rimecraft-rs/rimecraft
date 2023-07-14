@@ -1,4 +1,5 @@
 pub mod chunk;
+pub mod palette;
 pub mod tick;
 
 use crate::prelude::*;
