@@ -88,7 +88,7 @@ impl<T: Hash + PartialEq + Eq + Clone> std::ops::Index<usize> for IdList<T> {
 }
 
 #[derive(Clone)]
-pub struct PackedIntArray {
+pub struct PackedArray {
     data: Vec<u64>,
     element_bits: usize,
     elements_per_long: usize,
@@ -99,7 +99,7 @@ pub struct PackedIntArray {
     max_value: u64,
 }
 
-impl PackedIntArray {
+impl PackedArray {
     /// Magic constants for faster integer division by a constant.
     const INDEX_PARAMS: [i32; 192] = [
         -1,
@@ -434,6 +434,7 @@ impl PackedIntArray {
         self.element_bits
     }
 
+    /// Executes an `action` on all values in this storage, sequentially.
     pub fn for_each<F>(&self, action: F)
     where
         F: Fn(u64),
@@ -451,6 +452,32 @@ impl PackedIntArray {
                 if i >= self.len {
                     return;
                 }
+            }
+        }
+    }
+
+    pub fn write_palette_indices(&self, out: &mut [i32]) {
+        let i = self.data.len();
+        let mut j = 0;
+
+        for k in 0..i - 1 {
+            let mut l = self.data[k];
+
+            for m in 0..self.elements_per_long {
+                out[j + m] = (l & self.max_value) as i32;
+                l >>= self.element_bits;
+            }
+
+            j += self.elements_per_long;
+        }
+
+        if self.len > j {
+            let k = self.len - j;
+            let mut l = self.data[i - 1];
+
+            for m in 0..k {
+                out[j + m] = (l & self.max_value) as i32;
+                l >>= self.element_bits;
             }
         }
     }
