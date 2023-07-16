@@ -443,9 +443,47 @@ impl Provider {
     }
 }
 
+/// A paletted container stores objects in 3D voxels as small integer indices,
+/// governed by "palettes" that map between these objects and indices.
 pub struct Container<'a, T: 'a + PartialEq + Eq>(parking_lot::RwLock<ContainerInner<'a, T>>);
 
 impl<'a, T: 'a + PartialEq + Eq> Container<'a, T> {
+    pub fn new(
+        ids: &'a (dyn crate::collections::Indexed<T> + Send + Sync),
+        provider: Provider,
+        variant: Variant,
+        bits: usize,
+        storage: Storage,
+        entries: Vec<&'a T>,
+    ) -> Self {
+        Self(parking_lot::RwLock::new(ContainerInner {
+            ids: crate::Ref(ids),
+            data: Some(Data(
+                DataProvider(variant, bits),
+                storage,
+                variant.create(bits, ids, entries),
+            )),
+            provider,
+        }))
+    }
+
+    pub fn from_initialize(
+        ids: &'a (dyn crate::collections::Indexed<T> + Send + Sync),
+        object: &'a T,
+        provider: Provider,
+    ) -> Self {
+        let mut this = ContainerInner {
+            ids: crate::Ref(ids),
+            data: None,
+            provider,
+        };
+
+        this.data = Some(this.get_compatible_data(None, 0));
+        this.data.as_mut().unwrap().2.index_or_insert(object);
+
+        Self(parking_lot::RwLock::new(this))
+    }
+
     pub fn swap(&self, pos: (i32, i32, i32), value: &'a T) -> &'a T {
         let _this = self.0.write();
         unsafe { self.swap_unchecked(pos, value) }
