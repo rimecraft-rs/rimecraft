@@ -1,3 +1,4 @@
+pub mod biome;
 pub mod chunk;
 pub mod palette;
 pub mod tick;
@@ -39,14 +40,14 @@ pub trait HeightLimitView {
 /// fluid states and block entities.
 pub trait BlockView: HeightLimitView {
     /// Default max light level in Rimecraft.
-    const DEF_MAX_LIGHT_LEVEL: u8 = 15;
+    const DEFAULT_MAX_LIGHT_LEVEL: u8 = 15;
 
     /// The block state at the target `pos`.
     fn block_state(&self, pos: BlockPos) -> &crate::block::BlockState;
 
     /// The max light level of this view.
     fn max_light_level() -> u8 {
-        Self::DEF_MAX_LIGHT_LEVEL
+        Self::DEFAULT_MAX_LIGHT_LEVEL
     }
 }
 

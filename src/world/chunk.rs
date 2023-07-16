@@ -1,8 +1,8 @@
-use std::{ops::Deref, sync::atomic::AtomicU16};
+use std::{ops::Deref, sync::atomic};
 
-use crate::{prelude::*, util::math::ChunkPos};
+use crate::{block, prelude::*, util::math::ChunkPos};
 
-use super::HeightLimitView;
+use super::{palette, HeightLimitView};
 
 pub struct RawChunk<W: HeightLimitView> {
     pub pos: ChunkPos,
@@ -13,9 +13,10 @@ pub struct RawChunk<W: HeightLimitView> {
 impl<W: HeightLimitView> RawChunk<W> {}
 
 pub struct ChunkSection {
-    non_empty_block_count: AtomicU16,
-    random_tickable_block_count: AtomicU16,
-    non_empty_fluid_count: AtomicU16,
+    non_empty_block_count: atomic::AtomicU16,
+    random_tickable_block_count: atomic::AtomicU16,
+    non_empty_fluid_count: atomic::AtomicU16,
+    bs_container: palette::Container<'static, block::SharedBlockState>,
 }
 
 pub struct UpgradeData {
@@ -30,7 +31,7 @@ impl UpgradeData {
     const INDICES_KEY: &str = "Indices";
 
     pub fn new(nbt: &crate::nbt::NbtCompound, world: &impl HeightLimitView) -> Self {
-        let mut s = Self {
+        let mut this = Self {
             sides_to_upgrade: Vec::new(),
             block_ticks: Vec::new(),
             fluid_ticks: Vec::new(),
@@ -38,9 +39,9 @@ impl UpgradeData {
         };
 
         if let Some(compound) = nbt.get_compound(Self::INDICES_KEY) {
-            for i in 0..s.center_indices_to_upgrade.0 {
+            for i in 0..this.center_indices_to_upgrade.0 {
                 let string = i.to_string();
-                s.center_indices_to_upgrade.1.push(
+                this.center_indices_to_upgrade.1.push(
                     if let Some(slice) = compound.get_i32_slice(&string) {
                         slice.to_vec()
                     } else {
@@ -54,7 +55,7 @@ impl UpgradeData {
 
         for ewd in crate::util::math::EightWayDirection::values() {
             if (j & 1 << ewd as u8) != 0 {
-                s.sides_to_upgrade.push(ewd);
+                this.sides_to_upgrade.push(ewd);
             }
         }
 
@@ -69,7 +70,7 @@ impl UpgradeData {
                         .unwrap_or_default(),
                 )
             },
-            &mut s.block_ticks,
+            &mut this.block_ticks,
         );
 
         Self::add_neighbor_ticks(
@@ -83,10 +84,10 @@ impl UpgradeData {
                         .unwrap_or_default(),
                 )
             },
-            &mut s.fluid_ticks,
+            &mut this.fluid_ticks,
         );
 
-        s
+        this
     }
 
     fn add_neighbor_ticks<T, F>(
