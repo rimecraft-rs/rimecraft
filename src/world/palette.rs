@@ -6,21 +6,30 @@ use crate::network::{Decode, Encode};
 /// While the objects palettes handle are already represented by integer
 /// IDs, shrinking IDs in cases where only a few appear can further reduce
 /// storage space and network traffic volume.
-pub struct Palette<'a, T: 'a> {
+pub struct Palette<'a, T: 'a + PartialEq + Eq> {
     ids: crate::Ref<'a, dyn crate::collections::Indexed<T> + Send + Sync>,
     inner: Inner<'a, T>,
 }
 
-impl<'a, T: 'a> Palette<'a, T> {
+impl<'a, T: 'a + PartialEq + Eq> Palette<'a, T> {
     /// Returns the ID of an object in this palette.
     pub fn index(&self, value: &T) -> Option<usize> {
         match &self.inner {
             Inner::Vector(vec) => vec.iter().position(|option| {
                 option.map_or(false, |e| {
-                    e.0 as *const T as usize == value as *const T as usize
+                    e.0 as *const T as usize == value as *const T as usize || e.0 == value
                 })
             }),
             Inner::Indexed(ids) => ids.get_raw_id(value),
+            Inner::Singular(option) => option
+                .map(|e| {
+                    if e.0 as *const T as usize == value as *const T as usize || e.0 == value {
+                        Some(0)
+                    } else {
+                        None
+                    }
+                })
+                .flatten(),
         }
     }
 
@@ -36,6 +45,10 @@ impl<'a, T: 'a> Palette<'a, T> {
                 vec.len() - 1
             }
             Inner::Indexed(_) => 0,
+            Inner::Singular(option) => {
+                *option = Some(crate::Ref(value));
+                0
+            }
         })
     }
 
@@ -47,6 +60,9 @@ impl<'a, T: 'a> Palette<'a, T> {
         match &self.inner {
             Inner::Vector(vec) => vec.iter().any(|e| e.map_or(false, |ee| predicate(ee.0))),
             Inner::Indexed(_) => true,
+            Inner::Singular(option) => {
+                predicate(option.as_ref().expect("use of an uninitialized palette").0)
+            }
         }
     }
 
@@ -55,6 +71,13 @@ impl<'a, T: 'a> Palette<'a, T> {
         match &self.inner {
             Inner::Vector(vec) => vec.get(index).map(|e| e.map(|ee| ee.0)).flatten(),
             Inner::Indexed(ids) => ids.0.get(index),
+            Inner::Singular(option) => {
+                if let (Some(e), 0) = (option, index) {
+                    Some(e.0)
+                } else {
+                    panic!("missing palette entry for id {index}")
+                }
+            }
         }
     }
 
@@ -78,6 +101,16 @@ impl<'a, T: 'a> Palette<'a, T> {
                 }
             }
             Inner::Indexed(_) => (),
+            Inner::Singular(option) => {
+                *option = Some(crate::Ref(
+                    self.ids
+                        .0
+                        .get(crate::VarInt::decode(buf)? as usize)
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("raw id not found in the target id list.")
+                        })?,
+                ));
+            }
         }
 
         Ok(())
@@ -109,6 +142,19 @@ impl<'a, T: 'a> Palette<'a, T> {
                 }
             }
             Inner::Indexed(_) => (),
+            Inner::Singular(option) => {
+                if let Some(entry) = option {
+                    crate::VarInt(
+                        self.ids
+                            .get_raw_id(&entry)
+                            .map(|e| e as i32)
+                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
+                    )
+                    .encode(buf)?;
+                } else {
+                    panic!("use of an uninitialized palette");
+                }
+            }
         }
 
         Ok(())
@@ -137,6 +183,19 @@ impl<'a, T: 'a> Palette<'a, T> {
                 i
             }
             Inner::Indexed(_) => crate::VarInt(0).len(),
+            Inner::Singular(option) => {
+                if let Some(entry) = option {
+                    crate::VarInt(
+                        self.ids
+                            .get_raw_id(&entry)
+                            .map(|e| e as i32)
+                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
+                    )
+                    .len()
+                } else {
+                    panic!("use of an uninitialized palette");
+                }
+            }
         }
     }
 
@@ -145,11 +204,12 @@ impl<'a, T: 'a> Palette<'a, T> {
         match &self.inner {
             Inner::Vector(vec) => vec.len(),
             Inner::Indexed(ids) => ids.len(),
+            Inner::Singular(_) => 1,
         }
     }
 }
 
-impl<'a, T: 'a> Encode for Palette<'a, T> {
+impl<'a, T: 'a + PartialEq + Eq> Encode for Palette<'a, T> {
     fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
@@ -158,7 +218,7 @@ impl<'a, T: 'a> Encode for Palette<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Clone for Palette<'a, T> {
+impl<'a, T: 'a + PartialEq + Eq> Clone for Palette<'a, T> {
     fn clone(&self) -> Self {
         Self {
             ids: self.ids,
@@ -196,7 +256,10 @@ impl Variant {
         bits: usize,
         ids: &'a (dyn crate::collections::Indexed<A> + Send + Sync),
         entries: Vec<&'a A>,
-    ) -> Palette<'a, A> {
+    ) -> Palette<'a, A>
+    where
+        A: 'a + PartialEq + Eq,
+    {
         match self {
             Variant::Indexed => Palette {
                 ids: crate::Ref(ids),
@@ -314,9 +377,11 @@ impl Storage {
     }
 }
 
-struct Data<'a, T: 'a>(DataProvider, Storage, Palette<'a, T>);
+struct Data<'a, T: 'a>(DataProvider, Storage, Palette<'a, T>)
+where
+    T: PartialEq + Eq;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 struct DataProvider(Variant, usize);
 
 impl DataProvider {
@@ -324,7 +389,10 @@ impl DataProvider {
         self,
         ids: &'a (dyn crate::collections::Indexed<T> + Send + Sync),
         len: usize,
-    ) -> Data<'a, T> {
+    ) -> Data<'a, T>
+    where
+        T: 'a + PartialEq + Eq,
+    {
         Data(
             self,
             if self.1 == 0 {
@@ -349,15 +417,139 @@ impl Provider {
         }
     }
 
-    fn create_provider<A, I>(self, ids: &I, bits: usize) -> DataProvider
-    where
-        I: crate::collections::Indexed<A>,
-    {
+    fn create_provider<A>(
+        self,
+        ids: &(dyn crate::collections::Indexed<A>),
+        bits: usize,
+    ) -> DataProvider {
         match self {
             Provider::BlockState => match bits {
-                0 => DataProvider(todo!(), bits),
-                _ => todo!(),
+                0 => DataProvider(Variant::Singular, bits),
+                1 | 2 | 3 => DataProvider(Variant::Vector, bits),
+                _ => DataProvider(
+                    Variant::Indexed,
+                    crate::math::impl_helper::ceil_log_2(ids.len() as i32) as usize,
+                ),
             },
         }
+    }
+
+    pub fn compute_index(self, x: i32, y: i32, z: i32) -> usize {
+        ((y << self.edge_bits() | z) << self.edge_bits() | x) as usize
+    }
+
+    pub fn container_size(self) -> usize {
+        1 << self.edge_bits() * 3
+    }
+}
+
+pub struct Container<'a, T: 'a + PartialEq + Eq>(parking_lot::RwLock<ContainerInner<'a, T>>);
+
+impl<'a, T: 'a + PartialEq + Eq> Container<'a, T> {
+    pub fn swap(&self, pos: (i32, i32, i32), value: &'a T) -> &'a T {
+        let _this = self.0.write();
+        unsafe { self.swap_unchecked(pos, value) }
+    }
+
+    pub unsafe fn swap_unchecked(&self, (x, y, z): (i32, i32, i32), value: &'a T) -> &'a T {
+        let this = self.0.data_ptr().as_mut().unwrap();
+        let data = this.data.as_mut().unwrap();
+
+        let i = data.2.index_or_insert(value);
+        let j = data.1.swap(this.provider.compute_index(x, y, z), i as u64);
+
+        data.2.get(j as usize).unwrap()
+    }
+
+    pub fn set(&self, (x, y, z): (i32, i32, i32), value: &'a T) {
+        let mut this = self.0.write();
+
+        let index = this.provider.compute_index(x, y, z);
+        let data = this.data.as_mut().unwrap();
+        let i = data.2.index_or_insert(value);
+
+        data.1.set(index, i as u64);
+    }
+
+    pub fn get(&self, (x, y, z): (i32, i32, i32)) -> Option<&'a T> {
+        let this = self.0.read();
+        let data = this.data.as_ref().unwrap();
+
+        let index = this.provider.compute_index(x, y, z);
+        data.2.get(data.1.get(index) as usize)
+    }
+
+    pub fn for_each<F>(&self, action: F)
+    where
+        F: Fn(&'a T),
+    {
+        let this = self.0.read();
+        let data = this.data.as_ref().unwrap();
+
+        let mut vec = Vec::new();
+        let ptr = &mut vec as *mut Vec<u64>;
+
+        data.1.for_each(|value| {
+            let v = unsafe { ptr.as_mut().unwrap() };
+
+            if !v.contains(&value) {
+                v.push(value);
+            }
+        });
+
+        vec.into_iter()
+            .for_each(|id| action(data.2.get(id as usize).unwrap()))
+    }
+
+    pub fn read_buf<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::Buf,
+    {
+        let mut this = self.0.write();
+
+        let i = buf.get_u8();
+        let taken_data = this.data.take();
+        let mut data = this.get_compatible_data(taken_data, i as usize);
+
+        data.2.read_buf(buf)?;
+
+        this.data = Some(data);
+
+        Ok(())
+    }
+
+    pub fn write_buf<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::BufMut,
+    {
+        let data_r = self.0.read();
+        let data_r1 = data_r.data.as_ref();
+        let data = data_r1.unwrap();
+
+        buf.put_u8(data.1.element_bits() as u8);
+        data.2.write_buf(buf)?;
+        data.1.data().encode(buf)?;
+
+        Ok(())
+    }
+}
+
+struct ContainerInner<'a, T: 'a + PartialEq + Eq> {
+    ids: crate::Ref<'a, dyn crate::collections::Indexed<T> + Send + Sync>,
+    data: Option<Data<'a, T>>,
+    provider: Provider,
+}
+
+impl<'a, T: 'a + PartialEq + Eq> ContainerInner<'a, T> {
+    fn get_compatible_data(&self, previous: Option<Data<'a, T>>, bits: usize) -> Data<'a, T> {
+        let data_provider = self.provider.create_provider(self.ids.0, bits);
+
+        if let Some(data) = previous {
+            if data_provider == data.0 {
+                return data;
+            }
+        }
+
+        data_provider.create_data(self.ids.0, self.provider.container_size())
     }
 }
