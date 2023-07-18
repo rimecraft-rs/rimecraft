@@ -8,13 +8,13 @@ use crate::prelude::*;
 pub use registries::*;
 
 /// Represents a registration and its id and tags.
-pub struct Holder<T> {
+pub struct Entry<T> {
     key: RegistryKey<T>,
     pub tags: parking_lot::RwLock<Vec<tag::TagKey<T>>>,
     value: T,
 }
 
-impl<T> Holder<T> {
+impl<T> Entry<T> {
     pub fn key(&self) -> &RegistryKey<T> {
         &self.key
     }
@@ -25,7 +25,7 @@ impl<T> Holder<T> {
     }
 }
 
-impl<T> Deref for Holder<T> {
+impl<T> Deref for Entry<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -38,7 +38,7 @@ impl<T> Deref for Holder<T> {
 /// You're not able to create a registry directly, use a [`Builder`] instead.
 pub struct Registry<T> {
     default: Option<usize>,
-    entries: Vec<Holder<T>>,
+    entries: Vec<Entry<T>>,
     id_map: hashbrown::HashMap<Identifier, usize>,
     /// Key of this registry.
     pub key: RegistryKey<Self>,
@@ -64,7 +64,7 @@ impl<T> Registry<T> {
     ///
     /// Panic if a default entry don't exist.
     /// See [`Self::is_defaulted`].
-    pub fn default_entry(&self) -> (usize, &Holder<T>) {
+    pub fn default_entry(&self) -> (usize, &Entry<T>) {
         let def = self
             .default
             .expect("trying to get a default entry that don't exist");
@@ -72,21 +72,21 @@ impl<T> Registry<T> {
     }
 
     /// Get an entry from a [`RegistryKey`].
-    pub fn get_from_key(&self, key: &RegistryKey<T>) -> Option<(usize, &Holder<T>)> {
+    pub fn get_from_key(&self, key: &RegistryKey<T>) -> Option<(usize, &Entry<T>)> {
         self.key_map
             .get(key)
             .map(|e| (*e, self.entries.get(*e).unwrap()))
     }
 
     /// Get an entry from an [`Identifier`].
-    pub fn get_from_id(&self, id: &Identifier) -> Option<(usize, &Holder<T>)> {
+    pub fn get_from_id(&self, id: &Identifier) -> Option<(usize, &Entry<T>)> {
         self.id_map
             .get(id)
             .map(|e| (*e, self.entries.get(*e).unwrap()))
     }
 
     /// Get an entry from its raw id.
-    pub fn get_from_raw(&self, raw_id: usize) -> Option<&Holder<T>> {
+    pub fn get_from_raw(&self, raw_id: usize) -> Option<&Entry<T>> {
         self.entries.get(raw_id)
     }
 
@@ -96,7 +96,7 @@ impl<T> Registry<T> {
     }
 
     /// Returns an iterator over the slice of entries.
-    pub fn iter(&self) -> std::slice::Iter<'_, Holder<T>> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Entry<T>> {
         self.entries.iter()
     }
 }
@@ -127,16 +127,16 @@ impl<T: PartialEq + Eq> crate::util::collections::Indexed<T> for Registry<T> {
     }
 }
 
-impl<T: PartialEq + Eq> crate::util::collections::Indexed<Holder<T>> for Registry<T> {
-    fn get_raw_id(&self, value: &Holder<T>) -> Option<usize> {
+impl<T: PartialEq + Eq> crate::util::collections::Indexed<Entry<T>> for Registry<T> {
+    fn get_raw_id(&self, value: &Entry<T>) -> Option<usize> {
         self.entries
             .iter()
             .enumerate()
-            .find(|e| e.1 as *const Holder<T> as usize == value as *const Holder<T> as usize)
+            .find(|e| e.1 as *const Entry<T> as usize == value as *const Entry<T> as usize)
             .map(|e| e.0)
     }
 
-    fn get(&self, index: usize) -> Option<&Holder<T>> {
+    fn get(&self, index: usize) -> Option<&Entry<T>> {
         self.get_from_raw(index)
     }
 
@@ -178,7 +178,7 @@ impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
             .enumerate()
             .map(|mut e| {
                 e.1 .0.accept(e.0);
-                Holder {
+                Entry {
                     value: e.1 .0,
                     key: RegistryKey::new(&opts.0, e.1 .1.clone()),
                     tags: parking_lot::RwLock::new(Vec::new()),

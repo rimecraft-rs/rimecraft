@@ -1,18 +1,18 @@
 use crate::registry::Registration;
 
-/// Vanilla item events for perform item actions and obtain item settings.
-pub static EVENTS: parking_lot::RwLock<VanillaItemEvents> =
-    parking_lot::RwLock::new(VanillaItemEvents(vec![]));
+/// Core item events for perform item actions and obtain item settings.
+pub static EVENTS: parking_lot::RwLock<CoreItemEvents> =
+    parking_lot::RwLock::new(CoreItemEvents(vec![]));
 
 /// Manager for item events.
-pub struct VanillaItemEvents(Vec<(Option<usize>, VanillaItemCallback)>);
+pub struct CoreItemEvents(Vec<(Option<usize>, CoreItemCallback)>);
 
-impl VanillaItemEvents {
+impl CoreItemEvents {
     /// Register a callback into this instance.
     ///
     /// The required `item` can be `None` for some events
     /// so that all items will be affected by this callback.
-    pub fn register(&mut self, item: Option<super::Item>, callback: VanillaItemCallback) {
+    pub fn register(&mut self, item: Option<super::Item>, callback: CoreItemCallback) {
         self.0.push((item.map(|e| e.raw_id()), callback));
     }
 
@@ -21,11 +21,10 @@ impl VanillaItemEvents {
         self.0
             .iter()
             .find(|e| {
-                e.0.map_or(false, |ee| ee == id)
-                    && matches!(e.1, VanillaItemCallback::GetMaxDamage(_))
+                e.0.map_or(false, |ee| ee == id) && matches!(e.1, CoreItemCallback::GetMaxDamage(_))
             })
             .map_or(0, |e| match &e.1 {
-                VanillaItemCallback::GetMaxDamage(c) => c(stack),
+                CoreItemCallback::GetMaxDamage(c) => c(stack),
                 _ => unreachable!(),
             })
     }
@@ -35,11 +34,10 @@ impl VanillaItemEvents {
         self.0
             .iter()
             .find(|e| {
-                e.0.map_or(false, |ee| ee == id)
-                    && matches!(e.1, VanillaItemCallback::GetMaxCount(_))
+                e.0.map_or(false, |ee| ee == id) && matches!(e.1, CoreItemCallback::GetMaxCount(_))
             })
             .map_or(64, |e| match &e.1 {
-                VanillaItemCallback::GetMaxCount(c) => c(stack),
+                CoreItemCallback::GetMaxCount(c) => c(stack),
                 _ => unreachable!(),
             })
     }
@@ -50,18 +48,18 @@ impl VanillaItemEvents {
             .iter()
             .filter(|e| {
                 e.0.map_or(true, |ee| ee == id)
-                    && matches!(e.1, VanillaItemCallback::PostProcessNbt(_))
+                    && matches!(e.1, CoreItemCallback::PostProcessNbt(_))
             })
             .for_each(|e| match &e.1 {
-                VanillaItemCallback::PostProcessNbt(c) => c(nbt),
+                CoreItemCallback::PostProcessNbt(c) => c(nbt),
                 _ => unreachable!(),
             })
     }
 }
 
 /// An item event callback variant.
-pub enum VanillaItemCallback {
-    GetMaxCount(Box<dyn Fn(&super::ItemStack) -> u8 + 'static + Send + Sync>),
-    GetMaxDamage(Box<dyn Fn(&super::ItemStack) -> u32 + 'static + Send + Sync>),
-    PostProcessNbt(Box<dyn Fn(&mut crate::nbt::NbtCompound) + 'static + Send + Sync>),
+pub enum CoreItemCallback {
+    GetMaxCount(fn(&super::ItemStack) -> u8),
+    GetMaxDamage(fn(&super::ItemStack) -> u32),
+    PostProcessNbt(fn(&mut crate::nbt::NbtCompound)),
 }

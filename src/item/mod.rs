@@ -104,7 +104,7 @@ pub trait AsItem {
     fn as_item(&self) -> Item;
 }
 
-impl AsItem for crate::registry::Holder<Item> {
+impl AsItem for crate::registry::Entry<Item> {
     /// Convert this object into an item.
     fn as_item(&self) -> Item {
         *self.deref().deref()
@@ -185,7 +185,7 @@ impl ItemStack {
     }
 
     /// Whether the target item holder matches the provided predicate.
-    pub fn matches<F: Fn(&crate::registry::Holder<Item>) -> bool>(&self, f: F) -> bool {
+    pub fn matches<F: Fn(&crate::registry::Entry<Item>) -> bool>(&self, f: F) -> bool {
         f(crate::registry::ITEM
             .get_from_raw(self.item.raw_id())
             .unwrap())

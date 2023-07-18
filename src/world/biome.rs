@@ -12,3 +12,6 @@ pub struct Weather {
 }
 
 pub type TemperatureModifier = (&'static str, fn(BlockPos, f32) -> f32);
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Shared<'w>(pub crate::Ref<'w, crate::registry::Entry<Biome>>);

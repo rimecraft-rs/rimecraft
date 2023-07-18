@@ -1,22 +1,145 @@
 use std::{ops::Deref, sync::atomic};
 
-use crate::{block, prelude::*, util::math::ChunkPos};
+use crate::{block, fluid, prelude::*, util::math::ChunkPos};
 
-use super::{palette, HeightLimitView};
+use super::{biome, palette};
 
-pub struct RawChunk<W: HeightLimitView> {
-    pub pos: ChunkPos,
-    pub height_limit_view: std::sync::Arc<W>,
-    pub upgrade_data: UpgradeData,
+pub trait Chunk<'w>: super::BlockView + super::LightSourceView {
+    fn pos(&self) -> ChunkPos;
+    fn sections(&self) -> &[Section];
+
+    fn set_block_state(&self, pos: BlockPos, state: block::SharedBlockState, moved: bool);
 }
 
-impl<W: HeightLimitView> RawChunk<W> {}
+pub struct Section<'w> {
+    pub biome_container: palette::Container<'w, biome::Shared<'w>>,
+    pub block_state_container: palette::Container<'static, block::SharedBlockState>,
 
-pub struct ChunkSection {
+    lock: parking_lot::Mutex<()>,
+
     non_empty_block_count: atomic::AtomicU16,
-    random_tickable_block_count: atomic::AtomicU16,
     non_empty_fluid_count: atomic::AtomicU16,
-    bs_container: palette::Container<'static, block::SharedBlockState>,
+    random_tickable_block_count: atomic::AtomicU16,
+}
+
+impl<'w> Section<'w> {
+    pub fn get_block_state(&self, x: i32, y: i32, z: i32) -> Option<block::SharedBlockState> {
+        self.block_state_container.get((x, y, z))
+    }
+
+    pub fn set_block_state(
+        &self,
+        pos: (i32, i32, i32),
+        state: block::SharedBlockState,
+    ) -> block::SharedBlockState {
+        let _lock = self.lock.lock();
+        unsafe { self.set_block_state_unchecked(pos, state) }
+    }
+
+    pub unsafe fn set_block_state_unchecked(
+        &self,
+        pos: (i32, i32, i32),
+        state: block::SharedBlockState,
+    ) -> block::SharedBlockState {
+        let bs = unsafe { self.block_state_container.swap_unchecked(pos, state) };
+        let fs = bs.fluid_state();
+        let fs2 = state.fluid_state();
+
+        if !block::EVENTS.read().is_air(bs.deref()) {
+            let nebc = self.non_empty_block_count.load(atomic::Ordering::Acquire);
+            self.non_empty_block_count
+                .store(nebc - 1, atomic::Ordering::Release);
+        }
+
+        if !fluid::EVENTS.read().is_empty(fs.deref()) {
+            let nefc = self.non_empty_fluid_count.load(atomic::Ordering::Acquire);
+            self.non_empty_fluid_count
+                .store(nefc - 1, atomic::Ordering::Release);
+        }
+
+        if !block::EVENTS.read().is_air(state.deref()) {
+            let nebc = self.non_empty_block_count.load(atomic::Ordering::Acquire);
+            self.non_empty_block_count
+                .store(nebc + 1, atomic::Ordering::Release);
+
+            if block::EVENTS.read().has_random_ticks(state.deref()) {
+                let rtbc = self
+                    .random_tickable_block_count
+                    .load(atomic::Ordering::Acquire);
+                self.random_tickable_block_count
+                    .store(rtbc + 1, atomic::Ordering::Release);
+            }
+        }
+
+        if !fluid::EVENTS.read().is_empty(fs2.deref()) {
+            let nefc = self.non_empty_fluid_count.load(atomic::Ordering::Acquire);
+            self.non_empty_fluid_count
+                .store(nefc + 1, atomic::Ordering::Release);
+        }
+
+        bs
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.non_empty_block_count.load(atomic::Ordering::Acquire) == 0
+    }
+
+    pub fn has_random_ticks(&self) -> bool {
+        self.has_random_block_ticks() || self.has_random_fluid_ticks()
+    }
+
+    pub fn has_random_block_ticks(&self) -> bool {
+        self.random_tickable_block_count
+            .load(atomic::Ordering::Acquire)
+            > 0
+    }
+
+    pub fn has_random_fluid_ticks(&self) -> bool {
+        self.non_empty_fluid_count.load(atomic::Ordering::Acquire) > 0
+    }
+
+    pub fn calculate_counts(&self) {
+        let mut counter = BlockStateCounter::default();
+        self.block_state_container.count(&mut counter);
+
+        self.non_empty_block_count
+            .store(counter.non_empty_block_count, atomic::Ordering::Release);
+        self.random_tickable_block_count.store(
+            counter.random_tickable_block_count,
+            atomic::Ordering::Release,
+        );
+        self.non_empty_fluid_count
+            .store(counter.non_empty_fluid_count, atomic::Ordering::Release);
+    }
+}
+
+#[derive(Default)]
+struct BlockStateCounter {
+    non_empty_block_count: u16,
+    non_empty_fluid_count: u16,
+    random_tickable_block_count: u16,
+}
+
+impl palette::ContainerCounter<block::SharedBlockState> for BlockStateCounter {
+    fn accept(&mut self, value: block::SharedBlockState, count: usize) {
+        let fs = value.fluid_state();
+
+        if !block::EVENTS.read().is_air(value.deref()) {
+            self.non_empty_block_count += count as u16;
+
+            if block::EVENTS.read().has_random_ticks(value.deref()) {
+                self.random_tickable_block_count += count as u16;
+            }
+        }
+
+        if !fluid::EVENTS.read().is_empty(fs.deref()) {
+            self.non_empty_block_count += count as u16;
+
+            if fluid::EVENTS.read().has_random_ticks(fs.deref()) {
+                self.non_empty_fluid_count += count as u16;
+            }
+        }
+    }
 }
 
 pub struct UpgradeData {

@@ -121,6 +121,7 @@ impl Hash for Block {
 pub struct BlockState {
     block: std::sync::atomic::AtomicUsize,
     state: crate::state::State,
+    fluid_state: once_cell::sync::OnceCell<crate::state::Shared<crate::fluid::FluidState>>,
 }
 
 impl BlockState {
@@ -131,6 +132,10 @@ impl BlockState {
             .unwrap()
             .deref()
     }
+
+    pub fn fluid_state(&self) -> crate::state::Shared<crate::fluid::FluidState> {
+        *self.fluid_state.get_or_init(|| todo!())
+    }
 }
 
 impl From<((), crate::state::State)> for BlockState {
@@ -138,6 +143,7 @@ impl From<((), crate::state::State)> for BlockState {
         Self {
             block: std::sync::atomic::AtomicUsize::new(0),
             state: value,
+            fluid_state: once_cell::sync::OnceCell::new(),
         }
     }
 }

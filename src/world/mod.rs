@@ -43,7 +43,7 @@ pub trait BlockView: HeightLimitView {
     const DEFAULT_MAX_LIGHT_LEVEL: u8 = 15;
 
     /// The block state at the target `pos`.
-    fn block_state(&self, pos: BlockPos) -> &crate::block::BlockState;
+    fn get_block_state(&self, pos: BlockPos) -> &crate::block::BlockState;
 
     /// The max light level of this view.
     fn max_light_level() -> u8 {

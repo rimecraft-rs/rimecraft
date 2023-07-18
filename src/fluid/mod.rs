@@ -1,9 +1,13 @@
+mod event;
+
 use std::{hash::Hash, ops::Deref};
 
 use crate::{
     prelude::*,
     registry::{Registration, RegistryAccess},
 };
+
+pub use event::*;
 
 /// Represents a type of fluid.
 #[derive(Clone)]
