@@ -1,19 +1,18 @@
 use crate::registry::Registration;
 
 /// Core fluid events for perform fluid actions and obtain fluid settings.
-pub static EVENTS: parking_lot::RwLock<CoreFluidEvents> =
-    parking_lot::RwLock::new(CoreFluidEvents(Vec::new()));
+pub static EVENTS: parking_lot::RwLock<Events> = parking_lot::RwLock::new(Events(Vec::new()));
 
 /// Manager for fluid events.
-pub struct CoreFluidEvents(Vec<(Option<usize>, CoreFluidCallback)>);
+pub struct Events(Vec<(Option<usize>, Callback)>);
 
-impl CoreFluidEvents {
+impl Events {
     /// Register a callback into this instance.
     ///
-    /// The required `item` can be `None` for some events
+    /// The required `fluid` can be `None` for some events
     /// so that all fluids will be affected by this callback.
-    pub fn register(&mut self, item: Option<super::Fluid>, callback: CoreFluidCallback) {
-        self.0.push((item.map(|e| e.raw_id()), callback));
+    pub fn register(&mut self, fluid: Option<super::Fluid>, callback: Callback) {
+        self.0.push((fluid.map(|e| e.raw_id()), callback));
     }
 
     pub fn is_empty(&self, state: &super::FluidState) -> bool {
@@ -21,11 +20,9 @@ impl CoreFluidEvents {
 
         self.0
             .iter()
-            .find(|e| {
-                e.0.map_or(false, |ee| ee == id) && matches!(e.1, CoreFluidCallback::IsEmpty(_))
-            })
+            .find(|e| e.0.map_or(false, |ee| ee == id) && matches!(e.1, Callback::IsEmpty(_)))
             .map_or(false, |e| match &e.1 {
-                CoreFluidCallback::IsEmpty(c) => c(state),
+                Callback::IsEmpty(c) => c(state),
                 _ => unreachable!(),
             })
     }
@@ -36,18 +33,17 @@ impl CoreFluidEvents {
         self.0
             .iter()
             .find(|e| {
-                e.0.map_or(false, |ee| ee == id)
-                    && matches!(e.1, CoreFluidCallback::HasRandomTicks(_))
+                e.0.map_or(false, |ee| ee == id) && matches!(e.1, Callback::HasRandomTicks(_))
             })
             .map_or(false, |e| match &e.1 {
-                CoreFluidCallback::HasRandomTicks(c) => c(state),
+                Callback::HasRandomTicks(c) => c(state),
                 _ => unreachable!(),
             })
     }
 }
 
-/// An block event callback variant.
-pub enum CoreFluidCallback {
+/// An fluid event callback variant.
+pub enum Callback {
     IsEmpty(fn(&super::FluidState) -> bool),
     HasRandomTicks(fn(&super::FluidState) -> bool),
 }

@@ -398,12 +398,14 @@ impl DataProvider {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Provider {
     BlockState,
+    Biome,
 }
 
 impl Provider {
     fn edge_bits(self) -> usize {
         match self {
             Provider::BlockState => 4,
+            Provider::Biome => 2,
         }
     }
 
@@ -414,6 +416,15 @@ impl Provider {
     ) -> DataProvider {
         match self {
             Provider::BlockState => match bits {
+                0 => DataProvider(Variant::Singular, bits),
+                1 | 2 | 3 | 4 => DataProvider(Variant::Vector, bits),
+                5 | 6 | 7 | 8 => unimplemented!("bimap"),
+                _ => DataProvider(
+                    Variant::Indexed,
+                    crate::math::impl_helper::ceil_log_2(ids.len() as i32) as usize,
+                ),
+            },
+            Provider::Biome => match bits {
                 0 => DataProvider(Variant::Singular, bits),
                 1 | 2 | 3 => DataProvider(Variant::Vector, bits),
                 _ => DataProvider(

@@ -1,18 +1,17 @@
 use crate::registry::Registration;
 
 /// Core block events for perform item actions and obtain block settings.
-pub static EVENTS: parking_lot::RwLock<CoreBlockEvents> =
-    parking_lot::RwLock::new(CoreBlockEvents(Vec::new()));
+pub static EVENTS: parking_lot::RwLock<Events> = parking_lot::RwLock::new(Events(Vec::new()));
 
 /// Manager for block events.
-pub struct CoreBlockEvents(Vec<(Option<usize>, CoreBlockCallback)>);
+pub struct Events(Vec<(Option<usize>, Callback)>);
 
-impl CoreBlockEvents {
+impl Events {
     /// Register a callback into this instance.
     ///
     /// The required `item` can be `None` for some events
     /// so that all items will be affected by this callback.
-    pub fn register(&mut self, item: Option<super::Block>, callback: CoreBlockCallback) {
+    pub fn register(&mut self, item: Option<super::Block>, callback: Callback) {
         self.0.push((item.map(|e| e.raw_id()), callback));
     }
 
@@ -22,13 +21,12 @@ impl CoreBlockEvents {
         self.0
             .iter()
             .find(|e| {
-                e.0.map_or(false, |ee| ee == id)
-                    && matches!(e.1, CoreBlockCallback::BlockStateItemMap(_))
+                e.0.map_or(false, |ee| ee == id) && matches!(e.1, Callback::BlockStateItemMap(_))
             })
             .map_or_else(
                 || crate::item::ItemStack::default(),
                 |e| match &e.1 {
-                    CoreBlockCallback::BlockStateItemMap(c) => c(state),
+                    Callback::BlockStateItemMap(c) => c(state),
                     _ => unreachable!(),
                 },
             )
@@ -39,11 +37,9 @@ impl CoreBlockEvents {
 
         self.0
             .iter()
-            .find(|e| {
-                e.0.map_or(false, |ee| ee == id) && matches!(e.1, CoreBlockCallback::IsAir(_))
-            })
+            .find(|e| e.0.map_or(false, |ee| ee == id) && matches!(e.1, Callback::IsAir(_)))
             .map_or(false, |e| match &e.1 {
-                CoreBlockCallback::IsAir(c) => c(state),
+                Callback::IsAir(c) => c(state),
                 _ => unreachable!(),
             })
     }
@@ -54,18 +50,17 @@ impl CoreBlockEvents {
         self.0
             .iter()
             .find(|e| {
-                e.0.map_or(false, |ee| ee == id)
-                    && matches!(e.1, CoreBlockCallback::HasRandomTicks(_))
+                e.0.map_or(false, |ee| ee == id) && matches!(e.1, Callback::HasRandomTicks(_))
             })
             .map_or(false, |e| match &e.1 {
-                CoreBlockCallback::HasRandomTicks(c) => c(state),
+                Callback::HasRandomTicks(c) => c(state),
                 _ => unreachable!(),
             })
     }
 }
 
 /// An block event callback variant.
-pub enum CoreBlockCallback {
+pub enum Callback {
     BlockStateItemMap(fn(&super::BlockState) -> crate::item::ItemStack),
     IsAir(fn(&super::BlockState) -> bool),
     HasRandomTicks(fn(&super::BlockState) -> bool),

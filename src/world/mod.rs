@@ -56,3 +56,25 @@ pub trait LightSourceView: BlockView {
     /// Perform for each light sources in this view.
     fn for_each_sources<T: Fn(BlockPos, &crate::block::BlockState)>(&self, f: T);
 }
+
+pub mod heightmap {
+    use super::*;
+
+    pub struct Heightmap {
+        predicate: fn(crate::block::SharedBlockState) -> bool,
+        storage: palette::Storage,
+    }
+
+    pub struct Type {
+        pub name: &'static str,
+        pub purpose: Purpose,
+        pub predicate: fn(crate::block::SharedBlockState) -> bool,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub enum Purpose {
+        Worldgen,
+        LiveWorld,
+        Client,
+    }
+}

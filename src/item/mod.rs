@@ -13,7 +13,7 @@ pub use event::*;
 #[derive(Clone, Copy)]
 pub struct Item {
     id: usize,
-    properties: ItemDescriptor,
+    properties: crate::Ref<'static, ItemDescriptor>,
 }
 
 /// Describes some basic properties of an item.
@@ -32,7 +32,7 @@ impl Item {
     pub fn new(descriptor: ItemDescriptor) -> Self {
         Self {
             id: 0,
-            properties: descriptor,
+            properties: descriptor.into(),
         }
     }
 

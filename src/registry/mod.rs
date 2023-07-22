@@ -99,6 +99,10 @@ impl<T> Registry<T> {
     pub fn iter(&self) -> std::slice::Iter<'_, Entry<T>> {
         self.entries.iter()
     }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
 }
 
 impl<T> std::ops::Index<usize> for Registry<T> {

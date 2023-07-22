@@ -1,4 +1,5 @@
 pub mod block;
+pub mod entity;
 pub mod fluid;
 pub mod item;
 /// Thin wrapper between Rimecraft modules

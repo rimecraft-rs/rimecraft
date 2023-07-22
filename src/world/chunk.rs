@@ -4,11 +4,53 @@ use crate::{block, fluid, prelude::*, util::math::ChunkPos};
 
 use super::{biome, palette};
 
-pub trait Chunk<'w>: super::BlockView + super::LightSourceView {
+pub trait Chunk<'w>: super::BlockView + super::LightSourceView + std::any::Any {
     fn pos(&self) -> ChunkPos;
-    fn sections(&self) -> &[Section];
 
-    fn set_block_state(&self, pos: BlockPos, state: block::SharedBlockState, moved: bool);
+    fn sections(&self) -> &[Option<Section>];
+    fn sections_mut(&self) -> &mut [Option<Section>];
+
+    fn heightmaps(
+        &self,
+    ) -> &[(
+        crate::Ref<'static, super::heightmap::Type>,
+        super::heightmap::Heightmap,
+    )];
+
+    fn heightmaps_mut(
+        &self,
+    ) -> &mut [(
+        crate::Ref<'static, super::heightmap::Type>,
+        super::heightmap::Heightmap,
+    )];
+
+    fn set_block_state(
+        &self,
+        pos: BlockPos,
+        state: block::SharedBlockState,
+        moved: bool,
+    ) -> Option<block::SharedBlockState>;
+
+    fn set_block_entity(&self, be: block::entity::BlockEntity);
+    fn remove_block_entity(&self, pos: BlockPos);
+}
+
+pub struct WorldChunk<'w> {
+    sections: Vec<Section<'w>>,
+    height_limit_view: *const dyn super::HeightLimitView,
+}
+
+mod chunk_imp {
+    pub fn fill_sections<'w>(
+        sections: &mut [Option<super::Section>],
+        registry: &'w super::biome::SharedRegistry,
+    ) {
+        for value in sections.iter_mut() {
+            if value.is_none() {
+                *value = Some(super::Section::from_biome_registry(registry))
+            }
+        }
+    }
 }
 
 pub struct Section<'w> {
@@ -23,6 +65,25 @@ pub struct Section<'w> {
 }
 
 impl<'w> Section<'w> {
+    pub fn from_biome_registry(biomes: &'w super::biome::SharedRegistry) -> Self {
+        Self {
+            block_state_container: palette::Container::from_initialize(
+                block::STATE_IDS.deref().deref(),
+                block::Block::default().default_state(),
+                palette::Provider::BlockState,
+            ),
+            biome_container: palette::Container::from_initialize(
+                biomes,
+                todo!(),
+                palette::Provider::Biome,
+            ),
+            lock: parking_lot::Mutex::new(()),
+            non_empty_block_count: atomic::AtomicU16::new(0),
+            non_empty_fluid_count: atomic::AtomicU16::new(0),
+            random_tickable_block_count: atomic::AtomicU16::new(0),
+        }
+    }
+
     pub fn get_block_state(&self, x: i32, y: i32, z: i32) -> Option<block::SharedBlockState> {
         self.block_state_container.get((x, y, z))
     }
@@ -153,7 +214,7 @@ pub struct UpgradeData {
 impl UpgradeData {
     const INDICES_KEY: &str = "Indices";
 
-    pub fn new(nbt: &crate::nbt::NbtCompound, world: &impl HeightLimitView) -> Self {
+    pub fn new(nbt: &crate::nbt::NbtCompound, world: &impl super::HeightLimitView) -> Self {
         let mut this = Self {
             sides_to_upgrade: Vec::new(),
             block_ticks: Vec::new(),

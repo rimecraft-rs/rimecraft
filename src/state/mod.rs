@@ -134,11 +134,11 @@ impl State {
 pub struct States<T: Deref<Target = State> + 'static> {
     def: usize,
     properties: hashbrown::HashMap<String, property::Property>,
-    states: Vec<crate::util::StaticRef<T>>,
+    states: Vec<crate::util::Ref<'static, T>>,
 }
 
 impl<T: Deref<Target = State> + 'static> States<T> {
-    pub fn states(&self) -> &[crate::util::Ref<T>] {
+    pub fn states(&self) -> &[crate::util::Ref<'static, T>] {
         &self.states
     }
 
@@ -158,12 +158,9 @@ impl<T: Deref<Target = State> + 'static> States<T> {
         self.properties.get(name)
     }
 
-    pub fn get_shared(
-        shared: crate::util::StaticRef<crate::state::States<T>>,
-        id: usize,
-    ) -> Shared<T> {
+    pub fn get_shared(shared: &'static crate::state::States<T>, id: usize) -> Shared<T> {
         Shared {
-            entries: shared,
+            entries: crate::Ref(shared),
             value: shared.states[id],
         }
     }
@@ -277,7 +274,7 @@ impl StatesBuilder {
         let name = property.name();
 
         {
-            let matcher = lazy_regex::regex!("^[a-z0-9_]+$");
+            let matcher = todo!();
             if matcher.is_match(name) {
                 return Err(anyhow::anyhow!("Invalidly named property: {name}"));
             }

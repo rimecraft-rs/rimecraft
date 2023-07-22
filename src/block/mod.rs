@@ -1,3 +1,4 @@
+pub mod entity;
 mod event;
 
 use std::{hash::Hash, ops::Deref};
@@ -9,18 +10,19 @@ use crate::{
 
 pub use event::*;
 
+use once_cell::sync::Lazy;
+
 //TODO: Build and freeze STATE_IDS
 
 /// An `ID <-> BlockState` list.
-pub static STATE_IDS: once_cell::sync::Lazy<
-    crate::util::Freezer<crate::collections::IdList<SharedBlockState>>,
-> = once_cell::sync::Lazy::new(|| crate::util::Freezer::new(crate::collections::IdList::new()));
+pub static STATE_IDS: Lazy<crate::util::Freezer<crate::collections::IdList<SharedBlockState>>> =
+    once_cell::sync::Lazy::new(|| crate::util::Freezer::new(crate::collections::IdList::new()));
 
 /// Represents a block.
 #[derive(Clone, Copy)]
 pub struct Block {
     id: usize,
-    pub states: crate::util::StaticRef<crate::state::States<BlockState>>,
+    pub states: crate::util::Ref<'static, crate::state::States<BlockState>>,
 }
 
 impl Block {
@@ -38,6 +40,13 @@ impl Block {
             }
             .into(),
         })
+    }
+
+    pub fn default_state(&self) -> SharedBlockState {
+        crate::state::Shared {
+            entries: self.states,
+            value: crate::Ref(self.states.0.default_state()),
+        }
     }
 }
 
