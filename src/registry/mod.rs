@@ -9,13 +9,13 @@ pub use registries::*;
 
 /// Represents a registration and its id and tags.
 pub struct Entry<T> {
-    key: RegistryKey<T>,
+    key: Key<T>,
     pub tags: parking_lot::RwLock<Vec<tag::TagKey<T>>>,
     value: T,
 }
 
 impl<T> Entry<T> {
-    pub fn key(&self) -> &RegistryKey<T> {
+    pub fn key(&self) -> &Key<T> {
         &self.key
     }
 
@@ -41,15 +41,15 @@ pub struct Registry<T> {
     entries: Vec<Entry<T>>,
     id_map: hashbrown::HashMap<Identifier, usize>,
     /// Key of this registry.
-    pub key: RegistryKey<Self>,
-    key_map: hashbrown::HashMap<RegistryKey<T>, usize>,
+    pub key: Key<Self>,
+    key_map: hashbrown::HashMap<Key<T>, usize>,
     /// Tag to entries mapping of this registry.
     pub tags: parking_lot::RwLock<hashbrown::HashMap<tag::TagKey<T>, Vec<usize>>>,
 }
 
 impl<T> Registry<T> {
     /// Whether this registry contains an entry with the target registry key.
-    pub fn contains_ket(&self, key: &RegistryKey<T>) -> bool {
+    pub fn contains_ket(&self, key: &Key<T>) -> bool {
         self.key_map.contains_key(key)
     }
 
@@ -72,7 +72,7 @@ impl<T> Registry<T> {
     }
 
     /// Get an entry from a [`RegistryKey`].
-    pub fn get_from_key(&self, key: &RegistryKey<T>) -> Option<(usize, &Entry<T>)> {
+    pub fn get_from_key(&self, key: &Key<T>) -> Option<(usize, &Entry<T>)> {
         self.key_map
             .get(key)
             .map(|e| (*e, self.entries.get(*e).unwrap()))
@@ -173,7 +173,7 @@ impl<T: Registration> Builder<T> {
 }
 
 impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
-    type Opts = (RegistryKey<Registry<T>>, Option<Identifier>);
+    type Opts = (Key<Registry<T>>, Option<Identifier>);
 
     fn build(self, opts: Self::Opts) -> Registry<T> {
         let entries = self
@@ -184,7 +184,7 @@ impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
                 e.1 .0.accept(e.0);
                 Entry {
                     value: e.1 .0,
-                    key: RegistryKey::new(&opts.0, e.1 .1.clone()),
+                    key: Key::new(&opts.0, e.1 .1.clone()),
                     tags: parking_lot::RwLock::new(Vec::new()),
                 }
             })
@@ -231,14 +231,14 @@ pub trait RegistryAccess: Sized {
 /// a root registry is available.
 ///
 /// This type is driven by [`std::sync::Arc`] so it's cheap to clone.
-pub struct RegistryKey<T> {
+pub struct Key<T> {
     _type: std::marker::PhantomData<T>,
     /// (reg, value)
     inner: std::sync::Arc<(Identifier, Identifier)>,
 }
 
-impl<T> RegistryKey<T> {
-    pub fn new(registry: &RegistryKey<Registry<T>>, value: Identifier) -> Self {
+impl<T> Key<T> {
+    pub fn new(registry: &Key<Registry<T>>, value: Identifier) -> Self {
         Self {
             inner: std::sync::Arc::new((registry.inner.1.clone(), value)),
             _type: std::marker::PhantomData,
@@ -246,14 +246,14 @@ impl<T> RegistryKey<T> {
     }
 
     /// Whether this registry key belongs to the given registry.
-    pub fn is_of<E>(&self, reg: &RegistryKey<Registry<E>>) -> bool {
+    pub fn is_of<E>(&self, reg: &Key<Registry<E>>) -> bool {
         self.inner.0 == reg.inner.1
     }
 
     /// Return `Some(_)` if the key is of reg, otherwise `None`.
-    pub fn cast<E>(&self, reg: &RegistryKey<Registry<E>>) -> Option<RegistryKey<E>> {
+    pub fn cast<E>(&self, reg: &Key<Registry<E>>) -> Option<Key<E>> {
         if self.is_of(&reg) {
-            Some(RegistryKey {
+            Some(Key {
                 inner: std::sync::Arc::clone(&self.inner),
                 _type: std::marker::PhantomData,
             })
@@ -273,7 +273,7 @@ impl<T> RegistryKey<T> {
     }
 }
 
-impl<T> RegistryKey<Registry<T>> {
+impl<T> Key<Registry<T>> {
     /// Creates a registry key for a registry in the root registry
     /// with an identifier for the registry.
     pub fn of_reg(reg: Identifier) -> Self {
@@ -284,7 +284,7 @@ impl<T> RegistryKey<Registry<T>> {
     }
 }
 
-impl<T> std::fmt::Display for RegistryKey<T> {
+impl<T> std::fmt::Display for Key<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("RegistryKey[")?;
         self.inner.0.fmt(f)?;
@@ -294,7 +294,7 @@ impl<T> std::fmt::Display for RegistryKey<T> {
     }
 }
 
-impl<T> Clone for RegistryKey<T> {
+impl<T> Clone for Key<T> {
     fn clone(&self) -> Self {
         Self {
             inner: std::sync::Arc::clone(&self.inner),
@@ -303,15 +303,15 @@ impl<T> Clone for RegistryKey<T> {
     }
 }
 
-impl<T> PartialEq for RegistryKey<T> {
+impl<T> PartialEq for Key<T> {
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner
     }
 }
 
-impl<T> Eq for RegistryKey<T> {}
+impl<T> Eq for Key<T> {}
 
-impl<T> std::hash::Hash for RegistryKey<T> {
+impl<T> std::hash::Hash for Key<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.inner.hash(state)
     }

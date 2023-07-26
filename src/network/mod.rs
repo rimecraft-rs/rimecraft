@@ -864,7 +864,7 @@ mod packet_buf_impl {
         }
     }
 
-    impl<T> Encode for crate::registry::RegistryKey<T> {
+    impl<T> Encode for crate::registry::Key<T> {
         fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
         where
             B: bytes::BufMut,
@@ -873,18 +873,18 @@ mod packet_buf_impl {
         }
     }
 
-    impl<'de, T> Decode<'de> for crate::registry::RegistryKey<T>
+    impl<'de, T> Decode<'de> for crate::registry::Key<T>
     where
         T: RegistryAccess + 'static,
     {
-        type Output = crate::registry::RegistryKey<T>;
+        type Output = crate::registry::Key<T>;
 
         fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
         where
             B: bytes::Buf,
         {
             let id = Identifier::decode(buf)?;
-            Ok(crate::registry::RegistryKey::new(&T::registry().key, id))
+            Ok(crate::registry::Key::new(&T::registry().key, id))
         }
     }
 }
