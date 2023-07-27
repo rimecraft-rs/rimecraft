@@ -5,3 +5,5 @@
 /.VSCodeCounter
 /Cargo.lock
 */Cargo.lock
+
+*.DS_STORE
