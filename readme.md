@@ -1,5 +1,7 @@
 # Rimecraft
 
-Rimecraft tend to be a full-featured, flexible and free implementation of Minecraft.
+**Rimecraft** is committed to becoming a fully-featured, flexible and free implementation of **[Minecraft.](https://minecraft.net)**
 
-THIS PROJECT IS OWNED BY [DM EARTH](https://github.com/DM-Earth) AND LICENSED UNDER AGPL3.
+## License and Ownership
+
+**Rimecraft** is owned by **[DM Earth](https://github.com/DM-Earth)** and is licensed under **[GNU Affero General Public License v3.](LICENSE.md)**
