@@ -1,4 +1,4 @@
-# <sub><img width="40" height="40" src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true" /></sub>&ensp;Rimecraft
+# <sub><img width="34" height="34" src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true" /></sub>&ensp;Rimecraft
 
 **Rimecraft** is committed to becoming a fully-featured, flexible and free implementation of **[Minecraft.](https://minecraft.net)**
 
