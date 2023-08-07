@@ -15,7 +15,7 @@ pub mod world;
 
 pub use util::*;
 
-/// Core utils of Rimecraft.
+/// Core types of Rimecraft.
 pub mod prelude {
     pub use crate::{
         nbt::NbtCompoundExt,

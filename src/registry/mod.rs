@@ -72,14 +72,14 @@ impl<T> Registry<T> {
         (def, self.get_from_raw(def).unwrap())
     }
 
-    /// Get an entry from a [`RegistryKey`].
+    /// Get an entry from a [`Key`].
     pub fn get_from_key(&self, key: &Key<T>) -> Option<(usize, &Entry<T>)> {
         self.key_map
             .get(key)
             .map(|e| (*e, self.entries.get(*e).unwrap()))
     }
 
-    /// Get an entry from an [`Identifier`].
+    /// Get an entry from an [`Id`].
     pub fn get_from_id(&self, id: &Id) -> Option<(usize, &Entry<T>)> {
         self.id_map
             .get(id)
