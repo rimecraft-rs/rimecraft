@@ -1,6 +1,17 @@
-# <sub><a href="https://github.com/rimecraft-rs"><img width="34" height="34" src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true" /></a></sub>&ensp;Rimecraft
+<a href="https://github.com/rimecraft-rs">
+  <img
+    width="150" 
+    height="150" 
+    align="left"
+    src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true"
+    />
+</a>
 
-**Rimecraft** is committed to becoming a fully-featured, flexible and free implementation of **[Minecraft.](https://minecraft.net)**
+# Rimecraft
+
+> **Rimecraft** is committed to becoming a fully-featured, flexible and free rust implementation of **[Minecraft.](https://minecraft.net)**
+
+<br />
 
 ## License and Ownership
 
