@@ -4,12 +4,12 @@ pub mod collections;
 pub mod math;
 
 #[derive(PartialEq, Eq, Clone, Hash)]
-pub struct Identifier {
+pub struct Id {
     namespace: String,
     path: String,
 }
 
-impl Identifier {
+impl Id {
     pub fn new(namespace: &str, path: &str) -> anyhow::Result<Self> {
         if Self::is_namespace_valid(namespace) && Self::is_path_valid(path) {
             Ok(Self {
@@ -73,7 +73,7 @@ impl Identifier {
     }
 }
 
-impl std::fmt::Display for Identifier {
+impl std::fmt::Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.namespace)?;
         f.write_str(":")?;
@@ -82,7 +82,7 @@ impl std::fmt::Display for Identifier {
     }
 }
 
-impl serde::Serialize for Identifier {
+impl serde::Serialize for Id {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -91,7 +91,7 @@ impl serde::Serialize for Identifier {
     }
 }
 
-impl<'de> serde::Deserialize<'de> for Identifier {
+impl<'de> serde::Deserialize<'de> for Id {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,

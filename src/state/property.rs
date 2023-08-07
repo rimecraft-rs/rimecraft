@@ -23,10 +23,17 @@ impl Property {
     }
 
     pub fn values<T: From<u8>>(&self) -> Vec<T> {
+        assert_eq!(self.type_id, std::any::TypeId::of::<T>());
+        unsafe { self.values_unchecked() }
+    }
+
+    pub unsafe fn values_unchecked<T: From<u8>>(&self) -> Vec<T> {
         let mut vec = Vec::new();
+
         for i in self.range.0..=self.range.1 {
             vec.push(i.into())
         }
+
         vec
     }
 }

@@ -1,4 +1,7 @@
-use std::hash::Hash;
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 pub const DEFAULT_INDEXED_INDEX: i32 = -1;
 
@@ -479,6 +482,110 @@ impl PackedArray {
                 out[j + m] = (l & self.max_value) as i32;
                 l >>= self.element_bits;
             }
+        }
+    }
+}
+
+pub struct Intern<T>
+where
+    T: Hash + Eq,
+{
+    map: parking_lot::RwLock<Vec<(u64, *const T)>>,
+}
+
+impl<T> Intern<T>
+where
+    T: Hash + Eq,
+{
+    pub const fn new() -> Self {
+        Self {
+            map: parking_lot::RwLock::new(Vec::new()),
+        }
+    }
+
+    pub fn get<'a>(&'a self, value: T) -> &'a T {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        if let Some(entry) = self.map.read().iter().find(|entry| entry.0 == hash) {
+            unsafe { &*entry.1 }
+        } else {
+            let reference = Box::leak(Box::new(value));
+            self.map.write().push((hash, reference as *const T));
+            reference
+        }
+    }
+}
+
+impl<T> Drop for Intern<T>
+where
+    T: Hash + Eq,
+{
+    fn drop(&mut self) {
+        for value in self.map.get_mut() {
+            let _ = unsafe { Box::from_raw(value.1 as *mut T) };
+        }
+    }
+}
+
+unsafe impl<T> Send for Intern<T> where T: Hash + Eq + ToOwned<Owned = T> {}
+unsafe impl<T> Sync for Intern<T> where T: Hash + Eq + ToOwned<Owned = T> {}
+
+pub struct ArcIntern<T>
+where
+    T: Hash + Eq,
+{
+    map: parking_lot::RwLock<Vec<(u64, std::sync::Weak<T>)>>,
+}
+
+impl<T> ArcIntern<T>
+where
+    T: Hash + Eq,
+{
+    pub const fn new() -> Self {
+        Self {
+            map: parking_lot::RwLock::new(Vec::new()),
+        }
+    }
+
+    pub fn get(&self, value: T) -> std::sync::Arc<T> {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        if let Some(entry) = self
+            .map
+            .read()
+            .iter()
+            .enumerate()
+            .find(|entry| entry.1 .0 == hash)
+        {
+            if let Some(arc) = entry.1 .1.upgrade() {
+                arc
+            } else {
+                let pos = entry.0;
+                drop(entry);
+
+                let arc = std::sync::Arc::new(value);
+                self.map.write().get_mut(pos).unwrap().1 = std::sync::Arc::downgrade(&arc);
+                arc
+            }
+        } else {
+            let mut map_write = self.map.write();
+            let arc = std::sync::Arc::new(value);
+            let entry_expected = (hash, std::sync::Arc::downgrade(&arc));
+
+            if let Some(entry) = map_write
+                .iter_mut()
+                .find(|entry| entry.1.strong_count() == 0)
+            {
+                *entry = entry_expected
+            } else {
+                map_write.push(entry_expected)
+            }
+
+            arc
         }
     }
 }

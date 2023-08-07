@@ -77,7 +77,7 @@ impl<'de> serde::Deserialize<'de> for Fluid {
     where
         D: serde::Deserializer<'de>,
     {
-        let id = Identifier::deserialize(deserializer)?;
+        let id = Id::deserialize(deserializer)?;
         match crate::registry::FLUID.get_from_id(&id) {
             Some(e) => Ok(e.1.deref().clone()),
             None => Ok(crate::registry::FLUID.default_entry().1.deref().clone()),

@@ -19,6 +19,6 @@ pub use util::*;
 pub mod prelude {
     pub use crate::{
         nbt::NbtCompoundExt,
-        util::{math::BlockPos, EnumValues, Identifier},
+        util::{math::BlockPos, EnumValues, Id},
     };
 }

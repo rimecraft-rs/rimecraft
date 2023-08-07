@@ -6,11 +6,12 @@ use std::ops::Deref;
 use crate::prelude::*;
 
 pub use registries::*;
+pub use tag::Key as TagKey;
 
 /// Represents a registration and its id and tags.
 pub struct Entry<T> {
     key: Key<T>,
-    pub tags: parking_lot::RwLock<Vec<tag::TagKey<T>>>,
+    pub tags: parking_lot::RwLock<Vec<tag::Key<T>>>,
     value: T,
 }
 
@@ -20,7 +21,7 @@ impl<T> Entry<T> {
     }
 
     /// If this registration is in target tag.
-    pub fn is_in(&self, tag: &tag::TagKey<T>) -> bool {
+    pub fn is_in(&self, tag: &tag::Key<T>) -> bool {
         self.tags.read().contains(tag)
     }
 }
@@ -39,12 +40,12 @@ impl<T> Deref for Entry<T> {
 pub struct Registry<T> {
     default: Option<usize>,
     entries: Vec<Entry<T>>,
-    id_map: hashbrown::HashMap<Identifier, usize>,
+    id_map: hashbrown::HashMap<Id, usize>,
     /// Key of this registry.
     pub key: Key<Self>,
     key_map: hashbrown::HashMap<Key<T>, usize>,
     /// Tag to entries mapping of this registry.
-    pub tags: parking_lot::RwLock<hashbrown::HashMap<tag::TagKey<T>, Vec<usize>>>,
+    pub tags: parking_lot::RwLock<hashbrown::HashMap<tag::Key<T>, Vec<usize>>>,
 }
 
 impl<T> Registry<T> {
@@ -54,7 +55,7 @@ impl<T> Registry<T> {
     }
 
     /// Whether this registry contains an entry with the target id.
-    pub fn contains_id(&self, id: &Identifier) -> bool {
+    pub fn contains_id(&self, id: &Id) -> bool {
         self.id_map.contains_key(id)
     }
 
@@ -79,7 +80,7 @@ impl<T> Registry<T> {
     }
 
     /// Get an entry from an [`Identifier`].
-    pub fn get_from_id(&self, id: &Identifier) -> Option<(usize, &Entry<T>)> {
+    pub fn get_from_id(&self, id: &Id) -> Option<(usize, &Entry<T>)> {
         self.id_map
             .get(id)
             .map(|e| (*e, self.entries.get(*e).unwrap()))
@@ -151,7 +152,7 @@ impl<T: PartialEq + Eq> crate::util::collections::Indexed<Entry<T>> for Registry
 
 /// Mutable registry builder for building [`Registry`].
 pub struct Builder<T: Registration> {
-    entries: Vec<(T, Identifier)>,
+    entries: Vec<(T, Id)>,
 }
 
 impl<T: Registration> Builder<T> {
@@ -162,7 +163,7 @@ impl<T: Registration> Builder<T> {
     }
 
     /// Register a new value and its id into this builder and return its raw id.
-    pub fn register(&mut self, value: T, id: Identifier) -> anyhow::Result<usize> {
+    pub fn register(&mut self, value: T, id: Id) -> anyhow::Result<usize> {
         if self.entries.iter().any(|e| e.1 == id) {
             Err(anyhow::anyhow!("Registration with id {id} already exist!"))
         } else {
@@ -173,7 +174,7 @@ impl<T: Registration> Builder<T> {
 }
 
 impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
-    type Opts = (Key<Registry<T>>, Option<Identifier>);
+    type Opts = (Key<Registry<T>>, Option<Id>);
 
     fn build(self, opts: Self::Opts) -> Registry<T> {
         let entries = self
@@ -184,7 +185,7 @@ impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
                 e.1 .0.accept(e.0);
                 Entry {
                     value: e.1 .0,
-                    key: Key::new(&opts.0, e.1 .1.clone()),
+                    key: Key::new(opts.0, e.1 .1.clone()),
                     tags: parking_lot::RwLock::new(Vec::new()),
                 }
             })
@@ -227,34 +228,36 @@ pub trait RegistryAccess: Sized {
     fn registry() -> &'static Registry<Self>;
 }
 
+static KEYS_CACHE: crate::collections::Intern<(Id, Id)> = crate::collections::Intern::new();
+
 /// Represents a key for a value in a registry in a context where
 /// a root registry is available.
 ///
-/// This type is driven by [`std::sync::Arc`] so it's cheap to clone.
+/// This type is cheap to clone.
 pub struct Key<T> {
     _type: std::marker::PhantomData<T>,
-    /// (reg, value)
-    inner: std::sync::Arc<(Identifier, Identifier)>,
+    // (reg, value)
+    inner: crate::Ref<'static, (Id, Id)>,
 }
 
 impl<T> Key<T> {
-    pub fn new(registry: &Key<Registry<T>>, value: Identifier) -> Self {
+    pub fn new(registry: Key<Registry<T>>, value: Id) -> Self {
         Self {
-            inner: std::sync::Arc::new((registry.inner.1.clone(), value)),
+            inner: crate::Ref(KEYS_CACHE.get((registry.inner.0 .1.clone(), value))),
             _type: std::marker::PhantomData,
         }
     }
 
     /// Whether this registry key belongs to the given registry.
     pub fn is_of<E>(&self, reg: &Key<Registry<E>>) -> bool {
-        self.inner.0 == reg.inner.1
+        self.inner.0 .0 == reg.inner.1
     }
 
     /// Return `Some(_)` if the key is of reg, otherwise `None`.
     pub fn cast<E>(&self, reg: &Key<Registry<E>>) -> Option<Key<E>> {
         if self.is_of(&reg) {
             Some(Key {
-                inner: std::sync::Arc::clone(&self.inner),
+                inner: self.inner,
                 _type: std::marker::PhantomData,
             })
         } else {
@@ -263,43 +266,44 @@ impl<T> Key<T> {
     }
 
     /// Value of this key.
-    pub fn value(&self) -> &Identifier {
-        &self.inner.0
+    pub fn value(&self) -> &'static Id {
+        &self.inner.0 .0
     }
 
     /// Registry of this key.
-    pub fn reg(&self) -> &Identifier {
-        &self.inner.1
+    pub fn reg(&self) -> &'static Id {
+        &self.inner.0 .1
     }
 }
 
 impl<T> Key<Registry<T>> {
     /// Creates a registry key for a registry in the root registry
     /// with an identifier for the registry.
-    pub fn of_reg(reg: Identifier) -> Self {
+    pub fn of_reg(reg: Id) -> Self {
         Self {
-            inner: std::sync::Arc::new((registries::root_key(), reg)),
+            inner: crate::Ref(KEYS_CACHE.get((registries::root_key(), reg))),
             _type: std::marker::PhantomData,
         }
     }
 }
 
-impl<T> std::fmt::Display for Key<T> {
+impl<T> std::fmt::Debug for Key<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Display;
+
         f.write_str("RegistryKey[")?;
-        self.inner.0.fmt(f)?;
+        self.inner.0 .0.fmt(f)?;
         f.write_str(" / ")?;
-        self.inner.1.fmt(f)?;
+        self.inner.0 .1.fmt(f)?;
         f.write_str("]")
     }
 }
 
+impl<T> Copy for Key<T> {}
+
 impl<T> Clone for Key<T> {
     fn clone(&self) -> Self {
-        Self {
-            inner: std::sync::Arc::clone(&self.inner),
-            _type: std::marker::PhantomData,
-        }
+        *self
     }
 }
 

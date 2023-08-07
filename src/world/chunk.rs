@@ -249,7 +249,7 @@ impl UpgradeData {
             |id| {
                 Some(
                     crate::registry::BLOCK
-                        .get_from_id(&Identifier::try_parse(id).ok()?)
+                        .get_from_id(&Id::try_parse(id).ok()?)
                         .map(|e| e.1.deref().clone())
                         .unwrap_or_default(),
                 )
@@ -263,7 +263,7 @@ impl UpgradeData {
             |id| {
                 Some(
                     crate::registry::FLUID
-                        .get_from_id(&Identifier::try_parse(id).ok()?)
+                        .get_from_id(&Id::try_parse(id).ok()?)
                         .map(|e| e.1.deref().clone())
                         .unwrap_or_default(),
                 )

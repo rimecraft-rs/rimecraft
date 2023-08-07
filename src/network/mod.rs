@@ -844,7 +844,7 @@ mod packet_buf_impl {
         }
     }
 
-    impl Encode for Identifier {
+    impl Encode for Id {
         fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
         where
             B: bytes::BufMut,
@@ -853,14 +853,14 @@ mod packet_buf_impl {
         }
     }
 
-    impl<'de> Decode<'de> for Identifier {
-        type Output = Identifier;
+    impl<'de> Decode<'de> for Id {
+        type Output = Id;
 
         fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
         where
             B: bytes::Buf,
         {
-            Identifier::try_parse(&String::decode(buf)?)
+            Id::try_parse(&String::decode(buf)?)
         }
     }
 
@@ -883,8 +883,8 @@ mod packet_buf_impl {
         where
             B: bytes::Buf,
         {
-            let id = Identifier::decode(buf)?;
-            Ok(crate::registry::Key::new(&T::registry().key, id))
+            let id = Id::decode(buf)?;
+            Ok(crate::registry::Key::new(T::registry().key, id))
         }
     }
 }

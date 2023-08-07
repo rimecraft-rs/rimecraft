@@ -1,67 +1,80 @@
 use crate::prelude::*;
 
-/// Represents a tag key.
-pub struct TagKey<T>(std::sync::Arc<(super::Key<super::Registry<T>>, Identifier)>);
+static KEYS_CACHE: crate::collections::ArcIntern<Id> = crate::collections::ArcIntern::new();
 
-impl<T> TagKey<T> {
-    pub fn new(reg: super::Key<super::Registry<T>>, id: Identifier) -> Self {
-        Self(std::sync::Arc::new((reg, id)))
+/// Represents a tag key.
+pub struct Key<T> {
+    reg: super::Key<super::Registry<T>>,
+    id: std::sync::Arc<Id>,
+}
+
+impl<T> Key<T> {
+    pub fn new(reg: super::Key<super::Registry<T>>, id: Id) -> Self {
+        Self {
+            reg,
+            id: KEYS_CACHE.get(id),
+        }
     }
 
     pub fn is_of<T1>(&self, reg: &super::Key<super::Registry<T1>>) -> bool {
-        self.0 .0.inner == reg.inner
+        self.reg.inner == reg.inner
     }
 
-    /// Return `Some(_)` if the key is of reg, otherwise `None`.
-    pub fn cast<E>(&self, reg: &super::Key<super::Registry<E>>) -> Option<TagKey<E>> {
+    /// Return `Some` if the key is of reg, otherwise `None`.
+    pub fn cast<E>(&self, reg: &super::Key<super::Registry<E>>) -> Option<Key<E>> {
         if self.is_of(reg) {
-            Some(TagKey(std::sync::Arc::new((
-                super::Key {
+            Some(Key {
+                reg: super::Key {
                     _type: std::marker::PhantomData,
-                    inner: self.0 .0.inner.clone(),
+                    inner: self.reg.inner,
                 },
-                self.0 .1.clone(),
-            ))))
+                id: self.id.clone(),
+            })
         } else {
             None
         }
     }
 
-    pub fn reg(&self) -> &super::Key<super::Registry<T>> {
-        &self.0 .0
+    pub fn reg(&self) -> super::Key<super::Registry<T>> {
+        self.reg
     }
 
-    pub fn id(&self) -> &Identifier {
-        &self.0 .1
+    pub fn id(&self) -> &Id {
+        &self.id
     }
 }
 
-impl<T> Clone for TagKey<T> {
+impl<T> Clone for Key<T> {
     fn clone(&self) -> Self {
-        Self(std::sync::Arc::clone(&self.0))
+        Self {
+            reg: self.reg,
+            id: self.id.clone(),
+        }
     }
 }
 
-impl<T> PartialEq for TagKey<T> {
+impl<T> PartialEq for Key<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        self.id == other.id && self.reg == other.reg
     }
 }
 
-impl<T> Eq for TagKey<T> {}
+impl<T> Eq for Key<T> {}
 
-impl<T> std::fmt::Display for TagKey<T> {
+impl<T> std::fmt::Debug for Key<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Display;
+
         f.write_str("TagKey[")?;
-        self.0 .0.fmt(f)?;
+        self.reg.fmt(f)?;
         f.write_str(" / ")?;
-        self.0 .1.fmt(f)?;
+        self.id.fmt(f)?;
         f.write_str("]")
     }
 }
 
-impl<T> std::hash::Hash for TagKey<T> {
+impl<T> std::hash::Hash for Key<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state)
+        self.id.hash(state)
     }
 }

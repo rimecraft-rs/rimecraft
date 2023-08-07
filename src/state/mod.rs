@@ -215,11 +215,13 @@ fn new_states<E: Clone, T: Deref<Target = State> + From<(E, State)>>(
         temp = temp
             .iter()
             .flat_map(|list| {
-                property.values::<u8>().into_iter().map(|i| {
-                    let mut list2 = list.clone();
-                    list2.push((property.clone(), i));
-                    list2
-                })
+                unsafe { property.values_unchecked::<u8>() }
+                    .into_iter()
+                    .map(|i| {
+                        let mut list2 = list.clone();
+                        list2.push((property.clone(), i));
+                        list2
+                    })
             })
             .collect()
     }
@@ -274,13 +276,11 @@ impl StatesBuilder {
         let name = property.name();
 
         {
-            let matcher = todo!();
-            if matcher.is_match(name) {
+            if lazy_regex::regex!("^[a-z0-9_]+$").is_match(name) {
                 return Err(anyhow::anyhow!("Invalidly named property: {name}"));
             }
 
-            let c = property.values::<u8>();
-            if c.len() <= 1 {
+            if unsafe { property.values_unchecked::<u8>() }.len() <= 1 {
                 return Err(anyhow::anyhow!(
                     "Attempted use property {name} with <= 1 possible values"
                 ));

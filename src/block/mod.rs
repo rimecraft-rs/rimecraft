@@ -95,7 +95,7 @@ impl<'de> serde::Deserialize<'de> for Block {
     where
         D: serde::Deserializer<'de>,
     {
-        let id = Identifier::deserialize(deserializer)?;
+        let id = Id::deserialize(deserializer)?;
         Ok(crate::registry::BLOCK.get_from_id(&id).map_or_else(
             || {
                 tracing::debug!("Tried to load invalid block: {id}");

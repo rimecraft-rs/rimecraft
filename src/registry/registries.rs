@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
-pub fn root_key() -> Identifier {
-    Identifier::parse("root")
+pub fn root_key() -> Id {
+    Id::parse("root")
 }
 
 pub static ITEM: super::Freezer<crate::item::Item> = super::Freezer::new(super::Builder::new());
