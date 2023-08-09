@@ -486,14 +486,23 @@ impl PackedArray {
     }
 }
 
-pub struct Intern<T>
+/// Hash-based caches that leaked into heap.
+///
+/// A caches is a collection that provide cached value of
+/// a given value to reduce memory usage.
+///
+/// # Safety
+///
+/// Although the values are leaked into heap, they will be
+/// dropped when dropping the instance to prevent memory leaking.
+pub struct Caches<T>
 where
     T: Hash + Eq,
 {
     map: parking_lot::RwLock<Vec<(u64, *const T)>>,
 }
 
-impl<T> Intern<T>
+impl<T> Caches<T>
 where
     T: Hash + Eq,
 {
@@ -503,6 +512,10 @@ where
         }
     }
 
+    /// Obtain a reference from cached values in this caches,
+    /// and the provided value will be dropped.
+    /// If an equaled value dosen't exist in this caches, the value
+    /// will be leaked into heap.
     pub fn get<'a>(&'a self, value: T) -> &'a T {
         let mut hasher = DefaultHasher::new();
         value.hash(&mut hasher);
@@ -518,7 +531,7 @@ where
     }
 }
 
-impl<T> Drop for Intern<T>
+impl<T> Drop for Caches<T>
 where
     T: Hash + Eq,
 {
@@ -529,17 +542,20 @@ where
     }
 }
 
-unsafe impl<T> Send for Intern<T> where T: Hash + Eq + ToOwned<Owned = T> {}
-unsafe impl<T> Sync for Intern<T> where T: Hash + Eq + ToOwned<Owned = T> {}
+unsafe impl<T> Send for Caches<T> where T: Hash + Eq + ToOwned<Owned = T> {}
+unsafe impl<T> Sync for Caches<T> where T: Hash + Eq + ToOwned<Owned = T> {}
 
-pub struct ArcIntern<T>
+/// A variant of hash-based [`Caches`], where values are stored in weak
+/// pointers and values are provided with [`std::sync::Arc`].
+/// Caches with zero strong count will be soon destroyed.
+pub struct ArcCaches<T>
 where
     T: Hash + Eq,
 {
     map: parking_lot::RwLock<Vec<(u64, std::sync::Weak<T>)>>,
 }
 
-impl<T> ArcIntern<T>
+impl<T> ArcCaches<T>
 where
     T: Hash + Eq,
 {
@@ -549,6 +565,10 @@ where
         }
     }
 
+    /// Obtain an [`std::sync::Arc`] from cached weak pointers in this caches,
+    /// and the provided value will be dropped.
+    /// If an equaled value dosen't exist in this caches, the value
+    /// will be stored in a new [`std::sync::Arc`].
     pub fn get(&self, value: T) -> std::sync::Arc<T> {
         let mut hasher = DefaultHasher::new();
         value.hash(&mut hasher);

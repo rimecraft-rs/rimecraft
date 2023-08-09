@@ -228,7 +228,7 @@ pub trait RegistryAccess: Sized {
     fn registry() -> &'static Registry<Self>;
 }
 
-static KEYS_CACHE: crate::collections::Intern<(Id, Id)> = crate::collections::Intern::new();
+static KEYS_CACHE: crate::collections::Caches<(Id, Id)> = crate::collections::Caches::new();
 
 /// Represents a key for a value in a registry in a context where
 /// a root registry is available.

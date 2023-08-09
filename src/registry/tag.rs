@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-static KEYS_CACHE: crate::collections::ArcIntern<Id> = crate::collections::ArcIntern::new();
+static KEYS_CACHE: crate::collections::ArcCaches<Id> = crate::collections::ArcCaches::new();
 
 /// Represents a tag key.
 pub struct Key<T> {
