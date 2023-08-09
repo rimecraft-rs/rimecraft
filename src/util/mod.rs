@@ -3,6 +3,9 @@ use std::{hash::Hash, ops::Deref};
 pub mod collections;
 pub mod math;
 
+static IDENTIFIER_NAMESPACE_CACHES: crate::collections::Caches<String> =
+    crate::collections::Caches::new();
+
 /// An identifier used to identify things.
 ///
 /// This is also known as "resource location", "namespaced ID",
@@ -11,7 +14,7 @@ pub mod math;
 /// using a combination of namespace and path.
 #[derive(PartialEq, Eq, Clone, Hash)]
 pub struct Id {
-    namespace: String,
+    namespace: Ref<'static, String>,
     path: String,
 }
 
@@ -19,7 +22,7 @@ impl Id {
     pub fn new(namespace: &str, path: &str) -> anyhow::Result<Self> {
         if Self::is_namespace_valid(namespace) && Self::is_path_valid(path) {
             Ok(Self {
-                namespace: namespace.to_string(),
+                namespace: Ref(IDENTIFIER_NAMESPACE_CACHES.get(namespace.to_string())),
                 path: path.to_string(),
             })
         } else {
@@ -70,8 +73,8 @@ impl Id {
         true
     }
 
-    pub fn namespace(&self) -> &str {
-        &self.namespace
+    pub fn namespace(&self) -> &'static str {
+        self.namespace.0
     }
 
     pub fn path(&self) -> &str {

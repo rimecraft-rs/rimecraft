@@ -163,12 +163,12 @@ impl<T: Registration> Builder<T> {
     }
 
     /// Register a new value and its id into this builder and return its raw id.
-    pub fn register(&mut self, value: T, id: Id) -> anyhow::Result<usize> {
+    pub fn register(&mut self, value: T, id: Id) -> Option<usize> {
         if self.entries.iter().any(|e| e.1 == id) {
-            Err(anyhow::anyhow!("Registration with id {id} already exist!"))
+            None
         } else {
             self.entries.push((value, id));
-            Ok(self.entries.len() - 1)
+            Some(self.entries.len() - 1)
         }
     }
 }
