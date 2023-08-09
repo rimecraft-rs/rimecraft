@@ -546,8 +546,8 @@ where
     }
 }
 
-unsafe impl<T> Send for Caches<T> where T: Hash + Eq + ToOwned<Owned = T> {}
-unsafe impl<T> Sync for Caches<T> where T: Hash + Eq + ToOwned<Owned = T> {}
+unsafe impl<T> Send for Caches<T> where T: Hash + Eq + Send {}
+unsafe impl<T> Sync for Caches<T> where T: Hash + Eq + Sync {}
 
 #[cfg(test)]
 mod tests_caches {
