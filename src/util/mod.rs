@@ -27,7 +27,7 @@ impl Id {
             })
         } else {
             Err(anyhow::anyhow!(
-                "Non [a-z0-9/._-] character in id: {namespace}:{path}"
+                "Non [a-z0-9/._-] character in id {namespace}:{path}"
             ))
         }
     }
@@ -86,8 +86,7 @@ impl std::fmt::Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.namespace)?;
         f.write_str(":")?;
-        f.write_str(&self.path)?;
-        std::fmt::Result::Ok(())
+        f.write_str(&self.path)
     }
 }
 
@@ -117,6 +116,24 @@ impl<'de> serde::Deserialize<'de> for Id {
     }
 }
 
+#[cfg(test)]
+mod id_tests {
+    use crate::Id;
+
+    #[test]
+    fn to_str() {
+        let id = Id::new("modid", "example_path").unwrap();
+        assert_eq!(id.to_string(), "modid:example_path");
+    }
+
+    #[test]
+    fn parse_str() {
+        let raw = "modid:example_path";
+        let id = Id::parse(raw);
+        assert_eq!(id.to_string(), raw);
+    }
+}
+
 /// Describes a var int.
 pub struct VarInt(pub i32);
 
@@ -137,8 +154,6 @@ pub trait EnumValues<const N: usize>: Sized + Clone + Copy + PartialEq + Eq {
     fn values() -> [Self; N];
 }
 
-pub type StaticRef<T> = Ref<'static, T>;
-
 /// Represents a reference with enhancements based on `&'a`.
 pub struct Ref<'a, T: 'a + ?Sized>(pub &'a T);
 
@@ -158,7 +173,7 @@ impl<'a, T: 'a + ?Sized> Deref for Ref<'a, T> {
     }
 }
 
-impl<'a, T: 'a> From<T> for Ref<'a, T> {
+impl<T> From<T> for Ref<'static, T> {
     fn from(value: T) -> Self {
         Self(Box::leak(Box::new(value)))
     }
@@ -184,7 +199,7 @@ impl<'a, T: 'a> Hash for Ref<'a, T> {
     }
 }
 
-/// A static instance that can be created with a type in a [`parking_lot::Mutex`]
+/// A static instance that can be created with a type in a [`std::sync::Mutex`]
 /// to be mutable and be freezed into (maybe) another type inside a once cell.
 /// Which the freezed instance can be accessed without a lock and be borrowed
 /// outlives static.
@@ -197,14 +212,14 @@ where
 {
     immutable: once_cell::sync::OnceCell<I>,
     /// The mutable instance.
-    pub mutable: parking_lot::Mutex<Option<M>>,
+    pub mutable: std::sync::Mutex<Option<M>>,
 }
 
 impl<I, M: Freeze<I>> Freezer<I, M> {
     pub const fn new(mutable: M) -> Self {
         Self {
             immutable: once_cell::sync::OnceCell::new(),
-            mutable: parking_lot::Mutex::new(Some(mutable)),
+            mutable: std::sync::Mutex::new(Some(mutable)),
         }
     }
 
@@ -213,7 +228,7 @@ impl<I, M: Freeze<I>> Freezer<I, M> {
         assert!(!self.is_freezed());
         let _ = self
             .immutable
-            .set(self.mutable.lock().take().unwrap().build(opts));
+            .set(self.mutable.lock().unwrap().take().unwrap().build(opts));
     }
 
     /// Whether this instance has been already freezed.

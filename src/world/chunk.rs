@@ -57,7 +57,7 @@ pub struct Section<'w> {
     pub biome_container: palette::Container<'w, biome::Shared<'w>>,
     pub block_state_container: palette::Container<'static, block::SharedBlockState>,
 
-    lock: parking_lot::Mutex<()>,
+    lock: std::sync::Mutex<()>,
 
     non_empty_block_count: atomic::AtomicU16,
     non_empty_fluid_count: atomic::AtomicU16,
@@ -77,7 +77,7 @@ impl<'w> Section<'w> {
                 todo!(),
                 palette::Provider::Biome,
             ),
-            lock: parking_lot::Mutex::new(()),
+            lock: std::sync::Mutex::new(()),
             non_empty_block_count: atomic::AtomicU16::new(0),
             non_empty_fluid_count: atomic::AtomicU16::new(0),
             random_tickable_block_count: atomic::AtomicU16::new(0),

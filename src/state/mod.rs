@@ -169,8 +169,8 @@ impl<T: Deref<Target = State> + 'static> States<T> {
 /// A shared state with states reference count and the index
 /// which is cheap to clone.
 pub struct Shared<T: Deref<Target = State> + 'static> {
-    pub entries: crate::util::StaticRef<crate::state::States<T>>,
-    pub value: crate::util::StaticRef<T>,
+    pub entries: crate::util::Ref<'static, crate::state::States<T>>,
+    pub value: crate::util::Ref<'static, T>,
 }
 
 impl<T: Deref<Target = State>> Deref for Shared<T> {
