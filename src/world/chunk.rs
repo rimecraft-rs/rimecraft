@@ -7,8 +7,8 @@ use super::{biome, palette};
 pub trait Chunk<'w>: super::BlockView + super::LightSourceView + std::any::Any {
     fn pos(&self) -> ChunkPos;
 
-    fn sections(&self) -> &[Option<Section>];
-    fn sections_mut(&self) -> &mut [Option<Section>];
+    fn sections(&self) -> &[Option<Section<'w>>];
+    fn sections_mut(&self) -> &mut [Option<Section<'w>>];
 
     fn heightmaps(
         &self,
@@ -42,7 +42,7 @@ pub struct WorldChunk<'w> {
 
 mod chunk_imp {
     pub fn fill_sections<'w>(
-        sections: &mut [Option<super::Section>],
+        sections: &mut [Option<super::Section<'w>>],
         registry: &'w super::biome::SharedRegistry,
     ) {
         for value in sections.iter_mut() {

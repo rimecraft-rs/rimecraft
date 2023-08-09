@@ -22,7 +22,7 @@ impl Property {
         self.range
     }
 
-    pub fn values<T: From<u8>>(&self) -> Vec<T> {
+    pub fn values<T: From<u8> + std::any::Any>(&self) -> Vec<T> {
         assert_eq!(self.type_id, std::any::TypeId::of::<T>());
         unsafe { self.values_unchecked() }
     }

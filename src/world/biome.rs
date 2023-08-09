@@ -28,7 +28,7 @@ impl<'w> Indexed<Shared<'w>> for SharedRegistry<'w> {
         self.0
              .0
             .get_from_raw(index)
-            .map(|e| &Shared(crate::Ref(e)))
+            .map(|e| unsafe { &*(e as *const crate::registry::Entry<Biome> as *const Shared<'w>) })
     }
 
     fn len(&self) -> usize {

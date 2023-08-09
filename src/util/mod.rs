@@ -3,9 +3,12 @@ use std::{hash::Hash, ops::Deref};
 pub mod collections;
 pub mod math;
 
-/// An identifier used to identify things. This is also known as "resource location",
-/// "namespaced ID", "location", or "Identifier". This is a non-typed immutable object,
-/// and identifies things using a combination of namespace and path.
+/// An identifier used to identify things.
+///
+/// This is also known as "resource location", "namespaced ID",
+/// "location", or "Identifier".
+/// This is a non-typed immutable object, and identifies things
+/// using a combination of namespace and path.
 #[derive(PartialEq, Eq, Clone, Hash)]
 pub struct Id {
     namespace: String,

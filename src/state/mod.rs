@@ -170,7 +170,7 @@ impl<T: Deref<Target = State> + 'static> States<T> {
 /// which is cheap to clone.
 pub struct Shared<T: Deref<Target = State> + 'static> {
     pub entries: crate::util::StaticRef<crate::state::States<T>>,
-    value: crate::util::StaticRef<T>,
+    pub value: crate::util::StaticRef<T>,
 }
 
 impl<T: Deref<Target = State>> Deref for Shared<T> {

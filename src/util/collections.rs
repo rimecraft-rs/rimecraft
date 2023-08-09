@@ -521,9 +521,13 @@ where
         value.hash(&mut hasher);
         let hash = hasher.finish();
 
-        if let Some(entry) = self.map.read().iter().find(|entry| entry.0 == hash) {
+        let read = self.map.read();
+
+        if let Some(entry) = read.iter().find(|entry| entry.0 == hash) {
             unsafe { &*entry.1 }
         } else {
+            drop(read);
+
             let reference = Box::leak(Box::new(value));
             self.map.write().push((hash, reference as *const T));
             reference
@@ -545,8 +549,54 @@ where
 unsafe impl<T> Send for Caches<T> where T: Hash + Eq + ToOwned<Owned = T> {}
 unsafe impl<T> Sync for Caches<T> where T: Hash + Eq + ToOwned<Owned = T> {}
 
+#[cfg(test)]
+mod tests_caches {
+    use std::ops::Deref;
+
+    use super::{ArcCaches, Caches};
+
+    #[test]
+    fn storing() {
+        let caches: Caches<String> = Caches::new();
+        let first_ptr = caches.get("1".to_string());
+
+        assert_eq!(first_ptr, "1");
+        assert_eq!(
+            caches.get("1".to_string()) as *const String as usize,
+            first_ptr as *const String as usize
+        );
+    }
+
+    #[test]
+    fn arc_storing() {
+        let caches: ArcCaches<String> = ArcCaches::new();
+        let first_ptr = caches.get("1".to_string());
+
+        assert_eq!(first_ptr.deref(), "1");
+        assert_eq!(
+            caches.get("1".to_string()).deref() as *const String as usize,
+            first_ptr.deref() as *const String as usize
+        );
+    }
+
+    #[test]
+    fn arc_destroying() {
+        let caches: ArcCaches<String> = ArcCaches::new();
+        let first_ptr = caches.get("1".to_string());
+        let _second_ptr = caches.get("2".to_string());
+
+        assert_eq!(caches.map.read().len(), 2);
+
+        drop(first_ptr);
+        let _third_ptr = caches.get("3".to_string());
+
+        assert_eq!(caches.map.read().len(), 2);
+    }
+}
+
 /// A variant of hash-based [`Caches`], where values are stored in weak
 /// pointers and values are provided with [`std::sync::Arc`].
+///
 /// Caches with zero strong count will be soon destroyed.
 pub struct ArcCaches<T>
 where
@@ -574,35 +624,29 @@ where
         value.hash(&mut hasher);
         let hash = hasher.finish();
 
-        if let Some(entry) = self
-            .map
-            .read()
-            .iter()
-            .enumerate()
-            .find(|entry| entry.1 .0 == hash)
-        {
+        let read = self.map.read();
+
+        if let Some(entry) = read.iter().enumerate().find(|entry| entry.1 .0 == hash) {
             if let Some(arc) = entry.1 .1.upgrade() {
                 arc
             } else {
                 let pos = entry.0;
-                drop(entry);
+                drop(read);
 
                 let arc = std::sync::Arc::new(value);
                 self.map.write().get_mut(pos).unwrap().1 = std::sync::Arc::downgrade(&arc);
                 arc
             }
         } else {
-            let mut map_write = self.map.write();
+            drop(read);
+            let mut write = self.map.write();
             let arc = std::sync::Arc::new(value);
             let entry_expected = (hash, std::sync::Arc::downgrade(&arc));
 
-            if let Some(entry) = map_write
-                .iter_mut()
-                .find(|entry| entry.1.strong_count() == 0)
-            {
+            if let Some(entry) = write.iter_mut().find(|entry| entry.1.strong_count() == 0) {
                 *entry = entry_expected
             } else {
-                map_write.push(entry_expected)
+                write.push(entry_expected)
             }
 
             arc

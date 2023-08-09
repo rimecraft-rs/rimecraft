@@ -19,7 +19,7 @@ impl BlockEntity {
         unsafe { &*(self.data.deref() as *const dyn Data as *const T) }
     }
 
-    pub fn data_mut<T>(&mut self) -> &mut T {
+    pub fn data_mut<T: std::any::Any>(&mut self) -> &mut T {
         assert_eq!(TypeId::of::<T>(), self.data.type_id());
         unsafe { &mut *(self.data.deref_mut() as *mut dyn Data as *mut T) }
     }
