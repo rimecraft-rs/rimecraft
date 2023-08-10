@@ -281,3 +281,47 @@ impl<T> Freeze<T> for T {
         self
     }
 }
+
+pub struct Event<'a, In, Out, Ivk>
+where
+    Ivk: for<'call> Fn(&'call [&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
+{
+    listeners: Vec<&'a dyn Fn(In) -> Out>,
+    invoker_factory: Ivk,
+}
+
+impl<'a, In, Out, Ivk> Event<'a, In, Out, Ivk>
+where
+    Ivk: for<'call> Fn(&'call [&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
+{
+    pub const fn new(invoker_factory: Ivk) -> Self {
+        Self {
+            listeners: Vec::new(),
+            invoker_factory,
+        }
+    }
+
+    pub fn invoker<'call>(&'call self) -> Box<dyn FnOnce(In) -> Out + 'call> {
+        (self.invoker_factory)(self.listeners.as_slice())
+    }
+
+    pub fn register(&mut self, listener: impl Fn(In) -> Out + 'a) {
+        let in_heap = Box::leak(Box::new(listener));
+        self.listeners.push(in_heap);
+    }
+}
+
+impl<'a, In, Out, Ivk> Drop for Event<'a, In, Out, Ivk>
+where
+    Ivk: for<'call> Fn(&'call [&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
+{
+    fn drop(&mut self) {
+        let mut vec = Vec::new();
+        std::mem::swap(&mut vec, &mut self.listeners);
+        for reference in vec {
+            let _ = unsafe {
+                Box::from_raw(reference as *const dyn Fn(In) -> Out as *mut dyn Fn(In) -> Out)
+            };
+        }
+    }
+}
