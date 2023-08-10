@@ -79,7 +79,7 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Palette<'a, T> {
     {
         match &mut self.inner {
             Inner::Vector(vec) => {
-                vec.clear();
+                *vec = Vec::new();
 
                 for _ in 0..crate::VarInt::decode(buf)? {
                     vec.push(

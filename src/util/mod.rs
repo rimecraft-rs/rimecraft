@@ -199,6 +199,22 @@ impl<'a, T: 'a> Hash for Ref<'a, T> {
     }
 }
 
+#[cfg(test)]
+mod ref_tests {
+    use super::Ref;
+
+    #[test]
+    fn aligned() {
+        let string = "Hello, world!";
+        let str_ref = Ref(string);
+
+        assert_eq!(
+            unsafe { &*(&str_ref as *const Ref<str> as *const &'static str) },
+            &string
+        );
+    }
+}
+
 /// A static instance that can be created with a type in a [`std::sync::Mutex`]
 /// to be mutable and be freezed into (maybe) another type inside a once cell.
 /// Which the freezed instance can be accessed without a lock and be borrowed
