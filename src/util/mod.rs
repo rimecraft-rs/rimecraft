@@ -282,51 +282,53 @@ impl<T> Freeze<T> for T {
     }
 }
 
-pub struct Event<'a, In, Out, Ivk, Phase = i8>
+pub struct Event<T, Ivk, Phase = i8>
 where
+    T: ?Sized + 'static,
     Phase: Ord,
-    Ivk: for<'call> Fn(&[&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
+    Ivk: Fn(Vec<&'static T>) -> Box<T>,
 {
-    listeners: std::cell::UnsafeCell<Vec<(Phase, Box<dyn Fn(In) -> Out + 'a>)>>,
+    listeners: parking_lot::RwLock<Vec<(Phase, *const T)>>,
     invoker_factory: Ivk,
 
     dirty: std::sync::atomic::AtomicBool,
-    lock: parking_lot::RwLock<()>,
 }
 
-impl<'a, In, Out, Phase, Ivk> Event<'a, In, Out, Ivk, Phase>
+impl<T, Phase, Ivk> Event<T, Ivk, Phase>
 where
+    T: ?Sized,
     Phase: Ord,
-    Ivk: for<'call> Fn(&[&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
+    Ivk: Fn(Vec<&'static T>) -> Box<T>,
 {
     pub const fn new(invoker_factory: Ivk) -> Self {
         Self {
-            listeners: std::cell::UnsafeCell::new(Vec::new()),
+            listeners: parking_lot::RwLock::new(Vec::new()),
             invoker_factory,
             dirty: std::sync::atomic::AtomicBool::new(false),
-            lock: parking_lot::RwLock::new(()),
         }
     }
 
-    pub fn invoker<'call>(&'call self) -> Box<dyn FnOnce(In) -> Out + 'call> {
+    pub fn invoker<'a>(&'a self) -> EventInvokerGuard<'a, T> {
         if self.dirty.load(std::sync::atomic::Ordering::Acquire) {
-            let _ = self.lock.write();
-            let mut_vec = unsafe { &mut *self.listeners.get() };
-            mut_vec.sort_by(|e0, e1| Phase::cmp(&e0.0, &e1.0));
+            self.listeners
+                .write()
+                .sort_by(|e0, e1| Phase::cmp(&e0.0, &e1.0));
         }
 
-        let _ = self.lock.read();
-
-        let vec: Vec<_> = unsafe { &*self.listeners.get() }
+        let vec: Vec<_> = self
+            .listeners
+            .read()
             .iter()
-            .map(|e| e.1.deref())
+            .map(|e| unsafe { &*e.1 })
             .collect();
 
-        (self.invoker_factory)(&vec)
+        EventInvokerGuard {
+            value: Box::leak((self.invoker_factory)(vec)),
+        }
     }
 
-    pub fn register_with_phase(&mut self, listener: impl Fn(In) -> Out + 'a, phase: Phase) {
-        self.listeners.get_mut().push((phase, Box::new(listener)));
+    pub fn register_with_phase(&mut self, listener: Box<T>, phase: Phase) {
+        self.listeners.get_mut().push((phase, Box::leak(listener)));
 
         if !self.dirty.load(std::sync::atomic::Ordering::Acquire) {
             self.dirty.store(true, std::sync::atomic::Ordering::Release);
@@ -334,28 +336,41 @@ where
     }
 }
 
-impl<'a, In, Out, Phase, Ivk> Event<'a, In, Out, Ivk, Phase>
+impl<T, Phase, Ivk> Event<T, Ivk, Phase>
 where
+    T: ?Sized,
     Phase: Ord + Default,
-    Ivk: for<'call> Fn(&[&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
+    Ivk: Fn(Vec<&'static T>) -> Box<T>,
 {
-    pub fn register(&mut self, listener: impl Fn(In) -> Out + 'a) {
+    pub fn register(&mut self, listener: Box<T>) {
         self.register_with_phase(listener, Default::default())
     }
 }
 
-unsafe impl<'a, In, Out, Phase, Ivk> Send for Event<'a, In, Out, Ivk, Phase>
+impl<T, Phase, Ivk> Drop for Event<T, Ivk, Phase>
 where
-    Phase: Ord + Send,
-    Ivk: for<'call> Fn(&[&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call> + Send,
+    T: ?Sized,
+    Phase: Ord,
+    Ivk: Fn(Vec<&'static T>) -> Box<T>,
 {
+    fn drop(&mut self) {
+        let mut vec = Vec::new();
+        std::mem::swap(self.listeners.get_mut(), &mut vec);
+
+        for value in vec {
+            let _ = unsafe { Box::from_raw(value.1 as *mut T) };
+        }
+    }
 }
 
-unsafe impl<'a, In, Out, Phase, Ivk> Sync for Event<'a, In, Out, Ivk, Phase>
-where
-    Phase: Ord + Sync,
-    Ivk: for<'call> Fn(&[&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call> + Sync,
-{
+pub struct EventInvokerGuard<'a, T: ?Sized> {
+    value: &'a T,
+}
+
+impl<T: ?Sized> Drop for EventInvokerGuard<'_, T> {
+    fn drop(&mut self) {
+        let _ = unsafe { Box::from_raw(self.value as *const T as *mut T) };
+    }
 }
 
 #[cfg(test)]
