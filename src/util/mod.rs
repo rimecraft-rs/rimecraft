@@ -313,6 +313,9 @@ where
             self.listeners
                 .write()
                 .sort_by(|e0, e1| Phase::cmp(&e0.0, &e1.0));
+
+            self.dirty
+                .store(false, std::sync::atomic::Ordering::Release);
         }
 
         let vec: Vec<_> = self
@@ -324,6 +327,7 @@ where
 
         EventInvokerGuard {
             value: Box::leak((self.invoker_factory)(vec)),
+            _ptr: 0 as *mut (),
         }
     }
 
@@ -363,8 +367,31 @@ where
     }
 }
 
+unsafe impl<T, Phase, Ivk> Send for Event<T, Ivk, Phase>
+where
+    T: ?Sized,
+    Phase: Ord + Send,
+    Ivk: Fn(Vec<&'static T>) -> Box<T> + Send,
+{
+}
+
+unsafe impl<T, Phase, Ivk> Sync for Event<T, Ivk, Phase>
+where
+    T: ?Sized,
+    Phase: Ord + Sync,
+    Ivk: Fn(Vec<&'static T>) -> Box<T> + Sync,
+{
+}
+
 pub struct EventInvokerGuard<'a, T: ?Sized> {
     value: &'a T,
+    _ptr: *mut (),
+}
+
+impl<'a, T: ?Sized> EventInvokerGuard<'a, T> {
+    pub fn as_ref(&self) -> &'a T {
+        self.value
+    }
 }
 
 impl<T: ?Sized> Drop for EventInvokerGuard<'_, T> {
