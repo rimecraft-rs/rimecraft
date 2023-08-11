@@ -282,46 +282,81 @@ impl<T> Freeze<T> for T {
     }
 }
 
-pub struct Event<'a, In, Out, Ivk>
+pub struct Event<'a, In, Out, Ivk, Phase = i8>
 where
-    Ivk: for<'call> Fn(&'call [&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
+    Phase: Ord,
+    Ivk: for<'call> Fn(&[&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
 {
-    listeners: Vec<&'a dyn Fn(In) -> Out>,
+    listeners: std::cell::UnsafeCell<Vec<(Phase, Box<dyn Fn(In) -> Out + 'a>)>>,
     invoker_factory: Ivk,
+
+    dirty: std::sync::atomic::AtomicBool,
+    lock: parking_lot::RwLock<()>,
 }
 
-impl<'a, In, Out, Ivk> Event<'a, In, Out, Ivk>
+impl<'a, In, Out, Phase, Ivk> Event<'a, In, Out, Ivk, Phase>
 where
-    Ivk: for<'call> Fn(&'call [&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
+    Phase: Ord,
+    Ivk: for<'call> Fn(&[&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
 {
     pub const fn new(invoker_factory: Ivk) -> Self {
         Self {
-            listeners: Vec::new(),
+            listeners: std::cell::UnsafeCell::new(Vec::new()),
             invoker_factory,
+            dirty: std::sync::atomic::AtomicBool::new(false),
+            lock: parking_lot::RwLock::new(()),
         }
     }
 
     pub fn invoker<'call>(&'call self) -> Box<dyn FnOnce(In) -> Out + 'call> {
-        (self.invoker_factory)(self.listeners.as_slice())
+        if self.dirty.load(std::sync::atomic::Ordering::Acquire) {
+            let _ = self.lock.write();
+            let mut_vec = unsafe { &mut *self.listeners.get() };
+            mut_vec.sort_by(|e0, e1| Phase::cmp(&e0.0, &e1.0));
+        }
+
+        let _ = self.lock.read();
+
+        let vec: Vec<_> = unsafe { &*self.listeners.get() }
+            .iter()
+            .map(|e| e.1.deref())
+            .collect();
+
+        (self.invoker_factory)(&vec)
     }
 
-    pub fn register(&mut self, listener: impl Fn(In) -> Out + 'a) {
-        let in_heap = Box::leak(Box::new(listener));
-        self.listeners.push(in_heap);
-    }
-}
+    pub fn register_with_phase(&mut self, listener: impl Fn(In) -> Out + 'a, phase: Phase) {
+        self.listeners.get_mut().push((phase, Box::new(listener)));
 
-impl<'a, In, Out, Ivk> Drop for Event<'a, In, Out, Ivk>
-where
-    Ivk: for<'call> Fn(&'call [&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
-{
-    fn drop(&mut self) {
-        let mut vec = Vec::new();
-        std::mem::swap(&mut vec, &mut self.listeners);
-        for reference in vec {
-            let _ = unsafe {
-                Box::from_raw(reference as *const dyn Fn(In) -> Out as *mut dyn Fn(In) -> Out)
-            };
+        if !self.dirty.load(std::sync::atomic::Ordering::Acquire) {
+            self.dirty.store(true, std::sync::atomic::Ordering::Release);
         }
     }
 }
+
+impl<'a, In, Out, Phase, Ivk> Event<'a, In, Out, Ivk, Phase>
+where
+    Phase: Ord + Default,
+    Ivk: for<'call> Fn(&[&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call>,
+{
+    pub fn register(&mut self, listener: impl Fn(In) -> Out + 'a) {
+        self.register_with_phase(listener, Default::default())
+    }
+}
+
+unsafe impl<'a, In, Out, Phase, Ivk> Send for Event<'a, In, Out, Ivk, Phase>
+where
+    Phase: Ord + Send,
+    Ivk: for<'call> Fn(&[&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call> + Send,
+{
+}
+
+unsafe impl<'a, In, Out, Phase, Ivk> Sync for Event<'a, In, Out, Ivk, Phase>
+where
+    Phase: Ord + Sync,
+    Ivk: for<'call> Fn(&[&'call dyn Fn(In) -> Out]) -> Box<dyn FnOnce(In) -> Out + 'call> + Sync,
+{
+}
+
+#[cfg(test)]
+mod event_tests {}
