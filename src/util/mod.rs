@@ -282,57 +282,53 @@ impl<T> Freeze<T> for T {
     }
 }
 
-pub struct Event<T, Ivk, Phase = i8>
+pub struct Event<T, Phase = i8>
 where
     T: ?Sized + 'static,
     Phase: Ord,
-    Ivk: Fn(Vec<&'static T>) -> Box<T>,
 {
-    listeners: parking_lot::RwLock<Vec<(Phase, *const T)>>,
-    invoker_factory: Ivk,
+    listeners_and_cache: parking_lot::RwLock<(Vec<(Phase, *const T)>, Option<Box<T>>)>,
+    invoker_factory: fn(Vec<&'static T>) -> Box<T>,
 
     dirty: std::sync::atomic::AtomicBool,
 }
 
-impl<T, Phase, Ivk> Event<T, Ivk, Phase>
+impl<T, Phase> Event<T, Phase>
 where
     T: ?Sized,
     Phase: Ord,
-    Ivk: Fn(Vec<&'static T>) -> Box<T>,
 {
-    pub const fn new(invoker_factory: Ivk) -> Self {
+    pub const fn new(invoker_factory: fn(Vec<&'static T>) -> Box<T>) -> Self {
         Self {
-            listeners: parking_lot::RwLock::new(Vec::new()),
+            listeners_and_cache: parking_lot::RwLock::new((Vec::new(), None)),
             invoker_factory,
             dirty: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
-    pub fn invoker<'a>(&'a self) -> EventInvokerGuard<'a, T> {
+    pub fn invoker(&self) -> &T {
         if self.dirty.load(std::sync::atomic::Ordering::Acquire) {
-            self.listeners
-                .write()
-                .sort_by(|e0, e1| Phase::cmp(&e0.0, &e1.0));
+            let mut write_guard = self.listeners_and_cache.write();
+            write_guard.0.sort_by(|e0, e1| Phase::cmp(&e0.0, &e1.0));
 
             self.dirty
                 .store(false, std::sync::atomic::Ordering::Release);
+
+            write_guard.1 = Some((self.invoker_factory)(
+                write_guard.0.iter().map(|e| unsafe { &*e.1 }).collect(),
+            ));
+        } else if self.listeners_and_cache.read().1.is_none() {
+            self.listeners_and_cache.write().1 = Some((self.invoker_factory)(Vec::new()))
         }
 
-        let vec: Vec<_> = self
-            .listeners
-            .read()
-            .iter()
-            .map(|e| unsafe { &*e.1 })
-            .collect();
-
-        EventInvokerGuard {
-            value: Box::leak((self.invoker_factory)(vec)),
-            _ptr: 0 as *mut (),
-        }
+        unsafe { &*(self.listeners_and_cache.read().1.as_ref().unwrap().deref() as *const T) }
     }
 
     pub fn register_with_phase(&mut self, listener: Box<T>, phase: Phase) {
-        self.listeners.get_mut().push((phase, Box::leak(listener)));
+        self.listeners_and_cache
+            .get_mut()
+            .0
+            .push((phase, Box::leak(listener)));
 
         if !self.dirty.load(std::sync::atomic::Ordering::Acquire) {
             self.dirty.store(true, std::sync::atomic::Ordering::Release);
@@ -340,26 +336,24 @@ where
     }
 }
 
-impl<T, Phase, Ivk> Event<T, Ivk, Phase>
+impl<T, Phase> Event<T, Phase>
 where
     T: ?Sized,
     Phase: Ord + Default,
-    Ivk: Fn(Vec<&'static T>) -> Box<T>,
 {
     pub fn register(&mut self, listener: Box<T>) {
         self.register_with_phase(listener, Default::default())
     }
 }
 
-impl<T, Phase, Ivk> Drop for Event<T, Ivk, Phase>
+impl<T, Phase> Drop for Event<T, Phase>
 where
     T: ?Sized,
     Phase: Ord,
-    Ivk: Fn(Vec<&'static T>) -> Box<T>,
 {
     fn drop(&mut self) {
         let mut vec = Vec::new();
-        std::mem::swap(self.listeners.get_mut(), &mut vec);
+        std::mem::swap(&mut self.listeners_and_cache.get_mut().0, &mut vec);
 
         for value in vec {
             let _ = unsafe { Box::from_raw(value.1 as *mut T) };
@@ -367,37 +361,18 @@ where
     }
 }
 
-unsafe impl<T, Phase, Ivk> Send for Event<T, Ivk, Phase>
+unsafe impl<T, Phase> Send for Event<T, Phase>
 where
     T: ?Sized,
     Phase: Ord + Send,
-    Ivk: Fn(Vec<&'static T>) -> Box<T> + Send,
 {
 }
 
-unsafe impl<T, Phase, Ivk> Sync for Event<T, Ivk, Phase>
+unsafe impl<T, Phase> Sync for Event<T, Phase>
 where
     T: ?Sized,
     Phase: Ord + Sync,
-    Ivk: Fn(Vec<&'static T>) -> Box<T> + Sync,
 {
-}
-
-pub struct EventInvokerGuard<'a, T: ?Sized> {
-    value: &'a T,
-    _ptr: *mut (),
-}
-
-impl<'a, T: ?Sized> EventInvokerGuard<'a, T> {
-    pub fn as_ref(&self) -> &'a T {
-        self.value
-    }
-}
-
-impl<T: ?Sized> Drop for EventInvokerGuard<'_, T> {
-    fn drop(&mut self) {
-        let _ = unsafe { Box::from_raw(self.value as *const T as *mut T) };
-    }
 }
 
 #[cfg(test)]
