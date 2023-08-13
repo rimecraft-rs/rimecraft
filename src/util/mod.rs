@@ -287,8 +287,9 @@ where
     T: ?Sized + 'static,
     Phase: Ord,
 {
-    listeners_and_cache: parking_lot::RwLock<(Vec<(Phase, *const T)>, Option<Box<T>>)>,
-    invoker_factory: fn(Vec<&'static T>) -> Box<T>,
+    listeners_and_cache:
+        parking_lot::RwLock<(Vec<(Phase, *const T)>, Option<Box<T>>, Vec<&'static T>)>,
+    invoker_factory: fn(&'static [&'static T]) -> Box<T>,
 
     dirty: std::sync::atomic::AtomicBool,
 }
@@ -298,9 +299,9 @@ where
     T: ?Sized,
     Phase: Ord,
 {
-    pub const fn new(invoker_factory: fn(Vec<&'static T>) -> Box<T>) -> Self {
+    pub const fn new(invoker_factory: fn(&'static [&'static T]) -> Box<T>) -> Self {
         Self {
-            listeners_and_cache: parking_lot::RwLock::new((Vec::new(), None)),
+            listeners_and_cache: parking_lot::RwLock::new((Vec::new(), None, Vec::new())),
             invoker_factory,
             dirty: std::sync::atomic::AtomicBool::new(false),
         }
@@ -310,15 +311,18 @@ where
         if self.dirty.load(std::sync::atomic::Ordering::Acquire) {
             let mut write_guard = self.listeners_and_cache.write();
             write_guard.0.sort_by(|e0, e1| Phase::cmp(&e0.0, &e1.0));
-
             self.dirty
                 .store(false, std::sync::atomic::Ordering::Release);
 
-            write_guard.1 = Some((self.invoker_factory)(
-                write_guard.0.iter().map(|e| unsafe { &*e.1 }).collect(),
-            ));
+            write_guard.2 = write_guard.0.iter().map(|e| unsafe { &*e.1 }).collect();
+            write_guard.1 = Some((self.invoker_factory)(unsafe {
+                &*(&write_guard.2 as *const Vec<&'static T>)
+            }));
         } else if self.listeners_and_cache.read().1.is_none() {
-            self.listeners_and_cache.write().1 = Some((self.invoker_factory)(Vec::new()))
+            let mut write_guard = self.listeners_and_cache.write();
+            write_guard.1 = Some((self.invoker_factory)(unsafe {
+                &*(&write_guard.2 as *const Vec<&'static T>)
+            }));
         }
 
         unsafe { &*(self.listeners_and_cache.read().1.as_ref().unwrap().deref() as *const T) }
@@ -376,4 +380,40 @@ where
 }
 
 #[cfg(test)]
-mod event_tests {}
+mod event_tests {
+    use super::Event;
+
+    #[test]
+    fn registering_invoking() {
+        let mut event: Event<dyn Fn(&str) -> bool> = Event::new(|listeners| {
+            Box::new(move |string| {
+                for listener in listeners {
+                    if !listener(string) {
+                        return false;
+                    }
+                }
+
+                true
+            })
+        });
+
+        event.register(Box::new(|string| {
+            !string.to_lowercase().contains("propritary software")
+        }));
+
+        event.register(Box::new(|string| !string.to_lowercase().contains("mojang")));
+        event.register(Box::new(|string| {
+            !string.to_lowercase().contains("minecraft")
+        }));
+
+        assert!(!event.invoker()(
+            "minecraft by mojang is a propritary software."
+        ));
+
+        assert!(event.invoker()("i love krlite."));
+
+        event.register(Box::new(|string| !string.to_lowercase().contains("krlite")));
+
+        assert!(!event.invoker()("i love krlite."));
+    }
+}
