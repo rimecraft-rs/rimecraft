@@ -286,7 +286,7 @@ impl<T> Freeze<T> for T {
 /// which can be invoked by an invoker.
 ///
 /// The listeners are sorted by phases ([`i8`] by default)
-/// that can be called by order.
+/// that can be called in order.
 ///
 /// This type was inspired by the event system in Fabric API.
 pub struct Event<T, Phase = i8>
@@ -318,10 +318,10 @@ where
     /// able to be copied and moved.
     /// So you should add a `move` keyword before the closure
     /// to return in the factory.
-    pub const fn new(invoker_factory: fn(&'static [&'static T]) -> Box<T>) -> Self {
+    pub const fn new(factory: fn(&'static [&'static T]) -> Box<T>) -> Self {
         Self {
             listeners_and_cache: parking_lot::RwLock::new((Vec::new(), None, Vec::new())),
-            invoker_factory,
+            invoker_factory: factory,
             dirty: std::sync::atomic::AtomicBool::new(false),
         }
     }
