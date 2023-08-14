@@ -1,4 +1,4 @@
-use crate::network::{Decode, Encode};
+use crate::net::{Decode, Encode};
 
 /// A palette maps objects from and to small integer IDs that uses less
 /// number of bits to make storage smaller.

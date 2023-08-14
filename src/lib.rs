@@ -5,7 +5,7 @@ pub mod item;
 /// Thin wrapper between Rimecraft modules
 /// and [`fastnbt_rc`] and [`fastsnbt`].
 pub mod nbt;
-pub mod network;
+pub mod net;
 /// Registry stuffs for managing almost all parts of in-game components.
 pub mod registry;
 pub mod server;

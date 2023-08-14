@@ -50,7 +50,7 @@ pub struct Registry<T> {
 
 impl<T> Registry<T> {
     /// Whether this registry contains an entry with the target registry key.
-    pub fn contains_ket(&self, key: &Key<T>) -> bool {
+    pub fn contains_key(&self, key: &Key<T>) -> bool {
         self.key_map.contains_key(key)
     }
 
