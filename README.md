@@ -9,7 +9,7 @@
 
 # Rimecraft
 
-> **Rimecraft** is committed to becoming a fully-featured, flexible and free rust implementation of **[Minecraft.](https://minecraft.net)**
+> **Rimecraft** is committed to becoming a fully-featured, flexible and free Rust implementation of **[Minecraft.](https://minecraft.net)**
 
 <br />
 
