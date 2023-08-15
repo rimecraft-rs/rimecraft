@@ -218,7 +218,7 @@ impl PackedArray {
         let l = self.data[i];
         let j = (index - i * self.elements_per_long) * self.element_bits;
 
-        l >> j & self.max_value
+        l.wrapping_shr(j as u32) & self.max_value
     }
 
     /// The backing data of this storage.
@@ -328,6 +328,9 @@ mod packed_array_tests {
 
         assert_eq!(packed_array.get(4), 2);
         assert_eq!(packed_array.get(35), 7);
+
+        assert!(packed_array.iter().any(|e| e == 2));
+        assert!(packed_array.iter().any(|e| e == 7));
     }
 }
 
