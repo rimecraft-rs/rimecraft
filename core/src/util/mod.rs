@@ -150,6 +150,25 @@ impl VarInt {
     }
 }
 
+#[cfg(test)]
+mod var_int_tests {
+    use super::VarInt;
+    use crate::net::{Decode, Encode};
+
+    #[test]
+    fn encode_decode() {
+        let num = 114514;
+
+        let mut bytes_mut = bytes::BytesMut::new();
+        VarInt(num).encode(&mut bytes_mut).unwrap();
+
+        assert_eq!(bytes_mut.len(), VarInt(num).len());
+
+        let mut bytes: bytes::Bytes = bytes_mut.into();
+        assert_eq!(VarInt::decode(&mut bytes).unwrap(), num);
+    }
+}
+
 /// Represents types of enum that can be itered with values, like Java.
 pub trait EnumValues<const N: usize>: Sized + Clone + Copy + PartialEq + Eq {
     fn values() -> [Self; N];

@@ -397,51 +397,6 @@ where
 unsafe impl<T> Send for Caches<T> where T: Hash + Eq + Send {}
 unsafe impl<T> Sync for Caches<T> where T: Hash + Eq + Sync {}
 
-#[cfg(test)]
-mod tests_caches {
-    use std::ops::Deref;
-
-    use super::{ArcCaches, Caches};
-
-    #[test]
-    fn storing() {
-        let caches: Caches<String> = Caches::new();
-        let first_ptr = caches.get("1".to_string());
-
-        assert_eq!(first_ptr, "1");
-        assert_eq!(
-            caches.get("1".to_string()) as *const String as usize,
-            first_ptr as *const String as usize
-        );
-    }
-
-    #[test]
-    fn arc_storing() {
-        let caches: ArcCaches<String> = ArcCaches::new();
-        let first_ptr = caches.get("1".to_string());
-
-        assert_eq!(first_ptr.deref(), "1");
-        assert_eq!(
-            caches.get("1".to_string()).deref() as *const String as usize,
-            first_ptr.deref() as *const String as usize
-        );
-    }
-
-    #[test]
-    fn arc_destroying() {
-        let caches: ArcCaches<String> = ArcCaches::new();
-        let first_ptr = caches.get("1".to_string());
-        let _second_ptr = caches.get("2".to_string());
-
-        assert_eq!(caches.map.read().len(), 2);
-
-        drop(first_ptr);
-        let _third_ptr = caches.get("3".to_string());
-
-        assert_eq!(caches.map.read().len(), 2);
-    }
-}
-
 /// A variant of hash-based [`Caches`], where values are stored in weak
 /// pointers and values are provided with [`std::sync::Arc`].
 ///
@@ -499,5 +454,50 @@ where
 
             arc
         }
+    }
+}
+
+#[cfg(test)]
+mod tests_caches {
+    use std::ops::Deref;
+
+    use super::{ArcCaches, Caches};
+
+    #[test]
+    fn storing() {
+        let caches: Caches<String> = Caches::new();
+        let first_ptr = caches.get("1".to_string());
+
+        assert_eq!(first_ptr, "1");
+        assert_eq!(
+            caches.get("1".to_string()) as *const String as usize,
+            first_ptr as *const String as usize
+        );
+    }
+
+    #[test]
+    fn arc_storing() {
+        let caches: ArcCaches<String> = ArcCaches::new();
+        let first_ptr = caches.get("1".to_string());
+
+        assert_eq!(first_ptr.deref(), "1");
+        assert_eq!(
+            caches.get("1".to_string()).deref() as *const String as usize,
+            first_ptr.deref() as *const String as usize
+        );
+    }
+
+    #[test]
+    fn arc_destroying() {
+        let caches: ArcCaches<String> = ArcCaches::new();
+        let first_ptr = caches.get("1".to_string());
+        let _second_ptr = caches.get("2".to_string());
+
+        assert_eq!(caches.map.read().len(), 2);
+
+        drop(first_ptr);
+        let _third_ptr = caches.get("3".to_string());
+
+        assert_eq!(caches.map.read().len(), 2);
     }
 }
