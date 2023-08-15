@@ -296,7 +296,7 @@ impl DataProvider {
         Data(
             self,
             if self.1 == 0 {
-                Storage::new(32, len, None)
+                Storage::new(1, len, None)
             } else {
                 Storage::new(self.1, len, None)
             },

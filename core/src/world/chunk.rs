@@ -161,7 +161,12 @@ impl<'w> Section<'w> {
 
     pub fn calculate_counts(&self) {
         let mut counter = BlockStateCounter::default();
-        self.block_state_container.count(&mut counter);
+
+        {
+            let ptr = &mut counter as *mut BlockStateCounter;
+            self.block_state_container
+                .count(|value, count| unsafe { &mut *ptr }.accept(value, count));
+        }
 
         self.non_empty_block_count
             .store(counter.non_empty_block_count, atomic::Ordering::Release);
@@ -181,9 +186,7 @@ struct BlockStateCounter {
     random_tickable_block_count: u16,
 }
 
-impl BlockStateCounter {}
-
-impl palette::ContainerCounter<block::SharedBlockState> for BlockStateCounter {
+impl BlockStateCounter {
     fn accept(&mut self, value: block::SharedBlockState, count: usize) {
         let fs = value.fluid_state();
 
