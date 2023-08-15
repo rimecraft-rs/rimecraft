@@ -103,204 +103,10 @@ pub struct PackedArray {
 }
 
 impl PackedArray {
-    /// Magic constants for faster integer division by a constant.
-    const INDEX_PARAMS: [i32; 192] = [
-        -1,
-        -1,
-        0,
-        i32::MIN,
-        0,
-        0,
-        0x55555555,
-        0x55555555,
-        0,
-        i32::MIN,
-        0,
-        1,
-        0x33333333,
-        0x33333333,
-        0,
-        0x2AAAAAAA,
-        0x2AAAAAAA,
-        0,
-        0x24924924,
-        0x24924924,
-        0,
-        i32::MIN,
-        0,
-        2,
-        0x1C71C71C,
-        0x1C71C71C,
-        0,
-        0x19999999,
-        0x19999999,
-        0,
-        390451572,
-        390451572,
-        0,
-        0x15555555,
-        0x15555555,
-        0,
-        0x13B13B13,
-        0x13B13B13,
-        0,
-        306783378,
-        306783378,
-        0,
-        0x11111111,
-        0x11111111,
-        0,
-        i32::MIN,
-        0,
-        3,
-        0xF0F0F0F,
-        0xF0F0F0F,
-        0,
-        0xE38E38E,
-        0xE38E38E,
-        0,
-        226050910,
-        226050910,
-        0,
-        0xCCCCCCC,
-        0xCCCCCCC,
-        0,
-        0xC30C30C,
-        0xC30C30C,
-        0,
-        195225786,
-        195225786,
-        0,
-        186737708,
-        186737708,
-        0,
-        0xAAAAAAA,
-        0xAAAAAAA,
-        0,
-        171798691,
-        171798691,
-        0,
-        0x9D89D89,
-        0x9D89D89,
-        0,
-        159072862,
-        159072862,
-        0,
-        0x9249249,
-        0x9249249,
-        0,
-        148102320,
-        148102320,
-        0,
-        0x8888888,
-        0x8888888,
-        0,
-        138547332,
-        138547332,
-        0,
-        i32::MIN,
-        0,
-        4,
-        130150524,
-        130150524,
-        0,
-        0x7878787,
-        0x7878787,
-        0,
-        0x7507507,
-        0x7507507,
-        0,
-        0x71C71C7,
-        0x71C71C7,
-        0,
-        116080197,
-        116080197,
-        0,
-        113025455,
-        113025455,
-        0,
-        0x6906906,
-        0x6906906,
-        0,
-        0x6666666,
-        0x6666666,
-        0,
-        104755299,
-        104755299,
-        0,
-        0x6186186,
-        0x6186186,
-        0,
-        99882960,
-        99882960,
-        0,
-        97612893,
-        97612893,
-        0,
-        0x5B05B05,
-        0x5B05B05,
-        0,
-        93368854,
-        93368854,
-        0,
-        91382282,
-        91382282,
-        0,
-        0x5555555,
-        0x5555555,
-        0,
-        87652393,
-        87652393,
-        0,
-        85899345,
-        85899345,
-        0,
-        0x5050505,
-        0x5050505,
-        0,
-        0x4EC4EC4,
-        0x4EC4EC4,
-        0,
-        81037118,
-        81037118,
-        0,
-        79536431,
-        79536431,
-        0,
-        78090314,
-        78090314,
-        0,
-        0x4924924,
-        0x4924924,
-        0,
-        75350303,
-        75350303,
-        0,
-        74051160,
-        74051160,
-        0,
-        72796055,
-        72796055,
-        0,
-        0x4444444,
-        0x4444444,
-        0,
-        70409299,
-        70409299,
-        0,
-        69273666,
-        69273666,
-        0,
-        0x4104104,
-        0x4104104,
-        0,
-        i32::MIN,
-        0,
-        5,
-    ];
-
     pub fn new(element_bits: usize, len: usize, data: Option<Vec<u64>>) -> Self {
-        assert!(element_bits > 0 && element_bits <= 32);
+        use super::magic_num::INDEX_PARAMS;
+
+        assert!(element_bits > 0 && element_bits <= 64);
 
         let elements_per_long = 64 / element_bits;
         let expected_data_len = (len + elements_per_long - 1) / elements_per_long;
@@ -310,9 +116,9 @@ impl PackedArray {
             element_bits,
             max_value: (1_u64 << element_bits) - 1,
             elements_per_long,
-            index_scale: Self::INDEX_PARAMS[elements_per_long + 0],
-            index_offset: Self::INDEX_PARAMS[elements_per_long + 1],
-            index_shift: Self::INDEX_PARAMS[elements_per_long + 2],
+            index_scale: INDEX_PARAMS[elements_per_long + 0],
+            index_offset: INDEX_PARAMS[elements_per_long + 1],
+            index_shift: INDEX_PARAMS[elements_per_long + 2],
             data: {
                 if let Some(vec) = data {
                     if vec.len() != expected_data_len {
@@ -385,35 +191,28 @@ impl PackedArray {
 
     /// Sets `value` to `index` and returns the previous value.
     pub fn swap(&mut self, index: usize, value: u64) -> u64 {
-        assert!(self.len >= 1 && self.len <= index + 1);
-        assert!(self.max_value <= value);
+        assert!(self.len >= 1 && index < self.len);
+        assert!(value <= self.max_value);
 
         let i = self.storage_index(index);
         let l = self.data[i];
         let j = (index - i * self.elements_per_long) * self.element_bits;
 
-        self.data[i] =
-            l & (self.max_value << j ^ 0xFFFFFFFFFFFFFFFF) | (value & self.max_value) << j;
+        self.data[i] = l & !(self.max_value.wrapping_shl(j as u32))
+            | (value & self.max_value).wrapping_shl(j as u32);
 
-        l >> j & self.max_value
+        l.wrapping_shr(j as u32) & self.max_value
     }
 
     /// Sets `value` to `index`.
+    #[inline]
     pub fn set(&mut self, index: usize, value: u64) {
-        assert!(self.len >= 1 && self.len <= index + 1);
-        assert!(self.max_value <= value);
-
-        let i = self.storage_index(index);
-        let l = self.data[i];
-        let j = (index - i * self.elements_per_long) * self.element_bits;
-
-        self.data[i] =
-            l & (self.max_value << j ^ 0xFFFFFFFFFFFFFFFF) | (value & self.max_value) << j;
+        self.swap(index, value);
     }
 
     /// Returns the value at `index`.
     pub fn get(&self, index: usize) -> u64 {
-        assert!(self.len >= 1 && self.len <= index + 1);
+        assert!(self.len >= 1 && index < self.len);
 
         let i = self.storage_index(index);
         let l = self.data[i];
@@ -423,6 +222,7 @@ impl PackedArray {
     }
 
     /// The backing data of this storage.
+    #[inline]
     pub fn data(&self) -> &[u64] {
         &self.data
     }
@@ -437,25 +237,14 @@ impl PackedArray {
         self.element_bits
     }
 
-    /// Executes an `action` on all values in this storage, sequentially.
-    pub fn for_each<F>(&self, action: F)
-    where
-        F: Fn(u64),
-    {
-        let mut i = 0;
-
-        for l in self.data.iter() {
-            let mut ll = *l;
-            for _ in 0..self.elements_per_long {
-                action(ll & self.max_value);
-
-                ll >>= self.element_bits;
-                i += 1;
-
-                if i >= self.len {
-                    return;
-                }
-            }
+    pub fn iter(&self) -> PackedArrayIter<'_> {
+        let mut iter = self.data.iter();
+        PackedArrayIter {
+            instance: self,
+            i: 0,
+            epl_index: 0,
+            l: iter.next().copied().unwrap_or_default(),
+            iter,
         }
     }
 
@@ -483,6 +272,62 @@ impl PackedArray {
                 l >>= self.element_bits;
             }
         }
+    }
+}
+
+pub struct PackedArrayIter<'a> {
+    instance: &'a PackedArray,
+    i: usize,
+    iter: std::slice::Iter<'a, u64>,
+    epl_index: usize,
+    l: u64,
+}
+
+impl Iterator for PackedArrayIter<'_> {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.i > self.instance.len {
+            return None;
+        }
+
+        if self.epl_index >= self.instance.elements_per_long {
+            if let Some(e) = self.iter.next() {
+                self.l = *e;
+                self.epl_index = 0;
+            } else {
+                return None;
+            }
+        } else {
+            self.epl_index += 1;
+        }
+
+        let result = self.l & self.instance.max_value;
+
+        self.l >>= self.instance.element_bits;
+        self.i += 1;
+
+        Some(result)
+    }
+}
+
+#[cfg(test)]
+mod packed_array_tests {
+    use super::PackedArray;
+
+    #[test]
+    fn swap() {
+        let mut packed_array = PackedArray::new(32, 64, None);
+        packed_array.iter().for_each(|num| assert_eq!(num, 0));
+
+        assert_eq!(packed_array.swap(4, 1), 0);
+        assert_eq!(packed_array.swap(4, 2), 1);
+
+        assert_eq!(packed_array.swap(35, 16), 0);
+        assert_eq!(packed_array.swap(35, 7), 16);
+
+        assert_eq!(packed_array.get(4), 2);
+        assert_eq!(packed_array.get(35), 7);
     }
 }
 

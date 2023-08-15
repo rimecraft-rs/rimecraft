@@ -275,97 +275,7 @@ impl Variant {
     }
 }
 
-/// A storage whose values are raw IDs held by palettes.
-#[derive(Clone)]
-pub enum Storage {
-    /// See [`crate::collections::PackedArray`].
-    PackedArray(crate::collections::PackedArray),
-    /// An empty palette storage has a length, but all its elements are 0.
-    Empty(
-        /// Length of this storage.
-        usize,
-    ),
-}
-
-impl Storage {
-    /// Sets `value` to `index` and returns the previous value.
-    pub fn swap(&mut self, index: usize, value: u64) -> u64 {
-        match self {
-            Storage::PackedArray(pa) => pa.swap(index, value),
-            Storage::Empty(len) => {
-                assert!(*len >= 1 && *len <= index + 1);
-                0
-            }
-        }
-    }
-
-    /// Sets `value` to `index`.
-    pub fn set(&mut self, index: usize, value: u64) {
-        match self {
-            Storage::PackedArray(pa) => pa.set(index, value),
-            Storage::Empty(len) => {
-                assert!(*len >= 1 && *len <= index + 1);
-            }
-        }
-    }
-
-    /// Returns the value at `index`.
-    pub fn get(&self, index: usize) -> u64 {
-        match self {
-            Storage::PackedArray(pa) => pa.get(index),
-            Storage::Empty(len) => {
-                assert!(*len >= 1 && *len <= index + 1);
-                0
-            }
-        }
-    }
-
-    /// The backing data of this storage.
-    pub fn data(&self) -> &[u64] {
-        match self {
-            Storage::PackedArray(pa) => pa.data(),
-            Storage::Empty(_) => &[],
-        }
-    }
-
-    /// The length of, or the number of elements, in this storage.
-    pub fn len(&self) -> usize {
-        match self {
-            Storage::PackedArray(pa) => pa.len(),
-            Storage::Empty(len) => *len,
-        }
-    }
-
-    /// The number of bits each element in this storage uses.
-    pub fn element_bits(&self) -> usize {
-        match self {
-            Storage::PackedArray(pa) => pa.element_bits(),
-            Storage::Empty(_) => 0,
-        }
-    }
-
-    /// Executes an `action` on all values in this storage, sequentially.
-    pub fn for_each<F>(&self, action: F)
-    where
-        F: Fn(u64),
-    {
-        match self {
-            Storage::PackedArray(ap) => ap.for_each(action),
-            Storage::Empty(len) => {
-                for _ in 0..*len {
-                    action(0)
-                }
-            }
-        }
-    }
-
-    pub fn write_palette_indices(&self, out: &mut [i32]) {
-        match self {
-            Storage::PackedArray(pa) => pa.write_palette_indices(out),
-            Storage::Empty(_) => out.fill(0),
-        }
-    }
-}
+pub type Storage = crate::collections::PackedArray;
 
 struct Data<'a, T: 'a>(DataProvider, Storage, Palette<'a, T>)
 where
@@ -386,9 +296,9 @@ impl DataProvider {
         Data(
             self,
             if self.1 == 0 {
-                Storage::Empty(len)
+                Storage::new(32, len, None)
             } else {
-                Storage::PackedArray(crate::collections::PackedArray::new(self.1, len, None))
+                Storage::new(self.1, len, None)
             },
             self.0.create(self.1, ids, Vec::new()),
         )
@@ -530,7 +440,7 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Container<'a, T> {
         let mut vec = Vec::new();
         let ptr = &mut vec as *mut Vec<u64>;
 
-        data.1.for_each(|value| {
+        data.1.iter().for_each(|value| {
             let v = unsafe { ptr.as_mut().unwrap() };
 
             if !v.contains(&value) {
@@ -574,17 +484,20 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Container<'a, T> {
         Ok(())
     }
 
-    pub fn count(&self, counter: &mut impl ContainerCounter<T>) {
+    pub fn count<F>(&self, counter: F)
+    where
+        F: Fn(T, usize),
+    {
         let this = self.0.read();
         let data = this.data.as_ref().unwrap();
 
         if data.2.len() == 1 {
-            counter.accept(data.2.get(0).unwrap(), data.2.len());
+            counter(data.2.get(0).unwrap(), data.2.len());
         } else {
             let mut map: Vec<(u64, usize)> = Vec::new();
             let ptr = &mut map as *mut Vec<(u64, usize)>;
 
-            data.1.for_each(|key| {
+            data.1.iter().for_each(|key| {
                 let m = unsafe { ptr.as_mut().unwrap() };
 
                 if let Some(entry) = m.iter_mut().find(|e| e.0 == key) {
@@ -595,7 +508,7 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Container<'a, T> {
             });
 
             map.into_iter().for_each(|(key, value)| {
-                counter.accept(data.2.get(key as usize).unwrap(), value);
+                counter(data.2.get(key as usize).unwrap(), value);
             })
         }
     }
@@ -619,8 +532,4 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> ContainerInner<'a, T> {
 
         data_provider.create_data(self.ids.0, self.provider.container_size())
     }
-}
-
-pub trait ContainerCounter<T> {
-    fn accept(&mut self, value: T, count: usize);
 }

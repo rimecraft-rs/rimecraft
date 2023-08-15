@@ -1,6 +1,7 @@
 use std::{hash::Hash, ops::Deref};
 
 pub mod collections;
+mod magic_num;
 pub mod math;
 
 static IDENTIFIER_NAMESPACE_CACHES: crate::collections::Caches<String> =

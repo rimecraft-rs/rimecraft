@@ -181,6 +181,8 @@ struct BlockStateCounter {
     random_tickable_block_count: u16,
 }
 
+impl BlockStateCounter {}
+
 impl palette::ContainerCounter<block::SharedBlockState> for BlockStateCounter {
     fn accept(&mut self, value: block::SharedBlockState, count: usize) {
         let fs = value.fluid_state();
