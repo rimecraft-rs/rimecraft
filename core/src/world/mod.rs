@@ -6,7 +6,7 @@ pub mod tick;
 use crate::prelude::*;
 
 /// A view with a height limit specification.
-pub trait HeightLimitView {
+pub trait HeightLimit {
     /// The difference in the [`Self::bottom_y`] and [`Self::top_y`] height.
     ///
     /// This is the number of blocks that can be modified in any vertical column
@@ -38,7 +38,7 @@ pub trait HeightLimitView {
 
 /// Represents a scoped, read-only view of block states,
 /// fluid states and block entities.
-pub trait BlockView: HeightLimitView {
+pub trait Blocks: HeightLimit {
     /// Default max light level in Rimecraft.
     const DEFAULT_MAX_LIGHT_LEVEL: u8 = 15;
 
@@ -52,7 +52,7 @@ pub trait BlockView: HeightLimitView {
 }
 
 /// Represents a view describing lights.
-pub trait LightSourceView: BlockView {
+pub trait LightSources: Blocks {
     /// Perform for each light sources in this view.
     fn for_each_sources<T: Fn(BlockPos, &crate::block::BlockState)>(&self, f: T);
 }

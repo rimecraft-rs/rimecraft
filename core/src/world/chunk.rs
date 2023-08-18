@@ -4,7 +4,7 @@ use crate::{block, fluid, prelude::*, util::math::ChunkPos};
 
 use super::{biome, palette};
 
-pub trait Chunk<'w>: super::BlockView + super::LightSourceView + std::any::Any {
+pub trait Chunk<'w>: super::Blocks + super::LightSources + std::any::Any {
     fn pos(&self) -> ChunkPos;
 
     fn sections(&self) -> &[Option<Section<'w>>];
@@ -37,7 +37,7 @@ pub trait Chunk<'w>: super::BlockView + super::LightSourceView + std::any::Any {
 
 pub struct WorldChunk<'w> {
     sections: Vec<Section<'w>>,
-    height_limit_view: *const dyn super::HeightLimitView,
+    height_limit_view: *const dyn super::HeightLimit,
 }
 
 mod chunk_imp {
@@ -219,7 +219,7 @@ pub struct UpgradeData {
 impl UpgradeData {
     const INDICES_KEY: &str = "Indices";
 
-    pub fn new(nbt: &crate::nbt::NbtCompound, world: &impl super::HeightLimitView) -> Self {
+    pub fn new(nbt: &crate::nbt::NbtCompound, world: &impl super::HeightLimit) -> Self {
         let mut this = Self {
             sides_to_upgrade: Vec::new(),
             block_ticks: Vec::new(),

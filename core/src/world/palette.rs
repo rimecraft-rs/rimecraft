@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use crate::net::{Decode, Encode};
 
 /// A palette maps objects from and to small integer IDs that uses less
@@ -6,12 +8,18 @@ use crate::net::{Decode, Encode};
 /// While the objects palettes handle are already represented by integer
 /// IDs, shrinking IDs in cases where only a few appear can further reduce
 /// storage space and network traffic volume.
-pub struct Palette<'a, T: PartialEq + Eq + Copy + 'a> {
+pub struct Palette<'a, T>
+where
+    T: Eq + Copy + Hash + 'a,
+{
     ids: crate::Ref<'a, dyn crate::collections::Indexed<T> + Send + Sync>,
     inner: Inner<'a, T>,
 }
 
-impl<'a, T: 'a + PartialEq + Eq + Copy> Palette<'a, T> {
+impl<'a, T> Palette<'a, T>
+where
+    T: Eq + Copy + Hash + 'a,
+{
     /// Returns the ID of an object in this palette.
     pub fn index(&self, value: T) -> Option<usize> {
         match &self.inner {
@@ -22,6 +30,7 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Palette<'a, T> {
             Inner::Singular(option) => option
                 .map(|e| if e == value { Some(0) } else { None })
                 .flatten(),
+            Inner::BiMap(bimap) => bimap.get_by_right(&value).copied(),
         }
     }
 
@@ -41,6 +50,11 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Palette<'a, T> {
                 *option = Some(value);
                 0
             }
+            Inner::BiMap(bimap) => bimap.get_by_right(&value).copied().unwrap_or_else(|| {
+                let id = bimap.len();
+                bimap.insert(id, value);
+                id
+            }),
         })
     }
 
@@ -53,6 +67,7 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Palette<'a, T> {
             Inner::Vector(vec) => vec.iter().any(|e| e.map_or(false, |ee| predicate(ee))),
             Inner::Indexed(_) => true,
             Inner::Singular(option) => predicate(option.expect("use of an uninitialized palette")),
+            Inner::BiMap(bimap) => bimap.iter().any(|entry| predicate(*entry.1)),
         }
     }
 
@@ -64,6 +79,13 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Palette<'a, T> {
             Inner::Singular(option) => {
                 if let (Some(e), 0) = (option, index) {
                     Some(*e)
+                } else {
+                    panic!("missing palette entry for id {index}")
+                }
+            }
+            Inner::BiMap(bimap) => {
+                if let Some(value) = bimap.get_by_left(&index) {
+                    Some(*value)
                 } else {
                     panic!("missing palette entry for id {index}")
                 }
@@ -100,6 +122,20 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Palette<'a, T> {
                             anyhow::anyhow!("raw id not found in the target id list.")
                         })?,
                 );
+            }
+            Inner::BiMap(bimap) => {
+                *bimap = {
+                    let mut map = bimap::BiMap::new();
+
+                    for j in 0..crate::VarInt::decode(buf)? {
+                        map.insert(
+                            map.len(),
+                            *self.ids.get(crate::VarInt::decode(buf)? as usize).unwrap(),
+                        );
+                    }
+
+                    map
+                }
             }
         }
 
@@ -145,6 +181,15 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Palette<'a, T> {
                     panic!("use of an uninitialized palette");
                 }
             }
+            Inner::BiMap(bimap) => {
+                let i = self.len();
+                crate::VarInt(i as i32).encode(buf)?;
+
+                for entry in bimap.iter() {
+                    crate::VarInt(self.ids.get_raw_id(entry.1).map(|e| e as i32).unwrap_or(-1))
+                        .encode(buf)?;
+                }
+            }
         }
 
         Ok(())
@@ -186,6 +231,18 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Palette<'a, T> {
                     panic!("use of an uninitialized palette");
                 }
             }
+            Inner::BiMap(bimap) => {
+                crate::VarInt(self.len() as i32).len()
+                    + bimap
+                        .iter()
+                        .map(|entry| {
+                            crate::VarInt(
+                                self.ids.get_raw_id(entry.1).map(|e| e as i32).unwrap_or(-1),
+                            )
+                            .len()
+                        })
+                        .sum::<usize>()
+            }
         }
     }
 
@@ -195,11 +252,15 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Palette<'a, T> {
             Inner::Vector(vec) => vec.len(),
             Inner::Indexed(ids) => ids.len(),
             Inner::Singular(_) => 1,
+            Inner::BiMap(bimap) => bimap.len(),
         }
     }
 }
 
-impl<'a, T: 'a + PartialEq + Eq + Copy> Encode for Palette<'a, T> {
+impl<'a, T> Encode for Palette<'a, T>
+where
+    T: Eq + Copy + Hash + 'a,
+{
     fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
@@ -208,7 +269,10 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Encode for Palette<'a, T> {
     }
 }
 
-impl<'a, T: 'a + PartialEq + Eq + Copy> Clone for Palette<'a, T> {
+impl<'a, T> Clone for Palette<'a, T>
+where
+    T: Eq + Copy + Hash + 'a,
+{
     fn clone(&self) -> Self {
         Self {
             ids: self.ids,
@@ -217,18 +281,26 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Clone for Palette<'a, T> {
     }
 }
 
-enum Inner<'a, T: 'a + Copy> {
+enum Inner<'a, T>
+where
+    T: Eq + Copy + Hash + 'a,
+{
     Indexed(crate::Ref<'a, dyn crate::collections::Indexed<T> + Send + Sync>),
     Vector(Vec<Option<T>>),
     Singular(Option<T>),
+    BiMap(bimap::BiMap<usize, T>),
 }
 
-impl<'a, T: 'a + Copy> Clone for Inner<'a, T> {
+impl<'a, T> Clone for Inner<'a, T>
+where
+    T: Eq + Copy + Hash + 'a,
+{
     fn clone(&self) -> Self {
         match self {
-            Inner::Vector(vec) => Self::Vector(vec.clone()),
             Inner::Indexed(ids) => Self::Indexed(*ids),
+            Inner::Vector(vec) => Self::Vector(vec.clone()),
             Inner::Singular(value) => Self::Singular(*value),
+            Inner::BiMap(bimap) => Self::BiMap(bimap.clone()),
         }
     }
 }
@@ -248,7 +320,7 @@ impl Variant {
         entries: Vec<A>,
     ) -> Palette<'a, A>
     where
-        A: 'a + PartialEq + Eq + Copy,
+        A: Eq + Copy + Hash + 'a,
     {
         match self {
             Variant::Indexed => Palette {
@@ -279,7 +351,7 @@ pub type Storage = crate::collections::PackedArray;
 
 struct Data<'a, T: 'a>(DataProvider, Storage, Palette<'a, T>)
 where
-    T: PartialEq + Eq + Copy;
+    T: Eq + Copy + Hash;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct DataProvider(Variant, usize);
@@ -291,7 +363,7 @@ impl DataProvider {
         len: usize,
     ) -> Data<'a, T>
     where
-        T: 'a + PartialEq + Eq + Copy,
+        T: Eq + Copy + Hash,
     {
         Data(
             self,
@@ -305,6 +377,7 @@ impl DataProvider {
     }
 }
 
+//TODO: don't make this an enum
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Provider {
     BlockState,
@@ -356,11 +429,14 @@ impl Provider {
 
 /// A paletted container stores objects in 3D voxels as small integer indices,
 /// governed by "palettes" that map between these objects and indices.
-pub struct Container<'a, T>(parking_lot::RwLock<ContainerInner<'a, T>>)
+pub struct Container<'a, T: 'a>(parking_lot::RwLock<ContainerInner<'a, T>>)
 where
-    T: 'a + PartialEq + Eq + Copy;
+    T: Eq + Copy + Hash;
 
-impl<'a, T: 'a + PartialEq + Eq + Copy> Container<'a, T> {
+impl<'a, T: 'a> Container<'a, T>
+where
+    T: Eq + Copy + Hash,
+{
     pub fn new(
         ids: &'a (dyn crate::collections::Indexed<T> + Send + Sync),
         provider: Provider,
@@ -514,13 +590,19 @@ impl<'a, T: 'a + PartialEq + Eq + Copy> Container<'a, T> {
     }
 }
 
-struct ContainerInner<'a, T: 'a + PartialEq + Eq + Copy> {
+struct ContainerInner<'a, T: 'a>
+where
+    T: Eq + Copy + Hash,
+{
     ids: crate::Ref<'a, dyn crate::collections::Indexed<T> + Send + Sync>,
     data: Option<Data<'a, T>>,
     provider: Provider,
 }
 
-impl<'a, T: 'a + PartialEq + Eq + Copy> ContainerInner<'a, T> {
+impl<'a, T: 'a> ContainerInner<'a, T>
+where
+    T: Eq + Copy + Hash,
+{
     fn get_compatible_data(&self, previous: Option<Data<'a, T>>, bits: usize) -> Data<'a, T> {
         let data_provider = self.provider.create_provider(self.ids.0, bits);
 
