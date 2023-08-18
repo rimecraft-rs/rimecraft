@@ -23,9 +23,7 @@ where
     /// Returns the ID of an object in this palette.
     pub fn index(&self, value: T) -> Option<usize> {
         match &self.inner {
-            Inner::Vector(vec) => vec
-                .iter()
-                .position(|option| option.map_or(false, |e| e == value)),
+            Inner::Vector(vec) => vec.iter().position(|e| e == &value),
             Inner::Indexed(ids) => ids.get_raw_id(&value),
             Inner::Singular(option) => option
                 .map(|e| if e == value { Some(0) } else { None })
@@ -42,7 +40,7 @@ where
     pub fn index_or_insert(&mut self, value: T) -> usize {
         self.index(value).unwrap_or_else(|| match &mut self.inner {
             Inner::Vector(vec) => {
-                vec.push(Some(value));
+                vec.push(value);
                 vec.len() - 1
             }
             Inner::Indexed(_) => 0,
@@ -64,7 +62,7 @@ where
         P: Fn(T) -> bool,
     {
         match &self.inner {
-            Inner::Vector(vec) => vec.iter().any(|e| e.map_or(false, |ee| predicate(ee))),
+            Inner::Vector(vec) => vec.iter().any(|e| predicate(*e)),
             Inner::Indexed(_) => true,
             Inner::Singular(option) => predicate(option.expect("use of an uninitialized palette")),
             Inner::BiMap(bimap) => bimap.iter().any(|entry| predicate(*entry.1)),
@@ -74,7 +72,7 @@ where
     /// Returns the object associated with the given `index`.
     pub fn get(&self, index: usize) -> Option<T> {
         match &self.inner {
-            Inner::Vector(vec) => vec.get(index).map(|e| e.map(|ee| ee)).flatten(),
+            Inner::Vector(vec) => vec.get(index).copied(),
             Inner::Indexed(ids) => ids.0.get(index).copied(),
             Inner::Singular(option) => {
                 if let (Some(e), 0) = (option, index) {
@@ -105,10 +103,11 @@ where
 
                 for _ in 0..crate::VarInt::decode(buf)? {
                     vec.push(
-                        self.ids
+                        *self
+                            .ids
                             .0
                             .get(crate::VarInt::decode(buf)? as usize)
-                            .copied(),
+                            .unwrap(),
                     );
                 }
             }
@@ -127,7 +126,7 @@ where
                 *bimap = {
                     let mut map = bimap::BiMap::new();
 
-                    for j in 0..crate::VarInt::decode(buf)? {
+                    for _ in 0..crate::VarInt::decode(buf)? {
                         map.insert(
                             map.len(),
                             *self.ids.get(crate::VarInt::decode(buf)? as usize).unwrap(),
@@ -154,17 +153,13 @@ where
                 crate::VarInt(vec.len() as i32).encode(buf)?;
 
                 for value in vec {
-                    if let Some(r) = value {
-                        crate::VarInt(
-                            self.ids
-                                .get_raw_id(r)
-                                .map(|e| e as i32)
-                                .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
-                        )
-                        .encode(buf)?;
-                    } else {
-                        crate::VarInt(crate::collections::DEFAULT_INDEXED_INDEX).encode(buf)?;
-                    }
+                    crate::VarInt(
+                        self.ids
+                            .get_raw_id(value)
+                            .map(|e| e as i32)
+                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
+                    )
+                    .encode(buf)?;
                 }
             }
             Inner::Indexed(_) => (),
@@ -199,23 +194,19 @@ where
     pub fn buf_len(&self) -> usize {
         match &self.inner {
             Inner::Vector(vec) => {
-                let mut i = crate::VarInt(vec.len() as i32).len() as usize;
-
-                for value in vec {
-                    if let Some(r) = value {
-                        i += crate::VarInt(
-                            self.ids
-                                .get_raw_id(r)
-                                .map(|e| e as i32)
-                                .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
-                        )
-                        .len();
-                    } else {
-                        i += crate::VarInt(crate::collections::DEFAULT_INDEXED_INDEX).len();
-                    }
-                }
-
-                i
+                crate::VarInt(vec.len() as i32).len() as usize
+                    + vec
+                        .iter()
+                        .map(|value| {
+                            crate::VarInt(
+                                self.ids
+                                    .get_raw_id(value)
+                                    .map(|e| e as i32)
+                                    .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
+                            )
+                            .len()
+                        })
+                        .sum::<usize>()
             }
             Inner::Indexed(_) => crate::VarInt(0).len(),
             Inner::Singular(option) => {
@@ -286,7 +277,7 @@ where
     T: Eq + Copy + Hash + 'a,
 {
     Indexed(crate::Ref<'a, dyn crate::collections::Indexed<T> + Send + Sync>),
-    Vector(Vec<Option<T>>),
+    Vector(Vec<T>),
     Singular(Option<T>),
     BiMap(bimap::BiMap<usize, T>),
 }
@@ -310,6 +301,7 @@ pub enum Variant {
     Indexed,
     Vector,
     Singular,
+    BiMap,
 }
 
 impl Variant {
@@ -330,18 +322,26 @@ impl Variant {
             Variant::Vector => Palette {
                 ids: crate::Ref(ids),
                 inner: Inner::Vector({
-                    let mut vec = vec![None; 1 << bits];
-
+                    let mut vec = Vec::with_capacity(1 << bits);
                     for value in entries.into_iter().enumerate() {
-                        vec[value.0] = Some(value.1);
+                        vec[value.0] = value.1;
                     }
-
                     vec
                 }),
             },
             Variant::Singular => Palette {
                 ids: crate::Ref(ids),
                 inner: Inner::Singular(entries.get(0).copied()),
+            },
+            Variant::BiMap => Palette {
+                ids: crate::Ref(ids),
+                inner: Inner::BiMap({
+                    let mut map = bimap::BiMap::with_capacity(1 << bits);
+                    for entry in entries {
+                        map.insert(map.len(), entry);
+                    }
+                    map
+                }),
             },
         }
     }
@@ -377,7 +377,6 @@ impl DataProvider {
     }
 }
 
-//TODO: don't make this an enum
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Provider {
     BlockState,
@@ -400,8 +399,8 @@ impl Provider {
         match self {
             Provider::BlockState => match bits {
                 0 => DataProvider(Variant::Singular, bits),
-                1 | 2 | 3 | 4 => DataProvider(Variant::Vector, bits),
-                5 | 6 | 7 | 8 => unimplemented!("bimap"),
+                1 | 2 | 3 | 4 => DataProvider(Variant::Vector, 4),
+                5 | 6 | 7 | 8 => DataProvider(Variant::BiMap, bits),
                 _ => DataProvider(
                     Variant::Indexed,
                     crate::math::impl_helper::ceil_log_2(ids.len() as i32) as usize,
