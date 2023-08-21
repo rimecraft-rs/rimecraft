@@ -115,7 +115,7 @@ impl<T> std::ops::Index<usize> for Registry<T> {
 }
 
 impl<T: PartialEq + Eq> crate::util::collections::Indexed<T> for Registry<T> {
-    fn get_raw_id(&self, value: &T) -> Option<usize> {
+    fn raw_id(&self, value: &T) -> Option<usize> {
         self.entries
             .iter()
             .enumerate()
@@ -133,7 +133,7 @@ impl<T: PartialEq + Eq> crate::util::collections::Indexed<T> for Registry<T> {
 }
 
 impl<T: PartialEq + Eq> crate::util::collections::Indexed<Entry<T>> for Registry<T> {
-    fn get_raw_id(&self, value: &Entry<T>) -> Option<usize> {
+    fn raw_id(&self, value: &Entry<T>) -> Option<usize> {
         self.entries
             .iter()
             .enumerate()

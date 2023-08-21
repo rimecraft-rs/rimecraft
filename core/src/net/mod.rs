@@ -20,13 +20,39 @@ pub trait Decode<'de> {
         B: bytes::Buf;
 }
 
+pub trait NetSync: Encode {
+    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::Buf;
+
+    fn write_buf<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::BufMut,
+    {
+        self.encode(buf)
+    }
+}
+
+impl<T> NetSync for T
+where
+    T: Encode + for<'de> Decode<'de, Output = T>,
+{
+    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::Buf,
+    {
+        *self = Self::decode(buf)?;
+        Ok(())
+    }
+}
+
 /// Layer for encoding and decoding in nbt binary format for packets.
 pub struct Nbt<'a, T>(pub &'a T);
 
 /// Layer for encoding and decoding in json utf8 for packets.
 pub struct Json<'a, T>(pub &'a T);
 
-mod packet_buf_impl {
+mod packet_buf_imp {
     use std::{hash::Hash, ops::Deref};
 
     use crate::registry::{Registration, RegistryAccess};

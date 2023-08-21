@@ -1,9 +1,12 @@
 pub mod biome;
 pub mod chunk;
+pub mod gen;
 pub mod palette;
 pub mod tick;
 
 use crate::prelude::*;
+
+pub use heightmap::Heightmap;
 
 /// A view with a height limit specification.
 pub trait HeightLimit {

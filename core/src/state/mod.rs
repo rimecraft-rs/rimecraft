@@ -215,13 +215,11 @@ fn new_states<E: Clone, T: Deref<Target = State> + From<(E, State)>>(
         temp = temp
             .iter()
             .flat_map(|list| {
-                unsafe { property.values_unchecked::<u8>() }
-                    .into_iter()
-                    .map(|i| {
-                        let mut list2 = list.clone();
-                        list2.push((property.clone(), i));
-                        list2
-                    })
+                property.values::<u8>().into_iter().map(|i| {
+                    let mut list2 = list.clone();
+                    list2.push((property.clone(), i));
+                    list2
+                })
             })
             .collect()
     }
@@ -280,7 +278,7 @@ impl StatesBuilder {
                 return Err(anyhow::anyhow!("Invalidly named property: {name}"));
             }
 
-            if unsafe { property.values_unchecked::<u8>() }.len() <= 1 {
+            if property.values::<u8>().len() <= 1 {
                 return Err(anyhow::anyhow!(
                     "Attempted use property {name} with <= 1 possible values"
                 ));

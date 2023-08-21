@@ -19,7 +19,7 @@ pub type Shared<'w> = crate::Ref<'w, crate::registry::Entry<Biome>>;
 pub struct SharedRegistry<'w>(pub crate::Ref<'w, crate::registry::Registry<Biome>>);
 
 impl<'w> Indexed<Shared<'w>> for SharedRegistry<'w> {
-    fn get_raw_id(&self, value: &Shared<'w>) -> Option<usize> {
+    fn raw_id(&self, value: &Shared<'w>) -> Option<usize> {
         self.0.iter().position(|entry| crate::Ref(entry) == *value)
     }
 

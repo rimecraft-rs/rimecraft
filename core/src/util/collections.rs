@@ -7,7 +7,7 @@ pub const DEFAULT_INDEXED_INDEX: i32 = -1;
 
 /// An extended version of [`std::ops::Index`].
 pub trait Indexed<T> {
-    fn get_raw_id(&self, value: &T) -> Option<usize>;
+    fn raw_id(&self, value: &T) -> Option<usize>;
     fn get(&self, index: usize) -> Option<&T>;
     fn len(&self) -> usize;
 }
@@ -66,7 +66,7 @@ impl<T: Hash + PartialEq + Eq + Clone> IdList<T> {
 }
 
 impl<T: Hash + PartialEq + Eq + Clone> Indexed<T> for IdList<T> {
-    fn get_raw_id(&self, value: &T) -> Option<usize> {
+    fn raw_id(&self, value: &T) -> Option<usize> {
         self.id_map.get(value).copied().map(|e| e as usize)
     }
 
@@ -500,4 +500,8 @@ mod tests_caches {
 
         assert_eq!(caches.map.read().len(), 2);
     }
+}
+
+pub trait Weighted {
+    fn weight(&self) -> u32;
 }

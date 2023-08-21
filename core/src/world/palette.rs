@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use crate::net::{Decode, Encode};
+use crate::net::{Decode, Encode, NetSync};
 
 /// A palette maps objects from and to small integer IDs that uses less
 /// number of bits to make storage smaller.
@@ -24,7 +24,7 @@ where
     pub fn index(&self, value: T) -> Option<usize> {
         match &self.inner {
             Inner::Vector(vec) => vec.iter().position(|e| e == &value),
-            Inner::Indexed(ids) => ids.get_raw_id(&value),
+            Inner::Indexed(ids) => ids.raw_id(&value),
             Inner::Singular(option) => option
                 .map(|e| if e == value { Some(0) } else { None })
                 .flatten(),
@@ -91,9 +91,118 @@ where
         }
     }
 
-    /// Initializes this palette from the `buf`.
-    /// Clears the preexisting data in this palette.
-    pub fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    /// The serialized size of this palette in a byte buf, in bytes.
+    pub fn buf_len(&self) -> usize {
+        match &self.inner {
+            Inner::Vector(vec) => {
+                crate::VarInt(vec.len() as i32).len() as usize
+                    + vec
+                        .iter()
+                        .map(|value| {
+                            crate::VarInt(
+                                self.ids
+                                    .raw_id(value)
+                                    .map(|e| e as i32)
+                                    .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
+                            )
+                            .len()
+                        })
+                        .sum::<usize>()
+            }
+            Inner::Indexed(_) => crate::VarInt(0).len(),
+            Inner::Singular(option) => {
+                if let Some(entry) = option {
+                    crate::VarInt(
+                        self.ids
+                            .raw_id(&entry)
+                            .map(|e| e as i32)
+                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
+                    )
+                    .len()
+                } else {
+                    panic!("use of an uninitialized palette");
+                }
+            }
+            Inner::BiMap(bimap) => {
+                crate::VarInt(self.len() as i32).len()
+                    + bimap
+                        .iter()
+                        .map(|entry| {
+                            crate::VarInt(self.ids.raw_id(entry.1).map(|e| e as i32).unwrap_or(-1))
+                                .len()
+                        })
+                        .sum::<usize>()
+            }
+        }
+    }
+
+    /// Size of this palette.
+    pub fn len(&self) -> usize {
+        match &self.inner {
+            Inner::Vector(vec) => vec.len(),
+            Inner::Indexed(ids) => ids.len(),
+            Inner::Singular(_) => 1,
+            Inner::BiMap(bimap) => bimap.len(),
+        }
+    }
+}
+
+impl<'a, T> Encode for Palette<'a, T>
+where
+    T: Eq + Copy + Hash + 'a,
+{
+    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::BufMut,
+    {
+        match &self.inner {
+            Inner::Vector(vec) => {
+                crate::VarInt(vec.len() as i32).encode(buf)?;
+
+                for value in vec {
+                    crate::VarInt(
+                        self.ids
+                            .raw_id(value)
+                            .map(|e| e as i32)
+                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
+                    )
+                    .encode(buf)?;
+                }
+            }
+            Inner::Indexed(_) => (),
+            Inner::Singular(option) => {
+                if let Some(entry) = option {
+                    crate::VarInt(
+                        self.ids
+                            .raw_id(&entry)
+                            .map(|e| e as i32)
+                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
+                    )
+                    .encode(buf)?;
+                } else {
+                    panic!("use of an uninitialized palette");
+                }
+            }
+            Inner::BiMap(bimap) => {
+                let i = self.len();
+                crate::VarInt(i as i32).encode(buf)?;
+
+                for entry in bimap.iter() {
+                    crate::VarInt(self.ids.raw_id(entry.1).map(|e| e as i32).unwrap_or(-1))
+                        .encode(buf)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a, T> crate::net::NetSync for Palette<'a, T>
+where
+    T: Eq + Copy + Hash + 'a,
+{
+    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::Buf,
     {
@@ -125,138 +234,18 @@ where
             Inner::BiMap(bimap) => {
                 *bimap = {
                     let mut map = bimap::BiMap::new();
-
                     for _ in 0..crate::VarInt::decode(buf)? {
                         map.insert(
                             map.len(),
                             *self.ids.get(crate::VarInt::decode(buf)? as usize).unwrap(),
                         );
                     }
-
                     map
                 }
             }
         }
 
         Ok(())
-    }
-
-    /// Writes this palette to the `buf`.
-    ///
-    /// This is equal with [`Encode::encode`].
-    pub fn write_buf<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        match &self.inner {
-            Inner::Vector(vec) => {
-                crate::VarInt(vec.len() as i32).encode(buf)?;
-
-                for value in vec {
-                    crate::VarInt(
-                        self.ids
-                            .get_raw_id(value)
-                            .map(|e| e as i32)
-                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
-                    )
-                    .encode(buf)?;
-                }
-            }
-            Inner::Indexed(_) => (),
-            Inner::Singular(option) => {
-                if let Some(entry) = option {
-                    crate::VarInt(
-                        self.ids
-                            .get_raw_id(&entry)
-                            .map(|e| e as i32)
-                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
-                    )
-                    .encode(buf)?;
-                } else {
-                    panic!("use of an uninitialized palette");
-                }
-            }
-            Inner::BiMap(bimap) => {
-                let i = self.len();
-                crate::VarInt(i as i32).encode(buf)?;
-
-                for entry in bimap.iter() {
-                    crate::VarInt(self.ids.get_raw_id(entry.1).map(|e| e as i32).unwrap_or(-1))
-                        .encode(buf)?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// The serialized size of this palette in a byte buf, in bytes.
-    pub fn buf_len(&self) -> usize {
-        match &self.inner {
-            Inner::Vector(vec) => {
-                crate::VarInt(vec.len() as i32).len() as usize
-                    + vec
-                        .iter()
-                        .map(|value| {
-                            crate::VarInt(
-                                self.ids
-                                    .get_raw_id(value)
-                                    .map(|e| e as i32)
-                                    .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
-                            )
-                            .len()
-                        })
-                        .sum::<usize>()
-            }
-            Inner::Indexed(_) => crate::VarInt(0).len(),
-            Inner::Singular(option) => {
-                if let Some(entry) = option {
-                    crate::VarInt(
-                        self.ids
-                            .get_raw_id(&entry)
-                            .map(|e| e as i32)
-                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
-                    )
-                    .len()
-                } else {
-                    panic!("use of an uninitialized palette");
-                }
-            }
-            Inner::BiMap(bimap) => {
-                crate::VarInt(self.len() as i32).len()
-                    + bimap
-                        .iter()
-                        .map(|entry| {
-                            crate::VarInt(
-                                self.ids.get_raw_id(entry.1).map(|e| e as i32).unwrap_or(-1),
-                            )
-                            .len()
-                        })
-                        .sum::<usize>()
-            }
-        }
-    }
-
-    /// Size of this palette.
-    pub fn len(&self) -> usize {
-        match &self.inner {
-            Inner::Vector(vec) => vec.len(),
-            Inner::Indexed(ids) => ids.len(),
-            Inner::Singular(_) => 1,
-            Inner::BiMap(bimap) => bimap.len(),
-        }
-    }
-}
-
-impl<'a, T> Encode for Palette<'a, T>
-where
-    T: Eq + Copy + Hash + 'a,
-{
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        self.write_buf(buf)
     }
 }
 
@@ -553,7 +542,7 @@ where
         let data = data_r1.unwrap();
 
         buf.put_u8(data.1.element_bits() as u8);
-        data.2.write_buf(buf)?;
+        data.2.encode(buf)?;
         data.1.data().encode(buf)?;
 
         Ok(())

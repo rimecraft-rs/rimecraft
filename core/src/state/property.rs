@@ -23,7 +23,11 @@ impl Property {
     }
 
     pub fn values<T: From<u8> + std::any::Any>(&self) -> Vec<T> {
-        assert_eq!(self.type_id, std::any::TypeId::of::<T>());
+        assert!(
+            self.type_id == std::any::TypeId::of::<T>()
+                || std::any::TypeId::of::<u8>() == std::any::TypeId::of::<T>()
+        );
+
         unsafe { self.values_unchecked() }
     }
 

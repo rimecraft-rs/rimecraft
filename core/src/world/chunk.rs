@@ -35,9 +35,15 @@ pub trait Chunk<'w>: super::Blocks + super::LightSources + std::any::Any {
     fn remove_block_entity(&self, pos: BlockPos);
 }
 
-pub struct WorldChunk<'w> {
+struct BaseChunk<'w> {
     sections: Vec<Section<'w>>,
-    height_limit_view: *const dyn super::HeightLimit,
+    height_limit_view: &'static dyn super::HeightLimit,
+    heightmaps: Vec<(super::heightmap::Type, super::heightmap::Heightmap)>,
+    sky_light: light::ChunkSkyLight,
+}
+
+pub struct WorldChunk<'w> {
+    base: BaseChunk<'w>,
 }
 
 mod chunk_imp {
@@ -54,8 +60,8 @@ mod chunk_imp {
 }
 
 pub struct Section<'w> {
-    pub biome_container: palette::Container<'w, biome::Shared<'w>>,
-    pub block_state_container: palette::Container<'static, block::SharedBlockState>,
+    biome_container: palette::Container<'w, biome::Shared<'w>>,
+    block_state_container: palette::Container<'static, block::SharedBlockState>,
 
     lock: std::sync::Mutex<()>,
 
@@ -74,7 +80,7 @@ impl<'w> Section<'w> {
             ),
             biome_container: palette::Container::from_initialize(
                 biomes,
-                todo!(),
+                todo!("plains"),
                 palette::Provider::Biome,
             ),
             lock: std::sync::Mutex::new(()),
@@ -84,7 +90,8 @@ impl<'w> Section<'w> {
         }
     }
 
-    pub fn get_block_state(&self, x: i32, y: i32, z: i32) -> Option<block::SharedBlockState> {
+    #[inline]
+    pub fn block_state(&self, x: i32, y: i32, z: i32) -> Option<block::SharedBlockState> {
         self.block_state_container.get((x, y, z))
     }
 
@@ -102,7 +109,7 @@ impl<'w> Section<'w> {
         pos: (i32, i32, i32),
         state: block::SharedBlockState,
     ) -> block::SharedBlockState {
-        let bs = unsafe { self.block_state_container.swap_unchecked(pos, state) };
+        let bs = self.block_state_container.swap_unchecked(pos, state);
         let fs = bs.fluid_state();
         let fs2 = state.fluid_state();
 
@@ -176,6 +183,16 @@ impl<'w> Section<'w> {
         );
         self.non_empty_fluid_count
             .store(counter.non_empty_fluid_count, atomic::Ordering::Release);
+    }
+
+    #[inline]
+    pub fn block_state_container(&self) -> &palette::Container<'static, block::SharedBlockState> {
+        &self.block_state_container
+    }
+
+    #[inline]
+    pub fn biome_container(&self) -> &palette::Container<'w, biome::Shared<'w>> {
+        &self.biome_container
     }
 }
 
@@ -298,6 +315,33 @@ impl UpgradeData {
                 ) {
                     ticks.push(tick)
                 }
+            }
+        }
+    }
+}
+
+pub mod light {
+    pub struct ChunkSkyLight {
+        min_y: i32,
+        palette: super::palette::Storage,
+
+        bp1: crate::math::BlockPos,
+        bp2: crate::math::BlockPos,
+    }
+
+    impl ChunkSkyLight {
+        pub fn new(height_limit: &dyn crate::world::HeightLimit) -> Self {
+            let min_y = height_limit.bottom_y() - 1;
+
+            Self {
+                min_y,
+                palette: crate::collections::PackedArray::new(
+                    crate::math::impl_helper::ceil_log_2(height_limit.top_y() - min_y + 1) as usize,
+                    256,
+                    None,
+                ),
+                bp1: crate::math::BlockPos::ORIGIN,
+                bp2: crate::math::BlockPos::ORIGIN,
             }
         }
     }
