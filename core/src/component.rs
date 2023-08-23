@@ -5,7 +5,7 @@ pub trait Attach {
 }
 
 pub struct Components {
-    components: <(TypeId, Box<dyn Attach + Send + Sync>)>,
+    components: std::collections::HashMap<crate::Id, (TypeId, Box<dyn Attach + Send + Sync>)>,
 }
 
 impl Components {}
