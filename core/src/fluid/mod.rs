@@ -22,7 +22,7 @@ impl Fluid {
             id: 0,
             states: std::sync::Arc::new({
                 let mut builder = crate::state::StatesBuilder::new();
-                let mut map = hashbrown::HashMap::new();
+                let mut map = std::collections::HashMap::new();
                 for state in states {
                     builder.add(state.0.clone())?;
                     map.insert(state.0, state.1);

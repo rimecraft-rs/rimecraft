@@ -603,51 +603,6 @@ mod packet_buf_imp {
         }
     }
 
-    impl<K, V> Encode for hashbrown::HashMap<K, V>
-    where
-        K: Encode,
-        V: Encode,
-    {
-        fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-        where
-            B: bytes::BufMut,
-        {
-            crate::util::VarInt(self.len() as i32).encode(buf)?;
-
-            for (key, value) in self.iter() {
-                key.encode(buf)?;
-                value.encode(buf)?;
-            }
-
-            Ok(())
-        }
-    }
-
-    impl<'de, K, V, OK, OV> Decode<'de> for hashbrown::HashMap<K, V>
-    where
-        K: for<'a> Decode<'a, Output = OK>,
-        V: for<'a> Decode<'a, Output = OV>,
-        OK: Hash + Eq,
-    {
-        type Output = hashbrown::HashMap<OK, OV>;
-
-        fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-        where
-            B: bytes::Buf,
-        {
-            let len = crate::util::VarInt::decode(buf)? as usize;
-            let mut map = hashbrown::HashMap::with_capacity(len);
-
-            for _ in 0..len {
-                let obj = K::decode(buf)?;
-                let obj1 = V::decode(buf)?;
-                map.insert(obj, obj1);
-            }
-
-            Ok(map)
-        }
-    }
-
     impl<T> Encode for Option<T>
     where
         T: Encode,

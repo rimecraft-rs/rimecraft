@@ -18,7 +18,7 @@ pub trait Indexed<T> {
 #[derive(Clone)]
 pub struct IdList<T: Hash + PartialEq + Eq + Clone> {
     next_id: u32,
-    id_map: hashbrown::HashMap<T, u32>,
+    id_map: std::collections::HashMap<T, u32>,
     vec: Vec<Option<T>>,
 }
 
@@ -26,7 +26,7 @@ impl<T: Hash + PartialEq + Eq + Clone> IdList<T> {
     pub fn new() -> Self {
         Self {
             next_id: 0,
-            id_map: hashbrown::HashMap::new(),
+            id_map: std::collections::HashMap::new(),
             vec: vec![],
         }
     }
@@ -34,7 +34,7 @@ impl<T: Hash + PartialEq + Eq + Clone> IdList<T> {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             next_id: 0,
-            id_map: hashbrown::HashMap::with_capacity(capacity),
+            id_map: std::collections::HashMap::with_capacity(capacity),
             vec: Vec::with_capacity(capacity),
         }
     }

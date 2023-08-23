@@ -40,12 +40,12 @@ impl<T> Deref for Entry<T> {
 pub struct Registry<T> {
     default: Option<usize>,
     entries: Vec<Entry<T>>,
-    id_map: hashbrown::HashMap<Id, usize>,
+    id_map: std::collections::HashMap<Id, usize>,
     /// Key of this registry.
     pub key: Key<Self>,
-    key_map: hashbrown::HashMap<Key<T>, usize>,
+    key_map: std::collections::HashMap<Key<T>, usize>,
     /// Tag to entries mapping of this registry.
-    pub tags: parking_lot::RwLock<hashbrown::HashMap<tag::Key<T>, Vec<usize>>>,
+    pub tags: parking_lot::RwLock<std::collections::HashMap<tag::Key<T>, Vec<usize>>>,
 }
 
 impl<T> Registry<T> {
@@ -192,7 +192,7 @@ impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
             .collect::<Vec<_>>();
 
         let id_map = {
-            let mut map = hashbrown::HashMap::new();
+            let mut map = std::collections::HashMap::new();
             for e in entries.iter().enumerate() {
                 map.insert(e.1.key.value().clone(), e.0);
             }
@@ -202,7 +202,7 @@ impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
         Registry {
             default: opts.1.map(|e| id_map.get(&e).copied()).flatten(),
             key_map: {
-                let mut map = hashbrown::HashMap::new();
+                let mut map = std::collections::HashMap::new();
                 for e in entries.iter().enumerate() {
                     map.insert(e.1.key.clone(), e.0);
                 }
@@ -211,7 +211,7 @@ impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
             entries,
             id_map,
             key: opts.0,
-            tags: parking_lot::RwLock::new(hashbrown::HashMap::new()),
+            tags: parking_lot::RwLock::new(std::collections::HashMap::new()),
         }
     }
 }
