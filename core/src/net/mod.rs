@@ -841,7 +841,7 @@ mod packet_buf_imp {
         where
             B: bytes::Buf,
         {
-            Id::try_parse(&String::decode(buf)?)
+            Ok(Id::try_parse(&String::decode(buf)?)?)
         }
     }
 

@@ -4,8 +4,7 @@ pub mod collections;
 mod magic_num;
 pub mod math;
 
-static IDENTIFIER_NAMESPACE_CACHES: crate::collections::Caches<String> =
-    crate::collections::Caches::new();
+static ID_NAMESPACE_CACHES: crate::collections::Caches<String> = crate::collections::Caches::new();
 
 /// An identifier used to identify things.
 ///
@@ -20,16 +19,31 @@ pub struct Id {
 }
 
 impl Id {
-    pub fn new(namespace: &str, path: &str) -> anyhow::Result<Self> {
-        if Self::is_namespace_valid(namespace) && Self::is_path_valid(path) {
+    pub fn new(namespace: &str, path: String) -> Self {
+        Self::try_new(namespace, path).unwrap()
+    }
+
+    pub fn try_new(namespace: &str, path: String) -> Result<Self, IdError> {
+        let owned_namespace = namespace.to_string();
+        if Self::is_path_valid(&path) {
+            if !ID_NAMESPACE_CACHES.contains(&owned_namespace)
+                && !Self::is_namespace_valid(namespace)
+            {
+                return Err(IdError::InvalidChars {
+                    namespace: owned_namespace,
+                    path,
+                });
+            }
+
             Ok(Self {
-                namespace: Ref(IDENTIFIER_NAMESPACE_CACHES.get(namespace.to_string())),
-                path: path.to_string(),
+                namespace: Ref(ID_NAMESPACE_CACHES.get(owned_namespace)),
+                path,
             })
         } else {
-            Err(anyhow::anyhow!(
-                "Non [a-z0-9/._-] character in id {namespace}:{path}"
-            ))
+            Err(IdError::InvalidChars {
+                namespace: owned_namespace,
+                path,
+            })
         }
     }
 
@@ -37,14 +51,14 @@ impl Id {
         Self::try_parse(id).unwrap()
     }
 
-    pub fn try_parse(id: &str) -> anyhow::Result<Self> {
+    pub fn try_parse(id: &str) -> Result<Self, IdError> {
         Self::split_on(id, ':')
     }
 
-    pub fn split_on(id: &str, delimiter: char) -> anyhow::Result<Self> {
+    pub fn split_on(id: &str, delimiter: char) -> Result<Self, IdError> {
         match id.split_once(delimiter) {
-            Some(arr) => Self::new(arr.0, arr.1),
-            None => Self::new("rimecraft", id),
+            Some(arr) => Self::try_new(arr.0, arr.1.to_string()),
+            None => Self::try_new("unknown", id.to_string()),
         }
     }
 
@@ -81,6 +95,12 @@ impl Id {
     pub fn path(&self) -> &str {
         &self.path
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum IdError {
+    #[error("non [a-z0-9/._-] character in id {namespace}:{path}")]
+    InvalidChars { namespace: String, path: String },
 }
 
 impl std::fmt::Display for Id {
@@ -123,7 +143,7 @@ mod id_tests {
 
     #[test]
     fn to_str() {
-        let id = Id::new("modid", "example_path").unwrap();
+        let id = Id::new("modid", "example_path".to_string());
         assert_eq!(id.to_string(), "modid:example_path");
     }
 

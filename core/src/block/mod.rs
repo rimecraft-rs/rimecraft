@@ -26,7 +26,9 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn new(states: Vec<(crate::state::property::Property, u8)>) -> anyhow::Result<Self> {
+    pub fn new(
+        states: Vec<(crate::state::property::Property, u8)>,
+    ) -> Result<Self, crate::state::StatesBuilderError> {
         Ok(Self {
             id: 0,
             states: {

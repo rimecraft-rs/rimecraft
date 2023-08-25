@@ -11,17 +11,20 @@ pub struct State {
 }
 
 impl State {
-    pub fn cycle(&self, property: &property::Property) -> anyhow::Result<usize> {
+    pub fn cycle(&self, property: &property::Property) -> Result<usize, StateError> {
         self.with(property, {
             let range = property.range();
-            let mut value = *self.entries.get(property).ok_or_else(|| {
-                anyhow::anyhow!("Cannot set property {property:?} as it does not exist")
-            })?;
+            let mut value = *self
+                .entries
+                .get(property)
+                .ok_or_else(|| StateError::InvalidProperty(property.clone()))?;
+
             if value >= range.1 {
                 value = range.0;
             } else {
                 value += 1;
             }
+
             value
         })
     }
@@ -30,11 +33,12 @@ impl State {
         &self,
         property: &property::Property,
         value: T,
-    ) -> anyhow::Result<usize> {
+    ) -> Result<usize, StateError> {
         let i = value.into();
-        let peq = *self.entries.get(property).ok_or_else(|| {
-            anyhow::anyhow!("Cannot set property {property:?} as it does not exist")
-        })?;
+        let peq = *self
+            .entries
+            .get(property)
+            .ok_or_else(|| StateError::InvalidProperty(property.clone()))?;
 
         if peq == i {
             Ok(self.id)
@@ -45,10 +49,9 @@ impl State {
                 .get(property)
                 .unwrap()
                 .get((i - property.range().0) as usize)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Cannot set property {property:?} to {i}, it's not an allowed value"
-                    )
+                .ok_or_else(|| StateError::InvalidValue {
+                    property: property.clone(),
+                    value: i,
                 })
                 .copied()
         }
@@ -58,7 +61,7 @@ impl State {
         &self,
         property: &property::Property,
         value: T,
-    ) -> anyhow::Result<usize> {
+    ) -> Result<usize, StateError> {
         let i = value.into();
         let peq = self.entries.get(property).copied();
 
@@ -74,23 +77,25 @@ impl State {
                 .get(property)
                 .unwrap()
                 .get((i - property.range().0) as usize)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Cannot set property {property:?} to {i}, it's not an allowed value"
-                    )
+                .ok_or_else(|| StateError::InvalidValue {
+                    property: property.clone(),
+                    value: i,
                 })
                 .copied()
         }
     }
 
     fn init_table<T: Deref<Target = Self>>(&self, states: &[T]) {
-        assert!(self.table.get().is_none());
+        assert!(self.table.get().is_none(), "table already initialized");
         let mut table = std::collections::HashMap::new();
+
         for p in self.entries.keys() {
             let range = p.range();
             let mut vec = Vec::new();
+
             for i in range.0..=range.1 {
                 let iindex = i - range.0;
+
                 vec.push(
                     states
                         .iter()
@@ -109,8 +114,10 @@ impl State {
                         .id,
                 );
             }
+
             table.insert(p.clone(), vec);
         }
+
         self.table.get_or_init(|| table);
     }
 
@@ -129,6 +136,14 @@ impl State {
     pub fn entries(&self) -> &std::collections::HashMap<property::Property, u8> {
         &self.entries
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum StateError {
+    #[error("property {0:?} doesn't exist")]
+    InvalidProperty(property::Property),
+    #[error("{value} it's not an allowed value of {property:?}")]
+    InvalidValue { property: Property, value: u8 },
 }
 
 pub struct States<T: Deref<Target = State> + 'static> {
@@ -166,8 +181,7 @@ impl<T: Deref<Target = State> + 'static> States<T> {
     }
 }
 
-/// A shared state with states reference count and the index
-/// which is cheap to clone.
+/// A shared state with states reference count and the index.
 pub struct Shared<T: Deref<Target = State> + 'static> {
     pub entries: crate::util::Ref<'static, crate::state::States<T>>,
     pub value: crate::util::Ref<'static, T>,
@@ -271,22 +285,31 @@ impl StatesBuilder {
         Self::default()
     }
 
-    pub fn add(&mut self, property: property::Property) -> anyhow::Result<()> {
+    pub fn add(&mut self, property: property::Property) -> Result<(), StatesBuilderError> {
         let name = property.name();
 
         {
-            if lazy_regex::regex!("^[a-z0-9_]+$").is_match(name) {
-                return Err(anyhow::anyhow!("Invalidly named property: {name}"));
+            if lazy_regex::regex_is_match!("^[a-z0-9_]+$", name) {
+                return Err(StatesBuilderError::InvalidPropertyName {
+                    name: name.to_string(),
+                });
             }
 
-            if property.values::<u8>().len() <= 1 {
-                return Err(anyhow::anyhow!(
-                    "Attempted use property {name} with <= 1 possible values"
-                ));
+            {
+                let len = property.values::<u8>().len();
+
+                if len <= 1 {
+                    return Err(StatesBuilderError::PropertyLeOnePossibleValues {
+                        name: name.to_string(),
+                        len,
+                    });
+                }
             }
 
             if self.properties.contains_key(name) {
-                return Err(anyhow::anyhow!("Duplicated property: {name}"));
+                return Err(StatesBuilderError::PropertyDuplicated {
+                    name: name.to_string(),
+                });
             }
         }
 
@@ -302,4 +325,14 @@ impl StatesBuilder {
     ) -> States<S> {
         new_states(data, def_state, self.properties)
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum StatesBuilderError {
+    #[error("invalidly named property: {name}")]
+    InvalidPropertyName { name: String },
+    #[error("property {name} has {len} possible values which is lesser than or equal to 1")]
+    PropertyLeOnePossibleValues { name: String, len: usize },
+    #[error("property duplicated: {name}")]
+    PropertyDuplicated { name: String },
 }

@@ -381,6 +381,14 @@ where
             reference
         }
     }
+
+    pub fn contains(&self, value: &T) -> bool {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        self.map.read().iter().any(|value| value.0 == hash)
+    }
 }
 
 impl<T> Drop for Caches<T>
@@ -454,6 +462,14 @@ where
 
             arc
         }
+    }
+
+    pub fn contains(&self, value: &T) -> bool {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        self.map.read().iter().any(|value| value.0 == hash)
     }
 }
 

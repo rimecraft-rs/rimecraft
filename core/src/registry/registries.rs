@@ -1,7 +1,8 @@
 use crate::prelude::*;
 
+#[inline]
 pub fn root_key() -> Id {
-    Id::parse("root")
+    Id::new("core", "root".to_string())
 }
 
 pub static ITEM: super::Freezer<crate::item::Item> = super::Freezer::new(super::Builder::new());
