@@ -196,7 +196,7 @@ impl ComponentsBuilder {
     }
 
     /// Enable nbt reading and writing feature for the instance.
-    pub fn nbt_rw(mut self) -> Self {
+    pub fn nbt_storing(mut self) -> Self {
         self.inner
             .register(nbt_save_event_comp_id(), nbt_event_comp());
         self.inner
@@ -354,6 +354,11 @@ static NBT_SAVE_ID: once_cell::sync::Lazy<crate::Id> =
 static NBT_READ_ID: once_cell::sync::Lazy<crate::Id> =
     once_cell::sync::Lazy::new(nbt_read_event_comp_id);
 
+/// Represents a component that able to be stored
+/// by nbt, through [`crate::nbt::Update`] trait.
+///
+/// The `1` field is the component id which is used
+/// to be registered into components.
 pub struct Saved<T>(pub T, pub crate::Id)
 where
     T: Attach + crate::nbt::Update + 'static;
