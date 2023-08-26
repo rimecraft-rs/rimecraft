@@ -24,13 +24,6 @@ pub trait NetSync: Encode {
     fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::Buf;
-
-    fn write_buf<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        self.encode(buf)
-    }
 }
 
 impl<T> NetSync for T
@@ -58,6 +51,26 @@ mod packet_buf_imp {
     use crate::registry::{Registration, RegistryAccess};
 
     use super::*;
+
+    impl Encode for bytes::Bytes {
+        fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+        where
+            B: bytes::BufMut,
+        {
+            self.slice(..).encode(buf)
+        }
+    }
+
+    impl<'de> Decode<'de> for bytes::Bytes {
+        type Output = bytes::Bytes;
+
+        fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+        where
+            B: bytes::Buf,
+        {
+            Vec::<u8>::decode(buf).map(bytes::Bytes::from)
+        }
+    }
 
     impl Encode for u8 {
         fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
