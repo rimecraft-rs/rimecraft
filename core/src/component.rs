@@ -127,7 +127,7 @@ impl NetSync for Components {
         let Component(event) =
             self.get::<Component<
                 crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
-            >>(NET_SEND_ID.deref())
+            >>(NET_RECV_ID.deref())
                 .expect("net recv event component not found");
 
         let mut hashmap = HashMap::<crate::Id, Bytes>::decode(buf)?;
@@ -220,6 +220,7 @@ impl Into<Components> for ComponentsBuilder {
 /// Represents a simple component without extra
 /// attach features, which has an empty
 /// implementation of [`Attach`].
+#[derive(Debug)]
 pub struct Component<T>(pub T);
 
 impl<T> Attach for Component<T> {
@@ -240,6 +241,57 @@ impl<T> DerefMut for Component<T> {
     }
 }
 
+impl<T> Encode for Component<T>
+where
+    T: Encode,
+{
+    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::BufMut,
+    {
+        self.0.encode(buf)
+    }
+}
+
+impl<T> NetSync for Component<T>
+where
+    T: NetSync,
+{
+    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::Buf,
+    {
+        self.0.read_buf(buf)
+    }
+}
+
+impl<T> serde::Serialize for Component<T>
+where
+    T: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<T> crate::nbt::Update for Component<T>
+where
+    T: crate::nbt::Update,
+{
+    fn update<'de, D>(
+        &'de mut self,
+        deserializer: D,
+    ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        self.0.update(deserializer)
+    }
+}
+
 static NET_SEND_ID: once_cell::sync::Lazy<crate::Id> =
     once_cell::sync::Lazy::new(net_send_event_comp_id);
 static NET_RECV_ID: once_cell::sync::Lazy<crate::Id> =
@@ -250,6 +302,7 @@ static NET_RECV_ID: once_cell::sync::Lazy<crate::Id> =
 ///
 /// The `1` field is the component id which is used
 /// to be registered into components.
+#[derive(Debug)]
 pub struct Synced<T>(pub T, pub crate::Id)
 where
     T: Attach + NetSync + 'static;
@@ -326,6 +379,57 @@ where
     }
 }
 
+impl<T> Encode for Synced<T>
+where
+    T: Attach + NetSync + 'static,
+{
+    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::BufMut,
+    {
+        self.0.encode(buf)
+    }
+}
+
+impl<T> NetSync for Synced<T>
+where
+    T: Attach + NetSync + 'static,
+{
+    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::Buf,
+    {
+        self.0.read_buf(buf)
+    }
+}
+
+impl<T> serde::Serialize for Synced<T>
+where
+    T: Attach + NetSync + serde::Serialize + 'static,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<T> crate::nbt::Update for Synced<T>
+where
+    T: Attach + NetSync + crate::nbt::Update + 'static,
+{
+    fn update<'de, D>(
+        &'de mut self,
+        deserializer: D,
+    ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        self.0.update(deserializer)
+    }
+}
+
 pub fn net_event_comp(
 ) -> Component<crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>> {
     Component(crate::Event::new(|listeners| {
@@ -359,11 +463,12 @@ static NBT_READ_ID: once_cell::sync::Lazy<crate::Id> =
 ///
 /// The `1` field is the component id which is used
 /// to be registered into components.
-pub struct Saved<T>(pub T, pub crate::Id)
+#[derive(Debug)]
+pub struct Stored<T>(pub T, pub crate::Id)
 where
     T: Attach + crate::nbt::Update + 'static;
 
-impl<T> Attach for Saved<T>
+impl<T> Attach for Stored<T>
 where
     T: Attach + crate::nbt::Update + 'static,
 {
@@ -414,7 +519,7 @@ where
     }
 }
 
-impl<T> Deref for Saved<T>
+impl<T> Deref for Stored<T>
 where
     T: Attach + crate::nbt::Update + 'static,
 {
@@ -425,12 +530,63 @@ where
     }
 }
 
-impl<T> DerefMut for Saved<T>
+impl<T> DerefMut for Stored<T>
 where
     T: Attach + crate::nbt::Update + 'static,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl<T> Encode for Stored<T>
+where
+    T: Attach + crate::nbt::Update + Encode + 'static,
+{
+    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::BufMut,
+    {
+        self.0.encode(buf)
+    }
+}
+
+impl<T> NetSync for Stored<T>
+where
+    T: Attach + crate::nbt::Update + NetSync + 'static,
+{
+    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::Buf,
+    {
+        self.0.read_buf(buf)
+    }
+}
+
+impl<T> serde::Serialize for Stored<T>
+where
+    T: Attach + crate::nbt::Update + serde::Serialize + 'static,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<T> crate::nbt::Update for Stored<T>
+where
+    T: Attach + crate::nbt::Update + 'static,
+{
+    fn update<'de, D>(
+        &'de mut self,
+        deserializer: D,
+    ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        self.0.update(deserializer)
     }
 }
 
@@ -456,4 +612,114 @@ pub fn nbt_save_event_comp_id() -> crate::Id {
 #[inline]
 pub fn nbt_read_event_comp_id() -> crate::Id {
     crate::Id::new("core", "nbt_read".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::{Bytes, BytesMut};
+
+    use crate::{
+        component::Stored,
+        nbt::Update,
+        net::{Encode, NetSync},
+    };
+
+    use super::{Component, Components, Synced};
+
+    #[test]
+    fn register() {
+        let mut components = Components::new();
+
+        let id = crate::Id::new("test", "comp".to_string());
+        components.register(id.clone(), Component(114_i32));
+
+        assert_eq!(components.get::<Component<i32>>(&id).unwrap().0, 114);
+        assert!(components.get::<Component<u8>>(&id).is_none());
+    }
+
+    #[test]
+    fn net_sync() {
+        let mut components_0 = Components::builder().net_sync().build();
+
+        let id_0 = crate::Id::new("test", "comp0".to_string());
+        components_0.register(id_0.clone(), Synced(Component(114_i32), id_0.clone()));
+        let id_1 = crate::Id::new("test", "comp1".to_string());
+        components_0.register(id_1.clone(), Synced(Component(514_i32), id_1.clone()));
+        let id_2 = crate::Id::new("test", "comp2".to_string());
+        components_0.register(id_2.clone(), Component(514_i32));
+
+        let mut bytes = BytesMut::new();
+        components_0.encode(&mut bytes).unwrap();
+        let mut bytes: Bytes = bytes.into();
+
+        let mut components_1 = Components::builder().net_sync().build();
+
+        components_1.register(id_1.clone(), Synced(Component(0_i32), id_1.clone()));
+        components_1.register(id_0.clone(), Synced(Component(0_i32), id_0.clone()));
+        components_1.register(id_2.clone(), Component(0_i32));
+
+        components_1.read_buf(&mut bytes).unwrap();
+
+        assert_eq!(
+            components_1
+                .get::<Synced<Component<i32>>>(&id_0)
+                .unwrap()
+                .0
+                 .0,
+            114
+        );
+
+        assert_eq!(
+            components_1
+                .get::<Synced<Component<i32>>>(&id_1)
+                .unwrap()
+                .0
+                 .0,
+            514
+        );
+
+        assert_eq!(components_1.get::<Component<i32>>(&id_2).unwrap().0, 0);
+    }
+
+    #[test]
+    fn nbt_rw() {
+        let mut components_0 = Components::builder().nbt_storing().build();
+
+        let id_0 = crate::Id::new("test", "comp0".to_string());
+        components_0.register(id_0.clone(), Stored(Component(114_i32), id_0.clone()));
+        let id_1 = crate::Id::new("test", "comp1".to_string());
+        components_0.register(id_1.clone(), Stored(Component(514_i32), id_1.clone()));
+        let id_2 = crate::Id::new("test", "comp2".to_string());
+        components_0.register(id_2.clone(), Component(514_i32));
+
+        let nbt = fastnbt_rc::to_value(components_0).unwrap();
+
+        let mut components_1 = Components::builder().nbt_storing().build();
+
+        components_1.register(id_1.clone(), Stored(Component(0_i32), id_1.clone()));
+        components_1.register(id_0.clone(), Stored(Component(0_i32), id_0.clone()));
+        components_1.register(id_2.clone(), Component(0_i32));
+
+        components_1.update(&nbt).unwrap();
+
+        assert_eq!(
+            components_1
+                .get::<Stored<Component<i32>>>(&id_0)
+                .unwrap()
+                .0
+                 .0,
+            114
+        );
+
+        assert_eq!(
+            components_1
+                .get::<Stored<Component<i32>>>(&id_1)
+                .unwrap()
+                .0
+                 .0,
+            514
+        );
+
+        assert_eq!(components_1.get::<Component<i32>>(&id_2).unwrap().0, 0);
+    }
 }

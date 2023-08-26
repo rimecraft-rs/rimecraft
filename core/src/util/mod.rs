@@ -12,7 +12,7 @@ static ID_NAMESPACE_CACHES: crate::collections::Caches<String> = crate::collecti
 /// "location", or "Identifier".
 /// This is a non-typed immutable object, and identifies things
 /// using a combination of namespace and path.
-#[derive(PartialEq, Eq, Clone, Hash)]
+#[derive(PartialEq, Eq, Clone, Hash, Debug)]
 pub struct Id {
     namespace: Ref<'static, String>,
     path: String,
@@ -195,6 +195,7 @@ pub trait EnumValues<const N: usize>: Sized + Clone + Copy + PartialEq + Eq {
 }
 
 /// Represents a reference with enhancements based on `&'a`.
+#[derive(Debug)]
 pub struct Ref<'a, T: 'a + ?Sized>(pub &'a T);
 
 impl<'a, T: 'a + ?Sized> Copy for Ref<'a, T> {}

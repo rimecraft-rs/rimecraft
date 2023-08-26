@@ -289,10 +289,8 @@ impl<T> Key<Registry<T>> {
 
 impl<T> std::fmt::Debug for Key<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use std::fmt::Display;
-
         f.write_str("RegistryKey[")?;
-        self.inner.0 .0.fmt(f)?;
+        std::fmt::Display::fmt(&self.inner.0 .0, f)?;
         f.write_str(" / ")?;
         self.inner.0 .1.fmt(f)?;
         f.write_str("]")

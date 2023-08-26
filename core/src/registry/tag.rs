@@ -63,12 +63,10 @@ impl<T> Eq for Key<T> {}
 
 impl<T> std::fmt::Debug for Key<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use std::fmt::Display;
-
         f.write_str("TagKey[")?;
         self.reg.fmt(f)?;
         f.write_str(" / ")?;
-        self.id.fmt(f)?;
+        std::fmt::Display::fmt(&self.id, f)?;
         f.write_str("]")
     }
 }

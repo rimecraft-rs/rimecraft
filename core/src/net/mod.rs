@@ -57,7 +57,13 @@ mod packet_buf_imp {
         where
             B: bytes::BufMut,
         {
-            self.slice(..).encode(buf)
+            crate::util::VarInt(self.len() as i32).encode(buf)?;
+
+            for object in self.iter() {
+                object.encode(buf)?;
+            }
+
+            Ok(())
         }
     }
 
