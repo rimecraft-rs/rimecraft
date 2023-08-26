@@ -7,7 +7,10 @@ use std::{
 use bytes::Bytes;
 use tracing::{trace_span, warn};
 
-use crate::net::{Decode, Encode, NetSync};
+use crate::{
+    nbt::NbtElement,
+    net::{Decode, Encode, NetSync},
+};
 
 /// Represents a type of component that can be attached
 /// on [`Components`].
@@ -21,23 +24,32 @@ pub trait Attach {
     fn on_attach(&mut self, components: &mut Components);
 }
 
+/// Manager of components.
 pub struct Components {
     components: HashMap<crate::Id, (Box<dyn Attach + Send + Sync>, TypeId)>,
 }
 
 impl Components {
+    /// Creates a new empty components instance,
+    /// without networking and saving features.
+    ///
+    /// To create with external features,
+    /// see [`Self::builder()`].
     pub fn new() -> Self {
         Self {
             components: HashMap::new(),
         }
     }
 
+    /// Creates a new [`ComponentsBuilder`].
     #[inline]
     pub fn builder() -> ComponentsBuilder {
         ComponentsBuilder { inner: Self::new() }
     }
 
-    pub fn attach<T>(&mut self, id: crate::Id, component: T)
+    /// Register a component into this instance.
+    /// The component should implement [`Attach`].
+    pub fn register<T>(&mut self, id: crate::Id, component: T)
     where
         T: Attach + Send + Sync + 'static,
     {
@@ -51,6 +63,7 @@ impl Components {
         self.components.insert(id, (boxed, TypeId::of::<T>()));
     }
 
+    /// Get a static typed component from this instance.
     pub fn get<T>(&self, id: &crate::Id) -> Option<&T>
     where
         T: Attach + Send + Sync + 'static,
@@ -69,6 +82,7 @@ impl Components {
             .flatten()
     }
 
+    /// Get a mutable static typed component from this instance.
     pub fn get_mut<T>(&mut self, id: &crate::Id) -> Option<&mut T>
     where
         T: Attach + Send + Sync + 'static,
@@ -121,19 +135,76 @@ impl NetSync for Components {
     }
 }
 
+impl serde::Serialize for Components {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let Component(event) = self
+            .get::<Component<
+                crate::Event<
+                    dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
+                >,
+            >>(NBT_SAVE_ID.deref())
+            .expect("net send event component not found");
+
+        let mut hashmap = HashMap::new();
+
+        use serde::ser::Error;
+        event.invoker()(&mut hashmap)
+            .map_err(|err| <S as serde::Serializer>::Error::custom(err))?;
+        hashmap.serialize(serializer)
+    }
+}
+
+impl crate::nbt::Update for Components {
+    fn update<'de, D>(
+        &'de mut self,
+        deserializer: D,
+    ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let Component(event) = self
+            .get::<Component<
+                crate::Event<
+                    dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
+                >,
+            >>(NBT_READ_ID.deref())
+            .expect("net recv event component not found");
+
+        use serde::{de::Error, Deserialize};
+        let mut hashmap = HashMap::deserialize(deserializer)?;
+        event.invoker()(&mut hashmap)
+            .map_err(|err| <D as serde::Deserializer<'_>>::Error::custom(err))
+    }
+}
+
+/// [`Components`] builder for creating with external features.
 pub struct ComponentsBuilder {
     inner: Components,
 }
 
 impl ComponentsBuilder {
+    /// Enable networking features for the instance.
     pub fn net_sync(mut self) -> Self {
         self.inner
-            .attach(net_send_event_comp_id(), net_send_event_comp());
+            .register(net_send_event_comp_id(), net_event_comp());
         self.inner
-            .attach(net_recv_event_comp_id(), net_recv_event_comp());
+            .register(net_recv_event_comp_id(), net_event_comp());
         self
     }
 
+    /// Enable nbt reading and writing feature for the instance.
+    pub fn nbt_rw(mut self) -> Self {
+        self.inner
+            .register(nbt_save_event_comp_id(), nbt_event_comp());
+        self.inner
+            .register(nbt_read_event_comp_id(), nbt_event_comp());
+        self
+    }
+
+    /// Build this instance into [`Components`].
     #[inline]
     pub fn build(self) -> Components {
         self.inner
@@ -146,6 +217,9 @@ impl Into<Components> for ComponentsBuilder {
     }
 }
 
+/// Represents a simple component without extra
+/// attach features, which has an empty
+/// implementation of [`Attach`].
 pub struct Component<T>(pub T);
 
 impl<T> Attach for Component<T> {
@@ -171,6 +245,11 @@ static NET_SEND_ID: once_cell::sync::Lazy<crate::Id> =
 static NET_RECV_ID: once_cell::sync::Lazy<crate::Id> =
     once_cell::sync::Lazy::new(net_recv_event_comp_id);
 
+/// Represents a component that able to sync by
+/// networking methods, through [`NetSync`] trait.
+///
+/// The `1` field is the component id which is used
+/// to be registered into components.
 pub struct Synced<T>(pub T, pub crate::Id)
 where
     T: Attach + NetSync + 'static;
@@ -217,7 +296,7 @@ where
         {
             event.register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
-                let mut bytes = map.insert(this.1.clone(), Bytes::new()).unwrap();
+                let mut bytes = map.remove(&this.1).unwrap();
 
                 this.0.read_buf(&mut bytes)
             }))
@@ -247,9 +326,7 @@ where
     }
 }
 
-/// Creates a new event that handle network packet buf sending mapping,
-/// which component id is `core:net_send`.
-pub fn net_send_event_comp(
+pub fn net_event_comp(
 ) -> Component<crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>> {
     Component(crate::Event::new(|listeners| {
         Box::new(move |map| {
@@ -267,10 +344,94 @@ pub fn net_send_event_comp_id() -> crate::Id {
     crate::Id::new("core", "net_send".to_string())
 }
 
-/// Creates a new event that handle network packet buf receiving mapping,
-/// which component id is `core:net_recv`.
-pub fn net_recv_event_comp(
-) -> Component<crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>> {
+#[inline]
+pub fn net_recv_event_comp_id() -> crate::Id {
+    crate::Id::new("core", "net_recv".to_string())
+}
+
+static NBT_SAVE_ID: once_cell::sync::Lazy<crate::Id> =
+    once_cell::sync::Lazy::new(nbt_save_event_comp_id);
+static NBT_READ_ID: once_cell::sync::Lazy<crate::Id> =
+    once_cell::sync::Lazy::new(nbt_read_event_comp_id);
+
+pub struct Saved<T>(pub T, pub crate::Id)
+where
+    T: Attach + crate::nbt::Update + 'static;
+
+impl<T> Attach for Saved<T>
+where
+    T: Attach + crate::nbt::Update + 'static,
+{
+    fn on_attach(&mut self, components: &mut Components) {
+        self.0.on_attach(components);
+
+        let ptr = self as *mut Self;
+
+        let span = trace_span!(
+            "attach saved component",
+            comp_type = std::any::type_name::<T>()
+        );
+
+        let _ = span.enter();
+
+        if let Some(Component(event)) = components.get_mut::<Component<
+            crate::Event<
+                dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
+            >,
+        >>(NBT_SAVE_ID.deref())
+        {
+            event.register(Box::new(move |map| {
+                let this = unsafe { &*ptr };
+                map.insert(
+                    this.1.clone(),
+                    this.0.serialize(&mut fastnbt_rc::value::Serializer)?,
+                );
+
+                Ok(())
+            }))
+        } else {
+            warn!("nbt saving event not found");
+        }
+
+        if let Some(Component(event)) = components.get_mut::<Component<
+            crate::Event<
+                dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
+            >,
+        >>(NBT_READ_ID.deref())
+        {
+            event.register(Box::new(move |map| {
+                let this = unsafe { &mut *ptr };
+                this.0.update(&map.remove(&this.1).unwrap())
+            }))
+        } else {
+            warn!("nbt reading event not found");
+        }
+    }
+}
+
+impl<T> Deref for Saved<T>
+where
+    T: Attach + crate::nbt::Update + 'static,
+{
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for Saved<T>
+where
+    T: Attach + crate::nbt::Update + 'static,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+pub fn nbt_event_comp() -> Component<
+    crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>>,
+> {
     Component(crate::Event::new(|listeners| {
         Box::new(move |map| {
             for listener in listeners {
@@ -283,6 +444,11 @@ pub fn net_recv_event_comp(
 }
 
 #[inline]
-pub fn net_recv_event_comp_id() -> crate::Id {
-    crate::Id::new("core", "net_recv".to_string())
+pub fn nbt_save_event_comp_id() -> crate::Id {
+    crate::Id::new("core", "nbt_save".to_string())
+}
+
+#[inline]
+pub fn nbt_read_event_comp_id() -> crate::Id {
+    crate::Id::new("core", "nbt_read".to_string())
 }

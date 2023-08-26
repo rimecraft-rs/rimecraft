@@ -310,3 +310,28 @@ impl<'de, T: bytes::Buf> fastnbt_rc::input::Input<'de> for BufInput<'de, T> {
         Ok(self.0.get_f64())
     }
 }
+
+pub trait Update: serde::Serialize {
+    fn update<'de, D>(
+        &'de mut self,
+        deserializer: D,
+    ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+    where
+        D: serde::Deserializer<'de>;
+}
+
+impl<T> Update for T
+where
+    T: serde::Serialize + for<'de> serde::Deserialize<'de>,
+{
+    fn update<'de, D>(
+        &'de mut self,
+        deserializer: D,
+    ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        *self = Self::deserialize(deserializer)?;
+        Ok(())
+    }
+}
