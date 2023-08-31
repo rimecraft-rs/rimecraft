@@ -1,15 +1,15 @@
-<a href="https://github.com/rimecraft-rs">
-  <img
-    width="150" 
-    height="150" 
-    align="left"
-    src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true"
-    />
-</a>
+<div align="center">
+  <h5><br /></h5>
+  <a href="https://github.com/rimecraft-rs">
+    <img
+      height="75"
+      src="https://github.com/rimecraft-rs/artwork/blob/main/logo/rimecraft.png?raw=true"
+      />
+  </a>
+  <h5><br /></h5>
+</div>
 
-# Rimecraft
-
-> **Rimecraft** is committed to becoming a fully-featured, flexible and free Rust implementation of **[Minecraft.](https://minecraft.net)**
+###### <p align="center"><sub><img height="16" src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true" /></sub>&ensp;**Rimecraft** is committed to becoming a fully-featured, flexible and free Rust implementation of **[Minecraft.](https://minecraft.net)**&ensp;<sub><img height="16" src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true" /></sub></p>
 
 <br />
 
