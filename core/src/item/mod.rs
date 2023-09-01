@@ -107,7 +107,7 @@ pub trait AsItem {
 impl AsItem for crate::registry::Entry<Item> {
     /// Convert this object into an item.
     fn as_item(&self) -> Item {
-        *self.deref().deref()
+        *self.deref()
     }
 }
 

@@ -16,12 +16,12 @@ pub struct BlockEntity {
 impl BlockEntity {
     pub fn data<T: std::any::Any>(&self) -> &T {
         assert_eq!(TypeId::of::<T>(), self.data.type_id());
-        unsafe { &*(self.data.deref() as *const dyn Data as *const T) }
+        unsafe { &*(&*self.data as *const dyn Data as *const T) }
     }
 
     pub fn data_mut<T: std::any::Any>(&mut self) -> &mut T {
         assert_eq!(TypeId::of::<T>(), self.data.type_id());
-        unsafe { &mut *(self.data.deref_mut() as *mut dyn Data as *mut T) }
+        unsafe { &mut *(&mut *self.data as *mut dyn Data as *mut T) }
     }
 
     pub fn pos(&self) -> BlockPos {

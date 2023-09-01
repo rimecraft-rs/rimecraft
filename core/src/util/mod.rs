@@ -390,7 +390,7 @@ where
             }));
         }
 
-        unsafe { &*(self.listeners_and_cache.read().1.as_ref().unwrap().deref() as *const T) }
+        unsafe { &*(&**self.listeners_and_cache.read().1.as_ref().unwrap() as *const T) }
     }
 
     /// Register a listener to this event for the specified phase.

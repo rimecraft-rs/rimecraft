@@ -72,9 +72,7 @@ impl Components {
             .get(id)
             .map(|value| {
                 if value.1 == TypeId::of::<T>() {
-                    Some(unsafe {
-                        &*(value.0.deref() as *const (dyn Attach + Send + Sync) as *const T)
-                    })
+                    Some(unsafe { &*(&*value.0 as *const (dyn Attach + Send + Sync) as *const T) })
                 } else {
                     None
                 }
@@ -92,7 +90,7 @@ impl Components {
             .map(|value| {
                 if value.1 == TypeId::of::<T>() {
                     Some(unsafe {
-                        &mut *(value.0.deref_mut() as *mut (dyn Attach + Send + Sync) as *mut T)
+                        &mut *(&mut *value.0 as *mut (dyn Attach + Send + Sync) as *mut T)
                     })
                 } else {
                     None
@@ -110,7 +108,7 @@ impl Encode for Components {
         let Component(event) =
             self.get::<Component<
                 crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
-            >>(NET_SEND_ID.deref())
+            >>(&*NET_SEND_ID)
                 .expect("net send event component not found");
 
         let mut hashmap = HashMap::new();
@@ -127,7 +125,7 @@ impl NetSync for Components {
         let Component(event) =
             self.get::<Component<
                 crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
-            >>(NET_RECV_ID.deref())
+            >>(&*NET_RECV_ID)
                 .expect("net recv event component not found");
 
         let mut hashmap = HashMap::<crate::Id, Bytes>::decode(buf)?;
@@ -145,7 +143,7 @@ impl serde::Serialize for Components {
                 crate::Event<
                     dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
                 >,
-            >>(NBT_SAVE_ID.deref())
+            >>(&*NBT_SAVE_ID)
             .expect("net send event component not found");
 
         let mut hashmap = HashMap::new();
@@ -170,7 +168,7 @@ impl crate::nbt::Update for Components {
                 crate::Event<
                     dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
                 >,
-            >>(NBT_READ_ID.deref())
+            >>(&*NBT_READ_ID)
             .expect("net recv event component not found");
 
         use serde::{de::Error, Deserialize};
@@ -325,7 +323,7 @@ where
 
         if let Some(Component(event)) = components.get_mut::<Component<
             crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
-        >>(NET_SEND_ID.deref())
+        >>(&*NET_SEND_ID)
         {
             event.register(Box::new(move |map| {
                 let this = unsafe { &*ptr };
@@ -345,7 +343,7 @@ where
 
         if let Some(Component(event)) = components.get_mut::<Component<
             crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
-        >>(NET_RECV_ID.deref())
+        >>(&*NET_RECV_ID)
         {
             event.register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
@@ -488,7 +486,7 @@ where
             crate::Event<
                 dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
             >,
-        >>(NBT_SAVE_ID.deref())
+        >>(&*NBT_SAVE_ID)
         {
             event.register(Box::new(move |map| {
                 let this = unsafe { &*ptr };
@@ -507,7 +505,7 @@ where
             crate::Event<
                 dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
             >,
-        >>(NBT_READ_ID.deref())
+        >>(&*NBT_READ_ID)
         {
             event.register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
