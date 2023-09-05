@@ -534,14 +534,17 @@ impl<T> MutOnly<T> {
         Self { value }
     }
 
+    #[inline]
     pub fn as_mut(&mut self) -> &mut T {
         &mut self.value
     }
 
+    #[inline]
     pub fn as_ptr(&self) -> *mut T {
         &self.value as *const T as *mut T
     }
 
+    #[inline]
     pub fn into_inner(self) -> T {
         self.value
     }
