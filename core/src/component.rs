@@ -122,14 +122,16 @@ impl NetSync for Components {
     where
         B: bytes::Buf,
     {
-        let Component(event) =
-            self.get::<Component<
-                crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
+        let Component(event) = self
+            .get_mut::<Component<
+                crate::MutOnly<
+                    crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
+                >,
             >>(&*NET_RECV_ID)
-                .expect("net recv event component not found");
+            .expect("net recv event component not found");
 
         let mut hashmap = HashMap::<crate::Id, Bytes>::decode(buf)?;
-        event.invoker()(&mut hashmap)
+        event.as_mut().invoker()(&mut hashmap)
     }
 }
 
@@ -164,16 +166,20 @@ impl crate::nbt::Update for Components {
         D: serde::Deserializer<'de>,
     {
         let Component(event) = self
-            .get::<Component<
-                crate::Event<
-                    dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
+            .get_mut::<Component<
+                crate::MutOnly<
+                    crate::Event<
+                        dyn Fn(
+                            &mut HashMap<crate::Id, NbtElement>,
+                        ) -> fastnbt_rc::error::Result<()>,
+                    >,
                 >,
             >>(&*NBT_READ_ID)
             .expect("net recv event component not found");
 
         use serde::{de::Error, Deserialize};
         let mut hashmap = HashMap::deserialize(deserializer)?;
-        event.invoker()(&mut hashmap)
+        event.as_mut().invoker()(&mut hashmap)
             .map_err(|err| <D as serde::Deserializer<'_>>::Error::custom(err))
     }
 }
@@ -189,7 +195,8 @@ impl ComponentsBuilder {
         self.inner
             .register(net_send_event_comp_id(), net_event_comp());
         self.inner
-            .register(net_recv_event_comp_id(), net_event_comp());
+            .register(net_recv_event_comp_id(), net_event_comp_mut());
+
         self
     }
 
@@ -198,7 +205,8 @@ impl ComponentsBuilder {
         self.inner
             .register(nbt_save_event_comp_id(), nbt_event_comp());
         self.inner
-            .register(nbt_read_event_comp_id(), nbt_event_comp());
+            .register(nbt_read_event_comp_id(), nbt_event_comp_mut());
+
         self
     }
 
@@ -342,10 +350,12 @@ where
         }
 
         if let Some(Component(event)) = components.get_mut::<Component<
-            crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
+            crate::MutOnly<
+                crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
+            >,
         >>(&*NET_RECV_ID)
         {
-            event.register(Box::new(move |map| {
+            event.as_mut().register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
                 let mut bytes = map.remove(&this.1).unwrap();
 
@@ -428,7 +438,7 @@ where
     }
 }
 
-pub fn net_event_comp(
+fn net_event_comp(
 ) -> Component<crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>> {
     Component(crate::Event::new(|listeners| {
         Box::new(move |map| {
@@ -441,13 +451,27 @@ pub fn net_event_comp(
     }))
 }
 
+fn net_event_comp_mut() -> Component<
+    crate::MutOnly<crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>>,
+> {
+    Component(crate::MutOnly::new(crate::Event::new(|listeners| {
+        Box::new(move |map| {
+            for listener in listeners {
+                listener(map)?;
+            }
+
+            Ok(())
+        })
+    })))
+}
+
 #[inline]
-pub fn net_send_event_comp_id() -> crate::Id {
+fn net_send_event_comp_id() -> crate::Id {
     crate::Id::new("core", "net_send".to_string())
 }
 
 #[inline]
-pub fn net_recv_event_comp_id() -> crate::Id {
+fn net_recv_event_comp_id() -> crate::Id {
     crate::Id::new("core", "net_recv".to_string())
 }
 
@@ -502,12 +526,14 @@ where
         }
 
         if let Some(Component(event)) = components.get_mut::<Component<
-            crate::Event<
-                dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
+            crate::MutOnly<
+                crate::Event<
+                    dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
+                >,
             >,
         >>(&*NBT_READ_ID)
         {
-            event.register(Box::new(move |map| {
+            event.as_mut().register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
                 this.0.update(&map.remove(&this.1).unwrap())
             }))
@@ -588,7 +614,7 @@ where
     }
 }
 
-pub fn nbt_event_comp() -> Component<
+fn nbt_event_comp() -> Component<
     crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>>,
 > {
     Component(crate::Event::new(|listeners| {
@@ -602,13 +628,29 @@ pub fn nbt_event_comp() -> Component<
     }))
 }
 
+fn nbt_event_comp_mut() -> Component<
+    crate::MutOnly<
+        crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>>,
+    >,
+> {
+    Component(crate::MutOnly::new(crate::Event::new(|listeners| {
+        Box::new(move |map| {
+            for listener in listeners {
+                listener(map)?;
+            }
+
+            Ok(())
+        })
+    })))
+}
+
 #[inline]
-pub fn nbt_save_event_comp_id() -> crate::Id {
+fn nbt_save_event_comp_id() -> crate::Id {
     crate::Id::new("core", "nbt_save".to_string())
 }
 
 #[inline]
-pub fn nbt_read_event_comp_id() -> crate::Id {
+fn nbt_read_event_comp_id() -> crate::Id {
     crate::Id::new("core", "nbt_read".to_string())
 }
 
