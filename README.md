@@ -9,7 +9,7 @@
   <h5><br /></h5>
 </div>
 
-###### <p align="center"><sub><img height="16" src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true" /></sub>&ensp;**Rimecraft** is committed to becoming a fully-featured, flexible and free Rust implementation of **[Minecraft.](https://minecraft.net)**&ensp;<sub><img height="16" src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true" /></sub></p>
+###### <p align="center"><sub><img height="16" src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true" /></sub>&ensp;**Rimecraft** is Committed to Becoming a Fully-Featured, Flexible and Libre Rust Implementation of **[Minecraft.](https://minecraft.net)**&ensp;<sub><img height="16" src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true" /></sub></p>
 
 <br />
 
