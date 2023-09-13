@@ -4,7 +4,8 @@ pub mod collections;
 mod magic_num;
 pub mod math;
 
-static ID_NAMESPACE_CACHES: crate::collections::Caches<String> = crate::collections::Caches::new();
+static ID_NAMESPACE_CACHES: once_cell::sync::Lazy<crate::collections::Caches<String>> =
+    once_cell::sync::Lazy::new(crate::collections::Caches::new);
 
 /// An identifier used to identify things.
 ///
@@ -26,7 +27,7 @@ impl Id {
     pub fn try_new(namespace: &str, path: String) -> Result<Self, IdError> {
         let owned_namespace = namespace.to_string();
         if Self::is_path_valid(&path) {
-            if !ID_NAMESPACE_CACHES.contains(&owned_namespace)
+            if !ID_NAMESPACE_CACHES.contains::<str>(&owned_namespace)
                 && !Self::is_namespace_valid(namespace)
             {
                 return Err(IdError::InvalidChars {

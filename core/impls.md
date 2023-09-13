@@ -78,7 +78,7 @@ TODO
 
 ## Nbt
 
-implemented by `fastnbt_rc`.
+implemented by `fastnbt`.
 
 - [x] NbtCompound exts
 

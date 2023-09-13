@@ -2,6 +2,7 @@
 /target
 /.tuffous/config_gui.json
 /.vscode
+/.idea
 /.VSCodeCounter
 /Cargo.lock
 */Cargo.lock

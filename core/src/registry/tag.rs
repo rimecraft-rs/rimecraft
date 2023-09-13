@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
-static KEYS_CACHE: crate::collections::ArcCaches<Id> = crate::collections::ArcCaches::new();
+static KEYS_CACHE: once_cell::sync::Lazy<crate::collections::ArcCaches<Id>> =
+    once_cell::sync::Lazy::new(crate::collections::ArcCaches::new);
 
 /// Represents a tag key.
 pub struct Key<T> {

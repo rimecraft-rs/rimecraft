@@ -25,6 +25,7 @@ pub trait Attach {
 }
 
 /// Manager of components.
+#[derive(Default)]
 pub struct Components {
     components: HashMap<crate::Id, (Box<dyn Attach + Send + Sync>, TypeId)>,
 }
@@ -36,9 +37,7 @@ impl Components {
     /// To create with external features,
     /// see [`Self::builder()`].
     pub fn new() -> Self {
-        Self {
-            components: HashMap::new(),
-        }
+        Default::default()
     }
 
     /// Creates a new [`ComponentsBuilder`].
@@ -68,16 +67,13 @@ impl Components {
     where
         T: Attach + Send + Sync + 'static,
     {
-        self.components
-            .get(id)
-            .map(|value| {
-                if value.1 == TypeId::of::<T>() {
-                    Some(unsafe { &*(&*value.0 as *const (dyn Attach + Send + Sync) as *const T) })
-                } else {
-                    None
-                }
-            })
-            .flatten()
+        self.components.get(id).and_then(|value| {
+            if value.1 == TypeId::of::<T>() {
+                Some(unsafe { &*(&*value.0 as *const (dyn Attach + Send + Sync) as *const T) })
+            } else {
+                None
+            }
+        })
     }
 
     /// Get a mutable static typed component from this instance.
@@ -85,18 +81,13 @@ impl Components {
     where
         T: Attach + Send + Sync + 'static,
     {
-        self.components
-            .get_mut(id)
-            .map(|value| {
-                if value.1 == TypeId::of::<T>() {
-                    Some(unsafe {
-                        &mut *(&mut *value.0 as *mut (dyn Attach + Send + Sync) as *mut T)
-                    })
-                } else {
-                    None
-                }
-            })
-            .flatten()
+        self.components.get_mut(id).and_then(|value| {
+            if value.1 == TypeId::of::<T>() {
+                Some(unsafe { &mut *(&mut *value.0 as *mut (dyn Attach + Send + Sync) as *mut T) })
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -108,7 +99,7 @@ impl Encode for Components {
         let Component(event) =
             self.get::<Component<
                 crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
-            >>(&*NET_SEND_ID)
+            >>(&NET_SEND_ID)
                 .expect("net send event component not found");
 
         let mut hashmap = HashMap::new();
@@ -127,7 +118,7 @@ impl NetSync for Components {
                 crate::MutOnly<
                     crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
                 >,
-            >>(&*NET_RECV_ID)
+            >>(&NET_RECV_ID)
             .expect("net recv event component not found");
 
         let mut hashmap = HashMap::<crate::Id, Bytes>::decode(buf)?;
@@ -143,16 +134,15 @@ impl serde::Serialize for Components {
         let Component(event) = self
             .get::<Component<
                 crate::Event<
-                    dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
+                    dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>,
                 >,
-            >>(&*NBT_SAVE_ID)
+            >>(&NBT_SAVE_ID)
             .expect("net send event component not found");
 
         let mut hashmap = HashMap::new();
 
         use serde::ser::Error;
-        event.invoker()(&mut hashmap)
-            .map_err(|err| <S as serde::Serializer>::Error::custom(err))?;
+        event.invoker()(&mut hashmap).map_err(<S as serde::Serializer>::Error::custom)?;
         hashmap.serialize(serializer)
     }
 }
@@ -169,24 +159,37 @@ impl crate::nbt::Update for Components {
             .get_mut::<Component<
                 crate::MutOnly<
                     crate::Event<
-                        dyn Fn(
-                            &mut HashMap<crate::Id, NbtElement>,
-                        ) -> fastnbt_rc::error::Result<()>,
+                        dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>,
                     >,
                 >,
-            >>(&*NBT_READ_ID)
+            >>(&NBT_READ_ID)
             .expect("net recv event component not found");
 
         use serde::{de::Error, Deserialize};
         let mut hashmap = HashMap::deserialize(deserializer)?;
         event.as_mut().invoker()(&mut hashmap)
-            .map_err(|err| <D as serde::Deserializer<'_>>::Error::custom(err))
+            .map_err(<D as serde::Deserializer<'_>>::Error::custom)
     }
 }
 
+impl From<ComponentsBuilder> for Components {
+    fn from(value: ComponentsBuilder) -> Self {
+        value.build()
+    }
+}
+
+static ATTACH_EVENTS: parking_lot::RwLock<crate::Event<dyn Fn(TypeId, &mut Components)>> =
+    parking_lot::RwLock::new(crate::Event::new(|listeners| {
+        Box::new(move |type_id, components| {
+            for listener in listeners {
+                listener(type_id, components)
+            }
+        })
+    }));
+
 /// [`Components`] builder for creating with external features.
 pub struct ComponentsBuilder {
-    inner: Components,
+    pub inner: Components,
 }
 
 impl ComponentsBuilder {
@@ -210,16 +213,18 @@ impl ComponentsBuilder {
         self
     }
 
+    pub fn register_defaults<T>(mut self) -> Self
+    where
+        T: 'static,
+    {
+        ATTACH_EVENTS.read().invoker()(TypeId::of::<T>(), &mut self.inner);
+        self
+    }
+
     /// Build this instance into [`Components`].
     #[inline]
     pub fn build(self) -> Components {
         self.inner
-    }
-}
-
-impl Into<Components> for ComponentsBuilder {
-    fn into(self) -> Components {
-        self.build()
     }
 }
 
@@ -507,16 +512,14 @@ where
         let _ = span.enter();
 
         if let Some(Component(event)) = components.get_mut::<Component<
-            crate::Event<
-                dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
-            >,
+            crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>>,
         >>(&*NBT_SAVE_ID)
         {
             event.register(Box::new(move |map| {
                 let this = unsafe { &*ptr };
                 map.insert(
                     this.1.clone(),
-                    this.0.serialize(&mut fastnbt_rc::value::Serializer)?,
+                    this.0.serialize(&mut fastnbt::value::Serializer)?,
                 );
 
                 Ok(())
@@ -528,7 +531,7 @@ where
         if let Some(Component(event)) = components.get_mut::<Component<
             crate::MutOnly<
                 crate::Event<
-                    dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>,
+                    dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>,
                 >,
             >,
         >>(&*NBT_READ_ID)
@@ -615,7 +618,7 @@ where
 }
 
 fn nbt_event_comp() -> Component<
-    crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>>,
+    crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>>,
 > {
     Component(crate::Event::new(|listeners| {
         Box::new(move |map| {
@@ -630,7 +633,7 @@ fn nbt_event_comp() -> Component<
 
 fn nbt_event_comp_mut() -> Component<
     crate::MutOnly<
-        crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt_rc::error::Result<()>>,
+        crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>>,
     >,
 > {
     Component(crate::MutOnly::new(crate::Event::new(|listeners| {
@@ -732,7 +735,7 @@ mod tests {
         let id_2 = crate::Id::new("test", "comp2".to_string());
         components_0.register(id_2.clone(), Component(514_i32));
 
-        let nbt = fastnbt_rc::to_value(components_0).unwrap();
+        let nbt = fastnbt::to_value(components_0).unwrap();
 
         let mut components_1 = Components::builder().nbt_storing().build();
 

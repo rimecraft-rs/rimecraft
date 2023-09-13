@@ -42,6 +42,38 @@ where
 /// Layer for encoding and decoding in nbt binary format for packets.
 pub struct Nbt<'a, T>(pub &'a T);
 
+mod std_rw_imp {
+    pub struct ReadAdapt<'a, T: 'a>(pub &'a mut T)
+    where
+        T: bytes::Buf;
+
+    impl<T> std::io::Read for ReadAdapt<'_, T>
+    where
+        T: bytes::Buf,
+    {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            unsafe { &mut *(self.0 as *mut T as *mut bytes::buf::Reader<T>) }.read(buf)
+        }
+    }
+
+    pub struct WriteAdapt<'a, T: 'a>(pub &'a mut T)
+    where
+        T: bytes::BufMut;
+
+    impl<T> std::io::Write for WriteAdapt<'_, T>
+    where
+        T: bytes::BufMut,
+    {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            unsafe { &mut *(self.0 as *mut T as *mut bytes::buf::Writer<T>) }.write(buf)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            unsafe { &mut *(self.0 as *mut T as *mut bytes::buf::Writer<T>) }.flush()
+        }
+    }
+}
+
 /// Layer for encoding and decoding in json utf8 for packets.
 pub struct Json<'a, T>(pub &'a T);
 
@@ -359,9 +391,7 @@ mod packet_buf_imp {
         where
             B: bytes::BufMut,
         {
-            let mut vec = Vec::new();
-            fastnbt_rc::to_writer(&mut vec, self.0)?;
-            buf.put_slice(&vec);
+            fastnbt::to_writer(super::std_rw_imp::WriteAdapt(buf), self.0)?;
             Ok(())
         }
     }
@@ -376,10 +406,7 @@ mod packet_buf_imp {
         where
             B: bytes::Buf,
         {
-            Ok(T::deserialize(&mut fastnbt_rc::de::Deserializer::new(
-                crate::nbt::BufInput(buf),
-                fastnbt_rc::DeOpts::new(),
-            ))?)
+            Ok(fastnbt::from_reader(super::std_rw_imp::ReadAdapt(buf))?)
         }
     }
 

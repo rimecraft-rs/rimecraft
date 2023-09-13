@@ -10,25 +10,39 @@ pub use tag::Key as TagKey;
 
 /// Represents a registration and its id and tags.
 pub struct Entry<T> {
+    components: crate::component::Components,
     key: Key<T>,
     pub tags: parking_lot::RwLock<Vec<tag::Key<T>>>,
     value: T,
 }
 
 impl<T> Entry<T> {
+    #[inline]
     pub fn key(&self) -> &Key<T> {
         &self.key
     }
 
     /// If this registration is in target tag.
+    #[inline]
     pub fn is_in(&self, tag: &tag::Key<T>) -> bool {
         self.tags.read().contains(tag)
+    }
+
+    #[inline]
+    pub fn components(&self) -> &crate::component::Components {
+        &self.components
+    }
+
+    #[inline]
+    pub fn components_mut(&mut self) -> &mut crate::component::Components {
+        &mut self.components
     }
 }
 
 impl<T> Deref for Entry<T> {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.value
     }
@@ -49,11 +63,13 @@ pub struct Registry<T> {
 }
 
 impl<T> Registry<T> {
+    #[inline]
     /// Whether this registry contains an entry with the target registry key.
     pub fn contains_key(&self, key: &Key<T>) -> bool {
         self.key_map.contains_key(key)
     }
 
+    #[inline]
     /// Whether this registry contains an entry with the target id.
     pub fn contains_id(&self, id: &Id) -> bool {
         self.id_map.contains_key(id)
@@ -65,6 +81,7 @@ impl<T> Registry<T> {
     ///
     /// Panic if a default entry don't exist.
     /// See [`Self::is_defaulted`].
+    #[inline]
     pub fn default_entry(&self) -> (usize, &Entry<T>) {
         let def = self
             .default
@@ -73,6 +90,7 @@ impl<T> Registry<T> {
     }
 
     /// Get an entry from a [`Key`].
+    #[inline]
     pub fn get_from_key(&self, key: &Key<T>) -> Option<(usize, &Entry<T>)> {
         self.key_map
             .get(key)
@@ -80,6 +98,7 @@ impl<T> Registry<T> {
     }
 
     /// Get an entry from an [`Id`].
+    #[inline]
     pub fn get_from_id(&self, id: &Id) -> Option<(usize, &Entry<T>)> {
         self.id_map
             .get(id)
@@ -87,20 +106,24 @@ impl<T> Registry<T> {
     }
 
     /// Get an entry from its raw id.
+    #[inline]
     pub fn get_from_raw(&self, raw_id: usize) -> Option<&Entry<T>> {
         self.entries.get(raw_id)
     }
 
     /// Whether a default entry exist in this registry.
+    #[inline]
     pub fn is_defaulted(&self) -> bool {
         self.default.is_some()
     }
 
     /// Returns an iterator over the slice of entries.
+    #[inline]
     pub fn iter(&self) -> std::slice::Iter<'_, Entry<T>> {
         self.entries.iter()
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -173,7 +196,10 @@ impl<T: Registration> Builder<T> {
     }
 }
 
-impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
+impl<T> crate::util::Freeze<Registry<T>> for Builder<T>
+where
+    T: Registration + 'static,
+{
     type Opts = (Key<Registry<T>>, Option<Id>);
 
     fn build(self, opts: Self::Opts) -> Registry<T> {
@@ -187,27 +213,36 @@ impl<T: Registration> crate::util::Freeze<Registry<T>> for Builder<T> {
                     value: e.1 .0,
                     key: Key::new(opts.0, e.1 .1.clone()),
                     tags: parking_lot::RwLock::new(Vec::new()),
+                    components: crate::component::Components::builder()
+                        .net_sync()
+                        .register_defaults::<Entry<T>>()
+                        .build(),
                 }
             })
             .collect::<Vec<_>>();
 
         let id_map = {
             let mut map = std::collections::HashMap::new();
+
             for e in entries.iter().enumerate() {
                 map.insert(e.1.key.value().clone(), e.0);
             }
+
             map
         };
 
         Registry {
-            default: opts.1.map(|e| id_map.get(&e).copied()).flatten(),
             key_map: {
                 let mut map = std::collections::HashMap::new();
+
                 for e in entries.iter().enumerate() {
                     map.insert(e.1.key.clone(), e.0);
                 }
+
                 map
             },
+
+            default: opts.1.map(|e| id_map.get(&e).copied()).flatten(),
             entries,
             id_map,
             key: opts.0,
@@ -228,7 +263,8 @@ pub trait RegistryAccess: Sized {
     fn registry() -> &'static Registry<Self>;
 }
 
-static KEYS_CACHE: crate::collections::Caches<(Id, Id)> = crate::collections::Caches::new();
+static KEYS_CACHE: once_cell::sync::Lazy<crate::collections::Caches<(Id, Id)>> =
+    once_cell::sync::Lazy::new(crate::collections::Caches::new);
 
 /// Represents a key for a value in a registry in a context where
 /// a root registry is available.
@@ -249,6 +285,7 @@ impl<T> Key<T> {
     }
 
     /// Whether this registry key belongs to the given registry.
+    #[inline]
     pub fn is_of<E>(&self, reg: &Key<Registry<E>>) -> bool {
         self.inner.0 .0 == reg.inner.1
     }
@@ -266,11 +303,13 @@ impl<T> Key<T> {
     }
 
     /// Value of this key.
+    #[inline]
     pub fn value(&self) -> &'static Id {
         &self.inner.0 .0
     }
 
     /// Registry of this key.
+    #[inline]
     pub fn reg(&self) -> &'static Id {
         &self.inner.0 .1
     }

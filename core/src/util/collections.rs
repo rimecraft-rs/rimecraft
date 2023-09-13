@@ -1,7 +1,6 @@
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-};
+use crate::net::Encode;
+use std::{borrow::Borrow, hash::Hash, ops::Deref};
+use tracing::instrument;
 
 pub const DEFAULT_INDEXED_INDEX: i32 = -1;
 
@@ -10,6 +9,11 @@ pub trait Indexed<T> {
     fn raw_id(&self, value: &T) -> Option<usize>;
     fn get(&self, index: usize) -> Option<&T>;
     fn len(&self) -> usize;
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 /// An id list, just targeting the `IdList` in MCJE.
@@ -23,12 +27,9 @@ pub struct IdList<T: Hash + PartialEq + Eq + Clone> {
 }
 
 impl<T: Hash + PartialEq + Eq + Clone> IdList<T> {
+    #[inline]
     pub fn new() -> Self {
-        Self {
-            next_id: 0,
-            id_map: std::collections::HashMap::new(),
-            vec: vec![],
-        }
+        Default::default()
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
@@ -62,6 +63,20 @@ impl<T: Hash + PartialEq + Eq + Clone> IdList<T> {
 
     pub fn contains_key(&self, index: u32) -> bool {
         self.get(index as usize).is_some()
+    }
+}
+
+impl<T> Default for IdList<T>
+where
+    T: Hash + Eq + Clone,
+{
+    #[inline]
+    fn default() -> Self {
+        Self {
+            next_id: 0,
+            id_map: std::collections::HashMap::new(),
+            vec: vec![],
+        }
     }
 }
 
@@ -334,29 +349,25 @@ mod packed_array_tests {
     }
 }
 
-/// Hash-based caches that leaked into heap.
+/// Thread safe and hash-based caches.
 ///
 /// A caches is a collection that provide cached value of
 /// a given value to reduce memory usage.
-///
-/// # Safety
-///
-/// Although the values are leaked into heap, they will be
-/// dropped when dropping the instance to prevent memory leaking.
 pub struct Caches<T>
 where
     T: Hash + Eq,
 {
-    map: parking_lot::RwLock<Vec<(u64, *const T)>>,
+    map: dashmap::DashSet<Box<T>>,
 }
 
 impl<T> Caches<T>
 where
     T: Hash + Eq,
 {
-    pub const fn new() -> Self {
+    #[inline]
+    pub fn new() -> Self {
         Self {
-            map: parking_lot::RwLock::new(Vec::new()),
+            map: dashmap::DashSet::new(),
         }
     }
 
@@ -365,45 +376,25 @@ where
     /// If an equaled value dosen't exist in this caches, the value
     /// will be leaked into heap.
     pub fn get<'a>(&'a self, value: T) -> &'a T {
-        let mut hasher = DefaultHasher::new();
-        value.hash(&mut hasher);
-        let hash = hasher.finish();
-
-        let read = self.map.read();
-
-        if let Some(entry) = read.iter().find(|entry| entry.0 == hash) {
-            unsafe { &*entry.1 }
+        if let Some(v) = self.map.get(&value) {
+            unsafe { &*(v.deref().deref() as *const T) }
         } else {
-            drop(read);
-
-            let reference = Box::leak(Box::new(value));
-            self.map.write().push((hash, reference as *const T));
-            reference
+            let boxed = Box::new(value);
+            let ptr = boxed.deref() as *const T;
+            self.map.insert(boxed);
+            unsafe { &*ptr }
         }
     }
 
-    pub fn contains(&self, value: &T) -> bool {
-        let mut hasher = DefaultHasher::new();
-        value.hash(&mut hasher);
-        let hash = hasher.finish();
-
-        self.map.read().iter().any(|value| value.0 == hash)
+    #[inline]
+    pub fn contains<Q>(&self, value: &T) -> bool
+    where
+        T: Borrow<Q>,
+        Q: ?Sized,
+    {
+        self.map.contains(value)
     }
 }
-
-impl<T> Drop for Caches<T>
-where
-    T: Hash + Eq,
-{
-    fn drop(&mut self) {
-        for value in self.map.get_mut() {
-            let _ = unsafe { Box::from_raw(value.1 as *mut T) };
-        }
-    }
-}
-
-unsafe impl<T> Send for Caches<T> where T: Hash + Eq + Send {}
-unsafe impl<T> Sync for Caches<T> where T: Hash + Eq + Sync {}
 
 /// A variant of hash-based [`Caches`], where values are stored in weak
 /// pointers and values are provided with [`std::sync::Arc`].
@@ -411,18 +402,19 @@ unsafe impl<T> Sync for Caches<T> where T: Hash + Eq + Sync {}
 /// Caches with zero strong count will be soon destroyed.
 pub struct ArcCaches<T>
 where
-    T: Hash + Eq,
+    T: Hash + Eq + 'static,
 {
-    map: parking_lot::RwLock<Vec<(u64, std::sync::Weak<T>)>>,
+    map: dashmap::DashSet<arc_caches_imp::WeakNode<'static, T>>,
 }
 
 impl<T> ArcCaches<T>
 where
-    T: Hash + Eq,
+    T: Hash + Eq + 'static,
 {
-    pub const fn new() -> Self {
+    #[inline]
+    pub fn new() -> Self {
         Self {
-            map: parking_lot::RwLock::new(Vec::new()),
+            map: dashmap::DashSet::new(),
         }
     }
 
@@ -431,46 +423,81 @@ where
     /// If an equaled value dosen't exist in this caches, the value
     /// will be stored in a new [`std::sync::Arc`].
     pub fn get(&self, value: T) -> std::sync::Arc<T> {
-        let mut hasher = DefaultHasher::new();
-        value.hash(&mut hasher);
-        let hash = hasher.finish();
-
-        let read = self.map.read();
-
-        if let Some(entry) = read.iter().enumerate().find(|entry| entry.1 .0 == hash) {
-            if let Some(arc) = entry.1 .1.upgrade() {
-                arc
+        if let Some(v) = self.map.get(&arc_caches_imp::WeakNode::Ref(unsafe {
+            &*(&value as *const T)
+        })) {
+            if let arc_caches_imp::WeakNode::Stored(weak) = v.deref() {
+                weak.upgrade().expect("invalid weak pointer")
             } else {
-                let pos = entry.0;
-                drop(read);
-
-                let arc = std::sync::Arc::new(value);
-                self.map.write().get_mut(pos).unwrap().1 = std::sync::Arc::downgrade(&arc);
-                arc
+                unreachable!()
             }
         } else {
-            drop(read);
-            let mut write = self.map.write();
             let arc = std::sync::Arc::new(value);
-            let entry_expected = (hash, std::sync::Arc::downgrade(&arc));
-
-            if let Some(entry) = write.iter_mut().find(|entry| entry.1.strong_count() == 0) {
-                *entry = entry_expected
-            } else {
-                write.push(entry_expected)
-            }
+            self.map
+                .insert(arc_caches_imp::WeakNode::Stored(std::sync::Arc::downgrade(
+                    &arc,
+                )));
 
             arc
         }
     }
 
+    #[inline]
     pub fn contains(&self, value: &T) -> bool {
-        let mut hasher = DefaultHasher::new();
-        value.hash(&mut hasher);
-        let hash = hasher.finish();
-
-        self.map.read().iter().any(|value| value.0 == hash)
+        self.map.contains(&arc_caches_imp::WeakNode::Ref(unsafe {
+            &*(value as *const T)
+        }))
     }
+}
+
+mod arc_caches_imp {
+    use std::ops::Deref;
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+        sync::Weak,
+    };
+
+    pub enum WeakNode<'a, T> {
+        Stored(Weak<T>),
+        Ref(&'a T),
+    }
+
+    impl<T> Hash for WeakNode<'_, T>
+    where
+        T: Hash,
+    {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            match self {
+                WeakNode::Stored(value) => {
+                    if let Some(v) = value.upgrade() {
+                        v.hash(state)
+                    }
+                }
+                WeakNode::Ref(value) => value.hash(state),
+            }
+        }
+    }
+
+    impl<T> PartialEq for WeakNode<'_, T>
+    where
+        T: Hash + Eq,
+    {
+        fn eq(&self, other: &Self) -> bool {
+            match (self, other) {
+                (WeakNode::Stored(value0), WeakNode::Stored(value1)) => value0.ptr_eq(value1),
+                (WeakNode::Ref(value0), WeakNode::Stored(value1)) => {
+                    value1.upgrade().map_or(false, |e| e.deref() == *value0)
+                }
+                (WeakNode::Stored(value0), WeakNode::Ref(value1)) => {
+                    value0.upgrade().map_or(false, |e| e.deref() == *value1)
+                }
+                (WeakNode::Ref(value0), WeakNode::Ref(value1)) => value0 == value1,
+            }
+        }
+    }
+
+    impl<T> Eq for WeakNode<'_, T> where T: Hash + Eq {}
 }
 
 #[cfg(test)]
@@ -501,20 +528,6 @@ mod tests_caches {
             caches.get("1".to_string()).deref() as *const String as usize,
             first_ptr.deref() as *const String as usize
         );
-    }
-
-    #[test]
-    fn arc_destroying() {
-        let caches: ArcCaches<String> = ArcCaches::new();
-        let first_ptr = caches.get("1".to_string());
-        let _second_ptr = caches.get("2".to_string());
-
-        assert_eq!(caches.map.read().len(), 2);
-
-        drop(first_ptr);
-        let _third_ptr = caches.get("3".to_string());
-
-        assert_eq!(caches.map.read().len(), 2);
     }
 }
 

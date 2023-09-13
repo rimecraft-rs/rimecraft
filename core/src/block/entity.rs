@@ -1,8 +1,4 @@
-use std::{
-    any::TypeId,
-    hash::Hash,
-    ops::{Deref, DerefMut},
-};
+use std::{any::TypeId, hash::Hash};
 
 use crate::prelude::*;
 

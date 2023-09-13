@@ -1,17 +1,15 @@
-pub use fastnbt_rc::Tag as NbtType;
-pub use fastnbt_rc::Value as NbtElement;
+pub use fastnbt::Tag as NbtType;
+pub use fastnbt::Value as NbtElement;
 
-pub use fastnbt_rc::{
+pub use fastnbt::{
     from_bytes, from_bytes_with_opts, from_reader, nbt, to_bytes, to_writer, ByteArray, DeOpts,
     IntArray, LongArray,
 };
 
-pub use fastnbt_rc::value::from_value as from_nbt;
-pub use fastnbt_rc::value::to_value as to_nbt;
+pub use fastnbt::value::from_value as from_nbt;
+pub use fastnbt::value::to_value as to_nbt;
 
 pub use fastsnbt::from_str;
-
-use serde::de::Error;
 
 pub type NbtCompound = std::collections::HashMap<String, NbtElement>;
 
@@ -123,191 +121,87 @@ impl NbtCompoundExt for NbtCompound {
     }
 
     fn get_i8(&self, key: &str) -> Option<i8> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::Byte(value) => Some(*value),
-                _ => None,
-            })
-            .flatten()
-    }
-
-    fn get_i16(&self, key: &str) -> Option<i16> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::Short(value) => Some(*value),
-                _ => None,
-            })
-            .flatten()
-    }
-
-    fn get_i32(&self, key: &str) -> Option<i32> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::Int(value) => Some(*value),
-                _ => None,
-            })
-            .flatten()
-    }
-
-    fn get_i64(&self, key: &str) -> Option<i64> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::Long(value) => Some(*value),
-                _ => None,
-            })
-            .flatten()
-    }
-
-    fn get_f32(&self, key: &str) -> Option<f32> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::Float(value) => Some(*value),
-                _ => None,
-            })
-            .flatten()
-    }
-
-    fn get_f64(&self, key: &str) -> Option<f64> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::Double(value) => Some(*value),
-                _ => None,
-            })
-            .flatten()
-    }
-
-    fn get_str(&self, key: &str) -> Option<&str> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::String(value) => Some(value.as_str()),
-                _ => None,
-            })
-            .flatten()
-    }
-
-    fn get_i8_slice(&self, key: &str) -> Option<&[i8]> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::ByteArray(value) => Some(value.iter().as_slice()),
-                _ => None,
-            })
-            .flatten()
-    }
-
-    fn get_i32_slice(&self, key: &str) -> Option<&[i32]> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::IntArray(value) => Some(value.iter().as_slice()),
-                _ => None,
-            })
-            .flatten()
-    }
-
-    fn get_i64_slice(&self, key: &str) -> Option<&[i64]> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::LongArray(value) => Some(value.iter().as_slice()),
-                _ => None,
-            })
-            .flatten()
-    }
-
-    fn get_compound(&self, key: &str) -> Option<&NbtCompound> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::Compound(value) => Some(value),
-                _ => None,
-            })
-            .flatten()
-    }
-
-    fn get_slice(&self, key: &str) -> Option<&[NbtElement]> {
-        self.get(key)
-            .map(|e| match e {
-                NbtElement::List(value) => Some(value.as_slice()),
-                _ => None,
-            })
-            .flatten()
-    }
-}
-
-/// [`fastnbt_rc::input::Input`] implementation for [`bytes::Buf`].
-pub struct BufInput<'a, T: bytes::Buf>(pub &'a mut T);
-
-impl<'de, T: bytes::Buf> fastnbt_rc::input::Input<'de> for BufInput<'de, T> {
-    fn consume_byte(&mut self) -> fastnbt_rc::error::Result<u8> {
-        Ok(self.0.get_u8())
-    }
-
-    fn ignore_str(&mut self) -> fastnbt_rc::error::Result<()> {
-        let len = self.0.get_u16() as usize;
-        self.ignore_bytes(len)
-    }
-
-    fn ignore_bytes(&mut self, size: usize) -> fastnbt_rc::error::Result<()> {
-        for _ in 0..size {
-            self.0.get_u8();
-        }
-        Ok(())
-    }
-
-    fn consume_str<'s>(
-        &'s mut self,
-        scratch: &'s mut Vec<u8>,
-    ) -> fastnbt_rc::error::Result<fastnbt_rc::input::Reference<'de, 's, str>> {
-        let n = self.0.get_u16() as usize;
-        scratch.clear();
-        for i in 0..n {
-            scratch[i] = self.0.get_u8();
-        }
-
-        let str = cesu8::from_java_cesu8(scratch).map_err(|_| {
-            fastnbt_rc::error::Error::custom(format!("Non-unicode string: {:?}", scratch))
-        })?;
-
-        Ok(match str {
-            std::borrow::Cow::Borrowed(_) => fastnbt_rc::input::Reference::Copied(unsafe {
-                std::str::from_utf8_unchecked(scratch)
-            }),
-            std::borrow::Cow::Owned(s) => {
-                *scratch = s.into_bytes();
-                fastnbt_rc::input::Reference::Copied(unsafe {
-                    std::str::from_utf8_unchecked(scratch)
-                })
-            }
+        self.get(key).and_then(|e| match e {
+            NbtElement::Byte(value) => Some(*value),
+            _ => None,
         })
     }
 
-    fn consume_bytes<'s>(
-        &'s mut self,
-        n: usize,
-        scratch: &'s mut Vec<u8>,
-    ) -> fastnbt_rc::error::Result<fastnbt_rc::input::Reference<'de, 's, [u8]>> {
-        scratch.clear();
-        for i in 0..n {
-            scratch[i] = self.0.get_u8();
-        }
-        Ok(fastnbt_rc::input::Reference::Copied(scratch.as_slice()))
+    fn get_i16(&self, key: &str) -> Option<i16> {
+        self.get(key).and_then(|e| match e {
+            NbtElement::Short(value) => Some(*value),
+            _ => None,
+        })
     }
 
-    fn consume_i16(&mut self) -> fastnbt_rc::error::Result<i16> {
-        Ok(self.0.get_i16())
+    fn get_i32(&self, key: &str) -> Option<i32> {
+        self.get(key).and_then(|e| match e {
+            NbtElement::Int(value) => Some(*value),
+            _ => None,
+        })
     }
 
-    fn consume_i32(&mut self) -> fastnbt_rc::error::Result<i32> {
-        Ok(self.0.get_i32())
+    fn get_i64(&self, key: &str) -> Option<i64> {
+        self.get(key).and_then(|e| match e {
+            NbtElement::Long(value) => Some(*value),
+            _ => None,
+        })
     }
 
-    fn consume_i64(&mut self) -> fastnbt_rc::error::Result<i64> {
-        Ok(self.0.get_i64())
+    fn get_f32(&self, key: &str) -> Option<f32> {
+        self.get(key).and_then(|e| match e {
+            NbtElement::Float(value) => Some(*value),
+            _ => None,
+        })
     }
 
-    fn consume_f32(&mut self) -> fastnbt_rc::error::Result<f32> {
-        Ok(self.0.get_f32())
+    fn get_f64(&self, key: &str) -> Option<f64> {
+        self.get(key).and_then(|e| match e {
+            NbtElement::Double(value) => Some(*value),
+            _ => None,
+        })
     }
 
-    fn consume_f64(&mut self) -> fastnbt_rc::error::Result<f64> {
-        Ok(self.0.get_f64())
+    fn get_str(&self, key: &str) -> Option<&str> {
+        self.get(key).and_then(|e| match e {
+            NbtElement::String(value) => Some(value.as_str()),
+            _ => None,
+        })
+    }
+
+    fn get_i8_slice(&self, key: &str) -> Option<&[i8]> {
+        self.get(key).and_then(|e| match e {
+            NbtElement::ByteArray(value) => Some(value.iter().as_slice()),
+            _ => None,
+        })
+    }
+
+    fn get_i32_slice(&self, key: &str) -> Option<&[i32]> {
+        self.get(key).and_then(|e| match e {
+            NbtElement::IntArray(value) => Some(value.iter().as_slice()),
+            _ => None,
+        })
+    }
+
+    fn get_i64_slice(&self, key: &str) -> Option<&[i64]> {
+        self.get(key).and_then(|e| match e {
+            NbtElement::LongArray(value) => Some(value.iter().as_slice()),
+            _ => None,
+        })
+    }
+
+    fn get_compound(&self, key: &str) -> Option<&NbtCompound> {
+        self.get(key).and_then(|e| match e {
+            NbtElement::Compound(value) => Some(value),
+            _ => None,
+        })
+    }
+
+    fn get_slice(&self, key: &str) -> Option<&[NbtElement]> {
+        self.get(key).and_then(|e| match e {
+            NbtElement::List(value) => Some(value.as_slice()),
+            _ => None,
+        })
     }
 }
 

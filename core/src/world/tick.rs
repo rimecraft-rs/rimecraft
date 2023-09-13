@@ -38,7 +38,7 @@ impl<T> Tick<T> {
         let l: i64 = pos.into();
         for nbt in tick_list.iter() {
             let tick = match nbt {
-                fastnbt_rc::Value::Compound(value) => Self::from_nbt(value, |n| name_to_type_fn(n)),
+                fastnbt::Value::Compound(value) => Self::from_nbt(value, |n| name_to_type_fn(n)),
                 _ => None,
             };
 
