@@ -23,7 +23,7 @@ anyhow = "*"
 fastsnbt = "*"
 fastnbt-rc = { version = "*", git = "https://github.com/rimecraft-rs/fastnbt" }
 parking_lot = "0.12"
-lazy-regex = "2"
+lazy-regex = "3"
 cesu8 = "*"
 dashmap = "5.4"
 bimap = "0.6"
