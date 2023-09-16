@@ -3,13 +3,13 @@
   <a href="https://github.com/rimecraft-rs">
     <img
       height="75"
-      src="https://github.com/rimecraft-rs/artwork/blob/main/logo/rimecraft.png?raw=true"
+      src="https://github.com/rimecraft-rs/artwork/blob/main/logo/logo.png?raw=true"
       />
   </a>
   <h5><br /></h5>
 </div>
 
-###### <p align="center"><sub><img height="16" src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true" /></sub>&ensp;**Rimecraft** is Committed to Becoming a Fully-Featured, Flexible and Libre Rust Implementation of **[Minecraft.](https://minecraft.net)**&ensp;<sub><img height="16" src="https://github.com/rimecraft-rs/artwork/blob/main/cut/icon/raw/icon.png?raw=true" /></sub></p>
+###### <p align="center">**Rimecraft** is Committed to Becoming a Fully-Featured, Flexible and Libre Rust Implementation of **[Minecraft.](https://minecraft.net)**</p>
 
 <br />
 
