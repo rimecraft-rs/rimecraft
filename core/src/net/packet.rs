@@ -1,5 +1,5 @@
 pub trait Packet {
-    fn write<B>(&self, buf: &mut B)->anyhow::Result<()>
+    fn write<B>(&self, buf: &mut B) -> anyhow::Result<()>
     where
-        B:bytes::BufMut;
+        B: bytes::BufMut;
 }
