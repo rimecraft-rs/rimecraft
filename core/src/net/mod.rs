@@ -1,3 +1,5 @@
+pub mod packet;
+
 use crate::prelude::*;
 
 /// Describes types that can be encoded into a packet buffer.
