@@ -36,6 +36,7 @@ impl Components {
     ///
     /// To create with external features,
     /// see [`Self::builder()`].
+    #[inline]
     pub fn new() -> Self {
         Default::default()
     }
