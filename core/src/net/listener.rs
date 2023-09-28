@@ -1,8 +1,12 @@
+use crate::text::Text;
+
 pub trait Listener {
     const SHOULD_CRASH_ON_EXCEPTION: bool;
 
-    //TODO: Need to implement net.minecraft.Text
-    fn disconncted(&mut self, reason: ()) -> anyhow::Result<()>;
+    fn disconncted<T>(&mut self, reason: T) -> anyhow::Result<()>
+    where
+        T: Text;
+
     fn is_conn_open(&self) -> bool;
 }
 

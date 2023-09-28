@@ -1,4 +1,7 @@
-use crate::net::{listener, Decode, Encode};
+use crate::{
+    net::{listener, Decode, Encode},
+    text::Text,
+};
 
 pub struct LoginCompression {
     threshold: i32,
@@ -40,3 +43,19 @@ impl<'de> Decode<'de> for LoginCompression {
 }
 
 impl<L> super::Packet<L> for LoginCompression where L: listener::Accept<Self> {}
+
+pub struct LoginDisconnect<T>
+where
+    T: Text,
+{
+    reason: T,
+}
+
+impl<T> LoginDisconnect<T> where T: Text {
+    #[inline]
+    pub fn new(reason: T) -> Self {
+        Self { reason }
+    }
+}
+
+
