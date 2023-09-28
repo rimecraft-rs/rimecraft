@@ -1,3 +1,5 @@
+pub mod encrypt;
+pub mod listener;
 pub mod packet;
 mod packet_buf_imp;
 
@@ -9,6 +11,21 @@ pub trait Encode {
     fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::BufMut;
+}
+
+/// [`Encode`], but can be used as trait objects.
+pub trait BytesEncode {
+    fn encode_bytes(&self, bytes: &mut bytes::BytesMut) -> anyhow::Result<()>;
+}
+
+impl<T> BytesEncode for T
+where
+    T: Encode,
+{
+    #[inline]
+    fn encode_bytes(&self, bytes: &mut bytes::BytesMut) -> anyhow::Result<()> {
+        self.encode(bytes)
+    }
 }
 
 /// Describes types that can be decoded from a packet buffer.

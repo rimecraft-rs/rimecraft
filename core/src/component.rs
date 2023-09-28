@@ -257,6 +257,7 @@ impl<T> Encode for Component<T>
 where
     T: Encode,
 {
+    #[inline]
     fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
@@ -397,6 +398,7 @@ impl<T> Encode for Synced<T>
 where
     T: Attach + NetSync + 'static,
 {
+    #[inline]
     fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
@@ -571,6 +573,7 @@ impl<T> Encode for Stored<T>
 where
     T: Attach + crate::nbt::Update + Encode + 'static,
 {
+    #[inline]
     fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
