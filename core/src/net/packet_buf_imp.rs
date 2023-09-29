@@ -24,7 +24,8 @@ impl<'de> Decode<'de> for bytes::Bytes {
     where
         B: bytes::Buf,
     {
-        Vec::<u8>::decode(buf).map(bytes::Bytes::from)
+        let len = crate::VarInt::decode(buf)? as usize;
+        Ok(buf.copy_to_bytes(len))
     }
 }
 

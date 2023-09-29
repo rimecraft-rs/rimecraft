@@ -366,16 +366,14 @@ where
 {
     #[inline]
     pub fn new() -> Self {
-        Self {
-            map: dashmap::DashSet::new(),
-        }
+        Default::default()
     }
 
     /// Obtain a reference from cached values in this caches,
     /// and the provided value will be dropped.
-    /// If an equaled value dosen't exist in this caches, the value
+    /// If an equaled value doesn't exist in this caches, the value
     /// will be leaked into heap.
-    pub fn get<'a>(&'a self, value: T) -> &'a T {
+    pub fn get(&self, value: T) -> &T {
         if let Some(v) = self.map.get(&value) {
             unsafe { &*(v.deref().deref() as *const T) }
         } else {
@@ -396,6 +394,17 @@ where
     }
 }
 
+impl<T> Default for Caches<T>
+where
+    T: Hash + Eq,
+{
+    fn default() -> Self {
+        Self {
+            map: dashmap::DashSet::new(),
+        }
+    }
+}
+
 /// A variant of hash-based [`Caches`], where values are stored in weak
 /// pointers and values are provided with [`std::sync::Arc`].
 ///
@@ -413,9 +422,7 @@ where
 {
     #[inline]
     pub fn new() -> Self {
-        Self {
-            map: dashmap::DashSet::new(),
-        }
+        Default::default()
     }
 
     /// Obtain an [`std::sync::Arc`] from cached weak pointers in this caches,
@@ -450,13 +457,20 @@ where
     }
 }
 
+impl<T> Default for ArcCaches<T>
+    where
+        T: Hash + Eq,
+{
+    fn default() -> Self {
+        Self {
+            map: dashmap::DashSet::new(),
+        }
+    }
+}
+
 mod arc_caches_imp {
     use std::ops::Deref;
-    use std::{
-        collections::hash_map::DefaultHasher,
-        hash::{Hash, Hasher},
-        sync::Weak,
-    };
+    use std::{hash::Hash, sync::Weak};
 
     pub enum WeakNode<'a, T> {
         Stored(Weak<T>),

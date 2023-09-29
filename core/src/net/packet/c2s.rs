@@ -1,5 +1,6 @@
 use anyhow::Ok;
 
+use bytes::Bytes;
 use rsa::RsaPrivateKey;
 
 use crate::net::{listener, Decode, Encode};
@@ -12,6 +13,7 @@ pub struct Handshake {
 }
 
 impl Handshake {
+    #[inline]
     pub fn new(addr: String, port: u16, intended_state: crate::net::State) -> Self {
         ///TODO: Need to implement net.minecraft.SharedConstants
         const PROTO_VER: i32 = 114514;
@@ -34,14 +36,14 @@ impl Encode for Handshake {
         crate::VarInt(self.proto_ver).encode(buf)?;
         self.addr.encode(buf)?;
         self.port.encode(buf)?;
-        crate::VarInt(self.intended_state as i32).encode(buf)?;
-        Ok(())
+        crate::VarInt(self.intended_state as i32).encode(buf)
     }
 }
 
 impl<'de> Decode<'de> for Handshake {
     type Output = Self;
 
+    #[inline]
     fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
@@ -81,6 +83,7 @@ impl Encode for LoginHello {
 impl<'de> Decode<'de> for LoginHello {
     type Output = Self;
 
+    #[inline]
     fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
@@ -100,12 +103,14 @@ pub struct LoginQueryRes {
 }
 
 impl LoginQueryRes {
+    #[inline]
     pub fn query_id(&self) -> i32 {
         self.query_id
     }
 
-    pub fn response(&self) -> Option<&bytes::Bytes> {
-        self.res.as_ref()
+    #[inline]
+    pub fn response(&self) -> Option<&[u8]> {
+        self.res.as_ref().map(|value| &value[..])
     }
 }
 
@@ -138,17 +143,18 @@ impl<'de> Decode<'de> for LoginQueryRes {
         impl<'de> Decode<'de> for NullableRes {
             type Output = bytes::Bytes;
 
+            #[inline]
             fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
             where
                 B: bytes::Buf,
             {
-                const MAX_PAYLOAD_LEN: usize = 1048576;
-
-                if (0..=MAX_PAYLOAD_LEN).contains(&buf.remaining()) {
-                    bytes::Bytes::decode(buf)
+                let remaining = buf.remaining();
+                if remaining <= super::QUERY_MAX_PAYLOAD_LEN {
+                    Ok(buf.copy_to_bytes(remaining))
                 } else {
                     Err(anyhow::anyhow!(
-                        "payload may not be larger than {MAX_PAYLOAD_LEN} bytes"
+                        "payload may not be larger than {} bytes",
+                        super::QUERY_MAX_PAYLOAD_LEN
                     ))
                 }
             }
@@ -164,7 +170,7 @@ impl<'de> Decode<'de> for LoginQueryRes {
 impl<L> super::Packet<L> for LoginQueryRes where L: listener::Accept<Self> {}
 
 pub struct LoginKey {
-    encrypted_secret_key: Vec<u8>,
+    encrypted_secret_key: Bytes,
 
     /// The nonce value.
     ///
@@ -173,7 +179,7 @@ pub struct LoginKey {
     /// and the server verifies it by decrypting and comparing nonces. If signed, then it must
     /// be done so using the user's private key provided from Mojang's server, and the server
     /// verifies by checking if the reconstructed data can be verified using the public key.
-    nonce: Vec<u8>,
+    nonce: Bytes,
 }
 
 impl Encode for LoginKey {
@@ -195,8 +201,8 @@ impl<'de> Decode<'de> for LoginKey {
     where
         B: bytes::Buf,
     {
-        let encrypted_secret_key = Vec::<u8>::decode(buf)?;
-        let nonce = Vec::<u8>::decode(buf)?;
+        let encrypted_secret_key = Bytes::decode(buf)?;
+        let nonce = Bytes::decode(buf)?;
 
         Ok(LoginKey {
             encrypted_secret_key,
@@ -219,12 +225,12 @@ impl LoginKey {
         R: rsa::rand_core::CryptoRngCore,
     {
         Ok(Self {
-            encrypted_secret_key: public_key.encrypt(
-                rng,
-                rsa::pkcs1v15::Pkcs1v15Encrypt,
-                secret_key,
-            )?,
-            nonce: public_key.encrypt(rng, rsa::pkcs1v15::Pkcs1v15Encrypt, nonce)?,
+            encrypted_secret_key: public_key
+                .encrypt(rng, rsa::pkcs1v15::Pkcs1v15Encrypt, secret_key)?
+                .try_into()?,
+            nonce: public_key
+                .encrypt(rng, rsa::pkcs1v15::Pkcs1v15Encrypt, nonce)?
+                .try_into()?,
         })
     }
 
@@ -238,7 +244,7 @@ impl LoginKey {
     pub fn verify_signed_nonce(&self, nonce: &[u8], private_key: &RsaPrivateKey) -> bool {
         private_key
             .decrypt(rsa::pkcs1v15::Pkcs1v15Encrypt, &self.nonce)
-            .map_or(false, |value| nonce == &value)
+            .map_or(false, |value| nonce == value)
     }
 }
 
@@ -255,9 +261,11 @@ impl QueryPing {
 impl Encode for QueryPing {
     #[inline]
     fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-        where
-            B: bytes::BufMut {
-        (self.start_time as i64).encode(buf)
+    where
+        B: bytes::BufMut,
+    {
+        buf.put_i64(self.start_time as i64);
+        Ok(())
     }
 }
 
@@ -282,8 +290,9 @@ pub struct QueryReq;
 impl Encode for QueryReq {
     #[inline]
     fn encode<B>(&self, _buf: &mut B) -> anyhow::Result<()>
-        where
-            B: bytes::BufMut {
+    where
+        B: bytes::BufMut,
+    {
         Ok(())
     }
 }
@@ -293,8 +302,9 @@ impl<'de> Decode<'de> for QueryReq {
 
     #[inline]
     fn decode<B>(_buf: &'de mut B) -> anyhow::Result<Self::Output>
-        where
-            B: bytes::Buf {
+    where
+        B: bytes::Buf,
+    {
         Ok(Self)
     }
 }

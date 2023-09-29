@@ -5,6 +5,8 @@ use anyhow::Ok;
 
 use super::{listener::*, Encode};
 
+const QUERY_MAX_PAYLOAD_LEN: usize = 1048576;
+
 pub trait Packet<L: ?Sized>: super::BytesEncode
 where
     L: super::listener::Accept<Self>,
