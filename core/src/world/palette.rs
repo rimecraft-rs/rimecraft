@@ -180,7 +180,7 @@ where
                     )
                     .encode(buf)?;
                 } else {
-                    panic!("use of an uninitialized palette");
+                    panic!("use of uninitialized palette");
                 }
             }
             Inner::BiMap(bimap) => {

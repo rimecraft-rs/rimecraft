@@ -11,6 +11,7 @@ pub mod net;
 pub mod registry;
 pub mod server;
 pub mod state;
+pub mod text;
 mod util;
 pub mod world;
 
