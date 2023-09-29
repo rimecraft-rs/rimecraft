@@ -23,13 +23,10 @@ impl Events {
             .find(|e| {
                 e.0.map_or(false, |ee| ee == id) && matches!(e.1, Callback::BlockStateItemMap(_))
             })
-            .map_or_else(
-                || crate::item::ItemStack::default(),
-                |e| match &e.1 {
-                    Callback::BlockStateItemMap(c) => c(state),
-                    _ => unreachable!(),
-                },
-            )
+            .map_or_else(crate::item::ItemStack::default, |e| match &e.1 {
+                Callback::BlockStateItemMap(c) => c(state),
+                _ => unreachable!(),
+            })
     }
 
     pub fn is_air(&self, state: &super::BlockState) -> bool {

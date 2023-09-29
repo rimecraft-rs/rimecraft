@@ -103,14 +103,14 @@ impl<'de> serde::Deserialize<'de> for Block {
                 tracing::debug!("Tried to load invalid block: {id}");
                 *crate::registry::BLOCK.default_entry().1.deref()
             },
-            |e| e.1.deref().clone(),
+            |e| *e.1.deref(),
         ))
     }
 }
 
 impl Default for Block {
     fn default() -> Self {
-        crate::registry::BLOCK.default_entry().1.deref().clone()
+        *crate::registry::BLOCK.default_entry().1.deref()
     }
 }
 

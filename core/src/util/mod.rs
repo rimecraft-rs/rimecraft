@@ -162,12 +162,16 @@ pub struct VarInt(pub i32);
 impl VarInt {
     pub fn len(self) -> usize {
         for i in 1..5 {
-            if (self.0 & -1 << i * 7) == 0 {
+            if (self.0 & -1 << (i * 7)) == 0 {
                 return i as usize;
             }
         }
 
         5
+    }
+
+    pub const fn is_empty(self) -> bool {
+        false
     }
 }
 
@@ -197,13 +201,15 @@ pub trait EnumValues<const N: usize>: Sized + Clone + Copy + PartialEq + Eq {
 
 /// Represents a reference with enhancements based on `&'a`.
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct Ref<'a, T: 'a + ?Sized>(pub &'a T);
 
 impl<'a, T: 'a + ?Sized> Copy for Ref<'a, T> {}
 
 impl<'a, T: 'a + ?Sized> Clone for Ref<'a, T> {
+    #[inline]
     fn clone(&self) -> Self {
-        Self(self.0)
+        *self
     }
 }
 
@@ -227,11 +233,15 @@ impl<'a, T: 'a> From<&'a T> for Ref<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Eq for Ref<'a, T> {}
+impl<'a, T: 'a> Eq for Ref<'a, T> where T: ?Sized {}
 
-impl<'a, T: 'a> PartialEq for Ref<'a, T> {
+impl<'a, T: 'a> PartialEq for Ref<'a, T>
+where
+    T: ?Sized,
+{
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.0 as *const T as usize == other.0 as *const T as usize
+        self.0 as *const T == other.0 as *const T
     }
 }
 
@@ -324,6 +334,8 @@ impl<T> Freeze<T> for T {
     }
 }
 
+type LisCac<T, Phase> = (Vec<(Phase, *const T)>, Option<Box<T>>, Vec<&'static T>);
+
 /// A type containing listeners of this event,
 /// which can be invoked by an invoker.
 ///
@@ -334,7 +346,6 @@ impl<T> Freeze<T> for T {
 pub struct Event<T, Phase = i8>
 where
     T: ?Sized + 'static,
-    Phase: Ord,
 {
     /// Whether listeners has been modified before requesting the invoker.
     dirty: std::sync::atomic::AtomicBool,
@@ -344,8 +355,7 @@ where
     /// 0: raw listeners with phases
     /// 1: cached invoker
     /// 2: cached listener references
-    listeners_and_cache:
-        parking_lot::RwLock<(Vec<(Phase, *const T)>, Option<Box<T>>, Vec<&'static T>)>,
+    listeners_and_cache: parking_lot::RwLock<LisCac<T, Phase>>,
 }
 
 impl<T, Phase> Event<T, Phase>
@@ -421,7 +431,6 @@ where
 impl<T, Phase> Drop for Event<T, Phase>
 where
     T: ?Sized,
-    Phase: Ord,
 {
     fn drop(&mut self) {
         let mut vec = Vec::new();

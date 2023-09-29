@@ -338,7 +338,7 @@ where
 
         if let Some(Component(event)) = components.get_mut::<Component<
             crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
-        >>(&*NET_SEND_ID)
+        >>(&NET_SEND_ID)
         {
             event.register(Box::new(move |map| {
                 let this = unsafe { &*ptr };
@@ -360,7 +360,7 @@ where
             crate::MutOnly<
                 crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
             >,
-        >>(&*NET_RECV_ID)
+        >>(&NET_RECV_ID)
         {
             event.as_mut().register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
@@ -516,7 +516,7 @@ where
 
         if let Some(Component(event)) = components.get_mut::<Component<
             crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>>,
-        >>(&*NBT_SAVE_ID)
+        >>(&NBT_SAVE_ID)
         {
             event.register(Box::new(move |map| {
                 let this = unsafe { &*ptr };
@@ -537,7 +537,7 @@ where
                     dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>,
                 >,
             >,
-        >>(&*NBT_READ_ID)
+        >>(&NBT_READ_ID)
         {
             event.as_mut().register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
