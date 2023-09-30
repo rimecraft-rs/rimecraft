@@ -458,8 +458,8 @@ where
 }
 
 impl<T> Default for ArcCaches<T>
-    where
-        T: Hash + Eq,
+where
+    T: Hash + Eq,
 {
     fn default() -> Self {
         Self {
