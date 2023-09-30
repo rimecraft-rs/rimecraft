@@ -1,6 +1,4 @@
-use crate::net::Encode;
 use std::{borrow::Borrow, hash::Hash, ops::Deref};
-use tracing::instrument;
 
 pub const DEFAULT_INDEXED_INDEX: i32 = -1;
 
@@ -131,14 +129,12 @@ impl PackedArray {
             element_bits,
             max_value: (1_u64 << element_bits) - 1,
             elements_per_long,
-            index_scale: INDEX_PARAMS[elements_per_long + 0],
+            index_scale: INDEX_PARAMS[elements_per_long],
             index_offset: INDEX_PARAMS[elements_per_long + 1],
             index_shift: INDEX_PARAMS[elements_per_long + 2],
             data: {
                 if let Some(vec) = data {
-                    if vec.len() != expected_data_len {
-                        panic!("invalid length given for storage, got: {len} but expected: {expected_data_len}");
-                    }
+                    assert_eq!(vec.len(), expected_data_len, "invalid length given for storage, got: {len} but expected: {expected_data_len}");
                     vec
                 } else {
                     vec![0; expected_data_len]
@@ -201,7 +197,7 @@ impl PackedArray {
     fn storage_index(&self, index: usize) -> usize {
         let l = self.index_scale as u32 as usize;
         let m = self.index_offset as u32 as usize;
-        index * l + m >> 32 >> self.index_shift
+        (index * l + m) >> 32 >> self.index_shift
     }
 
     /// Sets `value` to `index` and returns the previous value.
@@ -458,8 +454,8 @@ where
 }
 
 impl<T> Default for ArcCaches<T>
-    where
-        T: Hash + Eq,
+where
+    T: Hash + Eq,
 {
     fn default() -> Self {
         Self {
@@ -543,8 +539,4 @@ mod tests_caches {
             first_ptr.deref() as *const String as usize
         );
     }
-}
-
-pub trait Weighted {
-    fn weight(&self) -> u32;
 }

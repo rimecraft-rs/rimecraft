@@ -8,7 +8,7 @@ pub trait Chunk<'w>: super::Blocks + super::LightSources + std::any::Any {
     fn pos(&self) -> ChunkPos;
 
     fn sections(&self) -> &[Option<Section<'w>>];
-    fn sections_mut(&self) -> &mut [Option<Section<'w>>];
+    fn sections_mut(&mut self) -> &mut [Option<Section<'w>>];
 
     fn heightmaps(
         &self,
@@ -18,7 +18,7 @@ pub trait Chunk<'w>: super::Blocks + super::LightSources + std::any::Any {
     )];
 
     fn heightmaps_mut(
-        &self,
+        &mut self,
     ) -> &mut [(
         crate::Ref<'static, super::heightmap::Type>,
         super::heightmap::Heightmap,

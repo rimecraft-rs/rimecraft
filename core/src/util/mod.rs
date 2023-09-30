@@ -11,6 +11,7 @@ static ID_NAMESPACE_CACHES: once_cell::sync::Lazy<crate::collections::Caches<Str
 ///
 /// This is also known as "resource location", "namespaced ID",
 /// "location", or "Identifier".
+///
 /// This is a non-typed immutable object, and identifies things
 /// using a combination of namespace and path.
 #[derive(PartialEq, Eq, Clone, Hash, Debug)]
@@ -241,7 +242,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.0 as *const T == other.0 as *const T
+        std::ptr::eq(self.0, other.0)
     }
 }
 

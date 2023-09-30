@@ -1,0 +1,17 @@
+[package]
+name = "rimecraft-primitives"
+version = "0.1.0"
+edition = "2021"
+authors = ["Yjn024 <jiening.yu@outlook.com>"]
+description = "Primitive types and traits for building Rimecraft applications"
+
+[dependencies]
+thiserror = "1.0"
+serde = { version = "1.0", optional = true }
+rimecraft-caches = { path = "../caches", optional = true }
+once_cell = { version = "1.18", optional = true }
+
+[features]
+default = ["caches"]
+serde = ["dep:serde"]
+caches = ["dep:rimecraft-caches", "dep:once_cell"]

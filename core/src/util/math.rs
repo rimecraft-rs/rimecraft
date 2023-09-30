@@ -275,10 +275,10 @@ impl Into<i64> for BlockPos {
 impl From<i64> for BlockPos {
     fn from(value: i64) -> Self {
         Self(glam::IVec3 {
-            x: (value << 64 - Self::BIT_SHIFT_X - Self::SIZE_BITS_X >> 64 - Self::SIZE_BITS_X)
+            x: (value << (64 - Self::BIT_SHIFT_X - Self::SIZE_BITS_X) >> (64 - Self::SIZE_BITS_X))
                 as i32,
-            y: (value << 64 - Self::SIZE_BITS_Y >> 64 - Self::SIZE_BITS_Y) as i32,
-            z: (value << 64 - Self::BIT_SHIFT_Z - Self::SIZE_BITS_Z >> 64 - Self::SIZE_BITS_Z)
+            y: (value << (64 - Self::SIZE_BITS_Y) >> (64 - Self::SIZE_BITS_Y)) as i32,
+            z: (value << (64 - Self::BIT_SHIFT_Z - Self::SIZE_BITS_Z) >> (64 - Self::SIZE_BITS_Z))
                 as i32,
         })
     }
