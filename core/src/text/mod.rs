@@ -1,22 +1,11 @@
 use anyhow::{anyhow, Ok};
 
+use crate::util;
+
 ///TODO: Implement net.minecraft.text.Text
 pub trait Text {
     fn style(&self) -> &Style;
 }
-
-const EMPTY: Style = Style {
-    color: None,
-    bold: None,
-    italic: None,
-    underlined: None,
-    strikethrough: None,
-    obfuscated: None,
-    click: None,
-    hover: None,
-    insertion: None,
-    font: None,
-};
 
 ///The style of a [`Text`].\
 ///A style is immutable.
@@ -33,8 +22,22 @@ pub struct Style {
     ///TODO: Implement net.minecraft.text.HoverEvent
     hover: Option<()>,
     insertion: Option<String>,
-    ///TODO: Implement net.minecraft.util.Identifier
-    font: Option<()>,
+    font: Option<util::Id>,
+}
+
+impl Style {
+    const EMPTY: Style = Style {
+        color: None,
+        bold: None,
+        italic: None,
+        underlined: None,
+        strikethrough: None,
+        obfuscated: None,
+        click: None,
+        hover: None,
+        insertion: None,
+        font: None,
+    };
 }
 
 pub struct Color {
@@ -45,16 +48,17 @@ pub struct Color {
 
 impl Color {
     const RGB_PREFIX: &str = "#";
+
     pub fn try_parse(name: String) -> anyhow::Result<Self> {
         if (name.starts_with(Self::RGB_PREFIX)) {
             let i: u32 = str::parse(&name[1..])?;
-            Ok(Self { rgb: i, name: None })
+            Ok(Self::from_rgb(i))
         } else {
             Err(anyhow!("121345"))
         }
     }
-}
 
-pub enum Formatting {
-    
+    pub fn from_rgb(rgb: u32) -> Self {
+        Self { rgb, name: None }
+    }
 }
