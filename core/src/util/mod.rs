@@ -1,6 +1,7 @@
 use std::{hash::Hash, ops::Deref};
 
 pub mod collections;
+pub mod formatting;
 mod magic_num;
 pub mod math;
 
