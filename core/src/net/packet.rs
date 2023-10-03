@@ -2,12 +2,13 @@ pub mod c2s;
 pub mod s2c;
 
 use anyhow::Ok;
+use rimecraft_edcode::Encode;
 
-use super::{listener::*, Encode};
+use super::listener::*;
 
 const QUERY_MAX_PAYLOAD_LEN: usize = 1048576;
 
-pub trait Packet<L: ?Sized>: super::BytesEncode
+pub trait Packet<L: ?Sized>: rimecraft_edcode::BytesEncode
 where
     L: super::listener::Accept<Self>,
 {

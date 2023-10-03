@@ -12,11 +12,11 @@ impl Events {
     /// The required `fluid` can be `None` for some events
     /// so that all fluids will be affected by this callback.
     pub fn register(&mut self, fluid: Option<super::Fluid>, callback: Callback) {
-        self.0.push((fluid.map(|e| e.raw_id()), callback));
+        self.0.push((fluid.map(|e| e.index_of()), callback));
     }
 
     pub fn is_empty(&self, state: &super::FluidState) -> bool {
-        let id = state.fluid().raw_id();
+        let id = state.fluid().index_of();
 
         self.0
             .iter()
@@ -28,7 +28,7 @@ impl Events {
     }
 
     pub fn has_random_ticks(&self, state: &super::FluidState) -> bool {
-        let id = state.fluid().raw_id();
+        let id = state.fluid().index_of();
 
         self.0
             .iter()

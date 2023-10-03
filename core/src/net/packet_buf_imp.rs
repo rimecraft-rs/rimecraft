@@ -24,7 +24,7 @@ impl<'de> Decode<'de> for bytes::Bytes {
     where
         B: bytes::Buf,
     {
-        let len = crate::VarInt::decode(buf)? as usize;
+        let len = VarI32::decode(buf)? as usize;
         Ok(buf.copy_to_bytes(len))
     }
 }
@@ -488,7 +488,7 @@ where
     where
         B: bytes::BufMut,
     {
-        crate::util::VarInt(self.raw_id() as i32).encode(buf)
+        crate::util::VarInt(self.index_of() as i32).encode(buf)
     }
 }
 
@@ -708,7 +708,7 @@ impl<'de> Decode<'de> for uuid::Uuid {
     }
 }
 
-impl Encode for crate::nbt::NbtCompound {
+impl Encode for rimecraft_nbt_ext::Compound {
     #[inline]
     fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
     where
@@ -718,8 +718,8 @@ impl Encode for crate::nbt::NbtCompound {
     }
 }
 
-impl<'de> Decode<'de> for crate::nbt::NbtCompound {
-    type Output = crate::nbt::NbtCompound;
+impl<'de> Decode<'de> for rimecraft_nbt_ext::Compound {
+    type Output = rimecraft_nbt_ext::Compound;
 
     #[inline]
     fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>

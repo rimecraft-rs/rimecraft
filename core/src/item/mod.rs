@@ -2,18 +2,17 @@ mod event;
 
 use std::ops::Deref;
 
-use crate::{
-    prelude::*,
-    registry::{Registration, RegistryAccess},
-};
+use crate::registry::{Registration, RegistryAccess};
 
 pub use event::*;
+use rimecraft_nbt_ext::CompoundExt;
+use rimecraft_primitives::Id;
 
 /// Represents an item.
 #[derive(Clone, Copy)]
 pub struct Item {
     id: usize,
-    properties: crate::Ref<'static, ItemDescriptor>,
+    properties: rimecraft_primitives::Ref<'static, ItemDescriptor>,
 }
 
 /// Describes some basic properties of an item.
@@ -56,7 +55,7 @@ impl Registration for Item {
         self.id = id
     }
 
-    fn raw_id(&self) -> usize {
+    fn index_of(&self) -> usize {
         self.id
     }
 }
@@ -73,7 +72,7 @@ impl serde::Serialize for Item {
         S: serde::Serializer,
     {
         crate::registry::ITEM
-            .get_from_raw(self.raw_id())
+            .get_from_raw(self.index_of())
             .unwrap()
             .key()
             .value()
@@ -124,7 +123,7 @@ impl AsItem for crate::registry::Entry<Item> {
 impl std::fmt::Display for Item {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         crate::registry::ITEM
-            .get_from_raw(self.raw_id())
+            .get_from_raw(self.index_of())
             .ok_or(std::fmt::Error)?
             .key()
             .value()
@@ -154,7 +153,7 @@ pub struct ItemStack {
     /// Count of this stack.
     pub count: u8,
     item: Item,
-    nbt: Option<crate::nbt::NbtCompound>,
+    nbt: Option<rimecraft_nbt_ext::Compound>,
 }
 
 impl ItemStack {
@@ -201,27 +200,27 @@ impl ItemStack {
     /// Whether the target item holder matches the provided predicate.
     pub fn matches<F: Fn(&crate::registry::Entry<Item>) -> bool>(&self, f: F) -> bool {
         f(crate::registry::ITEM
-            .get_from_raw(self.item.raw_id())
+            .get_from_raw(self.item.index_of())
             .unwrap())
     }
 
     #[inline]
-    pub fn nbt(&self) -> Option<&crate::nbt::NbtCompound> {
+    pub fn nbt(&self) -> Option<&rimecraft_nbt_ext::Compound> {
         self.nbt.as_ref()
     }
 
     #[inline]
-    pub fn nbt_mut(&mut self) -> Option<&mut crate::nbt::NbtCompound> {
+    pub fn nbt_mut(&mut self) -> Option<&mut rimecraft_nbt_ext::Compound> {
         self.nbt.as_mut()
     }
 
     #[inline]
-    pub fn get_or_init_nbt(&mut self) -> &mut crate::nbt::NbtCompound {
+    pub fn get_or_init_nbt(&mut self) -> &mut rimecraft_nbt_ext::Compound {
         self.nbt
-            .get_or_insert_with(|| crate::nbt::NbtCompound::new())
+            .get_or_insert_with(|| rimecraft_nbt_ext::Compound::new())
     }
 
-    pub fn set_nbt(&mut self, nbt: Option<crate::nbt::NbtCompound>) {
+    pub fn set_nbt(&mut self, nbt: Option<rimecraft_nbt_ext::Compound>) {
         self.nbt = nbt;
 
         if self.is_damageable() {
@@ -350,5 +349,5 @@ struct RawItemStack {
     #[serde(rename = "Count")]
     count: i8,
     #[serde(default)]
-    tag: Option<crate::nbt::NbtCompound>,
+    tag: Option<rimecraft_nbt_ext::Compound>,
 }

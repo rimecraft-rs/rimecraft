@@ -1,9 +1,10 @@
 use anyhow::Ok;
 
 use bytes::Bytes;
+use rimecraft_edcode::{Decode, Encode, VarI32};
 use rsa::RsaPrivateKey;
 
-use crate::net::{listener, Decode, Encode};
+use crate::net::listener;
 
 pub struct Handshake {
     proto_ver: i32,
@@ -33,10 +34,10 @@ impl Encode for Handshake {
     where
         B: bytes::BufMut,
     {
-        crate::VarInt(self.proto_ver).encode(buf)?;
+        VarI32(self.proto_ver).encode(buf)?;
         self.addr.encode(buf)?;
         self.port.encode(buf)?;
-        crate::VarInt(self.intended_state as i32).encode(buf)
+        VarI32(self.intended_state as i32).encode(buf)
     }
 }
 
@@ -48,10 +49,10 @@ impl<'de> Decode<'de> for Handshake {
     where
         B: bytes::Buf,
     {
-        let proto_ver = crate::VarInt::decode(buf)?;
+        let proto_ver = VarI32::decode(buf)?;
         let addr = String::decode(buf)?;
         let port = i16::decode(buf)? as u16;
-        let state = crate::VarInt::decode(buf)?;
+        let state = VarI32::decode(buf)?;
 
         Ok(Self {
             proto_ver,
@@ -119,7 +120,7 @@ impl Encode for LoginQueryRes {
     where
         B: bytes::BufMut,
     {
-        crate::VarInt(self.query_id).encode(buf)?;
+        VarI32(self.query_id).encode(buf)?;
 
         if let Some(ref value) = self.res {
             true.encode(buf)?;
@@ -160,7 +161,7 @@ impl<'de> Decode<'de> for LoginQueryRes {
             }
         }
 
-        let qid = crate::VarInt::decode(buf)?;
+        let qid = VarI32::decode(buf)?;
         let res = Option::<NullableRes>::decode(buf)?;
 
         Ok(Self { query_id: qid, res })

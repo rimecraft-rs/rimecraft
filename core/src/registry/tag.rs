@@ -1,7 +1,7 @@
-use crate::prelude::*;
+use rimecraft_primitives::Id;
 
-static KEYS_CACHE: once_cell::sync::Lazy<crate::collections::ArcCaches<Id>> =
-    once_cell::sync::Lazy::new(crate::collections::ArcCaches::new);
+static KEYS_CACHE: once_cell::sync::Lazy<rimecraft_caches::ArcCaches<Id>> =
+    once_cell::sync::Lazy::new(rimecraft_caches::ArcCaches::new);
 
 /// Represents a tag key.
 pub struct Key<T> {
@@ -10,6 +10,7 @@ pub struct Key<T> {
 }
 
 impl<T> Key<T> {
+    #[inline]
     pub fn new(reg: super::Key<super::Registry<T>>, id: Id) -> Self {
         Self {
             reg,
@@ -17,6 +18,7 @@ impl<T> Key<T> {
         }
     }
 
+    #[inline]
     pub fn is_of<T1>(&self, reg: &super::Key<super::Registry<T1>>) -> bool {
         self.reg.inner == reg.inner
     }
@@ -36,16 +38,19 @@ impl<T> Key<T> {
         }
     }
 
+    #[inline]
     pub fn reg(&self) -> super::Key<super::Registry<T>> {
         self.reg
     }
 
+    #[inline]
     pub fn id(&self) -> &Id {
         &self.id
     }
 }
 
 impl<T> Clone for Key<T> {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             reg: self.reg,
@@ -55,6 +60,7 @@ impl<T> Clone for Key<T> {
 }
 
 impl<T> PartialEq for Key<T> {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && self.reg == other.reg
     }
@@ -63,16 +69,14 @@ impl<T> PartialEq for Key<T> {
 impl<T> Eq for Key<T> {}
 
 impl<T> std::fmt::Debug for Key<T> {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("TagKey[")?;
-        self.reg.fmt(f)?;
-        f.write_str(" / ")?;
-        std::fmt::Display::fmt(&self.id, f)?;
-        f.write_str("]")
+        write!(f, "TagKey[{:?} / {}]", self.reg, self.id)
     }
 }
 
 impl<T> std::hash::Hash for Key<T> {
+    #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id.hash(state)
     }

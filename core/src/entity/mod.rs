@@ -12,7 +12,7 @@ impl crate::registry::Registration for Type {
         self.id = id
     }
 
-    fn raw_id(&self) -> usize {
+    fn index_of(&self) -> usize {
         self.id
     }
 }

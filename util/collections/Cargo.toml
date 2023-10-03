@@ -1,0 +1,18 @@
+[package]
+name = "rimecraft-collections"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Collection types for Rimecraft"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["data-structures"]
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[dependencies]
+
+[features]
+id_list = []
+packed_array = []

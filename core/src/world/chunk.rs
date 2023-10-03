@@ -1,5 +1,8 @@
 use std::{ops::Deref, sync::atomic};
 
+use rimecraft_nbt_ext::CompoundExt;
+use rimecraft_primitives::Id;
+
 use crate::{block, fluid, prelude::*, util::math::ChunkPos};
 
 use super::{biome, palette};
@@ -8,19 +11,19 @@ pub trait Chunk<'w>: super::Blocks + super::LightSources + std::any::Any {
     fn pos(&self) -> ChunkPos;
 
     fn sections(&self) -> &[Option<Section<'w>>];
-    fn sections_mut(&self) -> &mut [Option<Section<'w>>];
+    fn sections_mut(&mut self) -> &mut [Option<Section<'w>>];
 
     fn heightmaps(
         &self,
     ) -> &[(
-        crate::Ref<'static, super::heightmap::Type>,
+        rimecraft_primitives::Ref<'static, super::heightmap::Type>,
         super::heightmap::Heightmap,
     )];
 
     fn heightmaps_mut(
-        &self,
+        &mut self,
     ) -> &mut [(
-        crate::Ref<'static, super::heightmap::Type>,
+        rimecraft_primitives::Ref<'static, super::heightmap::Type>,
         super::heightmap::Heightmap,
     )];
 
@@ -236,7 +239,7 @@ pub struct UpgradeData {
 impl UpgradeData {
     const INDICES_KEY: &str = "Indices";
 
-    pub fn new(nbt: &crate::nbt::NbtCompound, world: &impl super::HeightLimit) -> Self {
+    pub fn new(nbt: &rimecraft_nbt_ext::Compound, world: &impl super::HeightLimit) -> Self {
         let mut this = Self {
             sides_to_upgrade: Vec::new(),
             block_ticks: Vec::new(),
@@ -259,7 +262,7 @@ impl UpgradeData {
 
         let j = nbt.get_i32("Sides").unwrap_or_default();
 
-        for ewd in crate::util::math::EightWayDirection::values() {
+        for ewd in crate::util::math::EightWayDirection::VALUES {
             if (j & 1 << ewd as u8) != 0 {
                 this.sides_to_upgrade.push(ewd);
             }
@@ -297,7 +300,7 @@ impl UpgradeData {
     }
 
     fn add_neighbor_ticks<T, F>(
-        nbt: &crate::nbt::NbtCompound,
+        nbt: &rimecraft_nbt_ext::Compound,
         key: &str,
         name_to_type: F,
         ticks: &mut Vec<super::tick::Tick<T>>,
@@ -307,9 +310,10 @@ impl UpgradeData {
         if let Some(list) = nbt.get_slice(key) {
             for value in list.iter() {
                 if let Some(tick) = super::tick::Tick::from_nbt(
-                    match value {
-                        crate::nbt::NbtElement::Compound(c) => c,
-                        _ => continue,
+                    if let fastnbt::Value::Compound(ref c) = value {
+                        c
+                    } else {
+                        continue;
                     },
                     |n| name_to_type(n),
                 ) {
@@ -335,7 +339,7 @@ pub mod light {
 
             Self {
                 min_y,
-                palette: crate::collections::PackedArray::new(
+                palette: rimecraft_collections::PackedArray::new(
                     crate::math::impl_helper::ceil_log_2(height_limit.top_y() - min_y + 1) as usize,
                     256,
                     None,

@@ -1,0 +1,32 @@
+[package]
+name = "rimecraft-edcode"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Rust implementation for PacketByteBuf"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["encoding"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+anyhow = "1.0"
+bytes = "1.5"
+serde = { version = "1.0", optional = true }
+# custom formats
+fastnbt = { version = "2.4", optional = true }
+serde_json = { version = "1.0", optional = true }
+# integrations
+uuid = { version = "1.4", optional = true }
+glam = { version = "0.24", optional = true }
+
+[features]
+serde = ["dep:serde"]
+# custom formats
+nbt = ["serde", "dep:fastnbt"]
+json = ["serde", "dep:serde_json"]
+# integrations
+uuid = ["dep:uuid"]
+glam = ["dep:glam"]
