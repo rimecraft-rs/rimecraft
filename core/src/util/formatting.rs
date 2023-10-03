@@ -228,6 +228,14 @@ impl Formatting<'_> {
         };
         ret
     }
+
+    pub fn color_value(&self) -> Option<u32> {
+        self.color_value
+    }
+
+    pub fn name(&self) -> &str {
+        self.name
+    }
 }
 
 impl super::StringIdentifiable for Formatting<'_> {
