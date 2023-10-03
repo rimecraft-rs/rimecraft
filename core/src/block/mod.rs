@@ -3,26 +3,25 @@ mod event;
 
 use std::{hash::Hash, ops::Deref};
 
-use crate::{
-    prelude::*,
-    registry::{Registration, RegistryAccess},
-};
+use crate::registry::{Registration, RegistryAccess};
 
 pub use event::*;
 
 use once_cell::sync::Lazy;
+use rimecraft_collections::IdList;
+use rimecraft_freezer::Freezer;
 
 //TODO: Build and freeze STATE_IDS
 
 /// An `ID <-> BlockState` list.
-pub static STATE_IDS: Lazy<crate::util::Freezer<crate::collections::IdList<SharedBlockState>>> =
-    once_cell::sync::Lazy::new(|| crate::util::Freezer::new(crate::collections::IdList::new()));
+pub static STATE_IDS: Lazy<Freezer<IdList<SharedBlockState>>> =
+    once_cell::sync::Lazy::new(|| Freezer::new(IdList::new()));
 
 /// Represents a block.
 #[derive(Clone, Copy)]
 pub struct Block {
     id: usize,
-    pub states: crate::util::Ref<'static, crate::state::States<BlockState>>,
+    pub states: rimecraft_primitives::Ref<'static, crate::state::States<BlockState>>,
 }
 
 impl Block {
@@ -47,7 +46,7 @@ impl Block {
     pub fn default_state(&self) -> SharedBlockState {
         crate::state::Shared {
             entries: self.states,
-            value: crate::Ref(self.states.0.default_state()),
+            value: rimecraft_primitives::Ref(self.states.0.default_state()),
         }
     }
 }
@@ -61,7 +60,7 @@ impl Registration for Block {
             .for_each(|state| state.block.store(id, std::sync::atomic::Ordering::Relaxed))
     }
 
-    fn raw_id(&self) -> usize {
+    fn index_of(&self) -> usize {
         self.id
     }
 }
@@ -84,7 +83,7 @@ impl serde::Serialize for Block {
         S: serde::Serializer,
     {
         crate::registry::BLOCK
-            .get_from_raw(self.raw_id())
+            .get_from_raw(self.index_of())
             .unwrap()
             .key()
             .value()
@@ -97,20 +96,20 @@ impl<'de> serde::Deserialize<'de> for Block {
     where
         D: serde::Deserializer<'de>,
     {
-        let id = Id::deserialize(deserializer)?;
+        let id = rimecraft_primitives::Id::deserialize(deserializer)?;
         Ok(crate::registry::BLOCK.get_from_id(&id).map_or_else(
             || {
                 tracing::debug!("Tried to load invalid block: {id}");
                 *crate::registry::BLOCK.default_entry().1.deref()
             },
-            |e| e.1.deref().clone(),
+            |e| *e.1.deref(),
         ))
     }
 }
 
 impl Default for Block {
     fn default() -> Self {
-        crate::registry::BLOCK.default_entry().1.deref().clone()
+        *crate::registry::BLOCK.default_entry().1.deref()
     }
 }
 

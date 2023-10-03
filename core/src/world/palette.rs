@@ -1,6 +1,7 @@
 use std::hash::Hash;
 
-use crate::net::{Decode, Encode, NetSync};
+use rimecraft_collections::PackedArray;
+use rimecraft_edcode::{Decode, Encode, VarI32};
 
 /// A palette maps objects from and to small integer IDs that uses less
 /// number of bits to make storage smaller.
@@ -12,7 +13,7 @@ pub struct Palette<'a, T>
 where
     T: Eq + Copy + Hash + 'a,
 {
-    ids: crate::Ref<'a, dyn crate::collections::Indexed<T> + Send + Sync>,
+    ids: rimecraft_primitives::Ref<'a, dyn rimecraft_collections::Index<T> + Send + Sync>,
     inner: Inner<'a, T>,
 }
 
@@ -24,7 +25,7 @@ where
     pub fn index(&self, value: T) -> Option<usize> {
         match &self.inner {
             Inner::Vector(vec) => vec.iter().position(|e| e == &value),
-            Inner::Indexed(ids) => ids.raw_id(&value),
+            Inner::Indexed(ids) => ids.index_of(&value),
             Inner::Singular(option) => option
                 .map(|e| if e == value { Some(0) } else { None })
                 .flatten(),
@@ -95,41 +96,28 @@ where
     pub fn buf_len(&self) -> usize {
         match &self.inner {
             Inner::Vector(vec) => {
-                crate::VarInt(vec.len() as i32).len() as usize
+                VarI32(vec.len() as i32).len() as usize
                     + vec
                         .iter()
                         .map(|value| {
-                            crate::VarInt(
-                                self.ids
-                                    .raw_id(value)
-                                    .map(|e| e as i32)
-                                    .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
-                            )
-                            .len()
+                            VarI32(self.ids.index_of(value).map(|e| e as i32).unwrap_or(-1)).len()
                         })
                         .sum::<usize>()
             }
-            Inner::Indexed(_) => crate::VarInt(0).len(),
+            Inner::Indexed(_) => VarI32(0).len(),
             Inner::Singular(option) => {
                 if let Some(entry) = option {
-                    crate::VarInt(
-                        self.ids
-                            .raw_id(&entry)
-                            .map(|e| e as i32)
-                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
-                    )
-                    .len()
+                    VarI32(self.ids.index_of(&entry).map(|e| e as i32).unwrap_or(-1)).len()
                 } else {
                     panic!("use of an uninitialized palette");
                 }
             }
             Inner::BiMap(bimap) => {
-                crate::VarInt(self.len() as i32).len()
+                VarI32(self.len() as i32).len()
                     + bimap
                         .iter()
                         .map(|entry| {
-                            crate::VarInt(self.ids.raw_id(entry.1).map(|e| e as i32).unwrap_or(-1))
-                                .len()
+                            VarI32(self.ids.index_of(entry.1).map(|e| e as i32).unwrap_or(-1)).len()
                         })
                         .sum::<usize>()
             }
@@ -157,38 +145,27 @@ where
     {
         match &self.inner {
             Inner::Vector(vec) => {
-                crate::VarInt(vec.len() as i32).encode(buf)?;
+                VarI32(vec.len() as i32).encode(buf)?;
 
                 for value in vec {
-                    crate::VarInt(
-                        self.ids
-                            .raw_id(value)
-                            .map(|e| e as i32)
-                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
-                    )
-                    .encode(buf)?;
+                    VarI32(self.ids.index_of(value).map(|e| e as i32).unwrap_or(-1)).encode(buf)?;
                 }
             }
             Inner::Indexed(_) => (),
             Inner::Singular(option) => {
                 if let Some(entry) = option {
-                    crate::VarInt(
-                        self.ids
-                            .raw_id(&entry)
-                            .map(|e| e as i32)
-                            .unwrap_or(crate::collections::DEFAULT_INDEXED_INDEX),
-                    )
-                    .encode(buf)?;
+                    VarI32(self.ids.index_of(&entry).map(|e| e as i32).unwrap_or(-1))
+                        .encode(buf)?;
                 } else {
                     panic!("use of uninitialized palette");
                 }
             }
             Inner::BiMap(bimap) => {
                 let i = self.len();
-                crate::VarInt(i as i32).encode(buf)?;
+                VarI32(i as i32).encode(buf)?;
 
                 for entry in bimap.iter() {
-                    crate::VarInt(self.ids.raw_id(entry.1).map(|e| e as i32).unwrap_or(-1))
+                    VarI32(self.ids.index_of(entry.1).map(|e| e as i32).unwrap_or(-1))
                         .encode(buf)?;
                 }
             }
@@ -198,11 +175,11 @@ where
     }
 }
 
-impl<'a, T> crate::net::NetSync for Palette<'a, T>
+impl<'a, T> rimecraft_edcode::Update for Palette<'a, T>
 where
     T: Eq + Copy + Hash + 'a,
 {
-    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::Buf,
     {
@@ -210,21 +187,15 @@ where
             Inner::Vector(vec) => {
                 *vec = Vec::new();
 
-                for _ in 0..crate::VarInt::decode(buf)? {
-                    vec.push(
-                        *self
-                            .ids
-                            .0
-                            .get(crate::VarInt::decode(buf)? as usize)
-                            .unwrap(),
-                    );
+                for _ in 0..VarI32::decode(buf)? {
+                    vec.push(*self.ids.0.get(VarI32::decode(buf)? as usize).unwrap());
                 }
             }
             Inner::Indexed(_) => (),
             Inner::Singular(option) => {
                 *option = Some(
                     self.ids
-                        .get(crate::VarInt::decode(buf)? as usize)
+                        .get(VarI32::decode(buf)? as usize)
                         .copied()
                         .ok_or_else(|| {
                             anyhow::anyhow!("raw id not found in the target id list.")
@@ -234,10 +205,10 @@ where
             Inner::BiMap(bimap) => {
                 *bimap = {
                     let mut map = bimap::BiMap::new();
-                    for _ in 0..crate::VarInt::decode(buf)? {
+                    for _ in 0..VarI32::decode(buf)? {
                         map.insert(
                             map.len(),
-                            *self.ids.get(crate::VarInt::decode(buf)? as usize).unwrap(),
+                            *self.ids.get(VarI32::decode(buf)? as usize).unwrap(),
                         );
                     }
                     map
@@ -265,7 +236,7 @@ enum Inner<'a, T>
 where
     T: Eq + Copy + Hash + 'a,
 {
-    Indexed(crate::Ref<'a, dyn crate::collections::Indexed<T> + Send + Sync>),
+    Indexed(rimecraft_primitives::Ref<'a, dyn rimecraft_collections::Index<T> + Send + Sync>),
     Vector(Vec<T>),
     Singular(Option<T>),
     BiMap(bimap::BiMap<usize, T>),
@@ -297,7 +268,7 @@ impl Variant {
     pub fn create<'a, A>(
         self,
         bits: usize,
-        ids: &'a (dyn crate::collections::Indexed<A> + Send + Sync),
+        ids: &'a (dyn rimecraft_collections::Index<A> + Send + Sync),
         entries: Vec<A>,
     ) -> Palette<'a, A>
     where
@@ -305,11 +276,11 @@ impl Variant {
     {
         match self {
             Variant::Indexed => Palette {
-                ids: crate::Ref(ids),
-                inner: Inner::Indexed(crate::Ref(ids)),
+                ids: rimecraft_primitives::Ref(ids),
+                inner: Inner::Indexed(rimecraft_primitives::Ref(ids)),
             },
             Variant::Vector => Palette {
-                ids: crate::Ref(ids),
+                ids: rimecraft_primitives::Ref(ids),
                 inner: Inner::Vector({
                     let mut vec = Vec::with_capacity(1 << bits);
                     for value in entries.into_iter().enumerate() {
@@ -319,11 +290,11 @@ impl Variant {
                 }),
             },
             Variant::Singular => Palette {
-                ids: crate::Ref(ids),
+                ids: rimecraft_primitives::Ref(ids),
                 inner: Inner::Singular(entries.get(0).copied()),
             },
             Variant::BiMap => Palette {
-                ids: crate::Ref(ids),
+                ids: rimecraft_primitives::Ref(ids),
                 inner: Inner::BiMap({
                     let mut map = bimap::BiMap::with_capacity(1 << bits);
                     for entry in entries {
@@ -336,7 +307,7 @@ impl Variant {
     }
 }
 
-pub type Storage = crate::collections::PackedArray;
+pub type Storage = PackedArray;
 
 struct Data<'a, T: 'a>(DataProvider, Storage, Palette<'a, T>)
 where
@@ -348,7 +319,7 @@ struct DataProvider(Variant, usize);
 impl DataProvider {
     fn create_data<'a, T>(
         self,
-        ids: &'a (dyn crate::collections::Indexed<T> + Send + Sync),
+        ids: &'a (dyn rimecraft_collections::Index<T> + Send + Sync),
         len: usize,
     ) -> Data<'a, T>
     where
@@ -382,7 +353,7 @@ impl Provider {
 
     fn create_provider<A>(
         self,
-        ids: &(dyn crate::collections::Indexed<A>),
+        ids: &(dyn rimecraft_collections::Index<A>),
         bits: usize,
     ) -> DataProvider {
         match self {
@@ -411,7 +382,7 @@ impl Provider {
     }
 
     pub fn container_size(self) -> usize {
-        1 << self.edge_bits() * 3
+        1 << (self.edge_bits() * 3)
     }
 }
 
@@ -426,7 +397,7 @@ where
     T: Eq + Copy + Hash,
 {
     pub fn new(
-        ids: &'a (dyn crate::collections::Indexed<T> + Send + Sync),
+        ids: &'a (dyn rimecraft_collections::Index<T> + Send + Sync),
         provider: Provider,
         variant: Variant,
         bits: usize,
@@ -434,7 +405,7 @@ where
         entries: Vec<T>,
     ) -> Self {
         Self(parking_lot::RwLock::new(ContainerInner {
-            ids: crate::Ref(ids),
+            ids: rimecraft_primitives::Ref(ids),
             data: Some(Data(
                 DataProvider(variant, bits),
                 storage,
@@ -445,12 +416,12 @@ where
     }
 
     pub fn from_initialize(
-        ids: &'a (dyn crate::collections::Indexed<T> + Send + Sync),
+        ids: &'a (dyn rimecraft_collections::Index<T> + Send + Sync),
         object: T,
         provider: Provider,
     ) -> Self {
         let mut this = ContainerInner {
-            ids: crate::Ref(ids),
+            ids: rimecraft_primitives::Ref(ids),
             data: None,
             provider,
         };
@@ -461,6 +432,7 @@ where
         Self(parking_lot::RwLock::new(this))
     }
 
+    #[inline]
     pub fn swap(&self, pos: (i32, i32, i32), value: T) -> T {
         let _this = self.0.write();
         unsafe { self.swap_unchecked(pos, value) }
@@ -526,7 +498,7 @@ where
         let taken_data = this.data.take();
         let mut data = this.get_compatible_data(taken_data, i as usize);
 
-        data.2.read_buf(buf)?;
+        rimecraft_edcode::Update::update(&mut data.2, buf)?;
 
         this.data = Some(data);
 
@@ -582,7 +554,7 @@ struct ContainerInner<'a, T: 'a>
 where
     T: Eq + Copy + Hash,
 {
-    ids: crate::Ref<'a, dyn crate::collections::Indexed<T> + Send + Sync>,
+    ids: rimecraft_primitives::Ref<'a, dyn rimecraft_collections::Index<T> + Send + Sync>,
     data: Option<Data<'a, T>>,
     provider: Provider,
 }

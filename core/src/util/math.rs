@@ -1,7 +1,5 @@
 use std::ops::Deref;
 
-use super::EnumValues;
-
 /// A box with double-valued coords.
 /// The box is axis-aligned and the coords are minimum inclusive and maximum exclusive.
 #[derive(Clone, Copy, PartialEq)]
@@ -257,28 +255,28 @@ impl From<glam::IVec3> for BlockPos {
     }
 }
 
-impl Into<glam::IVec3> for BlockPos {
-    fn into(self) -> glam::IVec3 {
-        self.0
+impl From<BlockPos> for glam::IVec3 {
+    fn from(val: BlockPos) -> Self {
+        val.0
     }
 }
 
-impl Into<i64> for BlockPos {
-    fn into(self) -> i64 {
+impl From<BlockPos> for i64 {
+    fn from(val: BlockPos) -> Self {
         let mut l = 0_i64;
-        l |= (self.x as i64 & Self::BITS_Z) << Self::BIT_SHIFT_Z;
-        l |= (self.y as i64 & Self::BITS_Y) << 0;
-        l | (self.z as i64 & Self::BITS_Z) << Self::BIT_SHIFT_Z
+        l |= (val.x as i64 & BlockPos::BITS_Z) << BlockPos::BIT_SHIFT_Z;
+        l |= val.y as i64 & BlockPos::BITS_Y;
+        l | (val.z as i64 & BlockPos::BITS_Z) << BlockPos::BIT_SHIFT_Z
     }
 }
 
 impl From<i64> for BlockPos {
     fn from(value: i64) -> Self {
         Self(glam::IVec3 {
-            x: (value << 64 - Self::BIT_SHIFT_X - Self::SIZE_BITS_X >> 64 - Self::SIZE_BITS_X)
+            x: (value << (64 - Self::BIT_SHIFT_X - Self::SIZE_BITS_X) >> (64 - Self::SIZE_BITS_X))
                 as i32,
-            y: (value << 64 - Self::SIZE_BITS_Y >> 64 - Self::SIZE_BITS_Y) as i32,
-            z: (value << 64 - Self::BIT_SHIFT_Z - Self::SIZE_BITS_Z >> 64 - Self::SIZE_BITS_Z)
+            y: (value << (64 - Self::SIZE_BITS_Y) >> (64 - Self::SIZE_BITS_Y)) as i32,
+            z: (value << (64 - Self::BIT_SHIFT_Z - Self::SIZE_BITS_Z) >> (64 - Self::SIZE_BITS_Z))
                 as i32,
         })
     }
@@ -307,9 +305,9 @@ impl From<i64> for ChunkPos {
     }
 }
 
-impl Into<i64> for ChunkPos {
-    fn into(self) -> i64 {
-        self.x as i64 & 0xFFFFFFFF | (self.z as i64 & 0xFFFFFFFF) << 32
+impl From<ChunkPos> for i64 {
+    fn from(val: ChunkPos) -> Self {
+        val.x as i64 & 0xFFFFFFFF | (val.z as i64 & 0xFFFFFFFF) << 32
     }
 }
 
@@ -339,7 +337,7 @@ impl Deref for ChunkSectionPos {
 
 /// An enum representing 6 cardinal directions in Rimecraft.
 #[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, enumn::N)]
 pub enum Direction {
     Down = 0,
     Up = 1,
@@ -350,15 +348,6 @@ pub enum Direction {
 }
 
 impl Direction {
-    const VALUES: [Self; 6] = [
-        Self::Down,
-        Self::Up,
-        Self::North,
-        Self::South,
-        Self::West,
-        Self::East,
-    ];
-
     pub fn opposite(self) -> Self {
         match self {
             Direction::Down => Self::Up,
@@ -382,23 +371,8 @@ impl Direction {
     }
 }
 
-impl EnumValues<6> for Direction {
-    fn values() -> [Self; 6] {
-        Self::VALUES
-    }
-}
-
-impl From<u8> for Direction {
-    fn from(value: u8) -> Self {
-        Self::VALUES
-            .into_iter()
-            .find(|e| *e as u8 == value)
-            .unwrap()
-    }
-}
-
 #[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, enumn::N)]
 pub enum EightWayDirection {
     North = 0,
     NorthEast,
@@ -411,7 +385,7 @@ pub enum EightWayDirection {
 }
 
 impl EightWayDirection {
-    const VALUES: [Self; 8] = [
+    pub const VALUES: [Self; 8] = [
         Self::North,
         Self::NorthEast,
         Self::East,
@@ -436,12 +410,6 @@ impl EightWayDirection {
     }
 }
 
-impl EnumValues<8> for EightWayDirection {
-    fn values() -> [Self; 8] {
-        Self::VALUES
-    }
-}
-
 /// Some translations from MCJE's `MathHelper` to Rust.
 pub(crate) mod impl_helper {
     const MULTIPLY_DE_BRUIJN_BIT_POSITION: [i32; 32] = [
@@ -450,7 +418,7 @@ pub(crate) mod impl_helper {
     ];
 
     pub const fn is_power_of_two(value: i32) -> bool {
-        value != 0 && (value & value - 1) == 0
+        value != 0 && (value & (value - 1)) == 0
     }
 
     pub const fn ceil_log_2(value: i32) -> i32 {
@@ -460,7 +428,7 @@ pub(crate) mod impl_helper {
             smallest_encompassing_power_of_two(value)
         };
 
-        MULTIPLY_DE_BRUIJN_BIT_POSITION[(((v as i64) * 125613361 >> 27) & 0x1F) as usize]
+        MULTIPLY_DE_BRUIJN_BIT_POSITION[((((v as i64) * 125613361) >> 27) & 0x1F) as usize]
     }
 
     pub const fn floor_log_2(value: i32) -> i32 {

@@ -3,9 +3,8 @@ pub mod tag;
 
 use std::ops::Deref;
 
-use crate::prelude::*;
-
 pub use registries::*;
+use rimecraft_primitives::Id;
 pub use tag::Key as TagKey;
 
 /// Represents a registration and its id and tags.
@@ -137,8 +136,8 @@ impl<T> std::ops::Index<usize> for Registry<T> {
     }
 }
 
-impl<T: PartialEq + Eq> crate::util::collections::Indexed<T> for Registry<T> {
-    fn raw_id(&self, value: &T) -> Option<usize> {
+impl<T: PartialEq + Eq> rimecraft_collections::Index<T> for Registry<T> {
+    fn index_of(&self, value: &T) -> Option<usize> {
         self.entries
             .iter()
             .enumerate()
@@ -155,8 +154,8 @@ impl<T: PartialEq + Eq> crate::util::collections::Indexed<T> for Registry<T> {
     }
 }
 
-impl<T: PartialEq + Eq> crate::util::collections::Indexed<Entry<T>> for Registry<T> {
-    fn raw_id(&self, value: &Entry<T>) -> Option<usize> {
+impl<T: PartialEq + Eq> rimecraft_collections::Index<Entry<T>> for Registry<T> {
+    fn index_of(&self, value: &Entry<T>) -> Option<usize> {
         self.entries
             .iter()
             .enumerate()
@@ -196,13 +195,13 @@ impl<T: Registration> Builder<T> {
     }
 }
 
-impl<T> crate::util::Freeze<Registry<T>> for Builder<T>
+impl<T> rimecraft_freezer::Freeze<Registry<T>> for Builder<T>
 where
     T: Registration + 'static,
 {
     type Opts = (Key<Registry<T>>, Option<Id>);
 
-    fn build(self, opts: Self::Opts) -> Registry<T> {
+    fn freeze(self, opts: Self::Opts) -> Registry<T> {
         let entries = self
             .entries
             .into_iter()
@@ -256,15 +255,15 @@ pub trait Registration {
     /// Accept a raw id.
     fn accept(&mut self, id: usize);
     /// Return the raw id.
-    fn raw_id(&self) -> usize;
+    fn index_of(&self) -> usize;
 }
 
 pub trait RegistryAccess: Sized {
     fn registry() -> &'static Registry<Self>;
 }
 
-static KEYS_CACHE: once_cell::sync::Lazy<crate::collections::Caches<(Id, Id)>> =
-    once_cell::sync::Lazy::new(crate::collections::Caches::new);
+static KEYS_CACHE: once_cell::sync::Lazy<rimecraft_caches::Caches<(Id, Id)>> =
+    once_cell::sync::Lazy::new(rimecraft_caches::Caches::new);
 
 /// Represents a key for a value in a registry in a context where
 /// a root registry is available.
@@ -273,13 +272,13 @@ static KEYS_CACHE: once_cell::sync::Lazy<crate::collections::Caches<(Id, Id)>> =
 pub struct Key<T> {
     _type: std::marker::PhantomData<T>,
     // (reg, value)
-    inner: crate::Ref<'static, (Id, Id)>,
+    inner: rimecraft_primitives::Ref<'static, (Id, Id)>,
 }
 
 impl<T> Key<T> {
     pub fn new(registry: Key<Registry<T>>, value: Id) -> Self {
         Self {
-            inner: crate::Ref(KEYS_CACHE.get((registry.inner.0 .1.clone(), value))),
+            inner: rimecraft_primitives::Ref(KEYS_CACHE.get((registry.inner.0 .1.clone(), value))),
             _type: std::marker::PhantomData,
         }
     }
@@ -320,7 +319,7 @@ impl<T> Key<Registry<T>> {
     /// with an identifier for the registry.
     pub fn of_reg(reg: Id) -> Self {
         Self {
-            inner: crate::Ref(KEYS_CACHE.get((registries::root_key(), reg))),
+            inner: rimecraft_primitives::Ref(KEYS_CACHE.get((registries::root_key(), reg))),
             _type: std::marker::PhantomData,
         }
     }
@@ -358,6 +357,6 @@ impl<T> std::hash::Hash for Key<T> {
     }
 }
 
-/// Freezeable registry for building and freezing registries,
+/// Freezable registry for building and freezing registries,
 /// just like what MCJE's `Registry` do.
-pub type Freezer<T> = crate::util::Freezer<Registry<T>, Builder<T>>;
+pub type Freezer<T> = rimecraft_freezer::Freezer<Registry<T>, Builder<T>>;

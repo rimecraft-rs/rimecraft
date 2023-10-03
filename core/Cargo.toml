@@ -6,6 +6,19 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+rimecraft-primitives = { path = "../primitives", features = [
+    "serde",
+    "edcode",
+] }
+rimecraft-caches = { path = "../util/caches", features = ["arc"] }
+rimecraft-collections = { path = "../util/collections", features = [
+    "id_list",
+    "packed_array",
+] }
+rimecraft-edcode = { path = "../util/edcode", features = ["uuid"] }
+rimecraft-event = { path = "../util/event" }
+rimecraft-freezer = { path = "../util/freezer" }
+rimecraft-nbt-ext = { path = "../util/nbt_ext" }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
@@ -29,3 +42,4 @@ dashmap = "5.4"
 bimap = "0.6"
 thiserror = "1.0"
 rsa = "0.9"
+enumn = "0.1"
