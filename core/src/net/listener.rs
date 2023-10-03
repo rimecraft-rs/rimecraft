@@ -3,7 +3,7 @@ use crate::text::Text;
 pub trait Listener {
     const SHOULD_CRASH_ON_EXCEPTION: bool;
 
-    fn disconncted<T>(&mut self, reason: T) -> anyhow::Result<()>
+    fn disconnected<T>(&mut self, reason: T) -> anyhow::Result<()>
     where
         T: Text;
 

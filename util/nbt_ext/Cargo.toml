@@ -1,0 +1,16 @@
+[package]
+name = "rimecraft-nbt-ext"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Extensions for working with nbt compounds"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["game-development", "encoding"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+fastnbt = "2.4"
+serde = "1.0"

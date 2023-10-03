@@ -149,15 +149,15 @@ pub enum StateError {
 pub struct States<T: Deref<Target = State> + 'static> {
     def: usize,
     properties: std::collections::HashMap<String, property::Property>,
-    states: Vec<crate::util::Ref<'static, T>>,
+    states: Vec<rimecraft_primitives::Ref<'static, T>>,
 }
 
 impl<T: Deref<Target = State> + 'static> States<T> {
-    pub fn states(&self) -> &[crate::util::Ref<'static, T>] {
+    pub fn states(&self) -> &[rimecraft_primitives::Ref<'static, T>] {
         &self.states
     }
 
-    pub fn from_id(&self, id: usize) -> Option<crate::util::Ref<T>> {
+    pub fn from_id(&self, id: usize) -> Option<rimecraft_primitives::Ref<T>> {
         self.states.get(id).copied()
     }
 
@@ -175,7 +175,7 @@ impl<T: Deref<Target = State> + 'static> States<T> {
 
     pub fn get_shared(shared: &'static crate::state::States<T>, id: usize) -> Shared<T> {
         Shared {
-            entries: crate::Ref(shared),
+            entries: rimecraft_primitives::Ref(shared),
             value: shared.states[id],
         }
     }
@@ -183,8 +183,8 @@ impl<T: Deref<Target = State> + 'static> States<T> {
 
 /// A shared state with states reference count and the index.
 pub struct Shared<T: Deref<Target = State> + 'static> {
-    pub entries: crate::util::Ref<'static, crate::state::States<T>>,
-    pub value: crate::util::Ref<'static, T>,
+    pub entries: rimecraft_primitives::Ref<'static, crate::state::States<T>>,
+    pub value: rimecraft_primitives::Ref<'static, T>,
 }
 
 impl<T: Deref<Target = State>> Deref for Shared<T> {
@@ -271,7 +271,10 @@ fn new_states<E: Clone, T: Deref<Target = State> + From<(E, State)>>(
             })
             .map_or(0, |e| e.0),
         properties,
-        states: states.into_iter().map(crate::util::Ref::from).collect(),
+        states: states
+            .into_iter()
+            .map(rimecraft_primitives::Ref::from)
+            .collect(),
     }
 }
 

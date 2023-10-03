@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use rimecraft_primitives::Id;
 
 #[inline]
 pub fn root_key() -> Id {

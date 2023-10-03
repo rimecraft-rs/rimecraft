@@ -22,7 +22,7 @@ pub struct Style {
     ///TODO: Implement net.minecraft.text.HoverEvent
     hover: Option<()>,
     insertion: Option<String>,
-    font: Option<util::Id>,
+    font: Option<rimecraft_primitives::Id>,
 }
 
 impl Style {

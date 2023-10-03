@@ -2,12 +2,10 @@ mod event;
 
 use std::{hash::Hash, ops::Deref};
 
-use crate::{
-    prelude::*,
-    registry::{Registration, RegistryAccess},
-};
+use crate::registry::{Registration, RegistryAccess};
 
 pub use event::*;
+use rimecraft_primitives::Id;
 
 /// Represents a type of fluid.
 #[derive(Clone)]
@@ -49,7 +47,7 @@ impl Registration for Fluid {
             .for_each(|state| state.fluid.store(id, std::sync::atomic::Ordering::Relaxed))
     }
 
-    fn raw_id(&self) -> usize {
+    fn index_of(&self) -> usize {
         self.id
     }
 }
