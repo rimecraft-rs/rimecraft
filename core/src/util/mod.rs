@@ -557,3 +557,13 @@ impl<T> From<T> for MutOnly<T> {
         Self::new(value)
     }
 }
+
+pub trait StringIdentifiable {
+    fn as_string(&self) -> String;
+
+    ///2 createCodec() ignored.
+    fn crate_codec() -> () {}
+
+    ///1 toKeyable ignored.
+    fn to_keyable() -> () {}
+}

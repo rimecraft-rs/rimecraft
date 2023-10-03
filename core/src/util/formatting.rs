@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Error, Ok};
+use anyhow::{anyhow, Ok};
 
 #[derive(Clone)]
 ///`string_value = CODE_PREFIX + code`
@@ -194,12 +194,46 @@ impl Formatting<'_> {
         Self::RESET,
     ];
 
-    pub fn try_from(name: &str) -> anyhow::Result<Self> {
+    pub fn try_from_name(name: &str) -> anyhow::Result<Self> {
         let map: HashMap<&str, Self> = Self::LIST.into_iter().map(|fmt| (fmt.name, fmt)).collect();
         let ret: anyhow::Result<Self> = match map.get(name) {
             Some(x) => Ok(x.clone()),
-            None => Err(Error::msg("No valid formatting key!")),
+            None => Err(anyhow!("Formatting key {} not found!", name)),
         };
+        ret
+    }
+
+    pub fn try_from_color_index(index: i32) -> anyhow::Result<Self> {
+        if index < 0 {
+            Ok(Self::RESET)
+        } else {
+            let map: HashMap<i32, Self> = Self::LIST
+                .into_iter()
+                .map(|fmt| (fmt.color_index, fmt))
+                .collect();
+            let ret: anyhow::Result<Self> = match map.get(&index) {
+                Some(x) => Ok(x.clone()),
+                None => Err(anyhow!("Color index {} not found!", index)),
+            };
+            ret
+        }
+    }
+
+    pub fn try_from_code(code: char) -> anyhow::Result<Self> {
+        let c: char = code.to_ascii_lowercase();
+        let map: HashMap<char, Self> = Self::LIST.into_iter().map(|fmt| (fmt.code, fmt)).collect();
+        let ret: anyhow::Result<Self> = match map.get(&c) {
+            Some(x) => Ok(x.clone()),
+            None => Err(anyhow!("Code {} not found!", c)),
+        };
+        ret
+    }
+}
+
+impl super::StringIdentifiable for Formatting<'_> {
+    fn as_string(&self) -> String {
+        let mut ret: String = String::from(Self::CODE_PREFIX);
+        ret.push(self.code);
         ret
     }
 }
