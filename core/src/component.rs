@@ -5,12 +5,10 @@ use std::{
 };
 
 use bytes::Bytes;
+use rimecraft_edcode::Encode;
+use rimecraft_event::Event;
+use rimecraft_primitives::{Id, SerDeUpdate};
 use tracing::{trace_span, warn};
-
-use crate::{
-    nbt::NbtElement,
-    net::{Decode, Encode, NetSync},
-};
 
 /// Represents a type of component that can be attached
 /// on [`Components`].
@@ -27,7 +25,7 @@ pub trait Attach {
 /// Manager of components.
 #[derive(Default)]
 pub struct Components {
-    components: HashMap<crate::Id, (Box<dyn Attach + Send + Sync>, TypeId)>,
+    components: HashMap<Id, (Box<dyn Attach + Send + Sync>, TypeId)>,
 }
 
 impl Components {
@@ -49,7 +47,7 @@ impl Components {
 
     /// Register a component into this instance.
     /// The component should implement [`Attach`].
-    pub fn register<T>(&mut self, id: crate::Id, component: T)
+    pub fn register<T>(&mut self, id: Id, component: T)
     where
         T: Attach + Send + Sync + 'static,
     {
@@ -64,7 +62,8 @@ impl Components {
     }
 
     /// Get a static typed component from this instance.
-    pub fn get<T>(&self, id: &crate::Id) -> Option<&T>
+    #[inline]
+    pub fn get<T>(&self, id: &Id) -> Option<&T>
     where
         T: Attach + Send + Sync + 'static,
     {
@@ -78,7 +77,8 @@ impl Components {
     }
 
     /// Get a mutable static typed component from this instance.
-    pub fn get_mut<T>(&mut self, id: &crate::Id) -> Option<&mut T>
+    #[inline]
+    pub fn get_mut<T>(&mut self, id: &Id) -> Option<&mut T>
     where
         T: Attach + Send + Sync + 'static,
     {
@@ -97,11 +97,11 @@ impl Encode for Components {
     where
         B: bytes::BufMut,
     {
-        let Component(event) =
-            self.get::<Component<
-                crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
-            >>(&NET_SEND_ID)
-                .expect("net send event component not found");
+        let Component(event) = self
+            .get::<Component<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>>>(
+                &NET_SEND_ID,
+            )
+            .expect("net send event component not found");
 
         let mut hashmap = HashMap::new();
         event.invoker()(&mut hashmap)?;
@@ -109,20 +109,20 @@ impl Encode for Components {
     }
 }
 
-impl NetSync for Components {
-    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+impl rimecraft_edcode::Update for Components {
+    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::Buf,
     {
-        let Component(event) = self
-            .get_mut::<Component<
-                crate::MutOnly<
-                    crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
-                >,
-            >>(&NET_RECV_ID)
-            .expect("net recv event component not found");
+        use rimecraft_edcode::Decode;
 
-        let mut hashmap = HashMap::<crate::Id, Bytes>::decode(buf)?;
+        let Component(event) =
+            self.get_mut::<Component<
+                crate::MutOnly<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>>,
+            >>(&NET_RECV_ID)
+                .expect("net recv event component not found");
+
+        let mut hashmap = HashMap::<Id, Bytes>::decode(buf)?;
         event.get_mut().invoker()(&mut hashmap)
     }
 }
@@ -132,13 +132,11 @@ impl serde::Serialize for Components {
     where
         S: serde::Serializer,
     {
-        let Component(event) = self
-            .get::<Component<
-                crate::Event<
-                    dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>,
-                >,
+        let Component(event) =
+            self.get::<Component<
+                Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>,
             >>(&NBT_SAVE_ID)
-            .expect("net send event component not found");
+                .expect("net send event component not found");
 
         let mut hashmap = HashMap::new();
 
@@ -148,7 +146,7 @@ impl serde::Serialize for Components {
     }
 }
 
-impl crate::nbt::Update for Components {
+impl SerDeUpdate for Components {
     fn update<'de, D>(
         &'de mut self,
         deserializer: D,
@@ -159,9 +157,7 @@ impl crate::nbt::Update for Components {
         let Component(event) = self
             .get_mut::<Component<
                 crate::MutOnly<
-                    crate::Event<
-                        dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>,
-                    >,
+                    Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>,
                 >,
             >>(&NBT_READ_ID)
             .expect("net recv event component not found");
@@ -174,13 +170,14 @@ impl crate::nbt::Update for Components {
 }
 
 impl From<ComponentsBuilder> for Components {
+    #[inline]
     fn from(value: ComponentsBuilder) -> Self {
         value.build()
     }
 }
 
-static ATTACH_EVENTS: parking_lot::RwLock<crate::Event<dyn Fn(TypeId, &mut Components)>> =
-    parking_lot::RwLock::new(crate::Event::new(|listeners| {
+static ATTACH_EVENTS: parking_lot::RwLock<Event<dyn Fn(TypeId, &mut Components)>> =
+    parking_lot::RwLock::new(Event::new(|listeners| {
         Box::new(move |type_id, components| {
             for listener in listeners {
                 listener(type_id, components)
@@ -242,12 +239,14 @@ impl<T> Attach for Component<T> {
 impl<T> Deref for Component<T> {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 impl<T> DerefMut for Component<T> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -266,15 +265,16 @@ where
     }
 }
 
-impl<T> NetSync for Component<T>
+impl<T> rimecraft_edcode::Update for Component<T>
 where
-    T: NetSync,
+    T: rimecraft_edcode::Update,
 {
-    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    #[inline]
+    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::Buf,
     {
-        self.0.read_buf(buf)
+        self.0.update(buf)
     }
 }
 
@@ -282,6 +282,7 @@ impl<T> serde::Serialize for Component<T>
 where
     T: serde::Serialize,
 {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -290,10 +291,11 @@ where
     }
 }
 
-impl<T> crate::nbt::Update for Component<T>
+impl<T> SerDeUpdate for Component<T>
 where
-    T: crate::nbt::Update,
+    T: SerDeUpdate,
 {
+    #[inline]
     fn update<'de, D>(
         &'de mut self,
         deserializer: D,
@@ -305,24 +307,22 @@ where
     }
 }
 
-static NET_SEND_ID: once_cell::sync::Lazy<crate::Id> =
-    once_cell::sync::Lazy::new(net_send_event_comp_id);
-static NET_RECV_ID: once_cell::sync::Lazy<crate::Id> =
-    once_cell::sync::Lazy::new(net_recv_event_comp_id);
+static NET_SEND_ID: once_cell::sync::Lazy<Id> = once_cell::sync::Lazy::new(net_send_event_comp_id);
+static NET_RECV_ID: once_cell::sync::Lazy<Id> = once_cell::sync::Lazy::new(net_recv_event_comp_id);
 
 /// Represents a component that able to sync by
-/// networking methods, through [`NetSync`] trait.
+/// networking methods, through [`SerDeUpdate`] trait.
 ///
 /// The `1` field is the component id which is used
 /// to be registered into components.
 #[derive(Debug)]
-pub struct Synced<T>(pub T, pub crate::Id)
+pub struct Synced<T>(pub T, pub Id)
 where
-    T: Attach + NetSync + 'static;
+    T: Attach + rimecraft_edcode::Update + 'static;
 
 impl<T> Attach for Synced<T>
 where
-    T: Attach + NetSync + 'static,
+    T: Attach + rimecraft_edcode::Update + 'static,
 {
     fn on_attach(&mut self, components: &mut Components) {
         self.0.on_attach(components);
@@ -337,7 +337,7 @@ where
         let _ = span.enter();
 
         if let Some(Component(event)) = components.get_mut::<Component<
-            crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
+            Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>,
         >>(&NET_SEND_ID)
         {
             event.register(Box::new(move |map| {
@@ -357,16 +357,14 @@ where
         }
 
         if let Some(Component(event)) = components.get_mut::<Component<
-            crate::MutOnly<
-                crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>,
-            >,
+            crate::MutOnly<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>>,
         >>(&NET_RECV_ID)
         {
             event.get_mut().register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
                 let mut bytes = map.remove(&this.1).unwrap();
 
-                this.0.read_buf(&mut bytes)
+                this.0.update(&mut bytes)
             }))
         } else {
             warn!("network receiving event not found");
@@ -376,10 +374,11 @@ where
 
 impl<T> Deref for Synced<T>
 where
-    T: Attach + NetSync + 'static,
+    T: Attach + rimecraft_edcode::Update + 'static,
 {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -387,8 +386,9 @@ where
 
 impl<T> DerefMut for Synced<T>
 where
-    T: Attach + NetSync + 'static,
+    T: Attach + rimecraft_edcode::Update + 'static,
 {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -396,7 +396,7 @@ where
 
 impl<T> Encode for Synced<T>
 where
-    T: Attach + NetSync + 'static,
+    T: Attach + rimecraft_edcode::Update + 'static,
 {
     #[inline]
     fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
@@ -407,22 +407,24 @@ where
     }
 }
 
-impl<T> NetSync for Synced<T>
+impl<T> rimecraft_edcode::Update for Synced<T>
 where
-    T: Attach + NetSync + 'static,
+    T: Attach + rimecraft_edcode::Update + 'static,
 {
-    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    #[inline]
+    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::Buf,
     {
-        self.0.read_buf(buf)
+        self.0.update(buf)
     }
 }
 
 impl<T> serde::Serialize for Synced<T>
 where
-    T: Attach + NetSync + serde::Serialize + 'static,
+    T: Attach + rimecraft_edcode::Update + serde::Serialize + 'static,
 {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -431,10 +433,11 @@ where
     }
 }
 
-impl<T> crate::nbt::Update for Synced<T>
+impl<T> SerDeUpdate for Synced<T>
 where
-    T: Attach + NetSync + crate::nbt::Update + 'static,
+    T: Attach + rimecraft_edcode::Update + SerDeUpdate + 'static,
 {
+    #[inline]
     fn update<'de, D>(
         &'de mut self,
         deserializer: D,
@@ -442,13 +445,13 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        self.0.update(deserializer)
+        SerDeUpdate::update(&mut self.0, deserializer)
     }
 }
 
-fn net_event_comp(
-) -> Component<crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>> {
-    Component(crate::Event::new(|listeners| {
+#[inline]
+fn net_event_comp() -> Component<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>> {
+    Component(Event::new(|listeners| {
         Box::new(move |map| {
             for listener in listeners {
                 listener(map)?;
@@ -459,10 +462,10 @@ fn net_event_comp(
     }))
 }
 
-fn net_event_comp_mut() -> Component<
-    crate::MutOnly<crate::Event<dyn Fn(&mut HashMap<crate::Id, Bytes>) -> anyhow::Result<()>>>,
-> {
-    Component(crate::MutOnly::new(crate::Event::new(|listeners| {
+#[inline]
+fn net_event_comp_mut(
+) -> Component<crate::MutOnly<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>>> {
+    Component(crate::MutOnly::new(Event::new(|listeners| {
         Box::new(move |map| {
             for listener in listeners {
                 listener(map)?;
@@ -474,33 +477,31 @@ fn net_event_comp_mut() -> Component<
 }
 
 #[inline]
-fn net_send_event_comp_id() -> crate::Id {
-    crate::Id::new("core", "net_send".to_string())
+fn net_send_event_comp_id() -> Id {
+    Id::new("core", "net_send".to_string())
 }
 
 #[inline]
-fn net_recv_event_comp_id() -> crate::Id {
-    crate::Id::new("core", "net_recv".to_string())
+fn net_recv_event_comp_id() -> Id {
+    Id::new("core", "net_recv".to_string())
 }
 
-static NBT_SAVE_ID: once_cell::sync::Lazy<crate::Id> =
-    once_cell::sync::Lazy::new(nbt_save_event_comp_id);
-static NBT_READ_ID: once_cell::sync::Lazy<crate::Id> =
-    once_cell::sync::Lazy::new(nbt_read_event_comp_id);
+static NBT_SAVE_ID: once_cell::sync::Lazy<Id> = once_cell::sync::Lazy::new(nbt_save_event_comp_id);
+static NBT_READ_ID: once_cell::sync::Lazy<Id> = once_cell::sync::Lazy::new(nbt_read_event_comp_id);
 
 /// Represents a component that able to be stored
-/// by nbt, through [`crate::nbt::Update`] trait.
+/// by nbt, through [`SerDeUpdate`] trait.
 ///
 /// The `1` field is the component id which is used
 /// to be registered into components.
 #[derive(Debug)]
-pub struct Stored<T>(pub T, pub crate::Id)
+pub struct Stored<T>(pub T, pub Id)
 where
-    T: Attach + crate::nbt::Update + 'static;
+    T: Attach + SerDeUpdate + 'static;
 
 impl<T> Attach for Stored<T>
 where
-    T: Attach + crate::nbt::Update + 'static,
+    T: Attach + SerDeUpdate + 'static,
 {
     fn on_attach(&mut self, components: &mut Components) {
         self.0.on_attach(components);
@@ -515,7 +516,7 @@ where
         let _ = span.enter();
 
         if let Some(Component(event)) = components.get_mut::<Component<
-            crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>>,
+            Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>,
         >>(&NBT_SAVE_ID)
         {
             event.register(Box::new(move |map| {
@@ -533,9 +534,7 @@ where
 
         if let Some(Component(event)) = components.get_mut::<Component<
             crate::MutOnly<
-                crate::Event<
-                    dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>,
-                >,
+                Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>,
             >,
         >>(&NBT_READ_ID)
         {
@@ -551,10 +550,11 @@ where
 
 impl<T> Deref for Stored<T>
 where
-    T: Attach + crate::nbt::Update + 'static,
+    T: Attach + SerDeUpdate + 'static,
 {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -562,8 +562,9 @@ where
 
 impl<T> DerefMut for Stored<T>
 where
-    T: Attach + crate::nbt::Update + 'static,
+    T: Attach + SerDeUpdate + 'static,
 {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -571,7 +572,7 @@ where
 
 impl<T> Encode for Stored<T>
 where
-    T: Attach + crate::nbt::Update + Encode + 'static,
+    T: Attach + SerDeUpdate + Encode + 'static,
 {
     #[inline]
     fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
@@ -582,22 +583,24 @@ where
     }
 }
 
-impl<T> NetSync for Stored<T>
+impl<T> rimecraft_edcode::Update for Stored<T>
 where
-    T: Attach + crate::nbt::Update + NetSync + 'static,
+    T: Attach + SerDeUpdate + rimecraft_edcode::Update + 'static,
 {
-    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    #[inline]
+    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::Buf,
     {
-        self.0.read_buf(buf)
+        rimecraft_edcode::Update::update(&mut self.0, buf)
     }
 }
 
 impl<T> serde::Serialize for Stored<T>
 where
-    T: Attach + crate::nbt::Update + serde::Serialize + 'static,
+    T: Attach + SerDeUpdate + serde::Serialize + 'static,
 {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -606,10 +609,11 @@ where
     }
 }
 
-impl<T> crate::nbt::Update for Stored<T>
+impl<T> SerDeUpdate for Stored<T>
 where
-    T: Attach + crate::nbt::Update + 'static,
+    T: Attach + SerDeUpdate + 'static,
 {
+    #[inline]
     fn update<'de, D>(
         &'de mut self,
         deserializer: D,
@@ -621,10 +625,9 @@ where
     }
 }
 
-fn nbt_event_comp() -> Component<
-    crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>>,
-> {
-    Component(crate::Event::new(|listeners| {
+fn nbt_event_comp(
+) -> Component<Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>> {
+    Component(Event::new(|listeners| {
         Box::new(move |map| {
             for listener in listeners {
                 listener(map)?;
@@ -636,11 +639,9 @@ fn nbt_event_comp() -> Component<
 }
 
 fn nbt_event_comp_mut() -> Component<
-    crate::MutOnly<
-        crate::Event<dyn Fn(&mut HashMap<crate::Id, NbtElement>) -> fastnbt::error::Result<()>>,
-    >,
+    crate::MutOnly<Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>>,
 > {
-    Component(crate::MutOnly::new(crate::Event::new(|listeners| {
+    Component(crate::MutOnly::new(Event::new(|listeners| {
         Box::new(move |map| {
             for listener in listeners {
                 listener(map)?;
@@ -652,24 +653,21 @@ fn nbt_event_comp_mut() -> Component<
 }
 
 #[inline]
-fn nbt_save_event_comp_id() -> crate::Id {
-    crate::Id::new("core", "nbt_save".to_string())
+fn nbt_save_event_comp_id() -> Id {
+    Id::new("core", "nbt_save".to_string())
 }
 
 #[inline]
-fn nbt_read_event_comp_id() -> crate::Id {
-    crate::Id::new("core", "nbt_read".to_string())
+fn nbt_read_event_comp_id() -> Id {
+    Id::new("core", "nbt_read".to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
+    use rimecraft_primitives::Id;
 
-    use crate::{
-        component::Stored,
-        nbt::Update,
-        net::{Encode, NetSync},
-    };
+    use crate::component::Stored;
 
     use super::{Component, Components, Synced};
 
@@ -677,7 +675,7 @@ mod tests {
     fn register() {
         let mut components = Components::new();
 
-        let id = crate::Id::new("test", "comp".to_string());
+        let id = Id::new("test", "comp".to_string());
         components.register(id.clone(), Component(114_i32));
 
         assert_eq!(components.get::<Component<i32>>(&id).unwrap().0, 114);
@@ -688,15 +686,15 @@ mod tests {
     fn net_sync() {
         let mut components_0 = Components::builder().net_sync().build();
 
-        let id_0 = crate::Id::new("test", "comp0".to_string());
+        let id_0 = Id::new("test", "comp0".to_string());
         components_0.register(id_0.clone(), Synced(Component(114_i32), id_0.clone()));
-        let id_1 = crate::Id::new("test", "comp1".to_string());
+        let id_1 = Id::new("test", "comp1".to_string());
         components_0.register(id_1.clone(), Synced(Component(514_i32), id_1.clone()));
-        let id_2 = crate::Id::new("test", "comp2".to_string());
+        let id_2 = Id::new("test", "comp2".to_string());
         components_0.register(id_2.clone(), Component(514_i32));
 
         let mut bytes = BytesMut::new();
-        components_0.encode(&mut bytes).unwrap();
+        rimecraft_edcode::Encode::encode(&components_0, &mut bytes).unwrap();
         let mut bytes: Bytes = bytes.into();
 
         let mut components_1 = Components::builder().net_sync().build();
@@ -705,7 +703,7 @@ mod tests {
         components_1.register(id_0.clone(), Synced(Component(0_i32), id_0.clone()));
         components_1.register(id_2.clone(), Component(0_i32));
 
-        components_1.read_buf(&mut bytes).unwrap();
+        rimecraft_edcode::Update::update(&mut components_1, &mut bytes).unwrap();
 
         assert_eq!(
             components_1
@@ -732,11 +730,11 @@ mod tests {
     fn nbt_rw() {
         let mut components_0 = Components::builder().nbt_storing().build();
 
-        let id_0 = crate::Id::new("test", "comp0".to_string());
+        let id_0 = Id::new("test", "comp0".to_string());
         components_0.register(id_0.clone(), Stored(Component(114_i32), id_0.clone()));
-        let id_1 = crate::Id::new("test", "comp1".to_string());
+        let id_1 = Id::new("test", "comp1".to_string());
         components_0.register(id_1.clone(), Stored(Component(514_i32), id_1.clone()));
-        let id_2 = crate::Id::new("test", "comp2".to_string());
+        let id_2 = Id::new("test", "comp2".to_string());
         components_0.register(id_2.clone(), Component(514_i32));
 
         let nbt = fastnbt::to_value(components_0).unwrap();
@@ -747,7 +745,7 @@ mod tests {
         components_1.register(id_0.clone(), Stored(Component(0_i32), id_0.clone()));
         components_1.register(id_2.clone(), Component(0_i32));
 
-        components_1.update(&nbt).unwrap();
+        rimecraft_primitives::SerDeUpdate::update(&mut components_1, &nbt).unwrap();
 
         assert_eq!(
             components_1

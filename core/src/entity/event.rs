@@ -12,11 +12,11 @@ impl Events {
     /// The required `entity` can be `None` for some events
     /// so that all entities will be affected by this callback.
     pub fn register(&mut self, entity: Option<super::Type>, callback: Callback) {
-        self.0.push((entity.map(|e| e.raw_id()), callback));
+        self.0.push((entity.map(|e| e.index_of()), callback));
     }
 
     pub fn is_summonable(&self, entity_type: super::Type) -> bool {
-        let id = entity_type.raw_id();
+        let id = entity_type.index_of();
 
         self.0
             .iter()
@@ -28,7 +28,7 @@ impl Events {
     }
 
     pub fn spawnable_blocks(&self, entity_type: super::Type) -> Vec<crate::block::Block> {
-        let id = entity_type.raw_id();
+        let id = entity_type.index_of();
 
         let mut vec = Vec::new();
 

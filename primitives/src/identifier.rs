@@ -196,3 +196,27 @@ impl<'de> serde::Deserialize<'de> for Identifier {
         })
     }
 }
+
+#[cfg(feature = "edcode")]
+impl rimecraft_edcode::Encode for Identifier {
+    #[inline]
+    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    where
+        B: bytes::BufMut,
+    {
+        self.to_string().encode(buf)
+    }
+}
+
+#[cfg(feature = "edcode")]
+impl<'de> rimecraft_edcode::Decode<'de> for Identifier {
+    type Output = Self;
+
+    #[inline]
+    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    where
+        B: bytes::Buf,
+    {
+        Ok(Self::try_parse(&String::decode(buf)?)?)
+    }
+}

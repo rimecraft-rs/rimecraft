@@ -32,25 +32,25 @@ impl BlockEntity {
         self.be_type
     }
 
-    fn read_nbt(&mut self, nbt: &crate::nbt::NbtCompound) {
+    fn read_nbt(&mut self, nbt: &rimecraft_nbt_ext::Compound) {
         self.data.read(nbt)
     }
 
-    fn write_nbt(&self, nbt: &mut crate::nbt::NbtCompound) {
+    fn write_nbt(&self, nbt: &mut rimecraft_nbt_ext::Compound) {
         self.data.write(nbt)
     }
 }
 
 pub trait Data: std::any::Any + Send + Sync + 'static {
-    fn read(&mut self, nbt: &crate::nbt::NbtCompound);
+    fn read(&mut self, nbt: &rimecraft_nbt_ext::Compound);
 
-    fn write(&self, nbt: &mut crate::nbt::NbtCompound);
+    fn write(&self, nbt: &mut rimecraft_nbt_ext::Compound);
 }
 
 #[derive(Clone, Copy, Eq)]
 pub struct Type {
     id: usize,
-    blocks: crate::Ref<'static, Vec<super::Block>>,
+    blocks: rimecraft_primitives::Ref<'static, Vec<super::Block>>,
 }
 
 impl Type {
@@ -77,7 +77,7 @@ impl crate::registry::Registration for Type {
         self.id = id
     }
 
-    fn raw_id(&self) -> usize {
+    fn index_of(&self) -> usize {
         self.id
     }
 }

@@ -1,7 +1,5 @@
 use std::ops::Deref;
 
-use super::EnumValues;
-
 /// A box with double-valued coords.
 /// The box is axis-aligned and the coords are minimum inclusive and maximum exclusive.
 #[derive(Clone, Copy, PartialEq)]
@@ -339,7 +337,7 @@ impl Deref for ChunkSectionPos {
 
 /// An enum representing 6 cardinal directions in Rimecraft.
 #[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, enumn::N)]
 pub enum Direction {
     Down = 0,
     Up = 1,
@@ -350,15 +348,6 @@ pub enum Direction {
 }
 
 impl Direction {
-    const VALUES: [Self; 6] = [
-        Self::Down,
-        Self::Up,
-        Self::North,
-        Self::South,
-        Self::West,
-        Self::East,
-    ];
-
     pub fn opposite(self) -> Self {
         match self {
             Direction::Down => Self::Up,
@@ -382,23 +371,8 @@ impl Direction {
     }
 }
 
-impl EnumValues<6> for Direction {
-    fn values() -> [Self; 6] {
-        Self::VALUES
-    }
-}
-
-impl From<u8> for Direction {
-    fn from(value: u8) -> Self {
-        Self::VALUES
-            .into_iter()
-            .find(|e| *e as u8 == value)
-            .unwrap()
-    }
-}
-
 #[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, enumn::N)]
 pub enum EightWayDirection {
     North = 0,
     NorthEast,
@@ -411,7 +385,7 @@ pub enum EightWayDirection {
 }
 
 impl EightWayDirection {
-    const VALUES: [Self; 8] = [
+    pub const VALUES: [Self; 8] = [
         Self::North,
         Self::NorthEast,
         Self::East,
@@ -433,12 +407,6 @@ impl EightWayDirection {
             EightWayDirection::West => vec![Direction::West],
             EightWayDirection::NorthWest => vec![Direction::North, Direction::West],
         }
-    }
-}
-
-impl EnumValues<8> for EightWayDirection {
-    fn values() -> [Self; 8] {
-        Self::VALUES
     }
 }
 

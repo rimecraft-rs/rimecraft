@@ -1,4 +1,3 @@
-use crate::collections::Indexed;
 use crate::prelude::*;
 
 pub struct Biome {
@@ -14,13 +13,15 @@ pub struct Weather {
 
 pub type TemperatureModifier = (&'static str, fn(BlockPos, f32) -> f32);
 
-pub type Shared<'w> = crate::Ref<'w, crate::registry::Entry<Biome>>;
+pub type Shared<'w> = rimecraft_primitives::Ref<'w, crate::registry::Entry<Biome>>;
 
-pub struct SharedRegistry<'w>(pub crate::Ref<'w, crate::registry::Registry<Biome>>);
+pub struct SharedRegistry<'w>(pub rimecraft_primitives::Ref<'w, crate::registry::Registry<Biome>>);
 
-impl<'w> Indexed<Shared<'w>> for SharedRegistry<'w> {
-    fn raw_id(&self, value: &Shared<'w>) -> Option<usize> {
-        self.0.iter().position(|entry| crate::Ref(entry) == *value)
+impl<'w> rimecraft_collections::Index<Shared<'w>> for SharedRegistry<'w> {
+    fn index_of(&self, value: &Shared<'w>) -> Option<usize> {
+        self.0
+            .iter()
+            .position(|entry| rimecraft_primitives::Ref(entry) == *value)
     }
 
     fn get(&self, index: usize) -> Option<&Shared<'w>> {

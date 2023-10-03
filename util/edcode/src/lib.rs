@@ -40,7 +40,7 @@ pub trait Decode<'de> {
 /// Represents types that can be updated from a buffer.
 pub trait Update: Encode {
     /// Update from a buffer.
-    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::Buf;
 }
@@ -49,7 +49,7 @@ impl<T> Update for T
 where
     T: Encode + for<'de> Decode<'de, Output = T>,
 {
-    fn read_buf<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::Buf,
     {

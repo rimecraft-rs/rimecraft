@@ -1,11 +1,9 @@
 use bytes::Bytes;
+use rimecraft_edcode::{Decode, Encode, VarI32};
+use rimecraft_primitives::Id;
 use rsa::{pkcs8::DecodePublicKey, RsaPublicKey};
 
-use crate::{
-    net::{listener, Decode, Encode},
-    text::Text,
-    Id,
-};
+use crate::{net::listener, text::Text};
 
 pub struct LoginCompression {
     threshold: i32,
@@ -28,7 +26,7 @@ impl Encode for LoginCompression {
     where
         B: bytes::BufMut,
     {
-        crate::VarInt(self.threshold).encode(buf)
+        VarI32(self.threshold).encode(buf)
     }
 }
 
@@ -41,7 +39,7 @@ impl<'de> Decode<'de> for LoginCompression {
         B: bytes::Buf,
     {
         Ok(Self {
-            threshold: crate::VarInt::decode(buf)?,
+            threshold: VarI32::decode(buf)?,
         })
     }
 }
@@ -202,7 +200,7 @@ impl Encode for LoginQueryReq {
     where
         B: bytes::BufMut,
     {
-        crate::VarInt(self.query_id).encode(buf)?;
+        VarI32(self.query_id).encode(buf)?;
         self.channel.encode(buf)?;
         buf.put_slice(&self.payload[..]);
         Ok(())
@@ -216,7 +214,7 @@ impl<'de> Decode<'de> for LoginQueryReq {
     where
         B: bytes::Buf,
     {
-        let query_id = crate::VarInt::decode(buf)?;
+        let query_id = VarI32::decode(buf)?;
         let channel = Id::decode(buf)?;
 
         let remaining = buf.remaining();

@@ -1,13 +1,13 @@
 use std::{
-    cell::OnceCell,
     ops::{Deref, DerefMut},
+    sync::OnceLock,
     sync::{Mutex, MutexGuard},
 };
 
 /// A type that contains either mutable value or immutable value,
 /// where the mutable one can be freezed into the immutable one.
 pub struct Freezer<I, M = I> {
-    immutable: OnceCell<I>,
+    immutable: OnceLock<I>,
     mutable: Mutex<Option<M>>,
 }
 
@@ -19,7 +19,7 @@ where
     #[inline]
     pub const fn new(mutable: M) -> Self {
         Self {
-            immutable: OnceCell::new(),
+            immutable: OnceLock::new(),
             mutable: Mutex::new(Some(mutable)),
         }
     }

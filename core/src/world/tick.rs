@@ -1,5 +1,7 @@
 use std::hash::Hash;
 
+use rimecraft_nbt_ext::CompoundExt;
+
 use crate::prelude::*;
 
 pub struct Tick<T> {
@@ -27,7 +29,7 @@ impl<T> Tick<T> {
     }
 
     pub fn tick<F, C>(
-        tick_list: &crate::nbt::NbtList,
+        tick_list: &[fastnbt::Value],
         name_to_type_fn: F,
         pos: crate::util::math::ChunkPos,
         tick_consumer: C,
@@ -37,9 +39,10 @@ impl<T> Tick<T> {
     {
         let l: i64 = pos.into();
         for nbt in tick_list.iter() {
-            let tick = match nbt {
-                fastnbt::Value::Compound(value) => Self::from_nbt(value, |n| name_to_type_fn(n)),
-                _ => None,
+            let tick = if let fastnbt::Value::Compound(ref value) = nbt {
+                Self::from_nbt(value, |n| name_to_type_fn(n))
+            } else {
+                None
             };
 
             if let Some(t) = tick {
@@ -50,7 +53,7 @@ impl<T> Tick<T> {
         }
     }
 
-    pub fn from_nbt<F>(nbt: &crate::nbt::NbtCompound, name_to_type: F) -> Option<Self>
+    pub fn from_nbt<F>(nbt: &rimecraft_nbt_ext::Compound, name_to_type: F) -> Option<Self>
     where
         F: Fn(&str) -> Option<T>,
     {
@@ -71,11 +74,11 @@ impl<T> Tick<T> {
             .flatten()
     }
 
-    pub fn to_nbt<F>(&self, type_to_name_fn: F) -> crate::nbt::NbtCompound
+    pub fn to_nbt<F>(&self, type_to_name_fn: F) -> rimecraft_nbt_ext::Compound
     where
         F: Fn(&T) -> String,
     {
-        let mut compound = crate::nbt::NbtCompound::new();
+        let mut compound = rimecraft_nbt_ext::Compound::new();
         compound.insert_str(Self::TYPE_NBT_KEY, &type_to_name_fn(&self.value));
 
         compound.insert_i32(Self::X_NBT_KEY, self.pos.x);
@@ -104,7 +107,7 @@ impl<T: PartialEq> PartialEq for Tick<T> {
 
 impl<T: Eq> Eq for Tick<T> {}
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, enumn::N)]
 pub enum Priority {
     ExtremelyHigh = -3,
     VeryHigh = -2,
@@ -143,11 +146,5 @@ impl Priority {
 impl Default for Priority {
     fn default() -> Self {
         Self::Normal
-    }
-}
-
-impl EnumValues<7> for Priority {
-    fn values() -> [Self; 7] {
-        Self::VALUES
     }
 }

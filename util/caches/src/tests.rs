@@ -15,6 +15,8 @@ fn storing() {
 #[test]
 #[cfg(feature = "arc")]
 fn arc_storing() {
+    use std::ops::Deref;
+
     use super::arc::Caches;
 
     let caches: Caches<String> = Caches::new();

@@ -8,6 +8,9 @@ use std::{hash::Hash, ops::Deref};
 
 use dashmap::DashSet;
 
+#[cfg(feature = "arc")]
+pub use arc::Caches as ArcCaches;
+
 /// Thread safe and hash-based caches.
 ///
 /// A caches is a collection that provide cached value of
