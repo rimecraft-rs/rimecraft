@@ -123,7 +123,7 @@ impl NetSync for Components {
             .expect("net recv event component not found");
 
         let mut hashmap = HashMap::<crate::Id, Bytes>::decode(buf)?;
-        event.as_mut().invoker()(&mut hashmap)
+        event.get_mut().invoker()(&mut hashmap)
     }
 }
 
@@ -168,7 +168,7 @@ impl crate::nbt::Update for Components {
 
         use serde::{de::Error, Deserialize};
         let mut hashmap = HashMap::deserialize(deserializer)?;
-        event.as_mut().invoker()(&mut hashmap)
+        event.get_mut().invoker()(&mut hashmap)
             .map_err(<D as serde::Deserializer<'_>>::Error::custom)
     }
 }
@@ -362,7 +362,7 @@ where
             >,
         >>(&NET_RECV_ID)
         {
-            event.as_mut().register(Box::new(move |map| {
+            event.get_mut().register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
                 let mut bytes = map.remove(&this.1).unwrap();
 
@@ -539,7 +539,7 @@ where
             >,
         >>(&NBT_READ_ID)
         {
-            event.as_mut().register(Box::new(move |map| {
+            event.get_mut().register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
                 this.0.update(&map.remove(&this.1).unwrap())
             }))

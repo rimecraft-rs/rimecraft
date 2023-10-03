@@ -1,18 +1,18 @@
 [package]
-name = "rimecraft-caches"
+name = "rimecraft-collections"
 version = "0.1.0"
 edition = "2021"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
-description = "Thread safe and hash-based caches implementation"
+description = "Collection types for Rimecraft"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
-categories = ["caching"]
+categories = ["data-structures"]
 
 [badges]
-maintenance = { status = "passively-maintained" }
+maintenance = { status = "actively-developed" }
 
 [dependencies]
-dashmap = "5.5"
 
 [features]
-arc = []
+id_list = []
+packed_array = []

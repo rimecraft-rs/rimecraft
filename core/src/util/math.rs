@@ -257,18 +257,18 @@ impl From<glam::IVec3> for BlockPos {
     }
 }
 
-impl Into<glam::IVec3> for BlockPos {
-    fn into(self) -> glam::IVec3 {
-        self.0
+impl From<BlockPos> for glam::IVec3 {
+    fn from(val: BlockPos) -> Self {
+        val.0
     }
 }
 
-impl Into<i64> for BlockPos {
-    fn into(self) -> i64 {
+impl From<BlockPos> for i64 {
+    fn from(val: BlockPos) -> Self {
         let mut l = 0_i64;
-        l |= (self.x as i64 & Self::BITS_Z) << Self::BIT_SHIFT_Z;
-        l |= (self.y as i64 & Self::BITS_Y) << 0;
-        l | (self.z as i64 & Self::BITS_Z) << Self::BIT_SHIFT_Z
+        l |= (val.x as i64 & BlockPos::BITS_Z) << BlockPos::BIT_SHIFT_Z;
+        l |= val.y as i64 & BlockPos::BITS_Y;
+        l | (val.z as i64 & BlockPos::BITS_Z) << BlockPos::BIT_SHIFT_Z
     }
 }
 
@@ -307,9 +307,9 @@ impl From<i64> for ChunkPos {
     }
 }
 
-impl Into<i64> for ChunkPos {
-    fn into(self) -> i64 {
-        self.x as i64 & 0xFFFFFFFF | (self.z as i64 & 0xFFFFFFFF) << 32
+impl From<ChunkPos> for i64 {
+    fn from(val: ChunkPos) -> Self {
+        val.x as i64 & 0xFFFFFFFF | (val.z as i64 & 0xFFFFFFFF) << 32
     }
 }
 
@@ -450,7 +450,7 @@ pub(crate) mod impl_helper {
     ];
 
     pub const fn is_power_of_two(value: i32) -> bool {
-        value != 0 && (value & value - 1) == 0
+        value != 0 && (value & (value - 1)) == 0
     }
 
     pub const fn ceil_log_2(value: i32) -> i32 {
@@ -460,7 +460,7 @@ pub(crate) mod impl_helper {
             smallest_encompassing_power_of_two(value)
         };
 
-        MULTIPLY_DE_BRUIJN_BIT_POSITION[(((v as i64) * 125613361 >> 27) & 0x1F) as usize]
+        MULTIPLY_DE_BRUIJN_BIT_POSITION[((((v as i64) * 125613361) >> 27) & 0x1F) as usize]
     }
 
     pub const fn floor_log_2(value: i32) -> i32 {

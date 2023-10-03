@@ -5,6 +5,10 @@ static NAMESPACE_CACHES: once_cell::sync::Lazy<rimecraft_caches::Caches<String>>
 
 /// An identifier used to identify things,
 /// containing a namespace and a path.
+///
+/// # MCJE Reference
+///
+/// This type represents `net.minecraft.util.Identifier` (yarn).
 #[derive(PartialEq, Eq, Clone, Hash, Debug)]
 pub struct Identifier {
     #[cfg(feature = "caches")]

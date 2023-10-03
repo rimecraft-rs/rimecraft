@@ -410,7 +410,7 @@ where
         self.listeners_and_cache
             .get_mut()
             .0
-            .push((phase, Box::leak(listener)));
+            .push((phase, Box::into_raw(listener)));
 
         if !self.dirty.load(std::sync::atomic::Ordering::Acquire) {
             self.dirty.store(true, std::sync::atomic::Ordering::Release);
@@ -424,6 +424,7 @@ where
     Phase: Ord + Default,
 {
     /// Register a listener to this event for the default phase.
+    #[inline]
     pub fn register(&mut self, listener: Box<T>) {
         self.register_with_phase(listener, Default::default())
     }
@@ -546,7 +547,7 @@ impl<T> MutOnly<T> {
     }
 
     #[inline]
-    pub fn as_mut(&mut self) -> &mut T {
+    pub fn get_mut(&mut self) -> &mut T {
         &mut self.value
     }
 

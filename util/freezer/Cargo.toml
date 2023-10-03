@@ -1,18 +1,14 @@
 [package]
-name = "rimecraft-caches"
+name = "rimecraft-freezer"
 version = "0.1.0"
 edition = "2021"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
-description = "Thread safe and hash-based caches implementation"
+description = "Freeze data for immutable access"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
-categories = ["caching"]
+categories = ["rust-patterns"]
 
 [badges]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-dashmap = "5.5"
-
-[features]
-arc = []

@@ -1,18 +1,15 @@
 [package]
-name = "rimecraft-caches"
+name = "rimecraft-event"
 version = "0.1.0"
 edition = "2021"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
-description = "Thread safe and hash-based caches implementation"
+description = "Rust implementation of the Fabric API Event system"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
-categories = ["caching"]
+categories = ["data-structures"]
 
 [badges]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-dashmap = "5.5"
-
-[features]
-arc = []
+parking_lot = "0.12"
