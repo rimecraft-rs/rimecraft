@@ -237,7 +237,7 @@ pub struct UpgradeData {
 }
 
 impl UpgradeData {
-    const INDICES_KEY: &str = "Indices";
+    const INDICES_KEY: &'static str = "Indices";
 
     pub fn new(nbt: &rimecraft_nbt_ext::Compound, world: &impl super::HeightLimit) -> Self {
         let mut this = Self {
