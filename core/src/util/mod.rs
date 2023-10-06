@@ -1,5 +1,5 @@
-pub mod math;
 pub mod formatting;
+pub mod math;
 
 /// Cell forbids immutable access to the inner value.
 pub struct MutOnly<T> {
@@ -32,14 +32,4 @@ impl<T> From<T> for MutOnly<T> {
     fn from(value: T) -> Self {
         Self::new(value)
     }
-}
-
-pub trait StringIdentifiable {
-    fn as_string(&self) -> String;
-
-    ///2 createCodec() ignored.
-    fn crate_codec() -> () {}
-
-    ///1 toKeyable ignored.
-    fn to_keyable() -> () {}
 }

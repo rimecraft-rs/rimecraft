@@ -1,174 +1,221 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
-use anyhow::{anyhow, Ok};
-
-#[derive(Clone)]
-///`string_value = CODE_PREFIX + code`
-pub struct Formatting<'a> {
-    name: &'a str,
+/// A type holding formattings.
+///
+/// There are two types of formattings, color and modifier. Color formattings
+/// are associated with a specific color, while modifier formattings modify the
+/// style, such as by bolding the text. [`Self::RESET`] is a special formatting
+/// and is not classified as either of these two.
+pub struct Formatting {
+    name: Cow<'static, str>,
     code: char,
     modifier: bool,
     color_index: i32,
     color_value: Option<u32>,
+    enum_v: Enum,
 }
 
-impl Formatting<'_> {
+impl Formatting {
     const CODE_PREFIX: char = '§';
 
-    const BLACK: Self = Self {
-        name: "BLACK",
+    pub const BLACK: Self = Self {
+        name: Cow::Borrowed("BLACK"),
         code: '0',
         modifier: false,
         color_index: 0,
-        color_value: Some(0),
+        color_value: Some(0x000000),
+        enum_v: Enum::Black,
     };
-    const DARK_BLUE: Self = Self {
-        name: "DARK_BLUE",
+
+    pub const DARK_BLUE: Self = Self {
+        name: Cow::Borrowed("DARK_BLUE"),
         code: '1',
         modifier: false,
         color_index: 1,
-        color_value: Some(170),
+        color_value: Some(0x0000AA),
+        enum_v: Enum::DarkBlue,
     };
-    const DARK_GREEN: Self = Self {
-        name: "DARK_GREEN",
+
+    pub const DARK_GREEN: Self = Self {
+        name: Cow::Borrowed("DARK_GREEN"),
         code: '2',
         modifier: false,
         color_index: 2,
-        color_value: Some(43520),
+        color_value: Some(0x00AA00),
+        enum_v: Enum::DarkGreen,
     };
-    const DARK_AQUA: Self = Self {
-        name: "DARK_AQUA",
+
+    pub const DARK_AQUA: Self = Self {
+        name: Cow::Borrowed("DARK_AQUA"),
         code: '3',
         modifier: false,
         color_index: 3,
-        color_value: Some(43690),
+        color_value: Some(0x00AAAA),
+        enum_v: Enum::DarkAqua,
     };
-    const DARK_RED: Self = Self {
-        name: "DARK_RED",
+
+    pub const DARK_RED: Self = Self {
+        name: Cow::Borrowed("DARK_RED"),
         code: '4',
         modifier: false,
         color_index: 4,
-        color_value: Some(11141120),
+        color_value: Some(0xAA0000),
+        enum_v: Enum::DarkRed,
     };
-    const DARK_PURPLE: Self = Self {
-        name: "DARK_PURPLE",
+
+    pub const DARK_PURPLE: Self = Self {
+        name: Cow::Borrowed("DARK_PURPLE"),
         code: '5',
         modifier: false,
         color_index: 5,
-        color_value: Some(11141290),
+        color_value: Some(0xAA00AA),
+        enum_v: Enum::DarkPurple,
     };
-    const GOLD: Self = Self {
-        name: "GOLD",
+
+    pub const GOLD: Self = Self {
+        name: Cow::Borrowed("GOLD"),
         code: '6',
         modifier: false,
         color_index: 6,
-        color_value: Some(16755200),
+        color_value: Some(0xFFAA00),
+        enum_v: Enum::Gold,
     };
-    const GRAY: Self = Self {
-        name: "GRAY",
+
+    pub const GRAY: Self = Self {
+        name: Cow::Borrowed("GRAY"),
         code: '7',
         modifier: false,
         color_index: 7,
-        color_value: Some(11184810),
+        color_value: Some(0xAAAAAA),
+        enum_v: Enum::Gray,
     };
-    const DARK_GRAY: Self = Self {
-        name: "DARK_GRAY",
+
+    pub const DARK_GRAY: Self = Self {
+        name: Cow::Borrowed("DARK_GRAY"),
         code: '8',
         modifier: false,
         color_index: 8,
-        color_value: Some(5592405),
+        color_value: Some(0x555555),
+        enum_v: Enum::DarkGray,
     };
-    const BLUE: Self = Self {
-        name: "BLUE",
+
+    pub const BLUE: Self = Self {
+        name: Cow::Borrowed("BLUE"),
         code: '9',
         modifier: false,
         color_index: 9,
-        color_value: Some(5592575),
+        color_value: Some(0x5555FF),
+        enum_v: Enum::Blue,
     };
-    const GREEN: Self = Self {
-        name: "GREEN",
+
+    pub const GREEN: Self = Self {
+        name: Cow::Borrowed("GREEN"),
         code: 'a',
         modifier: false,
         color_index: 10,
-        color_value: Some(5635925),
+        color_value: Some(0x55FF55),
+        enum_v: Enum::Green,
     };
-    const AQUA: Self = Self {
-        name: "GREEN",
+
+    pub const AQUA: Self = Self {
+        name: Cow::Borrowed("GREEN"),
         code: 'b',
         modifier: false,
         color_index: 11,
-        color_value: Some(5636095),
+        color_value: Some(0x55FFFF),
+        enum_v: Enum::Aqua,
     };
-    const RED: Self = Self {
-        name: "RED",
+
+    pub const RED: Self = Self {
+        name: Cow::Borrowed("RED"),
         code: 'c',
         modifier: false,
         color_index: 12,
-        color_value: Some(16733525),
+        color_value: Some(0xFF5555),
+        enum_v: Enum::Red,
     };
-    const LIGHT_PURPLE: Self = Self {
-        name: "LIGHT_PURPLE",
+
+    pub const LIGHT_PURPLE: Self = Self {
+        name: Cow::Borrowed("LIGHT_PURPLE"),
         code: 'd',
         modifier: false,
         color_index: 13,
-        color_value: Some(16733695),
+        color_value: Some(0xFF55FF),
+        enum_v: Enum::LightPurple,
     };
-    const YELLOW: Self = Self {
-        name: "YELLOW",
+
+    pub const YELLOW: Self = Self {
+        name: Cow::Borrowed("YELLOW"),
         code: 'e',
         modifier: false,
         color_index: 14,
-        color_value: Some(16777045),
+        color_value: Some(0xFFFF55),
+        enum_v: Enum::Yellow,
     };
-    const WHITE: Self = Self {
-        name: "WHITE",
+
+    pub const WHITE: Self = Self {
+        name: Cow::Borrowed("WHITE"),
         code: 'f',
         modifier: false,
         color_index: 15,
-        color_value: Some(16777215),
+        color_value: Some(0xFFFFFF),
+        enum_v: Enum::White,
     };
-    const OBFUSCATED: Self = Self {
-        name: "OBFUSCATED",
+
+    pub const OBFUSCATED: Self = Self {
+        name: Cow::Borrowed("OBFUSCATED"),
         code: 'k',
         modifier: true,
         color_index: -1,
         color_value: None,
+        enum_v: Enum::Obfuscated,
     };
-    const BOLD: Self = Self {
-        name: "BOLD",
+
+    pub const BOLD: Self = Self {
+        name: Cow::Borrowed("BOLD"),
         code: 'l',
         modifier: true,
         color_index: -1,
         color_value: None,
+        enum_v: Enum::Bold,
     };
-    const STRIKETHROUGH: Self = Self {
-        name: "STRIKETHROUGH",
+
+    pub const STRIKETHROUGH: Self = Self {
+        name: Cow::Borrowed("STRIKETHROUGH"),
         code: 'm',
         modifier: true,
         color_index: -1,
         color_value: None,
+        enum_v: Enum::Strikethrough,
     };
-    const UNDERLINE: Self = Self {
-        name: "UNDERLINE",
+
+    pub const UNDERLINE: Self = Self {
+        name: Cow::Borrowed("UNDERLINE"),
         code: 'n',
         modifier: true,
         color_index: -1,
         color_value: None,
+        enum_v: Enum::Underline,
     };
-    const ITALIC: Self = Self {
-        name: "ITALIC",
+
+    pub const ITALIC: Self = Self {
+        name: Cow::Borrowed("ITALIC"),
         code: 'o',
         modifier: true,
         color_index: -1,
         color_value: None,
+        enum_v: Enum::Italic,
     };
-    const RESET: Self = Self {
-        name: "RESET",
+
+    pub const RESET: Self = Self {
+        name: Cow::Borrowed("RESET"),
         code: 'r',
         modifier: false,
         color_index: -1,
         color_value: None,
+        enum_v: Enum::Reset,
     };
+
     const LIST: [Self; 22] = [
         Self::BLACK,
         Self::DARK_BLUE,
@@ -194,60 +241,106 @@ impl Formatting<'_> {
         Self::RESET,
     ];
 
-    pub fn try_from_name(name: &str) -> anyhow::Result<Self> {
-        let map: HashMap<&str, Self> = Self::LIST.into_iter().map(|fmt| (fmt.name, fmt)).collect();
-        let ret: anyhow::Result<Self> = match map.get(name) {
-            Some(x) => Ok(x.clone()),
-            None => Err(anyhow!("Formatting key {} not found!", name)),
-        };
-        ret
+    pub fn try_from_name(name: &str) -> Result<&'static Self, Error> {
+        use once_cell::sync::Lazy;
+
+        static MAPPING: Lazy<HashMap<String, &'static Formatting>> = Lazy::new(|| {
+            Formatting::LIST
+                .iter()
+                .map(|fmt| (fmt.name.clone().into_owned(), fmt))
+                .collect()
+        });
+
+        MAPPING
+            .get(name)
+            .copied()
+            .ok_or_else(|| Error::KeyNotFound {
+                key: name.to_owned(),
+            })
     }
 
-    pub fn try_from_color_index(index: i32) -> anyhow::Result<Self> {
+    pub fn try_from_color_index(index: i32) -> Result<&'static Self, Error> {
         if index < 0 {
-            Ok(Self::RESET)
+            Ok(&Self::RESET)
         } else {
-            let map: HashMap<i32, Self> = Self::LIST
-                .into_iter()
-                .map(|fmt| (fmt.color_index, fmt))
-                .collect();
-            let ret: anyhow::Result<Self> = match map.get(&index) {
-                Some(x) => Ok(x.clone()),
-                None => Err(anyhow!("Color index {} not found!", index)),
-            };
-            ret
+            Self::LIST
+                .iter()
+                .find(|value| value.color_index == index)
+                .ok_or(Error::ColorIndexNotFound { index })
         }
     }
 
-    pub fn try_from_code(code: char) -> anyhow::Result<Self> {
+    pub fn try_from_code(code: char) -> Result<&'static Self, Error> {
         let c: char = code.to_ascii_lowercase();
-        let map: HashMap<char, Self> = Self::LIST.into_iter().map(|fmt| (fmt.code, fmt)).collect();
-        let ret: anyhow::Result<Self> = match map.get(&c) {
-            Some(x) => Ok(x.clone()),
-            None => Err(anyhow!("Code {} not found!", c)),
-        };
-        ret
+        Self::LIST
+            .iter()
+            .find(|value| value.code == c)
+            .ok_or(Error::CodeNotFound { code })
     }
 
+    #[inline]
     pub fn color_value(&self) -> Option<u32> {
         self.color_value
     }
 
-    pub fn name(&self) -> &str {
-        self.name
+    #[inline]
+    pub fn name(&self) -> String {
+        self.name.to_ascii_lowercase()
+    }
+
+    #[inline]
+    pub fn is_modifier(&self) -> bool {
+        self.modifier
+    }
+
+    #[inline]
+    pub fn is_color(&self) -> bool {
+        self.color_index >= 0
     }
 }
 
-impl super::StringIdentifiable for Formatting<'_> {
-    fn as_string(&self) -> String {
-        let mut ret: String = String::from(Self::CODE_PREFIX);
-        ret.push(self.code);
-        ret
+impl serde::Serialize for Formatting {
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.enum_v.serialize(serializer)
     }
 }
 
-///Pre-installed formattings.
-pub enum FormattingEnum {
+impl<'de> serde::Deserialize<'de> for &'static Formatting {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Enum::deserialize(deserializer)?.into())
+    }
+}
+
+impl Display for Formatting {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", Self::CODE_PREFIX, self.code)
+    }
+}
+
+/// Error variants of formatting.
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("formatting key {key} not found")]
+    KeyNotFound { key: String },
+    #[error("color index {index} not found")]
+    ColorIndexNotFound { index: i32 },
+    #[error("code {code} not found")]
+    CodeNotFound { code: char },
+}
+
+/// Pre-installed formattings.
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+enum Enum {
     Black,
     DarkBlue,
     DarkGreen,
@@ -272,33 +365,39 @@ pub enum FormattingEnum {
     Reset,
 }
 
-impl FormattingEnum {
-    ///Pure shit.
-    pub fn to_formatting(e: Self) -> Formatting<'static> {
-        let f: Formatting = match e {
-            Self::Black => Formatting::BLACK,
-            Self::DarkBlue => Formatting::DARK_BLUE,
-            Self::DarkGreen => Formatting::DARK_GREEN,
-            Self::DarkAqua => Formatting::DARK_AQUA,
-            Self::DarkRed => Formatting::DARK_RED,
-            Self::DarkPurple => Formatting::DARK_PURPLE,
-            Self::Gold => Formatting::GOLD,
-            Self::Gray => Formatting::GRAY,
-            Self::DarkGray => Formatting::DARK_GRAY,
-            Self::Blue => Formatting::BLUE,
-            Self::Green => Formatting::GREEN,
-            Self::Aqua => Formatting::AQUA,
-            Self::Red => Formatting::RED,
-            Self::LightPurple => Formatting::LIGHT_PURPLE,
-            Self::Yellow => Formatting::YELLOW,
-            Self::White => Formatting::WHITE,
-            Self::Obfuscated => Formatting::OBFUSCATED,
-            Self::Bold => Formatting::BOLD,
-            Self::Strikethrough => Formatting::STRIKETHROUGH,
-            Self::Underline => Formatting::UNDERLINE,
-            Self::Italic => Formatting::ITALIC,
-            Self::Reset => Formatting::RESET,
-        };
-        f
+impl From<Enum> for &'static Formatting {
+    #[inline]
+    fn from(value: Enum) -> &'static Formatting {
+        match value {
+            Enum::Black => &Formatting::BLACK,
+            Enum::DarkBlue => &Formatting::DARK_BLUE,
+            Enum::DarkGreen => &Formatting::DARK_GREEN,
+            Enum::DarkAqua => &Formatting::DARK_AQUA,
+            Enum::DarkRed => &Formatting::DARK_RED,
+            Enum::DarkPurple => &Formatting::DARK_PURPLE,
+            Enum::Gold => &Formatting::GOLD,
+            Enum::Gray => &Formatting::GRAY,
+            Enum::DarkGray => &Formatting::DARK_GRAY,
+            Enum::Blue => &Formatting::BLUE,
+            Enum::Green => &Formatting::GREEN,
+            Enum::Aqua => &Formatting::AQUA,
+            Enum::Red => &Formatting::RED,
+            Enum::LightPurple => &Formatting::LIGHT_PURPLE,
+            Enum::Yellow => &Formatting::YELLOW,
+            Enum::White => &Formatting::WHITE,
+            Enum::Obfuscated => &Formatting::OBFUSCATED,
+            Enum::Bold => &Formatting::BOLD,
+            Enum::Strikethrough => &Formatting::STRIKETHROUGH,
+            Enum::Underline => &Formatting::UNDERLINE,
+            Enum::Italic => &Formatting::ITALIC,
+            Enum::Reset => &Formatting::RESET,
+        }
+    }
+}
+
+impl From<&'static Formatting> for Enum {
+    #[inline]
+    fn from(value: &'static Formatting) -> Self {
+        value.enum_v
     }
 }
