@@ -157,8 +157,8 @@ pub struct ItemStack {
 }
 
 impl ItemStack {
-    const UNBREAKABLE_KEY: &str = "Unbreakable";
-    const DAMAGE_KEY: &str = "Damage";
+    const UNBREAKABLE_KEY: &'static str = "Unbreakable";
+    const DAMAGE_KEY: &'static str = "Damage";
 
     #[inline]
     pub fn new(item: &impl AsItem, count: u8) -> Self {

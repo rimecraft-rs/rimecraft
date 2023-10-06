@@ -1,5 +1,5 @@
 use std::{
-    any::TypeId,
+    any::{type_name, TypeId},
     collections::HashMap,
     ops::{Deref, DerefMut},
 };
@@ -25,7 +25,7 @@ pub trait Attach {
 /// Manager of components.
 #[derive(Default)]
 pub struct Components {
-    components: HashMap<Id, (Box<dyn Attach + Send + Sync>, TypeId)>,
+    components: HashMap<Id, (Box<dyn Attach + Send + Sync>, TypeId, &'static str)>,
 }
 
 impl Components {
@@ -51,45 +51,71 @@ impl Components {
     where
         T: Attach + Send + Sync + 'static,
     {
-        assert!(
+        debug_assert!(
             !self.components.contains_key(&id),
             "component with id {id} already exist in this components!"
         );
 
         let mut boxed = Box::new(component);
         boxed.on_attach(self);
-        self.components.insert(id, (boxed, TypeId::of::<T>()));
+        self.components
+            .insert(id, (boxed, TypeId::of::<T>(), type_name::<T>()));
     }
 
     /// Get a static typed component from this instance.
     #[inline]
-    pub fn get<T>(&self, id: &Id) -> Option<&T>
+    pub fn get<T>(&self, id: &Id) -> Result<&T, ComponentsError>
     where
         T: Attach + Send + Sync + 'static,
     {
-        self.components.get(id).and_then(|value| {
-            if value.1 == TypeId::of::<T>() {
-                Some(unsafe { &*(&*value.0 as *const (dyn Attach + Send + Sync) as *const T) })
-            } else {
-                None
-            }
-        })
+        let value = self
+            .components
+            .get(id)
+            .ok_or_else(|| ComponentsError::IdNotFound(id.to_owned()))?;
+        if value.1 == TypeId::of::<T>() {
+            Ok(unsafe { &*(&*value.0 as *const (dyn Attach + Send + Sync) as *const T) })
+        } else {
+            Err(ComponentsError::TypeNotMatch {
+                expected: type_name::<T>(),
+                found: value.2,
+                id: id.to_owned(),
+            })
+        }
     }
 
     /// Get a mutable static typed component from this instance.
     #[inline]
-    pub fn get_mut<T>(&mut self, id: &Id) -> Option<&mut T>
+    pub fn get_mut<T>(&mut self, id: &Id) -> Result<&mut T, ComponentsError>
     where
         T: Attach + Send + Sync + 'static,
     {
-        self.components.get_mut(id).and_then(|value| {
-            if value.1 == TypeId::of::<T>() {
-                Some(unsafe { &mut *(&mut *value.0 as *mut (dyn Attach + Send + Sync) as *mut T) })
-            } else {
-                None
-            }
-        })
+        let value = self
+            .components
+            .get_mut(id)
+            .ok_or_else(|| ComponentsError::IdNotFound(id.to_owned()))?;
+        if value.1 == TypeId::of::<T>() {
+            Ok(unsafe { &mut *(&mut *value.0 as *mut (dyn Attach + Send + Sync) as *mut T) })
+        } else {
+            Err(ComponentsError::TypeNotMatch {
+                expected: type_name::<T>(),
+                found: value.2,
+                id: id.to_owned(),
+            })
+        }
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ComponentsError {
+    #[error("component with id {0} not found")]
+    IdNotFound(Id),
+    #[error("component with id {id} found, but its type is {found}, expected {expected}")]
+    TypeNotMatch {
+        expected: &'static str,
+        found: &'static str,
+
+        id: Id,
+    },
 }
 
 impl Encode for Components {
@@ -97,11 +123,7 @@ impl Encode for Components {
     where
         B: bytes::BufMut,
     {
-        let Component(event) = self
-            .get::<Component<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>>>(
-                &NET_SEND_ID,
-            )
-            .expect("net send event component not found");
+        let Component(event) = self.get::<Component<BytesPEvent>>(&NET_SEND_ID).unwrap();
 
         let mut hashmap = HashMap::new();
         event.invoker()(&mut hashmap)?;
@@ -116,14 +138,12 @@ impl rimecraft_edcode::Update for Components {
     {
         use rimecraft_edcode::Decode;
 
-        let Component(event) =
-            self.get_mut::<Component<
-                crate::MutOnly<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>>,
-            >>(&NET_RECV_ID)
-                .expect("net recv event component not found");
+        let Component(event) = self
+            .get_mut::<Component<BytesPEvent>>(&NET_RECV_ID)
+            .unwrap();
 
         let mut hashmap = HashMap::<Id, Bytes>::decode(buf)?;
-        event.get_mut().invoker()(&mut hashmap)
+        event.invoker()(&mut hashmap)
     }
 }
 
@@ -132,11 +152,7 @@ impl serde::Serialize for Components {
     where
         S: serde::Serializer,
     {
-        let Component(event) =
-            self.get::<Component<
-                Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>,
-            >>(&NBT_SAVE_ID)
-                .expect("net send event component not found");
+        let Component(event) = self.get::<Component<ValuePEvent>>(&NBT_SAVE_ID).unwrap();
 
         let mut hashmap = HashMap::new();
 
@@ -155,17 +171,12 @@ impl SerDeUpdate for Components {
         D: serde::Deserializer<'de>,
     {
         let Component(event) = self
-            .get_mut::<Component<
-                crate::MutOnly<
-                    Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>,
-                >,
-            >>(&NBT_READ_ID)
-            .expect("net recv event component not found");
+            .get_mut::<Component<ValuePEvent>>(&NBT_READ_ID)
+            .unwrap();
 
         use serde::{de::Error, Deserialize};
         let mut hashmap = HashMap::deserialize(deserializer)?;
-        event.get_mut().invoker()(&mut hashmap)
-            .map_err(<D as serde::Deserializer<'_>>::Error::custom)
+        event.invoker()(&mut hashmap).map_err(<D as serde::Deserializer<'_>>::Error::custom)
     }
 }
 
@@ -176,7 +187,9 @@ impl From<ComponentsBuilder> for Components {
     }
 }
 
-static ATTACH_EVENTS: parking_lot::RwLock<Event<dyn Fn(TypeId, &mut Components)>> =
+type CompPEvent = Event<dyn Fn(TypeId, &mut Components)>;
+
+static ATTACH_EVENTS: parking_lot::RwLock<CompPEvent> =
     parking_lot::RwLock::new(Event::new(|listeners| {
         Box::new(move |type_id, components| {
             for listener in listeners {
@@ -187,7 +200,7 @@ static ATTACH_EVENTS: parking_lot::RwLock<Event<dyn Fn(TypeId, &mut Components)>
 
 /// [`Components`] builder for creating with external features.
 pub struct ComponentsBuilder {
-    pub inner: Components,
+    inner: Components,
 }
 
 impl ComponentsBuilder {
@@ -196,7 +209,7 @@ impl ComponentsBuilder {
         self.inner
             .register(net_send_event_comp_id(), net_event_comp());
         self.inner
-            .register(net_recv_event_comp_id(), net_event_comp_mut());
+            .register(net_recv_event_comp_id(), net_event_comp());
 
         self
     }
@@ -206,7 +219,7 @@ impl ComponentsBuilder {
         self.inner
             .register(nbt_save_event_comp_id(), nbt_event_comp());
         self.inner
-            .register(nbt_read_event_comp_id(), nbt_event_comp_mut());
+            .register(nbt_read_event_comp_id(), nbt_event_comp());
 
         self
     }
@@ -336,11 +349,11 @@ where
 
         let _ = span.enter();
 
-        if let Some(Component(event)) = components.get_mut::<Component<
-            Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>,
-        >>(&NET_SEND_ID)
-        {
-            event.register(Box::new(move |map| {
+        match components
+            .get_mut::<Component<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>>>(
+                &NET_SEND_ID,
+            ) {
+            Ok(Component(event)) => event.register(Box::new(move |map| {
                 let this = unsafe { &*ptr };
 
                 map.insert(this.1.clone(), {
@@ -351,23 +364,22 @@ where
                 });
 
                 Ok(())
-            }))
-        } else {
-            warn!("network sending event not found");
+            })),
+            Err(err) => {
+                warn!("network sending event not found: {err}");
+            }
         }
 
-        if let Some(Component(event)) = components.get_mut::<Component<
-            crate::MutOnly<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>>,
-        >>(&NET_RECV_ID)
-        {
-            event.get_mut().register(Box::new(move |map| {
+        match components.get_mut::<Component<BytesPEvent>>(&NET_RECV_ID) {
+            Ok(Component(event)) => event.register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
                 let mut bytes = map.remove(&this.1).unwrap();
 
                 this.0.update(&mut bytes)
-            }))
-        } else {
-            warn!("network receiving event not found");
+            })),
+            Err(err) => {
+                warn!("network receiving event not found: {err}");
+            }
         }
     }
 }
@@ -449,8 +461,10 @@ where
     }
 }
 
+type BytesPEvent = Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>;
+
 #[inline]
-fn net_event_comp() -> Component<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>> {
+fn net_event_comp() -> Component<BytesPEvent> {
     Component(Event::new(|listeners| {
         Box::new(move |map| {
             for listener in listeners {
@@ -460,20 +474,6 @@ fn net_event_comp() -> Component<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow
             Ok(())
         })
     }))
-}
-
-#[inline]
-fn net_event_comp_mut(
-) -> Component<crate::MutOnly<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>>> {
-    Component(crate::MutOnly::new(Event::new(|listeners| {
-        Box::new(move |map| {
-            for listener in listeners {
-                listener(map)?;
-            }
-
-            Ok(())
-        })
-    })))
 }
 
 #[inline]
@@ -515,11 +515,11 @@ where
 
         let _ = span.enter();
 
-        if let Some(Component(event)) = components.get_mut::<Component<
+        match components.get_mut::<Component<
             Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>,
         >>(&NBT_SAVE_ID)
         {
-            event.register(Box::new(move |map| {
+            Ok(Component(event)) => event.register(Box::new(move |map| {
                 let this = unsafe { &*ptr };
                 map.insert(
                     this.1.clone(),
@@ -527,23 +527,20 @@ where
                 );
 
                 Ok(())
-            }))
-        } else {
-            warn!("nbt saving event not found");
+            })),
+            Err(err) => {
+                warn!("nbt saving event not found: {err}");
+            }
         }
 
-        if let Some(Component(event)) = components.get_mut::<Component<
-            crate::MutOnly<
-                Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>,
-            >,
-        >>(&NBT_READ_ID)
-        {
-            event.get_mut().register(Box::new(move |map| {
+        match components.get_mut::<Component<ValuePEvent>>(&NBT_READ_ID) {
+            Ok(Component(event)) => event.register(Box::new(move |map| {
                 let this = unsafe { &mut *ptr };
                 this.0.update(&map.remove(&this.1).unwrap())
-            }))
-        } else {
-            warn!("nbt reading event not found");
+            })),
+            Err(err) => {
+                warn!("nbt reading event not found: {err}");
+            }
         }
     }
 }
@@ -625,8 +622,9 @@ where
     }
 }
 
-fn nbt_event_comp(
-) -> Component<Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>> {
+type ValuePEvent = Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>;
+
+fn nbt_event_comp() -> Component<ValuePEvent> {
     Component(Event::new(|listeners| {
         Box::new(move |map| {
             for listener in listeners {
@@ -636,20 +634,6 @@ fn nbt_event_comp(
             Ok(())
         })
     }))
-}
-
-fn nbt_event_comp_mut() -> Component<
-    crate::MutOnly<Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>>,
-> {
-    Component(crate::MutOnly::new(Event::new(|listeners| {
-        Box::new(move |map| {
-            for listener in listeners {
-                listener(map)?;
-            }
-
-            Ok(())
-        })
-    })))
 }
 
 #[inline]
@@ -679,7 +663,7 @@ mod tests {
         components.register(id.clone(), Component(114_i32));
 
         assert_eq!(components.get::<Component<i32>>(&id).unwrap().0, 114);
-        assert!(components.get::<Component<u8>>(&id).is_none());
+        assert!(components.get::<Component<u8>>(&id).is_err());
     }
 
     #[test]

@@ -12,7 +12,7 @@ static NAMESPACE_CACHES: once_cell::sync::Lazy<rimecraft_caches::Caches<String>>
 #[derive(PartialEq, Eq, Clone, Hash, Debug)]
 pub struct Identifier {
     #[cfg(feature = "caches")]
-    namespace: super::Ref<'static, String>,
+    namespace: crate::reference::PartialEqRef<'static, String>,
 
     #[cfg(not(feature = "caches"))]
     namespace: String,
@@ -46,7 +46,7 @@ impl Identifier {
             }
 
             Ok(Self {
-                namespace: super::Ref(NAMESPACE_CACHES.get(namespace_owned)),
+                namespace: NAMESPACE_CACHES.get(namespace_owned).into(),
                 path,
             })
         } else {
@@ -87,12 +87,14 @@ impl Identifier {
     /// Parse a string identifier (ex. `minecraft:air`).
     #[inline]
     pub fn try_parse(id: &str) -> Result<Self, Error> {
-        Self::split_on(id, ':')
+        Self::split(id, ':')
     }
 
-    /// Split a string identifier based on a custom
-    /// delimiter.
-    fn split_on(id: &str, delimiter: char) -> Result<Self, Error> {
+    /// Splits the `id` into an array of two strings at the first occurrence
+    /// of `delimiter`, excluding the delimiter character, or uses `:` for
+    /// the first string in the resulting array when the deliminator does
+    /// not exist or is the first character.
+    fn split(id: &str, delimiter: char) -> Result<Self, Error> {
         if let Some(arr) = id.split_once(delimiter) {
             Self::try_new(arr.0, arr.1.to_owned())
         } else {
@@ -100,8 +102,8 @@ impl Identifier {
         }
     }
 
-    #[inline]
-    fn is_namespace_valid(namespace: &str) -> bool {
+    /// Whether `namespace` can be used as an identifier's namespace
+    pub fn is_namespace_valid(namespace: &str) -> bool {
         for c in namespace.chars() {
             if !(c == '_' || c == '-' || c >= 'a' || c <= 'z' || c >= '0' || c <= '9' || c == '.') {
                 return false;
@@ -110,8 +112,8 @@ impl Identifier {
         true
     }
 
-    #[inline]
-    fn is_path_valid(path: &str) -> bool {
+    /// Whether `path` can be used as an identifier's path
+    pub fn is_path_valid(path: &str) -> bool {
         for c in path.chars() {
             if !(c == '_'
                 || c == '-'
@@ -132,7 +134,7 @@ impl Identifier {
     #[inline]
     pub fn namespace(&self) -> &str {
         #[cfg(feature = "caches")]
-        return self.namespace.0;
+        return self.namespace.0 .0;
 
         #[cfg(not(feature = "caches"))]
         return &self.namespace;

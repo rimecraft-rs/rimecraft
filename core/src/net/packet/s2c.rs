@@ -184,13 +184,8 @@ impl LoginQueryReq {
     }
 
     #[inline]
-    pub fn channel(&self) -> &Id {
+    pub fn channel_id(&self) -> &Id {
         &self.channel
-    }
-
-    #[inline]
-    pub fn payload(&self) -> &[u8] {
-        &self.payload
     }
 }
 
@@ -219,7 +214,9 @@ impl<'de> Decode<'de> for LoginQueryReq {
 
         let remaining = buf.remaining();
         if remaining <= super::QUERY_MAX_PAYLOAD_LEN {
-            let payload = buf.copy_to_bytes(remaining);
+            // this was changed in 1.20.2
+            buf.advance(remaining);
+            let payload = Bytes::new();
             Ok(Self {
                 query_id,
                 channel,
@@ -238,11 +235,11 @@ impl<L> super::Packet<L> for LoginQueryReq where L: listener::Accept<Self> {}
 
 //TODO: LoginSuccessS2CPacket and authlib's GameProfile implementation
 
-pub struct QueryPong {
+pub struct PingResult {
     start_time: u64,
 }
 
-impl QueryPong {
+impl PingResult {
     #[inline]
     pub fn new(start_time: u64) -> Self {
         Self { start_time }
@@ -254,7 +251,7 @@ impl QueryPong {
     }
 }
 
-impl Encode for QueryPong {
+impl Encode for PingResult {
     #[inline]
     fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
     where
@@ -265,7 +262,7 @@ impl Encode for QueryPong {
     }
 }
 
-impl<'de> Decode<'de> for QueryPong {
+impl<'de> Decode<'de> for PingResult {
     type Output = Self;
 
     #[inline]
@@ -279,6 +276,6 @@ impl<'de> Decode<'de> for QueryPong {
     }
 }
 
-impl<L> super::Packet<L> for QueryPong where L: listener::Accept<Self> {}
+impl<L> super::Packet<L> for PingResult where L: listener::Accept<Self> {}
 
 //TODO: QueryResponseS2CPacket and ServerMetadata

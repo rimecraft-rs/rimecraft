@@ -4,7 +4,7 @@ Primitive types and traits for building Rimecraft applications.
 
 ## Status
 
-Targeting MCJE version: `1.20.1`
+Targeting MCJE version: `1.20.2`
 
 ## Features
 
