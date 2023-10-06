@@ -104,7 +104,7 @@ where
                         })
                         .sum::<usize>()
             }
-            Inner::Indexed(_) => VarI32(0).len(),
+            Inner::Indexed(_) => 0,
             Inner::Singular(option) => {
                 if let Some(entry) = option {
                     VarI32(self.ids.index_of(&entry).map(|e| e as i32).unwrap_or(-1)).len()

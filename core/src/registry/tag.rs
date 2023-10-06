@@ -1,7 +1,7 @@
 use rimecraft_primitives::Id;
 
-static KEYS_CACHE: once_cell::sync::Lazy<rimecraft_caches::ArcCaches<Id>> =
-    once_cell::sync::Lazy::new(rimecraft_caches::ArcCaches::new);
+static KEYS_CACHE: once_cell::sync::Lazy<rimecraft_caches::arc::Caches<Id>> =
+    once_cell::sync::Lazy::new(rimecraft_caches::arc::Caches::new);
 
 /// Represents a tag key.
 pub struct Key<T> {

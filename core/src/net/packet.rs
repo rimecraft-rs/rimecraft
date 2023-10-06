@@ -30,6 +30,18 @@ where
     fn is_writing_err_skippable(&self) -> bool {
         false
     }
+
+    /// Returns a new network state to transition to, or `None`
+    /// to indicate no state change.
+    ///
+    /// The state transition is done on both the sender and receiver
+    /// sides, but it is only in one direction (out of C2S and S2C).
+    /// Another packet must be processed in the reverse direction to
+    /// ensure the state in both directions are updated.
+    #[inline]
+    fn new_net_state(&self) -> Option<crate::net::State> {
+        None
+    }
 }
 
 /// Provides an abstraction to [`Packet::apply`], without complex

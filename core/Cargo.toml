@@ -1,9 +1,7 @@
 [package]
-name = "rimecraft_core"
+name = "rimecraft-core"
 version = "1.20.1"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 rimecraft-primitives = { path = "../primitives", features = [
