@@ -36,15 +36,14 @@ where
     /// and the provided value will be dropped.
     /// If an equaled value doesn't exist in this caches, the value
     /// will be leaked into heap.
-    pub fn get(&self, value: T) -> &T {
+    pub fn get<'a>(&'a self, value: T) -> &'a T {
         if let Some(v) = self.map.get(&value) {
-            unsafe { &*(v.deref().deref() as *const T) }
+            unsafe { &*(&**v as *const T) }
         } else {
             let boxed = Box::new(value);
-            let ptr = boxed.deref() as *const T;
+            let refe: &'a T = unsafe { &*(&*boxed as *const T) };
             self.map.insert(boxed);
-
-            unsafe { &*ptr }
+            refe
         }
     }
 
