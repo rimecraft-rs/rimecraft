@@ -21,7 +21,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Run tests
-      run: cargo tests
+      run: cargo test
   test-miri:
     runs-on: ubuntu-latest
     steps:
@@ -32,4 +32,4 @@ jobs:
         rustup override set nightly
         cargo miri setup
     - name: Run tests with Miri
-      run: cargo miri tests
+      run: cargo miri test
