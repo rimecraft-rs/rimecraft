@@ -1,13 +1,17 @@
 use std::{
     any::TypeId,
+    borrow::Cow,
     collections::{hash_map::DefaultHasher, HashMap},
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
 };
 
-use once_cell::sync::Lazy;
-
 use anyhow::anyhow;
+use once_cell::sync::Lazy;
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
+
+use rimecraft_event::Event;
 
 ///TODO: Implement net.minecraft.text.Text
 pub trait Text {
@@ -45,9 +49,14 @@ impl Style {
     };
 }
 
+/// Represents an RGB color of a [`Text`].
+///
+/// # MCJE Reference
+///
+/// This type represents `net.minecraft.text.TextColor` (yarn).
 #[derive(Debug, Hash)]
 pub struct Color {
-    ///24-bit color.
+    /// 24-bit color.
     rgb: u32,
     name: Option<String>,
 }
@@ -56,19 +65,14 @@ impl Color {
     const RGB_PREFIX: &str = "#";
 
     pub fn try_parse(name: String) -> anyhow::Result<Self> {
-        if name.starts_with(Self::RGB_PREFIX) {
-            let i: u32 = str::parse(&name[1..])?;
-            Ok(Self::from_rgb(i))
+        if let Some(value) = name.strip_prefix(Self::RGB_PREFIX) {
+            Ok(Self::from_rgb(value.parse()?))
         } else {
             let f = crate::util::formatting::Formatting::try_from_name(&name)?;
-
-            let cv: u32 = match f.color_value() {
-                Some(x) => x,
-                None => return Err(anyhow!("No valid color value!")),
-            };
-
             Ok(Self {
-                rgb: cv,
+                rgb: f
+                    .color_value()
+                    .ok_or_else(|| anyhow::anyhow!("no valid color value"))?,
                 name: Some(String::from(f.name())),
             })
         }
@@ -209,12 +213,12 @@ impl ClickEventAction {
 
 pub struct HoverEvent {
     contents: (Box<dyn Debug + Send + Sync>, TypeId),
-    action: HoverEventAction,
+    action: &'static HoverEventAction,
     hash: u64,
 }
 
 impl HoverEvent {
-    pub fn new<T>(action: HoverEventAction, contents: T) -> Self
+    pub fn new<T>(action: &'static HoverEventAction, contents: T) -> Self
     where
         T: Debug + Hash + Send + Sync + 'static,
     {
@@ -233,7 +237,6 @@ impl HoverEvent {
         &self.action
     }
 
-    #[inline]
     pub fn value<T: 'static>(&self) -> Option<&T> {
         if TypeId::of::<T>() == self.contents.1 {
             Some(unsafe { &*(&*self.contents.0 as *const (dyn Debug + Send + Sync) as *const T) })
@@ -242,7 +245,6 @@ impl HoverEvent {
         }
     }
 
-    #[inline]
     pub fn value_mut<T: 'static>(&mut self) -> Option<&mut T> {
         if TypeId::of::<T>() == self.contents.1 {
             Some(unsafe {
@@ -254,7 +256,17 @@ impl HoverEvent {
     }
 }
 
+impl Serialize for HoverEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        todo!()
+    }
+}
+
 impl Hash for HoverEvent {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write_u64(self.hash);
         self.action.hash(state);
@@ -262,6 +274,7 @@ impl Hash for HoverEvent {
 }
 
 impl Debug for HoverEvent {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -273,11 +286,51 @@ impl Debug for HoverEvent {
 
 #[derive(PartialEq, Eq, Clone, Hash)]
 pub struct HoverEventAction {
-    name: String,
+    name: Cow<'static, str>,
     parsable: bool,
 }
 
+/// An event to process actions on initialize.
+static HE_ACTIONS: RwLock<Event<dyn Fn(&mut Vec<HoverEventAction>)>> =
+    RwLock::new(Event::new(|listeners| {
+        Box::new(move |actions| {
+            for listener in listeners {
+                listener(actions)
+            }
+        })
+    }));
+
+static HE_MAPPING: Lazy<HashMap<String, HoverEventAction>> = Lazy::new(|| {
+    HE_ACTIONS.write().register(Box::new(|v| {
+        let mut vec = vec![
+            HoverEventAction::SHOW_TEXT,
+            HoverEventAction::SHOW_ITEM,
+            HoverEventAction::SHOW_ENTITY,
+        ];
+        v.append(&mut vec);
+    }));
+
+    let mut vec = Vec::new();
+    HE_ACTIONS.read().invoker()(&mut vec);
+    vec.into_iter().map(|v| (v.name().to_owned(), v)).collect()
+});
+
 impl HoverEventAction {
+    pub const SHOW_TEXT: Self = Self {
+        name: Cow::Borrowed("show_text"),
+        parsable: true,
+    };
+
+    pub const SHOW_ITEM: Self = Self {
+        name: Cow::Borrowed("show_item"),
+        parsable: true,
+    };
+
+    pub const SHOW_ENTITY: Self = Self {
+        name: Cow::Borrowed("show_entity"),
+        parsable: true,
+    };
+
     #[inline]
     pub fn name(&self) -> &str {
         &self.name
@@ -287,11 +340,39 @@ impl HoverEventAction {
     pub fn is_parsable(&self) -> bool {
         self.parsable
     }
+
+    pub fn from_name(name: &str) -> Option<&'static Self> {
+        HE_MAPPING.get(name)
+    }
 }
 
 impl Debug for HoverEventAction {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<action {} >", self.name)
+        write!(f, "<action {}>", self.name)
+    }
+}
+
+impl Serialize for HoverEventAction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.name().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for &'static HoverEventAction {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        static VARIANTS: Lazy<Vec<&'static str>> =
+            Lazy::new(|| HE_MAPPING.iter().map(|v| v.0.as_str()).collect());
+        let value = String::deserialize(deserializer)?;
+
+        use serde::de::Error;
+        HoverEventAction::from_name(&value)
+            .ok_or_else(|| D::Error::unknown_variant(&value, &VARIANTS))
     }
 }
