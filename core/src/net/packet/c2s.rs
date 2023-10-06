@@ -10,12 +10,12 @@ pub struct Handshake {
     proto_ver: i32,
     addr: String,
     port: u16,
-    intended_state: crate::net::State,
+    intended_state: ConnectionIntent,
 }
 
 impl Handshake {
     #[inline]
-    pub fn new(addr: String, port: u16, intended_state: crate::net::State) -> Self {
+    pub fn new(addr: String, port: u16, intended_state: ConnectionIntent) -> Self {
         ///TODO: Need to implement net.minecraft.SharedConstants
         const PROTO_VER: i32 = 114514;
 
@@ -25,6 +25,26 @@ impl Handshake {
             port,
             intended_state,
         }
+    }
+
+    #[inline]
+    pub fn proto_version(&self) -> i32 {
+        self.proto_ver
+    }
+
+    #[inline]
+    pub fn address(&self) -> &str {
+        &self.addr
+    }
+
+    #[inline]
+    pub fn port(&self) -> u16 {
+        self.port
+    }
+
+    #[inline]
+    pub fn intended_state(&self) -> ConnectionIntent {
+        self.intended_state
     }
 }
 
@@ -44,7 +64,6 @@ impl Encode for Handshake {
 impl<'de> Decode<'de> for Handshake {
     type Output = Self;
 
-    #[inline]
     fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
@@ -58,16 +77,42 @@ impl<'de> Decode<'de> for Handshake {
             proto_ver,
             addr,
             port,
-            intended_state: crate::net::State::from_id(state).unwrap(),
+            intended_state: ConnectionIntent::n(state)
+                .ok_or_else(|| anyhow::anyhow!("unknown connection intent: {state}"))?,
         })
     }
 }
 
-impl<L> super::Packet<L> for Handshake where L: listener::Accept<Self> {}
+impl<L> super::Packet<L> for Handshake
+where
+    L: listener::Accept<Self>,
+{
+    #[inline]
+    fn new_net_state(&self) -> Option<crate::net::State> {
+        Some(self.intended_state.state())
+    }
+}
+
+#[repr(i32)]
+#[derive(Clone, Copy, PartialEq, Eq, enumn::N)]
+pub enum ConnectionIntent {
+    Status,
+    Login,
+}
+
+impl ConnectionIntent {
+    #[inline]
+    pub fn state(self) -> crate::net::State {
+        match self {
+            ConnectionIntent::Status => crate::net::State::Status,
+            ConnectionIntent::Login => crate::net::State::Login,
+        }
+    }
+}
 
 pub struct LoginHello {
     name: String,
-    uuid: Option<uuid::Uuid>,
+    profile_id: uuid::Uuid,
 }
 
 impl Encode for LoginHello {
@@ -77,7 +122,7 @@ impl Encode for LoginHello {
         B: bytes::BufMut,
     {
         self.name.encode(buf)?;
-        self.uuid.encode(buf)
+        self.profile_id.encode(buf)
     }
 }
 
@@ -90,9 +135,12 @@ impl<'de> Decode<'de> for LoginHello {
         B: bytes::Buf,
     {
         let name = String::decode(buf)?;
-        let uuid = Option::<uuid::Uuid>::decode(buf)?;
+        let uuid = uuid::Uuid::decode(buf)?;
 
-        Ok(Self { name, uuid })
+        Ok(Self {
+            name,
+            profile_id: uuid,
+        })
     }
 }
 
@@ -107,11 +155,6 @@ impl LoginQueryRes {
     #[inline]
     pub fn query_id(&self) -> i32 {
         self.query_id
-    }
-
-    #[inline]
-    pub fn response(&self) -> Option<&[u8]> {
-        self.res.as_ref().map(|value| &value[..])
     }
 }
 
@@ -151,7 +194,9 @@ impl<'de> Decode<'de> for LoginQueryRes {
             {
                 let remaining = buf.remaining();
                 if remaining <= super::QUERY_MAX_PAYLOAD_LEN {
-                    Ok(buf.copy_to_bytes(remaining))
+                    // this was changed in 1.20.2 so the bytes are empty
+                    buf.advance(remaining);
+                    Ok(Bytes::new())
                 } else {
                     Err(anyhow::anyhow!(
                         "payload may not be larger than {} bytes",

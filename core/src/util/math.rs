@@ -3,7 +3,7 @@ use std::ops::Deref;
 /// A box with double-valued coords.
 /// The box is axis-aligned and the coords are minimum inclusive and maximum exclusive.
 #[derive(Clone, Copy, PartialEq)]
-pub struct Box {
+pub struct BoundingBox {
     pub min_x: f64,
     pub min_y: f64,
     pub min_z: f64,
@@ -12,8 +12,9 @@ pub struct Box {
     pub max_z: f64,
 }
 
-impl Box {
+impl BoundingBox {
     /// Creates a box of the given positions (in (x, y, z)) as corners.
+    #[inline]
     pub fn new<T: Into<(f64, f64, f64)>>(pos1: T, pos2: T) -> Self {
         let p1 = pos1.into();
         let p2 = pos2.into();
@@ -72,6 +73,7 @@ impl Box {
         self
     }
 
+    #[inline]
     pub fn expand(mut self, x: f64, y: f64, z: f64) -> Self {
         self.min_x -= x;
         self.min_y -= y;
@@ -79,9 +81,11 @@ impl Box {
         self.max_x += x;
         self.max_y += y;
         self.max_z += z;
+
         self
     }
 
+    #[inline]
     pub fn expand_all(self, value: f64) -> Self {
         self.expand(value, value, value)
     }
@@ -146,6 +150,7 @@ impl Box {
 
     /// Creates a box that is translated by the given offset
     /// on each axis from this box.
+    #[inline]
     pub fn offset(mut self, x: f64, y: f64, z: f64) -> Self {
         self.min_x += x;
         self.min_y += y;
@@ -156,6 +161,7 @@ impl Box {
         self
     }
 
+    #[inline]
     pub fn is_nan(self) -> bool {
         self.min_x.is_nan()
             || self.min_y.is_nan()
@@ -166,7 +172,8 @@ impl Box {
     }
 }
 
-impl std::hash::Hash for Box {
+impl std::hash::Hash for BoundingBox {
+    #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         state.write_u64(self.min_x.to_bits());
         state.write_u64(self.min_y.to_bits());
@@ -177,9 +184,10 @@ impl std::hash::Hash for Box {
     }
 }
 
-impl Eq for Box {}
+impl Eq for BoundingBox {}
 
-impl From<glam::DVec3> for Box {
+impl From<glam::DVec3> for BoundingBox {
+    #[inline]
     fn from(value: glam::DVec3) -> Self {
         Self {
             min_x: value.x,
@@ -192,7 +200,7 @@ impl From<glam::DVec3> for Box {
     }
 }
 
-impl std::fmt::Display for Box {
+impl std::fmt::Display for BoundingBox {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Box[")?;
 
