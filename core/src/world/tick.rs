@@ -12,12 +12,12 @@ pub struct Tick<T> {
 }
 
 impl<T> Tick<T> {
-    const TYPE_NBT_KEY: &str = "i";
-    const X_NBT_KEY: &str = "x";
-    const Y_NBT_KEY: &str = "y";
-    const Z_NBT_KEY: &str = "z";
-    const DELAY_NBT_KEY: &str = "t";
-    const PRIORITY_NBT_KEY: &str = "p";
+    const TYPE_NBT_KEY: &'static str = "i";
+    const X_NBT_KEY: &'static str = "x";
+    const Y_NBT_KEY: &'static str = "y";
+    const Z_NBT_KEY: &'static str = "z";
+    const DELAY_NBT_KEY: &'static str = "t";
+    const PRIORITY_NBT_KEY: &'static str = "p";
 
     pub fn new(value: T, pos: BlockPos) -> Self {
         Self {

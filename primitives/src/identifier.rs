@@ -12,7 +12,7 @@ static NAMESPACE_CACHES: once_cell::sync::Lazy<rimecraft_caches::Caches<String>>
 #[derive(PartialEq, Eq, Clone, Hash, Debug)]
 pub struct Identifier {
     #[cfg(feature = "caches")]
-    namespace: super::Ref<'static, String>,
+    namespace: crate::reference::PartialEqRef<'static, String>,
 
     #[cfg(not(feature = "caches"))]
     namespace: String,
@@ -46,7 +46,7 @@ impl Identifier {
             }
 
             Ok(Self {
-                namespace: super::Ref(NAMESPACE_CACHES.get(namespace_owned)),
+                namespace: NAMESPACE_CACHES.get(namespace_owned).into(),
                 path,
             })
         } else {
@@ -134,7 +134,7 @@ impl Identifier {
     #[inline]
     pub fn namespace(&self) -> &str {
         #[cfg(feature = "caches")]
-        return self.namespace.0;
+        return self.namespace.0 .0;
 
         #[cfg(not(feature = "caches"))]
         return &self.namespace;
