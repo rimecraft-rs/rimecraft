@@ -12,7 +12,7 @@ static NAMESPACE_CACHES: once_cell::sync::Lazy<rimecraft_caches::Caches<String>>
 #[derive(PartialEq, Eq, Clone, Hash, Debug)]
 pub struct Identifier {
     #[cfg(feature = "caches")]
-    namespace: &'static str,
+    namespace: crate::Ref<'static, String>,
 
     #[cfg(not(feature = "caches"))]
     namespace: String,
@@ -46,7 +46,7 @@ impl Identifier {
             }
 
             Ok(Self {
-                namespace: NAMESPACE_CACHES.get(namespace_owned).as_str(),
+                namespace: crate::Ref(NAMESPACE_CACHES.get(namespace_owned)),
                 path,
             })
         } else {
@@ -134,7 +134,7 @@ impl Identifier {
     #[inline]
     pub fn namespace(&self) -> &str {
         #[cfg(feature = "caches")]
-        return self.namespace;
+        return self.namespace.0;
 
         #[cfg(not(feature = "caches"))]
         return &self.namespace;
@@ -160,7 +160,7 @@ impl std::fmt::Display for Identifier {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         #[cfg(feature = "caches")]
-        return write!(f, "{}:{}", self.namespace, self.path);
+        return write!(f, "{}:{}", self.namespace.0, self.path);
 
         #[cfg(not(feature = "caches"))]
         return write!(f, "{}:{}", self.namespace, self.path);

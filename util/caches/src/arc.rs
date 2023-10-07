@@ -1,10 +1,9 @@
 use std::{
+    collections::HashSet,
     hash::Hash,
     ops::Deref,
-    sync::{Arc, Weak},
+    sync::{Arc, Mutex, Weak},
 };
-
-use dashmap::DashSet;
 
 /// A variant of hash-based [`crate::Caches`], where values are stored in weak
 /// pointers and values are provided with [`Arc`].
@@ -14,7 +13,7 @@ pub struct Caches<T>
 where
     T: Hash + Eq + 'static,
 {
-    map: DashSet<WeakNode<'static, T>>,
+    map: Mutex<HashSet<WeakNode<'static, T>>>,
 }
 
 impl<T> Caches<T>
@@ -32,10 +31,8 @@ where
     /// If an equaled value doesn't exist in this caches, the value
     /// will be stored in a new [`Arc`].
     pub fn get(&self, value: T) -> Arc<T> {
-        if let Some(v) = self
-            .map
-            .get(&WeakNode::Ref(unsafe { &*(&value as *const T) }))
-        {
+        let mut guard = self.map.lock().unwrap();
+        if let Some(v) = guard.get(&WeakNode::Ref(unsafe { &*(&value as *const T) })) {
             if let WeakNode::Stored(weak) = v.deref() {
                 weak.upgrade().expect("invalid weak pointer")
             } else {
@@ -43,8 +40,7 @@ where
             }
         } else {
             let arc = Arc::new(value);
-            self.map.insert(WeakNode::Stored(Arc::downgrade(&arc)));
-
+            guard.insert(WeakNode::Stored(Arc::downgrade(&arc)));
             arc
         }
     }
@@ -53,6 +49,8 @@ where
     #[inline]
     pub fn contains(&self, value: &T) -> bool {
         self.map
+            .lock()
+            .unwrap()
             .contains(&WeakNode::Ref(unsafe { &*(value as *const T) }))
     }
 }
@@ -64,7 +62,7 @@ where
     #[inline]
     fn default() -> Self {
         Self {
-            map: DashSet::new(),
+            map: Mutex::new(HashSet::new()),
         }
     }
 }
