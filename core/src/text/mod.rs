@@ -12,6 +12,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 use rimecraft_event::Event;
+use rimecraft_primitives::ErasedSerDeUpdate;
 
 ///TODO: Implement net.minecraft.text.Text
 pub trait Text {
@@ -28,7 +29,7 @@ pub struct Style {
     strikethrough: Option<bool>,
     obfuscated: Option<bool>,
     click: Option<ClickEvent>,
-    ///TODO: Implement net.minecraft.text.HoverEvent
+    // TODO: Implement net.minecraft.text.HoverEvent
     hover: Option<()>,
     insertion: Option<String>,
     font: Option<rimecraft_primitives::Id>,
@@ -211,8 +212,11 @@ impl ClickEventAction {
     }
 }
 
+trait UpdDebug: ErasedSerDeUpdate + Debug {}
+impl<T> UpdDebug for T where T: ?Sized + ErasedSerDeUpdate + Debug {}
+
 pub struct HoverEvent {
-    contents: (Box<dyn Debug + Send + Sync>, TypeId),
+    contents: (Box<dyn UpdDebug + Send + Sync>, TypeId),
     action: &'static HoverEventAction,
     hash: u64,
 }
@@ -220,7 +224,7 @@ pub struct HoverEvent {
 impl HoverEvent {
     pub fn new<T>(action: &'static HoverEventAction, contents: T) -> Self
     where
-        T: Debug + Hash + Send + Sync + 'static,
+        T: ErasedSerDeUpdate + Debug + Hash + Send + Sync + 'static,
     {
         let mut hasher = DefaultHasher::new();
         contents.hash(&mut hasher);
@@ -237,18 +241,20 @@ impl HoverEvent {
         &self.action
     }
 
+    #[inline]
     pub fn value<T: 'static>(&self) -> Option<&T> {
         if TypeId::of::<T>() == self.contents.1 {
-            Some(unsafe { &*(&*self.contents.0 as *const (dyn Debug + Send + Sync) as *const T) })
+            Some(unsafe { &*(&*self.contents.0 as *const (dyn UpdDebug + Send + Sync) as *const T) })
         } else {
             None
         }
     }
 
+    #[inline]
     pub fn value_mut<T: 'static>(&mut self) -> Option<&mut T> {
         if TypeId::of::<T>() == self.contents.1 {
             Some(unsafe {
-                &mut *(&mut *self.contents.0 as *mut (dyn Debug + Send + Sync) as *mut T)
+                &mut *(&mut *self.contents.0 as *mut (dyn UpdDebug + Send + Sync) as *mut T)
             })
         } else {
             None
@@ -341,6 +347,7 @@ impl HoverEventAction {
         self.parsable
     }
 
+    #[inline]
     pub fn from_name(name: &str) -> Option<&'static Self> {
         HE_MAPPING.get(name)
     }
@@ -372,6 +379,7 @@ impl<'de> Deserialize<'de> for &'static HoverEventAction {
         let value = String::deserialize(deserializer)?;
 
         use serde::de::Error;
+
         HoverEventAction::from_name(&value)
             .ok_or_else(|| D::Error::unknown_variant(&value, &VARIANTS))
     }

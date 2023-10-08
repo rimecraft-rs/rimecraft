@@ -26,3 +26,24 @@ where
         Ok(())
     }
 }
+
+/// [`Update`], but with type erased.
+pub trait ErasedUpdate: erased_serde::Serialize {
+    /// Update this type from an erased deserializer.
+    fn erased_update<'de>(
+        &'de mut self,
+        deserializer: &mut dyn erased_serde::Deserializer<'de>,
+    ) -> Result<(), erased_serde::Error>;
+}
+
+impl<T> ErasedUpdate for T
+where
+    T: ?Sized + Update,
+{
+    fn erased_update<'de>(
+        &'de mut self,
+        deserializer: &mut dyn erased_serde::Deserializer<'de>,
+    ) -> Result<(), erased_serde::Error> {
+        self.update(deserializer)
+    }
+}
