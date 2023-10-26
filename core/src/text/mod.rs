@@ -17,6 +17,7 @@ use rimecraft_primitives::ErasedSerDeUpdate;
 ///TODO: Implement net.minecraft.text.Text
 pub trait Text {
     fn style(&self) -> &Style;
+    fn siblings(&self) -> Vec<Box<dyn Text>>;
 }
 
 ///The style of a [`Text`].\
@@ -244,7 +245,9 @@ impl HoverEvent {
     #[inline]
     pub fn value<T: 'static>(&self) -> Option<&T> {
         if TypeId::of::<T>() == self.contents.1 {
-            Some(unsafe { &*(&*self.contents.0 as *const (dyn UpdDebug + Send + Sync) as *const T) })
+            Some(unsafe {
+                &*(&*self.contents.0 as *const (dyn UpdDebug + Send + Sync) as *const T)
+            })
         } else {
             None
         }
