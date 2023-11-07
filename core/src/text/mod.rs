@@ -173,8 +173,7 @@ impl FromStr for Color {
         if let Some(value) = s.strip_prefix(Self::RGB_PREFIX) {
             Ok(Self::from_rgb(value.parse().map_err(Error::ParseInt)?))
         } else {
-            let f =
-                crate::util::formatting::Formatting::try_from_name(s).map_err(Error::Formatting)?;
+            let f: Formatting = s.parse().map_err(Error::Formatting)?;
             Ok(Self {
                 rgb: f.color_value().ok_or(Error::ColorValueNotFound)?,
                 name: Some(Cow::Borrowed(f.name())),

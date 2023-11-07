@@ -7,7 +7,7 @@ use std::{
 use bytes::Bytes;
 use rimecraft_edcode::Encode;
 use rimecraft_event::Event;
-use rimecraft_primitives::{Id, SerDeUpdate, id};
+use rimecraft_primitives::{id, Id, SerDeUpdate};
 use tracing::{trace_span, warn};
 
 /// Represents a type of component that can be attached
@@ -649,7 +649,7 @@ fn nbt_read_event_comp_id() -> Id {
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
-    use rimecraft_primitives::{Id, id};
+    use rimecraft_primitives::id;
 
     use crate::component::Stored;
 
