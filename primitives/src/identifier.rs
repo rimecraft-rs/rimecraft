@@ -111,6 +111,51 @@ impl Identifier {
     }
 }
 
+/// Creates a new [`Identifier`].
+///
+/// # Examples
+///
+/// ```
+/// # use rimecraft_primitives::id;
+///
+/// // Either parse or create an identifier directly.
+/// assert_eq!(id!("namespace:path").to_string(), "namespace:path");
+/// assert_eq!(id!("namespace", "path").to_string(), "namespace:path");
+///
+/// // By default, the namespace is rimecraft.
+/// assert_eq!(id!("path").to_string(), "rimecraft:path");
+///
+/// // Concat paths with slashes.
+/// assert_eq!(id!["namespace", "path", "path1", "path2"].to_string(), "namespace:path/path1/path2");
+/// ```
+#[cfg(feature = "macros")]
+#[macro_export]
+macro_rules! id {
+    ($ns:expr, $p:expr) => {
+        {
+            $crate::identifier::Identifier::new($ns.to_string(), $p.to_string())
+        }
+    };
+
+    ($ns:expr, $p:expr, $( $pp:expr ),+) => {
+        {
+            let mut path = String::new();
+            path.push_str($p.as_ref());
+            $(
+                path.push('/');
+                path.push_str($pp.as_ref());
+            )*
+            $crate::identifier::Identifier::new($ns.to_string(), path)
+        }
+    };
+
+    ($n:expr) => {
+        {
+            $crate::identifier::Identifier::parse($n.as_ref())
+        }
+    }
+}
+
 /// Whether `namespace` can be used as an identifier's namespace
 pub fn is_namespace_valid(namespace: &str) -> bool {
     for c in namespace.chars() {

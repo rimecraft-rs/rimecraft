@@ -10,9 +10,5 @@ mod tests;
 pub use identifier::Identifier as Id;
 pub use reference::Reference as Ref;
 
-
 #[cfg(feature = "serde")]
-pub use serde_update::{Update as SerDeUpdate, ErasedUpdate as ErasedSerDeUpdate};
-
-#[cfg(feature = "macros")]
-pub use rimecraft_primitives_macros::*;
+pub use serde_update::{ErasedUpdate as ErasedSerDeUpdate, Update as SerDeUpdate};
