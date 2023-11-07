@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "core",
     "primitives",
+    "primitives/macros",
     # Utils
     "util/caches",
     "util/nbt_ext",

@@ -4,24 +4,42 @@ use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
+    str::FromStr,
+    sync::Arc,
 };
 
-use anyhow::anyhow;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 use rimecraft_event::Event;
-use rimecraft_primitives::ErasedSerDeUpdate;
+use rimecraft_primitives::{id, ErasedSerDeUpdate, Id};
 
-///TODO: Implement net.minecraft.text.Text
+use super::formatting::Formatting;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("not a valid color")]
+    InvalidColor,
+    #[error("no valid color value found")]
+    ColorValueNotFound,
+    #[error("unable to parse integer: {0}")]
+    ParseInt(std::num::ParseIntError),
+    #[error("formatting error: {0}")]
+    Formatting(super::formatting::Error),
+}
+
+/// TODO: Implement net.minecraft.text.Text
 pub trait Text {
     fn style(&self) -> &Style;
     fn siblings(&self) -> Vec<Box<dyn Text>>;
+    /// TODO: Implement net.minecraft.text.OrderedText
+    fn as_ordered_text(&self) -> ();
 }
 
-///The style of a [`Text`].\
-///A style is immutable.
+/// The style of a [`Text`].\
+/// A style is immutable.
+#[derive(PartialEq, Eq)]
 pub struct Style {
     color: Option<Color>,
     bold: Option<bool>,
@@ -31,13 +49,13 @@ pub struct Style {
     obfuscated: Option<bool>,
     click: Option<ClickEvent>,
     // TODO: Implement net.minecraft.text.HoverEvent
-    hover: Option<()>,
+    hover: Option<HoverEvent>,
     insertion: Option<String>,
     font: Option<rimecraft_primitives::Id>,
 }
 
 impl Style {
-    const EMPTY: Style = Style {
+    const EMPTY: Self = Self {
         color: None,
         bold: None,
         italic: None,
@@ -49,36 +67,78 @@ impl Style {
         insertion: None,
         font: None,
     };
+
+    const DEFAULT_FONT_ID: &str = "default";
+
+    #[inline]
+    pub fn color(&self) -> Option<&Color> {
+        self.color.as_ref()
+    }
+
+    #[inline]
+    pub fn bold(&self) -> bool {
+        self.bold.unwrap_or(false)
+    }
+
+    #[inline]
+    pub fn italic(&self) -> bool {
+        self.italic.unwrap_or(false)
+    }
+
+    #[inline]
+    pub fn strikethrough(&self) -> bool {
+        self.strikethrough.unwrap_or(false)
+    }
+
+    #[inline]
+    pub fn underlined(&self) -> bool {
+        self.underlined.unwrap_or(false)
+    }
+
+    #[inline]
+    pub fn obfuscated(&self) -> bool {
+        self.obfuscated.unwrap_or(false)
+    }
+
+    pub fn empty(&self) -> bool {
+        self == &Self::EMPTY
+    }
+
+    pub fn click(&self) -> Option<&ClickEvent> {
+        self.click.as_ref()
+    }
+
+    pub fn hover(&self) -> Option<&HoverEvent> {
+        self.hover.as_ref()
+    }
+
+    pub fn insertion(&self) -> Option<&String> {
+        self.insertion.as_ref()
+    }
+
+    pub fn font(&self) -> Cow<'_, Id> {
+        self.font
+            .as_ref()
+            .map_or_else(|| Cow::Owned(id!(Self::DEFAULT_FONT_ID)), Cow::Borrowed)
+    }
 }
 
 /// Represents an RGB color of a [`Text`].
+///
+/// This is immutable as a part of [`Style`].
 ///
 /// # MCJE Reference
 ///
 /// This type represents `net.minecraft.text.TextColor` (yarn).
 #[derive(Debug, Hash)]
 pub struct Color {
-    /// 24-bit color.
+    /// A 24-bit color.
     rgb: u32,
-    name: Option<String>,
+    name: Option<Cow<'static, str>>,
 }
 
 impl Color {
     const RGB_PREFIX: &str = "#";
-
-    pub fn try_parse(name: String) -> anyhow::Result<Self> {
-        if let Some(value) = name.strip_prefix(Self::RGB_PREFIX) {
-            Ok(Self::from_rgb(value.parse()?))
-        } else {
-            let f = crate::util::formatting::Formatting::try_from_name(&name)?;
-            Ok(Self {
-                rgb: f
-                    .color_value()
-                    .ok_or_else(|| anyhow::anyhow!("no valid color value"))?,
-                name: Some(String::from(f.name())),
-            })
-        }
-    }
 
     #[inline]
     pub fn from_rgb(rgb: u32) -> Self {
@@ -86,7 +146,7 @@ impl Color {
     }
 
     #[inline]
-    pub fn new(rgb: u32, name: String) -> Self {
+    pub fn new(rgb: u32, name: Cow<'static, str>) -> Self {
         Self {
             rgb,
             name: Some(name),
@@ -94,26 +154,46 @@ impl Color {
     }
 
     #[inline]
-    fn to_hex_str(&self) -> String {
-        return format!("{}{:06X}", Self::RGB_PREFIX, self.rgb);
+    fn as_hex_str(&self) -> String {
+        format!("{}{:06X}", Self::RGB_PREFIX, self.rgb)
     }
 
     #[inline]
-    pub fn name(&self) -> String {
-        match &(self.name) {
-            Some(x) => x.clone(),
-            None => self.to_hex_str(),
+    pub fn name(&self) -> Cow<'_, str> {
+        self.name
+            .clone()
+            .unwrap_or_else(|| Cow::Owned(self.as_hex_str()))
+    }
+}
+
+impl FromStr for Color {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(value) = s.strip_prefix(Self::RGB_PREFIX) {
+            Ok(Self::from_rgb(value.parse().map_err(Error::ParseInt)?))
+        } else {
+            let f =
+                crate::util::formatting::Formatting::try_from_name(s).map_err(Error::Formatting)?;
+            Ok(Self {
+                rgb: f.color_value().ok_or(Error::ColorValueNotFound)?,
+                name: Some(Cow::Borrowed(f.name())),
+            })
         }
     }
+}
 
-    pub fn try_from_formatting(formatting: &super::formatting::Formatting) -> anyhow::Result<Self> {
-        if formatting.is_color() {
+impl TryFrom<&'static Formatting> for Color {
+    type Error = Error;
+
+    fn try_from(value: &'static Formatting) -> Result<Self, Self::Error> {
+        if value.is_color() {
             Ok(Self {
-                rgb: formatting.color_value().unwrap(),
-                name: Some(String::from(formatting.name().clone())),
+                rgb: value.color_value().unwrap(),
+                name: Some(Cow::Borrowed(value.name())),
             })
         } else {
-            Err(anyhow!("Not a valid color!"))
+            Err(Error::InvalidColor)
         }
     }
 }
@@ -123,6 +203,8 @@ impl PartialEq for Color {
         self.rgb == other.rgb
     }
 }
+
+impl Eq for Color {}
 
 impl Display for Color {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -196,7 +278,7 @@ impl ClickEventAction {
     }
 
     #[inline]
-    pub fn user_definable(self) -> bool {
+    pub fn is_user_definable(self) -> bool {
         !matches!(self, Self::OpenFile)
     }
 
@@ -217,7 +299,7 @@ trait UpdDebug: ErasedSerDeUpdate + Debug {}
 impl<T> UpdDebug for T where T: ?Sized + ErasedSerDeUpdate + Debug {}
 
 pub struct HoverEvent {
-    contents: (Box<dyn UpdDebug + Send + Sync>, TypeId),
+    contents: (Arc<dyn UpdDebug + Send + Sync>, TypeId),
     action: &'static HoverEventAction,
     hash: u64,
 }
@@ -231,7 +313,7 @@ impl HoverEvent {
         contents.hash(&mut hasher);
 
         Self {
-            contents: (Box::new(contents), TypeId::of::<T>()),
+            contents: (Arc::new(contents), TypeId::of::<T>()),
             action,
             hash: hasher.finish(),
         }
@@ -242,22 +324,10 @@ impl HoverEvent {
         &self.action
     }
 
-    #[inline]
     pub fn value<T: 'static>(&self) -> Option<&T> {
         if TypeId::of::<T>() == self.contents.1 {
             Some(unsafe {
                 &*(&*self.contents.0 as *const (dyn UpdDebug + Send + Sync) as *const T)
-            })
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    pub fn value_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        if TypeId::of::<T>() == self.contents.1 {
-            Some(unsafe {
-                &mut *(&mut *self.contents.0 as *mut (dyn UpdDebug + Send + Sync) as *mut T)
             })
         } else {
             None
@@ -292,6 +362,14 @@ impl Debug for HoverEvent {
         )
     }
 }
+
+impl PartialEq for HoverEvent {
+    fn eq(&self, other: &Self) -> bool {
+        self.action() == other.action()
+    }
+}
+
+impl Eq for HoverEvent {}
 
 #[derive(PartialEq, Eq, Clone, Hash)]
 pub struct HoverEventAction {

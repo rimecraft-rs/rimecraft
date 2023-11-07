@@ -27,7 +27,7 @@ where
     }
 }
 
-/// [`Update`], but with type erased.
+/// [`Update`] but type erased.
 pub trait ErasedUpdate: erased_serde::Serialize {
     /// Update this type from an erased deserializer.
     fn erased_update<'de>(

@@ -1,0 +1,14 @@
+[package]
+name = "rimecraft-primitives-macros"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Macros for Id and more"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["game-development"]
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[dependencies]
