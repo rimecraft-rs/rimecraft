@@ -117,7 +117,7 @@ formattings! {
     Italic => "ITALIC", 'o', true, -1, None,
 
     // Special
-    Reset => "REST", 'r', false, -1, None,
+    Reset => "RESET", 'r', false, -1, None,
 }
 
 #[derive(thiserror::Error, Debug)]
