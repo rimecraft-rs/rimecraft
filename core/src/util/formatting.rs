@@ -1,23 +1,22 @@
-use std::{borrow::Cow, collections::HashMap, fmt::Display, sync::OnceLock};
-
 macro_rules! formatting {
-    ($( ($i:ty, $n:expr, $c:expr, $m:expr, $ci:expr, $cv:expr) ),*) => {
+    ($( $i:ident => $n:expr, $c:expr, $m:expr, $ci:expr, $cv:expr ),+) => {
         /// A type holding formattings.
         ///
         /// There are two types of formattings, color and modifier. Color formattings
         /// are associated with a specific color, while modifier formattings modify the
         /// style, such as by bolding the text. [`Self::RESET`] is a special formatting
         /// and is not classified as either of these two.
-        #[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
+        #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
         pub enum Formatting {
             $(
-                $i
+                $i,
             )*
         }
 
         impl Formatting {
             const CODE_PREFIX: char = '§';
 
+            #[inline]
             fn name_raw(&self) -> &'static str {
                 match self {
                     $(
@@ -68,24 +67,10 @@ macro_rules! formatting {
                 }
             }
         }
-
-        impl std::fmt::Display for Formatting {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                match self {
-                    $(
-                        Formatting::$i => {
-                            f.write_char(Self::CODE_PREFIX)?;
-                            f.write_char(self.code)?;
-                        },
-                    )*
-                }
-
-                Ok(())
-            }
-        }
     };
 }
 
-formatting!{
-    Black -> ("BLACK", '0', false, 0, Some(0)),
+formatting! {
+    Black => "BLACK", '0', false, Some(0), Some(0),
+    DarkBlue => "BLACK", '0', false, Some(0), Some(0)
 }
