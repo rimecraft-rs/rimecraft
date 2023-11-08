@@ -3,7 +3,7 @@
   <a href="https://github.com/rimecraft-rs">
     <img
       height="75"
-      src="https://github.com/rimecraft-rs/artwork/blob/main/rimecraft/logo/logo.png?raw=true"
+      src="https://github.com/rimecraft-rs/artwork/blob/main/rimecraft/cut/logo/logo.png?raw=true"
       />
   </a>
   <h5><br /></h5>
