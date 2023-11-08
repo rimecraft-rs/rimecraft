@@ -1,11 +1,41 @@
-use std::{borrow::Cow, collections::HashMap, ops::Deref, str::FromStr};
+use std::{collections::HashMap, fmt::Display, ops::Deref, str::FromStr};
 
 use once_cell::sync::Lazy;
 
-use super::ColorIndex;
+use super::Rgb;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct ColorIndex {
+    value: i8,
+}
+
+impl ColorIndex {
+    #[inline]
+    pub fn new(value: Option<u8>) -> Self {
+        Self {
+            value: value.map(|e| e as i8).unwrap_or(-1),
+        }
+    }
+
+    #[inline]
+    pub fn value(self) -> Option<u8> {
+        if self.value == -1 {
+            None
+        } else {
+            Some(self.value as u8)
+        }
+    }
+}
+
+impl Default for ColorIndex {
+    #[inline]
+    fn default() -> Self {
+        Self { value: -1 }
+    }
+}
 
 macro_rules! formattings {
-    ($( $i:ident => $n:expr, $c:expr, $m:expr, $ci:expr, $cv:expr ),+,) => {
+    ($( $i:ident => $n:literal, $c:literal, $m:expr, $ci:literal, $cv:expr ),+,) => {
         /// An enum holding formattings.
         ///
         /// There are two types of formattings, color and modifier. Color formattings
@@ -22,8 +52,6 @@ macro_rules! formattings {
         }
 
         impl Formatting {
-            const CODE_PREFIX: char = '§';
-
             #[inline]
             fn name_raw(self) -> &'static str {
                 match self {
@@ -67,10 +95,10 @@ macro_rules! formattings {
             /// Returns the color of the formatted text, or
             /// `None` if the formatting has no associated color.
             #[inline]
-            pub fn color_value(self) -> Option<u32> {
+            pub fn color_value(self) -> Option<Rgb> {
                 match self {
                     $(
-                        Formatting::$i => $cv,
+                        Formatting::$i => $cv.map(Rgb::new),
                     )*
                 }
             }
@@ -131,6 +159,8 @@ pub enum Error {
 }
 
 impl Formatting {
+    const CODE_PREFIX: char = '§';
+
     /// Returns `true` if the formatting is associated with
     /// a color, `false` otherwise.
     #[inline]
@@ -185,6 +215,16 @@ impl FromStr for Formatting {
             .get(&name_sanitize(s))
             .copied()
             .ok_or_else(|| Error::InvalidName(s.to_owned()))
+    }
+}
+
+impl Display for Formatting {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Write;
+
+        f.write_char(Self::CODE_PREFIX)?;
+        f.write_char(self.code())
     }
 }
 

@@ -13,7 +13,9 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 use rimecraft_event::Event;
-use rimecraft_primitives::{id, ErasedSerDeUpdate, Id};
+use rimecraft_primitives::{id, ErasedSerDeUpdate, Id, SerDeUpdate};
+
+use crate::Rgb;
 
 use super::formatting::Formatting;
 
@@ -27,6 +29,8 @@ pub enum Error {
     ParseInt(std::num::ParseIntError),
     #[error("formatting error: {0}")]
     Formatting(super::formatting::Error),
+    #[error("invalid name: {0}")]
+    InvalidName(String),
 }
 
 /// TODO: Implement net.minecraft.text.Text
@@ -39,7 +43,7 @@ pub trait Text {
 
 /// The style of a [`Text`].\
 /// A style is immutable.
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq)]
 pub struct Style {
     color: Option<Color>,
     bold: Option<bool>,
@@ -130,39 +134,40 @@ impl Style {
 /// # MCJE Reference
 ///
 /// This type represents `net.minecraft.text.TextColor` (yarn).
-#[derive(Debug, Hash)]
+#[derive(Debug, Hash, Eq)]
 pub struct Color {
     /// A 24-bit color.
-    rgb: u32,
-    name: Option<Cow<'static, str>>,
+    rgb: Rgb,
+    name: Option<&'static str>,
 }
 
 impl Color {
     const RGB_PREFIX: &str = "#";
 
     #[inline]
-    pub fn from_rgb(rgb: u32) -> Self {
-        Self { rgb, name: None }
+    pub fn rgb(&self) -> Rgb {
+        self.rgb
     }
 
     #[inline]
-    pub fn new(rgb: u32, name: Cow<'static, str>) -> Self {
-        Self {
-            rgb,
-            name: Some(name),
-        }
-    }
-
-    #[inline]
-    fn as_hex_str(&self) -> String {
+    fn to_hex_code(&self) -> String {
         format!("{}{:06X}", Self::RGB_PREFIX, self.rgb)
     }
 
-    #[inline]
-    pub fn name(&self) -> Cow<'_, str> {
+    pub fn name(&self) -> Cow<'static, str> {
         self.name
-            .clone()
-            .unwrap_or_else(|| Cow::Owned(self.as_hex_str()))
+            .map(|e| Cow::Borrowed(e))
+            .unwrap_or_else(|| Cow::Owned(self.to_hex_code()))
+    }
+}
+
+impl Display for Color {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(name) = self.name {
+            f.write_str(name)
+        } else {
+            f.write_str(&self.to_hex_code())
+        }
     }
 }
 
@@ -171,54 +176,48 @@ impl FromStr for Color {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some(value) = s.strip_prefix(Self::RGB_PREFIX) {
-            Ok(Self::from_rgb(value.parse().map_err(Error::ParseInt)?))
-        } else {
-            let f: Formatting = s.parse().map_err(Error::Formatting)?;
             Ok(Self {
-                rgb: f.color_value().ok_or(Error::ColorValueNotFound)?,
-                name: Some(Cow::Borrowed(f.name())),
+                rgb: value.parse().map_err(Error::ParseInt)?,
+                name: None,
             })
+        } else {
+            s.parse::<Formatting>()
+                .map_err(Error::Formatting)?
+                .try_into()
         }
     }
 }
 
-impl TryFrom<&'static Formatting> for Color {
+impl TryFrom<Formatting> for Color {
     type Error = Error;
 
-    fn try_from(value: &'static Formatting) -> Result<Self, Self::Error> {
-        if value.is_color() {
-            Ok(Self {
-                rgb: value.color_value().unwrap(),
-                name: Some(Cow::Borrowed(value.name())),
-            })
-        } else {
-            Err(Error::InvalidColor)
-        }
+    fn try_from(value: Formatting) -> Result<Self, Self::Error> {
+        Ok(Self {
+            rgb: value.color_value().ok_or(Error::ColorValueNotFound)?,
+            name: Some(value.name()),
+        })
     }
 }
 
 impl PartialEq for Color {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.rgb == other.rgb
     }
 }
 
-impl Eq for Color {}
-
-impl Display for Color {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let name = self.name();
-        write!(f, "{name}")
-    }
-}
-
-#[derive(Hash, PartialEq, Eq)]
+#[derive(Hash, PartialEq, Eq, Debug)]
 pub struct ClickEvent {
     action: ClickEventAction,
     value: String,
 }
 
 impl ClickEvent {
+    #[inline]
+    pub fn new(action: ClickEventAction, value: String) -> Self {
+        Self { action, value }
+    }
+
     #[inline]
     pub fn action(&self) -> ClickEventAction {
         self.action
@@ -227,20 +226,6 @@ impl ClickEvent {
     #[inline]
     pub fn value(&self) -> &str {
         &self.value
-    }
-
-    #[inline]
-    pub fn new(action: ClickEventAction, value: String) -> Self {
-        Self { action, value }
-    }
-}
-
-impl Debug for ClickEvent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let action = self.action().name();
-        let value = self.value();
-
-        write!(f, "ClickEvent{{action={action}, value='{value}'}}")
     }
 }
 
@@ -280,9 +265,12 @@ impl ClickEventAction {
     pub fn is_user_definable(self) -> bool {
         !matches!(self, Self::OpenFile)
     }
+}
 
-    #[inline]
-    pub fn from_name(name: &str) -> Option<Self> {
+impl FromStr for ClickEventAction {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         static MAP: Lazy<HashMap<String, ClickEventAction>> = Lazy::new(|| {
             ClickEventAction::VALUES
                 .into_iter()
@@ -290,12 +278,17 @@ impl ClickEventAction {
                 .collect()
         });
 
-        MAP.get(name).copied()
+        MAP.get(s)
+            .copied()
+            .ok_or_else(|| Error::InvalidName(s.to_owned()))
     }
 }
 
 trait UpdDebug: ErasedSerDeUpdate + Debug {}
 impl<T> UpdDebug for T where T: ?Sized + ErasedSerDeUpdate + Debug {}
+
+erased_serde::serialize_trait_object!(UpdDebug);
+rimecraft_primitives::update_trait_object!(UpdDebug);
 
 pub struct HoverEvent {
     contents: (Arc<dyn UpdDebug + Send + Sync>, TypeId),
@@ -334,15 +327,6 @@ impl HoverEvent {
     }
 }
 
-impl Serialize for HoverEvent {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        todo!()
-    }
-}
-
 impl Hash for HoverEvent {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -368,7 +352,33 @@ impl PartialEq for HoverEvent {
     }
 }
 
-impl Eq for HoverEvent {}
+impl Serialize for HoverEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer {
+        #[derive(Serialize)]
+        struct Struct<'a> {
+            action: &'static HoverEventAction,
+            contents: &'a (dyn UpdDebug + Send + Sync),
+        }
+
+        Struct {
+            action: self.action,
+            contents: &*self.contents.0,
+        }.serialize(serializer)
+    }
+}
+
+impl SerDeUpdate for HoverEvent {
+    fn update<'de, D>(
+        &'de mut self,
+        deserializer: D,
+    ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+    where
+        D: serde::Deserializer<'de> {
+        todo!()
+    }
+}
 
 #[derive(PartialEq, Eq, Clone, Hash)]
 pub struct HoverEventAction {
@@ -436,11 +446,12 @@ impl HoverEventAction {
 impl Debug for HoverEventAction {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<action {}>", self.name)
+        f.debug_struct("HoverEventAction").field("name", &self.name).finish()
     }
 }
 
 impl Serialize for HoverEventAction {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -456,6 +467,7 @@ impl<'de> Deserialize<'de> for &'static HoverEventAction {
     {
         static VARIANTS: Lazy<Vec<&'static str>> =
             Lazy::new(|| HE_MAPPING.iter().map(|v| v.0.as_str()).collect());
+            
         let value = String::deserialize(deserializer)?;
 
         use serde::de::Error;

@@ -1,9 +1,11 @@
+pub mod random;
+
 use std::ops::Deref;
 
 /// A box with double-valued coords.
 /// The box is axis-aligned and the coords are minimum inclusive and maximum exclusive.
 #[derive(Clone, Copy, PartialEq)]
-pub struct BoundingBox {
+pub struct BoundBox {
     pub min_x: f64,
     pub min_y: f64,
     pub min_z: f64,
@@ -12,7 +14,7 @@ pub struct BoundingBox {
     pub max_z: f64,
 }
 
-impl BoundingBox {
+impl BoundBox {
     /// Creates a box of the given positions (in (x, y, z)) as corners.
     #[inline]
     pub fn new<T: Into<(f64, f64, f64)>>(pos1: T, pos2: T) -> Self {
@@ -172,7 +174,7 @@ impl BoundingBox {
     }
 }
 
-impl std::hash::Hash for BoundingBox {
+impl std::hash::Hash for BoundBox {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         state.write_u64(self.min_x.to_bits());
@@ -184,9 +186,9 @@ impl std::hash::Hash for BoundingBox {
     }
 }
 
-impl Eq for BoundingBox {}
+impl Eq for BoundBox {}
 
-impl From<glam::DVec3> for BoundingBox {
+impl From<glam::DVec3> for BoundBox {
     #[inline]
     fn from(value: glam::DVec3) -> Self {
         Self {
@@ -200,7 +202,7 @@ impl From<glam::DVec3> for BoundingBox {
     }
 }
 
-impl std::fmt::Display for BoundingBox {
+impl std::fmt::Display for BoundBox {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Box[")?;
 

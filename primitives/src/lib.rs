@@ -2,7 +2,7 @@ pub mod identifier;
 pub mod reference;
 
 #[cfg(feature = "serde")]
-mod serde_update;
+pub mod serde_update;
 
 #[cfg(test)]
 mod tests;
