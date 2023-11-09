@@ -45,17 +45,16 @@ pub trait Text {
 /// A style is immutable.
 #[derive(PartialEq)]
 pub struct Style {
-    color: Option<Color>,
-    bold: Option<bool>,
-    italic: Option<bool>,
-    underlined: Option<bool>,
-    strikethrough: Option<bool>,
-    obfuscated: Option<bool>,
-    click: Option<ClickEvent>,
-    // TODO: Implement net.minecraft.text.HoverEvent
-    hover: Option<HoverEvent>,
-    insertion: Option<String>,
-    font: Option<rimecraft_primitives::Id>,
+    pub color: Option<Color>,
+    pub bold: Option<bool>,
+    pub italic: Option<bool>,
+    pub underlined: Option<bool>,
+    pub strikethrough: Option<bool>,
+    pub obfuscated: Option<bool>,
+    pub click: Option<ClickEvent>,
+    pub hover: Option<HoverEvent>,
+    pub insertion: Option<String>,
+    pub font: Option<Id>,
 }
 
 impl Style {
@@ -134,7 +133,7 @@ impl Style {
 /// # MCJE Reference
 ///
 /// This type represents `net.minecraft.text.TextColor` (yarn).
-#[derive(Debug, Hash, Eq)]
+#[derive(Debug, Eq)]
 pub struct Color {
     /// A 24-bit color.
     rgb: Rgb,
@@ -156,7 +155,7 @@ impl Color {
 
     pub fn name(&self) -> Cow<'static, str> {
         self.name
-            .map(|e| Cow::Borrowed(e))
+            .map(Cow::Borrowed)
             .unwrap_or_else(|| Cow::Owned(self.to_hex_code()))
     }
 }
@@ -203,6 +202,14 @@ impl PartialEq for Color {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.rgb == other.rgb
+    }
+}
+
+impl Hash for Color {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.rgb.hash(state);
+        self.name.hash(state)
     }
 }
 
@@ -354,8 +361,9 @@ impl PartialEq for HoverEvent {
 
 impl Serialize for HoverEvent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer {
+    where
+        S: serde::Serializer,
+    {
         #[derive(Serialize)]
         struct Struct<'a> {
             action: &'static HoverEventAction,
@@ -365,7 +373,8 @@ impl Serialize for HoverEvent {
         Struct {
             action: self.action,
             contents: &*self.contents.0,
-        }.serialize(serializer)
+        }
+        .serialize(serializer)
     }
 }
 
@@ -375,7 +384,31 @@ impl SerDeUpdate for HoverEvent {
         deserializer: D,
     ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
     where
-        D: serde::Deserializer<'de> {
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "lowercase")]
+        enum Field {
+            Action,
+            Contents,
+        }
+
+        struct HEVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for HEVisitor {
+            type Value = Field;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct HoverEvent { action, contents }")
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                todo!()
+            }
+        }
         todo!()
     }
 }
@@ -446,7 +479,9 @@ impl HoverEventAction {
 impl Debug for HoverEventAction {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HoverEventAction").field("name", &self.name).finish()
+        f.debug_struct("HoverEventAction")
+            .field("name", &self.name)
+            .finish()
     }
 }
 
@@ -467,7 +502,7 @@ impl<'de> Deserialize<'de> for &'static HoverEventAction {
     {
         static VARIANTS: Lazy<Vec<&'static str>> =
             Lazy::new(|| HE_MAPPING.iter().map(|v| v.0.as_str()).collect());
-            
+
         let value = String::deserialize(deserializer)?;
 
         use serde::de::Error;
