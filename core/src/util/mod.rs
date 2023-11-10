@@ -66,3 +66,8 @@ impl FromStr for Rgb {
         s.parse().map(Rgb::new)
     }
 }
+
+
+pub enum Unit{
+    Instance,
+}
