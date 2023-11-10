@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "core",
     "primitives",
+	"flare3d",
     # Utils
     "util/caches",
     "util/nbt_ext",
