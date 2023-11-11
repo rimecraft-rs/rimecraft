@@ -24,6 +24,10 @@ erased_serde::serialize_trait_object!(UpdDebug);
 rimecraft_primitives::update_trait_object!(UpdDebug);
 
 /// Event performed when cursor is hovering on a `Text`.
+///
+/// # MCJE Reference
+///
+/// This type represents `net.minecraft.text.HoverEvent` (yarn).
 pub struct HoverEvent {
     contents: Box<dyn UpdDebug + Send + Sync>,
     action: &'static ErasedAction,
@@ -114,7 +118,7 @@ impl<'de> Deserialize<'de> for HoverEvent {
             contents: serde_json::Value,
         }
 
-        //TODO: if `contents` is invalid, deserialize text from field `value`.
+        //TODO: if `contents` not found, deserialize text from field `value`.
         let Struct { action, contents } = Struct::deserialize(deserializer)?;
 
         // Deserializing contents.
@@ -139,6 +143,7 @@ pub struct Action<T> {
     factory: fn() -> T,
 }
 
+/// Registers an action.
 pub fn register_action<T: 'static>(action: Action<T>)
 where
     T: ErasedSerDeUpdate + Debug + Send + Sync,
