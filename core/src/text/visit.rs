@@ -1,9 +1,5 @@
-use crate::Unit;
+pub type Terminate = ();
 
-pub trait Visitable<T> {
-    const TERMINATE_VISIT:Option<Unit>=Some(Unit::Instance);
-}
-struct EmptyVisitable;
-impl Visitable<T> for EmptyVisitable {
-    
-}
+pub trait Visitable<T> {}
+
+impl<T> Visitable<T> for () {}

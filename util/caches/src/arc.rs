@@ -33,7 +33,7 @@ where
     pub fn get(&self, value: T) -> Arc<T> {
         let mut guard = self.map.lock().unwrap();
         if let Some(v) = guard.get(&WeakNode::Ref(unsafe { &*(&value as *const T) })) {
-            if let WeakNode::Stored(weak) = v.deref() {
+            if let WeakNode::Stored(weak) = v {
                 weak.upgrade().expect("invalid weak pointer")
             } else {
                 unreachable!()
