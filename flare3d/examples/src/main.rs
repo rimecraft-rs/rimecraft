@@ -9,7 +9,7 @@ use winit::{
 fn main() {
     let event_loop = EventLoop::new().unwrap();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
-    let mut state = futures_executor::block_on(State::new(&window));
+    let mut state = futures::executor::block_on(State::new(&window));
 
     event_loop
         .run(move |event, target| {

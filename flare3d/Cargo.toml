@@ -24,6 +24,7 @@ winit = { version = "0.29", default-features = false, features = [
   "wayland-csd-adwaita",
 ] }
 wgpu = "0.18"
+futures = "0.3.29"
 glam = "0.24"
 tracing = "0.1"
 bytemuck = { version = "1.4", features = ["derive"] }

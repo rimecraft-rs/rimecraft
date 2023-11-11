@@ -12,5 +12,5 @@ members = [
     "util/collections",
     "util/freezer",
     # Examples
-    "flare3d/examples/*",
+    "flare3d/examples",
 ]
