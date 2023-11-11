@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "core",
     "primitives",
-	"flare3d",
+    "flare3d",
     # Utils
     "util/caches",
     "util/nbt_ext",
@@ -11,4 +11,6 @@ members = [
     "util/edcode",
     "util/collections",
     "util/freezer",
+    # Examples
+    "flare3d/examples/*",
 ]

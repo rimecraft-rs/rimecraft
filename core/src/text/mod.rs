@@ -391,6 +391,8 @@ impl Serialize for Style {
     where
         S: serde::Serializer,
     {
+        // Don't serialize empty attributes.
+
         macro_rules! serialize {
             ($($f:ident),*) => {
                 {
