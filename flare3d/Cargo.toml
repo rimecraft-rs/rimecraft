@@ -28,3 +28,4 @@ glam = "0.24"
 tracing = "0.1"
 bytemuck = { version = "1.4", features = ["derive"] }
 anyhow = "1.0"
+futures-executor = "0.3"
