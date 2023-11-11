@@ -12,14 +12,13 @@ categories = ["game-development"]
 maintenance = { status = "actively-developed" }
 
 [dependencies]
-color_space = "0.5.3"
+color_space = "0.5"
 # Wgpu
-image = "0.24.7"
+image = "0.24"
 cgmath = "0.18"
-winit = "0.26.0"
-wgpu = "0.12.0"
-pollster = "0.2"
+winit = "0.29"
+wgpu = "0.18"
 glam = "0.24"
-tracing = "0.1.40"
+tracing = "0.1"
 bytemuck = { version = "1.4", features = ["derive"] }
 anyhow = "1.0"
