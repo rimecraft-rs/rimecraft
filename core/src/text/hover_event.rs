@@ -11,7 +11,8 @@ use std::{
     collections::hash_map::DefaultHasher,
     collections::HashMap,
     fmt::Debug,
-    hash::{Hash, Hasher}, marker::PhantomData,
+    hash::{Hash, Hasher},
+    marker::PhantomData,
 };
 
 trait UpdDebug: ErasedSerDeUpdate + Debug {}
@@ -22,12 +23,13 @@ rimecraft_primitives::update_trait_object!(UpdDebug);
 
 pub struct HoverEvent {
     contents: Box<dyn UpdDebug + Send + Sync>,
-    action: &'static HoverEventAction<()>,
-    hash: u64,
+    action: &'static ErasedAction,
+
+    contents_hash: u64,
 }
 
 impl HoverEvent {
-    pub fn new<T>(action: &'static HoverEventAction<T>, contents: T) -> Self
+    pub fn new<T>(action: &'static Action<T>, contents: T) -> Self
     where
         T: ErasedSerDeUpdate + Debug + Hash + Send + Sync + 'static,
     {
@@ -37,20 +39,21 @@ impl HoverEvent {
         Self {
             contents: Box::new(contents),
             action: unsafe { std::mem::transmute(action) },
-            hash: hasher.finish(),
+            contents_hash: hasher.finish(),
         }
     }
 
     #[inline]
-    pub fn action(&self) -> &'static HoverEventAction<()> {
-        &self.action
+    pub fn action(&self) -> &ErasedAction {
+        self.action
     }
 
-    pub fn value<T: 'static>(&self) -> Option<&T> {
+    pub fn value<T: 'static>(&self) -> Option<&T>
+    where
+        T: ErasedSerDeUpdate + Debug + Hash + Send + Sync,
+    {
         if TypeId::of::<T>() == self.action.type_id {
-            Some(unsafe {
-                &*(&*self.contents as *const (dyn UpdDebug + Send + Sync) as *const T)
-            })
+            Some(unsafe { &*(&*self.contents as *const (dyn UpdDebug + Send + Sync) as *const T) })
         } else {
             None
         }
@@ -60,7 +63,7 @@ impl HoverEvent {
 impl Hash for HoverEvent {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u64(self.hash);
+        state.write_u64(self.contents_hash);
         self.action.hash(state);
     }
 }
@@ -77,8 +80,12 @@ impl Debug for HoverEvent {
 }
 
 impl PartialEq for HoverEvent {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.action() == other.action()
+        std::ptr::eq(
+            self.action() as *const ErasedAction,
+            other.action() as *const ErasedAction,
+        )
     }
 }
 
@@ -89,7 +96,7 @@ impl Serialize for HoverEvent {
     {
         #[derive(Serialize)]
         struct Struct<'a> {
-            action: &'static HoverEventAction<()>,
+            action: &'static ErasedAction,
             contents: &'a (dyn UpdDebug + Send + Sync),
         }
 
@@ -111,7 +118,7 @@ impl SerDeUpdate for HoverEvent {
     {
         #[derive(Deserialize)]
         struct Struct {
-            action: &'static HoverEventAction<()>,
+            action: &'static ErasedAction,
             contents: serde_json::Value,
         }
 
@@ -125,19 +132,38 @@ impl SerDeUpdate for HoverEvent {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Hash)]
-pub struct HoverEventAction<T> {
-    name: Cow<'static, str>,
+pub struct Action<T> {
+    name: &'static str,
     parsable: bool,
 
-    type_id: TypeId,
-    factory: fn() -> Box<dyn UpdDebug + Send + Sync>,
+    factory: fn() -> T,
+}
 
-    _marker: PhantomData<fn() -> T>,
+impl<T> Hash for Action<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state)
+    }
+}
+
+pub struct ErasedAction {
+    name: &'static str,
+    parsable: bool,
+
+    factory: Box<dyn Fn() -> Box<dyn UpdDebug + Send + Sync> + Send + Sync>,
+
+    type_id: TypeId,
+    type_name: &'static str,
+}
+
+impl Hash for ErasedAction {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.type_id.hash(state);
+    }
 }
 
 /// An event to process actions on initialize.
-static HE_ACTIONS: RwLock<Event<dyn Fn(&mut Vec<HoverEventAction<()>>)>> =
+static HE_ACTIONS: RwLock<Event<dyn Fn(&mut Vec<ErasedAction>)>> =
     RwLock::new(Event::new(|listeners| {
         Box::new(move |actions| {
             for listener in listeners {
@@ -146,12 +172,10 @@ static HE_ACTIONS: RwLock<Event<dyn Fn(&mut Vec<HoverEventAction<()>>)>> =
         })
     }));
 
-static HE_MAPPING: Lazy<HashMap<String, HoverEventAction<()>>> = Lazy::new(|| {
+static HE_MAPPING: Lazy<HashMap<String, ErasedAction>> = Lazy::new(|| {
     HE_ACTIONS.write().register(Box::new(|v| {
         v.append(&mut vec![
-            HoverEventAction::SHOW_TEXT,
-            HoverEventAction::SHOW_ITEM,
-            HoverEventAction::SHOW_ENTITY,
+            //TODO: built-in actions
         ]);
     }));
 
@@ -160,25 +184,22 @@ static HE_MAPPING: Lazy<HashMap<String, HoverEventAction<()>>> = Lazy::new(|| {
     vec.into_iter().map(|v| (v.name().to_owned(), v)).collect()
 });
 
-impl<T> HoverEventAction<T> {
-    pub const SHOW_TEXT: Self = Self {
-        name: Cow::Borrowed("show_text"),
-        parsable: true,
-    };
-
-    pub const SHOW_ITEM: Self = Self {
-        name: Cow::Borrowed("show_item"),
-        parsable: true,
-    };
-
-    pub const SHOW_ENTITY: Self = Self {
-        name: Cow::Borrowed("show_entity"),
-        parsable: true,
-    };
-
+impl<T> Action<T> {
     #[inline]
     pub fn name(&self) -> &str {
-        &self.name
+        self.name
+    }
+
+    #[inline]
+    pub fn is_parsable(&self) -> bool {
+        self.parsable
+    }
+}
+
+impl ErasedAction {
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.name
     }
 
     #[inline]
@@ -192,7 +213,22 @@ impl<T> HoverEventAction<T> {
     }
 }
 
-impl<T> Debug for HoverEventAction<T> {
+impl<T> From<Action<T>> for ErasedAction
+where
+    T: ErasedSerDeUpdate + Debug + Send + Sync,
+{
+    fn from(value: Action<T>) -> Self {
+        Self {
+            name: value.name,
+            parsable: value.parsable,
+            factory: Box::new(|| Box::new((value.factory)())),
+            type_id: TypeId::of::<T>(),
+            type_name: std::any::type_name::<T>(),
+        }
+    }
+}
+
+impl<T> Debug for Action<T> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HoverEventAction")
@@ -201,8 +237,17 @@ impl<T> Debug for HoverEventAction<T> {
     }
 }
 
-impl<T> Serialize for HoverEventAction<T> {
+impl Debug for ErasedAction {
     #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HoverEventErasedAction")
+            .field("name", &self.name)
+            .field("type", &self.type_name)
+            .finish()
+    }
+}
+
+impl<T> Serialize for Action<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -211,7 +256,16 @@ impl<T> Serialize for HoverEventAction<T> {
     }
 }
 
-impl<'de, T> Deserialize<'de> for &'static HoverEventAction<T> {
+impl Serialize for ErasedAction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.name().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for &'static ErasedAction {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -222,8 +276,7 @@ impl<'de, T> Deserialize<'de> for &'static HoverEventAction<T> {
         let value = String::deserialize(deserializer)?;
 
         use serde::de::Error;
-
-        HoverEventAction::from_name(&value)
+        ErasedAction::from_name(&String::deserialize(deserializer)?)
             .ok_or_else(|| D::Error::unknown_variant(&value, &VARIANTS))
     }
 }

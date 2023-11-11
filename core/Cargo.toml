@@ -6,8 +6,7 @@ edition = "2021"
 [dependencies]
 rimecraft-primitives = { path = "../primitives", features = [
     "serde",
-    "edcode",
-    "macros"
+    "edcode"
 ] }
 rimecraft-caches = { path = "../util/caches", features = ["arc"] }
 rimecraft-collections = { path = "../util/collections", features = [

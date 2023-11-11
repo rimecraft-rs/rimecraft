@@ -3,6 +3,8 @@
 static NAMESPACE_CACHES: once_cell::sync::Lazy<rimecraft_caches::Caches<String>> =
     once_cell::sync::Lazy::new(rimecraft_caches::Caches::new);
 
+const DEFAULT_NAMESPACE: &str = "rimecraft";
+
 /// An identifier used to identify things,
 /// containing a namespace and a path.
 ///
@@ -90,7 +92,7 @@ impl Identifier {
         if let Some(arr) = id.split_once(delimiter) {
             Self::try_new(arr.0.to_owned(), arr.1.to_owned())
         } else {
-            Self::try_new("rimecraft".to_owned(), id.to_owned())
+            Self::try_new(DEFAULT_NAMESPACE.to_owned(), id.to_owned())
         }
     }
 
@@ -108,6 +110,22 @@ impl Identifier {
     #[inline]
     pub fn path(&self) -> &str {
         &self.path
+    }
+
+    /// Trimming the formatting of this identifier.
+    ///
+    /// # Examples
+    /// ```
+    /// use rimecraft_primitives::id;
+    /// assert_eq!(id!("rimecraft", "gold_ingot").trim_fmt(), "gold_ingot");
+    /// ```
+    #[inline]
+    pub fn trim_fmt(&self) -> String {
+        if &*self.namespace == DEFAULT_NAMESPACE {
+            self.path.to_owned()
+        } else {
+            self.to_string()
+        }
     }
 }
 
@@ -128,7 +146,6 @@ impl Identifier {
 /// // Concat paths with slashes.
 /// assert_eq!(id!["namespace", "path", "path1", "path2"].to_string(), "namespace:path/path1/path2");
 /// ```
-#[cfg(feature = "macros")]
 #[macro_export]
 macro_rules! id {
     ($ns:expr, $p:expr) => {
