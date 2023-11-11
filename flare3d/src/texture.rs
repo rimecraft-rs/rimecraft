@@ -32,6 +32,7 @@ impl Texture {
             height: dimensions.1,
             depth_or_array_layers: 1,
         };
+
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label,
             size,
@@ -40,7 +41,7 @@ impl Texture {
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: todo!(),
+            view_formats: &[],
         });
 
         queue.write_texture(
