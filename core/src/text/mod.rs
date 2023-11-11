@@ -7,17 +7,19 @@ use std::{
 
 use rimecraft_primitives::{id, Id};
 
-use crate::Rgb;
+use crate::RGB;
 
-use self::{click_event::ClickEvent, hover_event::HoverEvent};
-
-use super::formatting::Formatting;
+use super::fmt::Formatting;
 
 pub mod click_event;
 pub mod hover_event;
 
 pub mod visit;
 
+pub use click_event::ClickEvent;
+pub use hover_event::HoverEvent;
+
+/// An error that can occur when processing a [`Text`].
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("not a valid color")]
@@ -27,37 +29,63 @@ pub enum Error {
     #[error("unable to parse integer: {0}")]
     ParseInt(std::num::ParseIntError),
     #[error("formatting error: {0}")]
-    Formatting(super::formatting::Error),
+    Formatting(super::fmt::Error),
     #[error("invalid name: {0}")]
     InvalidName(String),
 }
 
-/// TODO: Implement net.minecraft.text.Text
+//TODO: Implement net.minecraft.text.Text
 pub trait Text {
     fn style(&self) -> &Style;
     fn siblings(&self) -> Vec<Box<dyn Text>>;
-    /// TODO: Implement net.minecraft.text.OrderedText
-    fn as_ordered_text(&self) -> ();
+    //TODO: Implement net.minecraft.text.OrderedText
+    fn as_ordered_text(&self);
 }
 
-/// The style of a [`Text`].\
-/// A style is immutable.
-#[derive(PartialEq)]
+/// The style of a [`Text`], representing cosmetic attributes.
+/// It includes font, color, click event, hover event, etc.
+///
+/// A style should be immutable.
+///
+/// # MCJE Reference
+///
+/// This type represents `net.minecraft.text.Style` (yarn).
+#[derive(PartialEq, Debug, Default)]
 pub struct Style {
+    /// The color of this style.
     pub color: Option<Color>,
+
+    /// Whether this style has bold formatting.
     pub bold: Option<bool>,
+
+    /// Whether this style has italic formatting.
     pub italic: Option<bool>,
+
+    /// Whether this style has underlined formatting.
     pub underlined: Option<bool>,
+
+    /// Whether this style has strikethrough formatting.
     pub strikethrough: Option<bool>,
+
+    /// Whether this style has obfuscated formatting.
     pub obfuscated: Option<bool>,
+
+    /// The click event of this style.
     pub click: Option<ClickEvent>,
+
+    /// The hover event of this style.
     pub hover: Option<HoverEvent>,
+
+    /// The insertion text of this style.
     pub insertion: Option<String>,
+
+    /// The font ID of this style.
     pub font: Option<Id>,
 }
 
 impl Style {
-    const EMPTY: Self = Self {
+    /// An empty style.
+    pub const EMPTY: Self = Self {
         color: None,
         bold: None,
         italic: None,
@@ -72,52 +100,82 @@ impl Style {
 
     const DEFAULT_FONT_ID: &str = "default";
 
+    /// Returns the color of this style.
     #[inline]
     pub fn color(&self) -> Option<&Color> {
         self.color.as_ref()
     }
 
+    /// Returns whether this style has bold formatting.
+    ///
+    /// See [`Formatting::Bold`].
     #[inline]
-    pub fn bold(&self) -> bool {
+    pub fn is_bold(&self) -> bool {
         self.bold.unwrap_or(false)
     }
 
+    /// Returns whether this style has italic formatting.
+    ///
+    /// See [`Formatting::Italic`].
     #[inline]
-    pub fn italic(&self) -> bool {
+    pub fn is_italic(&self) -> bool {
         self.italic.unwrap_or(false)
     }
 
+    /// Returns whether this style has strikethrough formatting.
+    ///
+    /// See [`Formatting::Strikethrough`].
     #[inline]
-    pub fn strikethrough(&self) -> bool {
+    pub fn is_strikethrough(&self) -> bool {
         self.strikethrough.unwrap_or(false)
     }
 
+    /// Returns whether this style has underlined formatting.
+    ///
+    /// See [`Formatting::Underline`].
     #[inline]
-    pub fn underlined(&self) -> bool {
+    pub fn is_underlined(&self) -> bool {
         self.underlined.unwrap_or(false)
     }
 
+    /// Returns whether this style has obfuscated formatting.
+    ///
+    /// See [`Formatting::Obfuscated`].
     #[inline]
-    pub fn obfuscated(&self) -> bool {
+    pub fn is_obfuscated(&self) -> bool {
         self.obfuscated.unwrap_or(false)
     }
 
-    pub fn empty(&self) -> bool {
+    /// Returns whether this style is empty.
+    ///
+    /// See [`Self::EMPTY`].
+    #[inline]
+    pub fn is_empty(&self) -> bool {
         self == &Self::EMPTY
     }
 
-    pub fn click(&self) -> Option<&ClickEvent> {
+    /// Returns the click event of this style.
+    #[inline]
+    pub fn click_event(&self) -> Option<&ClickEvent> {
         self.click.as_ref()
     }
 
-    pub fn hover(&self) -> Option<&HoverEvent> {
+    /// Returns the hover event of this style.
+    #[inline]
+    pub fn hover_event(&self) -> Option<&HoverEvent> {
         self.hover.as_ref()
     }
 
+    /// Returns the insertion text of this style.
+    ///
+    /// An insertion text is a text that is inserted into the chat
+    /// when the player shift-clicks on the text.
+    #[inline]
     pub fn insertion(&self) -> Option<&String> {
         self.insertion.as_ref()
     }
 
+    /// Returns the font ID of this style.
     pub fn font(&self) -> Cow<'_, Id> {
         self.font
             .as_ref()
@@ -135,23 +193,26 @@ impl Style {
 #[derive(Debug, Eq)]
 pub struct Color {
     /// A 24-bit color.
-    rgb: Rgb,
+    rgb: RGB,
     name: Option<&'static str>,
 }
 
 impl Color {
     const RGB_PREFIX: &str = "#";
 
+    /// Returns the inner RGB value of this color.
     #[inline]
-    pub fn rgb(&self) -> Rgb {
+    pub fn rgb(&self) -> RGB {
         self.rgb
     }
 
+    /// Returns the hex code of this color.
     #[inline]
     fn to_hex_code(&self) -> String {
         format!("{}{:06X}", Self::RGB_PREFIX, self.rgb)
     }
 
+    /// Returns the name of this color.
     pub fn name(&self) -> Cow<'static, str> {
         self.name
             .map(Cow::Borrowed)

@@ -116,12 +116,12 @@ impl Identifier {
     ///
     /// # Examples
     /// ```
-    /// use rimecraft_primitives::id;
+    /// # use rimecraft_primitives::id;
     /// assert_eq!(id!("rimecraft", "gold_ingot").trim_fmt(), "gold_ingot");
     /// ```
     #[inline]
     pub fn trim_fmt(&self) -> String {
-        if &*self.namespace == DEFAULT_NAMESPACE {
+        if *self.namespace == DEFAULT_NAMESPACE {
             self.path.to_owned()
         } else {
             self.to_string()
@@ -135,7 +135,6 @@ impl Identifier {
 ///
 /// ```
 /// # use rimecraft_primitives::id;
-///
 /// // Either parse or create an identifier directly.
 /// assert_eq!(id!("namespace:path").to_string(), "namespace:path");
 /// assert_eq!(id!("namespace", "path").to_string(), "namespace:path");

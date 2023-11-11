@@ -1,15 +1,18 @@
 use std::{collections::HashMap, fmt::Display, ops::Deref, str::FromStr};
 
+use fastnbt::de;
 use once_cell::sync::Lazy;
 
-use super::Rgb;
+use super::RGB;
 
+/// An index of a color in [`Formatting`].
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ColorIndex {
     value: i8,
 }
 
 impl ColorIndex {
+    /// Returns the color index for the given value.
     #[inline]
     pub fn new(value: Option<u8>) -> Self {
         Self {
@@ -17,6 +20,7 @@ impl ColorIndex {
         }
     }
 
+    /// Returns the value of the color index if valid.
     #[inline]
     pub fn value(self) -> Option<u8> {
         if self.value == -1 {
@@ -40,7 +44,7 @@ macro_rules! formattings {
         ///
         /// There are two types of formattings, color and modifier. Color formattings
         /// are associated with a specific color, while modifier formattings modify the
-        /// style, such as by bolding the text. [`Self::RESET`] is a special formatting
+        /// style, such as by bolding the text. [`Self::Reset`] is a special formatting
         /// and is not classified as either of these two.
         #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug, serde::Serialize, serde::Deserialize)]
         #[serde(rename_all = "snake_case")]
@@ -95,10 +99,10 @@ macro_rules! formattings {
             /// Returns the color of the formatted text, or
             /// `None` if the formatting has no associated color.
             #[inline]
-            pub fn color_value(self) -> Option<Rgb> {
+            pub fn color_value(self) -> Option<RGB> {
                 match self {
                     $(
-                        Formatting::$i => $cv.map(Rgb::new),
+                        Formatting::$i => $cv.map(RGB::new),
                     )*
                 }
             }
@@ -148,18 +152,23 @@ formattings! {
     Reset => "RESET", 'r', false, -1, None,
 }
 
+/// An error returned when parsing a formatting.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    /// No matching color index found.
     #[error("no matching color index {0:?} found")]
     NoMatchingColorIndex(ColorIndex),
+    /// Invalid code.
     #[error("invalid code: {0}")]
     InvalidCode(char),
+    /// Invalid name.
     #[error("invalid name: {0}")]
     InvalidName(String),
 }
 
 impl Formatting {
-    const CODE_PREFIX: char = '§';
+    /// The prefix of formatting codes.
+    pub const CODE_PREFIX: char = '§';
 
     /// Returns `true` if the formatting is associated with
     /// a color, `false` otherwise.
@@ -173,7 +182,7 @@ impl Formatting {
     pub fn name(self) -> &'static str {
         static NAMING_MAP: Lazy<Vec<String>> = Lazy::new(|| {
             Formatting::values()
-                .into_iter()
+                .iter()
                 .map(|e| e.name_raw().to_ascii_lowercase())
                 .collect()
         });
@@ -189,6 +198,7 @@ impl Formatting {
     }
 }
 
+/// Sanitize a formatting name.
 #[inline]
 fn name_sanitize(name: &str) -> String {
     lazy_regex::regex_replace_all!("[^a-z]", &name.to_lowercase(), "").into_owned()
@@ -207,7 +217,7 @@ impl FromStr for Formatting {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         static NAME_MAP: Lazy<HashMap<String, Formatting>> = Lazy::new(|| {
             Formatting::values()
-                .into_iter()
+                .iter()
                 .map(|e| (name_sanitize(e.name_raw()), *e))
                 .collect()
         });
@@ -238,7 +248,7 @@ impl TryFrom<ColorIndex> for Formatting {
         } else {
             static CI_MAP: Lazy<HashMap<ColorIndex, Formatting>> = Lazy::new(|| {
                 Formatting::values()
-                    .into_iter()
+                    .iter()
                     .map(|e| (e.color_index(), *e))
                     .collect()
             });
@@ -257,7 +267,7 @@ impl TryFrom<char> for Formatting {
     fn try_from(value: char) -> Result<Self, Self::Error> {
         static CHAR_MAP: Lazy<HashMap<char, Formatting>> = Lazy::new(|| {
             Formatting::values()
-                .into_iter()
+                .iter()
                 .map(|e| (e.code(), *e))
                 .collect()
         });
@@ -269,6 +279,7 @@ impl TryFrom<char> for Formatting {
 }
 
 /// The iterator returned by [`Formatting::names`].
+#[derive(Debug)]
 pub struct Names {
     iter: std::slice::Iter<'static, Formatting>,
 }
@@ -283,16 +294,19 @@ impl Iterator for Names {
 }
 
 /// Item of [`Names`].
+#[derive(Debug)]
 pub struct Name {
     value: Formatting,
 }
 
 impl Name {
+    /// Returns whether the targeting formatting is a color.
     #[inline]
     pub fn is_color(&self) -> bool {
         self.value.is_color()
     }
 
+    /// Returns whether the targeting formatting is a modifier.
     #[inline]
     pub fn is_modifier(&self) -> bool {
         self.value.is_modifier()

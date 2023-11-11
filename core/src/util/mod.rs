@@ -1,7 +1,7 @@
-pub mod formatting;
+pub mod fmt;
 pub mod math;
 
-use formatting::Formatting;
+use fmt::Formatting;
 
 use std::{fmt::UpperHex, str::FromStr};
 
@@ -35,11 +35,11 @@ pub enum Hand {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
-pub struct Rgb {
+pub struct RGB {
     value: u32,
 }
 
-impl Rgb {
+impl RGB {
     #[inline]
     pub fn new(value: u32) -> Self {
         Self { value }
@@ -51,18 +51,18 @@ impl Rgb {
     }
 }
 
-impl UpperHex for Rgb {
+impl UpperHex for RGB {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:06X}", self.value)
     }
 }
 
-impl FromStr for Rgb {
+impl FromStr for RGB {
     type Err = std::num::ParseIntError;
 
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Rgb::new)
+        s.parse().map(RGB::new)
     }
 }
