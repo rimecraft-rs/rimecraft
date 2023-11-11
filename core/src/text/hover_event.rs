@@ -1,53 +1,58 @@
+use erased_serde::Deserializer;
 use once_cell::sync::Lazy;
-use parking_lot::RwLock;
+use rimecraft_freezer::Freezer;
 use serde::{Deserialize, Serialize};
 
-use rimecraft_event::Event;
-use rimecraft_primitives::{ErasedSerDeUpdate, SerDeUpdate};
+use rimecraft_primitives::ErasedSerDeUpdate;
 
 use std::{
     any::TypeId,
-    borrow::Cow,
-    collections::hash_map::DefaultHasher,
     collections::HashMap,
     fmt::Debug,
     hash::{Hash, Hasher},
-    marker::PhantomData,
 };
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("hover event action not registered: {0}")]
+    ActionNotRegistered(&'static str),
+}
 
 trait UpdDebug: ErasedSerDeUpdate + Debug {}
 impl<T> UpdDebug for T where T: ?Sized + ErasedSerDeUpdate + Debug {}
-
 erased_serde::serialize_trait_object!(UpdDebug);
 rimecraft_primitives::update_trait_object!(UpdDebug);
 
+/// Event performed when cursor is hovering on a `Text`.
 pub struct HoverEvent {
     contents: Box<dyn UpdDebug + Send + Sync>,
     action: &'static ErasedAction,
-
-    contents_hash: u64,
 }
 
 impl HoverEvent {
-    pub fn new<T>(action: &'static Action<T>, contents: T) -> Self
+    /// Creates a new event from given action and contents.
+    pub fn new<T>(action: &Action<T>, contents: T) -> Self
     where
         T: ErasedSerDeUpdate + Debug + Hash + Send + Sync + 'static,
     {
-        let mut hasher = DefaultHasher::new();
-        contents.hash(&mut hasher);
-
         Self {
             contents: Box::new(contents),
-            action: unsafe { std::mem::transmute(action) },
-            contents_hash: hasher.finish(),
+            action: ErasedAction::from_name(action.name)
+                .ok_or(Error::ActionNotRegistered(action.name))
+                .unwrap(),
         }
     }
 
+    /// Gets the action of this event, with type erased.
     #[inline]
     pub fn action(&self) -> &ErasedAction {
         self.action
     }
 
+    /// Gets the contents of this event from given type.
+    ///
+    /// If the type is correct, the return value will contain
+    /// contents of this event.
     pub fn value<T: 'static>(&self) -> Option<&T>
     where
         T: ErasedSerDeUpdate + Debug + Hash + Send + Sync,
@@ -60,22 +65,12 @@ impl HoverEvent {
     }
 }
 
-impl Hash for HoverEvent {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u64(self.contents_hash);
-        self.action.hash(state);
-    }
-}
-
 impl Debug for HoverEvent {
-    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "HoverEvent{{action={:?},value={:?}}}",
-            self.action, self.contents
-        )
+        f.debug_struct("HoverEvent")
+            .field("action", &self.action)
+            .field("value", &self.contents)
+            .finish()
     }
 }
 
@@ -108,11 +103,8 @@ impl Serialize for HoverEvent {
     }
 }
 
-impl SerDeUpdate for HoverEvent {
-    fn update<'de, D>(
-        &'de mut self,
-        deserializer: D,
-    ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+impl<'de> Deserialize<'de> for HoverEvent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -122,21 +114,36 @@ impl SerDeUpdate for HoverEvent {
             contents: serde_json::Value,
         }
 
+        //TODO: if `contents` is invalid, deserialize text from field `value`.
         let Struct { action, contents } = Struct::deserialize(deserializer)?;
 
-        self.action = action;
-        self.contents.update(contents).map_err(|err| {
-            use serde::de::Error;
-            D::Error::custom(err.to_string())
+        // Deserializing contents.
+        let mut contents_obj = (action.factory)();
+        use serde::de::Error;
+        contents_obj
+            .erased_update(&mut <dyn Deserializer>::erase(contents))
+            .map_err(D::Error::custom)?;
+
+        Ok(Self {
+            contents: contents_obj,
+            action,
         })
     }
 }
 
+/// Action of a [`HoverEvent`].
 pub struct Action<T> {
     name: &'static str,
     parsable: bool,
 
     factory: fn() -> T,
+}
+
+pub fn register_action<T: 'static>(action: Action<T>)
+where
+    T: ErasedSerDeUpdate + Debug + Send + Sync,
+{
+    ACTIONS.lock().insert(action.name, action.into());
 }
 
 impl<T> Hash for Action<T> {
@@ -145,14 +152,22 @@ impl<T> Hash for Action<T> {
     }
 }
 
+impl<T> Copy for Action<T> {}
+impl<T> Clone for Action<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+/// [`Action`] with type erased.
 pub struct ErasedAction {
     name: &'static str,
     parsable: bool,
 
     factory: Box<dyn Fn() -> Box<dyn UpdDebug + Send + Sync> + Send + Sync>,
-
+    /// [`TypeId`] of the target type.
     type_id: TypeId,
-    type_name: &'static str,
 }
 
 impl Hash for ErasedAction {
@@ -162,34 +177,27 @@ impl Hash for ErasedAction {
     }
 }
 
-/// An event to process actions on initialize.
-static HE_ACTIONS: RwLock<Event<dyn Fn(&mut Vec<ErasedAction>)>> =
-    RwLock::new(Event::new(|listeners| {
-        Box::new(move |actions| {
-            for listener in listeners {
-                listener(actions)
-            }
-        })
-    }));
-
-static HE_MAPPING: Lazy<HashMap<String, ErasedAction>> = Lazy::new(|| {
-    HE_ACTIONS.write().register(Box::new(|v| {
-        v.append(&mut vec![
-            //TODO: built-in actions
-        ]);
-    }));
-
-    let mut vec = Vec::new();
-    HE_ACTIONS.read().invoker()(&mut vec);
-    vec.into_iter().map(|v| (v.name().to_owned(), v)).collect()
-});
+static ACTIONS: Lazy<Freezer<HashMap<&'static str, ErasedAction>>> =
+    Lazy::new(|| Freezer::new(HashMap::new()));
 
 impl<T> Action<T> {
+    /// Creates a new action.
+    #[inline]
+    pub const fn new(name: &'static str, parsable: bool, constructor: fn() -> T) -> Self {
+        Self {
+            name,
+            parsable,
+            factory: constructor,
+        }
+    }
+
+    /// Name of this action.
     #[inline]
     pub fn name(&self) -> &str {
         self.name
     }
 
+    /// Whether this action is parsable.
     #[inline]
     pub fn is_parsable(&self) -> bool {
         self.parsable
@@ -197,23 +205,26 @@ impl<T> Action<T> {
 }
 
 impl ErasedAction {
+    /// Name of this action.
     #[inline]
     pub fn name(&self) -> &str {
         self.name
     }
 
+    /// Whether this action is parsable.
     #[inline]
     pub fn is_parsable(&self) -> bool {
         self.parsable
     }
 
+    /// Gets registered action from its name.
     #[inline]
     pub fn from_name(name: &str) -> Option<&'static Self> {
-        HE_MAPPING.get(name)
+        ACTIONS.get_or_freeze().get(name)
     }
 }
 
-impl<T> From<Action<T>> for ErasedAction
+impl<T: 'static> From<Action<T>> for ErasedAction
 where
     T: ErasedSerDeUpdate + Debug + Send + Sync,
 {
@@ -221,10 +232,18 @@ where
         Self {
             name: value.name,
             parsable: value.parsable,
-            factory: Box::new(|| Box::new((value.factory)())),
+            factory: Box::new(move || Box::new((value.factory)())),
             type_id: TypeId::of::<T>(),
-            type_name: std::any::type_name::<T>(),
         }
+    }
+}
+
+impl<'a, T: 'static> TryFrom<&'a Action<T>> for &'static ErasedAction {
+    type Error = Error;
+
+    #[inline]
+    fn try_from(value: &'a Action<T>) -> Result<Self, Self::Error> {
+        ErasedAction::from_name(value.name).ok_or(Error::ActionNotRegistered(value.name))
     }
 }
 
@@ -238,11 +257,10 @@ impl<T> Debug for Action<T> {
 }
 
 impl Debug for ErasedAction {
-    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HoverEventErasedAction")
+        f.debug_struct("ErasedHoverEventAction")
             .field("name", &self.name)
-            .field("type", &self.type_name)
+            .field("type", &self.type_id)
             .finish()
     }
 }
@@ -271,12 +289,11 @@ impl<'de> Deserialize<'de> for &'static ErasedAction {
         D: serde::Deserializer<'de>,
     {
         static VARIANTS: Lazy<Vec<&'static str>> =
-            Lazy::new(|| HE_MAPPING.iter().map(|v| v.0.as_str()).collect());
+            Lazy::new(|| ACTIONS.get_or_freeze().keys().copied().collect());
 
         let value = String::deserialize(deserializer)?;
 
         use serde::de::Error;
-        ErasedAction::from_name(&String::deserialize(deserializer)?)
-            .ok_or_else(|| D::Error::unknown_variant(&value, &VARIANTS))
+        ErasedAction::from_name(&value).ok_or_else(|| D::Error::unknown_variant(&value, &VARIANTS))
     }
 }

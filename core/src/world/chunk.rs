@@ -77,7 +77,7 @@ impl<'w> Section<'w> {
     pub fn from_biome_registry(biomes: &'w super::biome::SharedRegistry) -> Self {
         Self {
             block_state_container: palette::Container::from_initialize(
-                block::STATE_IDS.deref().deref(),
+                block::STATE_IDS.get_or_freeze(),
                 block::Block::default().default_state(),
                 palette::Provider::BlockState,
             ),
@@ -274,6 +274,8 @@ impl UpgradeData {
             |id| {
                 Some(
                     crate::registry::BLOCK
+                        .get()
+                        .unwrap()
                         .get_from_id(&Id::try_parse(id).ok()?)
                         .map(|e| e.1.deref().clone())
                         .unwrap_or_default(),
@@ -288,6 +290,8 @@ impl UpgradeData {
             |id| {
                 Some(
                     crate::registry::FLUID
+                        .get()
+                        .unwrap()
                         .get_from_id(&Id::try_parse(id).ok()?)
                         .map(|e| e.1.deref().clone())
                         .unwrap_or_default(),

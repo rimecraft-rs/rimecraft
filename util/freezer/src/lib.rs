@@ -26,7 +26,7 @@ where
 
     /// Freeze this instance with provided options.
     pub fn freeze(&self, opts: M::Opts) {
-        assert!(!self.is_freezed(), "cannot freeze a freezed freezer again");
+        assert!(!self.is_freezed(), "cannot freeze a freezed freezer");
 
         let _ = self
             .immutable
@@ -46,13 +46,26 @@ where
             inner: self.mutable.lock().unwrap(),
         }
     }
+
+    /// Gets the immutable instance.
+    #[inline]
+    pub fn get(&self) -> Option<&I> {
+        self.immutable.get()
+    }
 }
 
-impl<I, M: Freeze<I>> Deref for Freezer<I, M> {
-    type Target = I;
+impl<I, M> Freezer<I, M>
+where
+    M: Freeze<I>,
+    M::Opts: Default,
+{
+    /// Gets the immutable instance, or initialize it with
+    /// a default value.
+    pub fn get_or_freeze(&self) -> &I {
+        if !self.is_freezed() {
+            self.freeze(Default::default());
+        }
 
-    #[inline]
-    fn deref(&self) -> &Self::Target {
         self.immutable.get().unwrap()
     }
 }

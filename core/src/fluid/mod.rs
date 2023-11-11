@@ -54,7 +54,7 @@ impl Registration for Fluid {
 
 impl RegistryAccess for Fluid {
     fn registry() -> &'static crate::registry::Registry<Self> {
-        crate::registry::FLUID.deref()
+        crate::registry::FLUID.get().unwrap()
     }
 }
 
@@ -64,6 +64,8 @@ impl serde::Serialize for Fluid {
         S: serde::Serializer,
     {
         crate::registry::FLUID
+            .get()
+            .unwrap()
             .get_from_raw(self.id())
             .unwrap()
             .key()
@@ -78,9 +80,15 @@ impl<'de> serde::Deserialize<'de> for Fluid {
         D: serde::Deserializer<'de>,
     {
         let id = Id::deserialize(deserializer)?;
-        match crate::registry::FLUID.get_from_id(&id) {
+        match crate::registry::FLUID.get().unwrap().get_from_id(&id) {
             Some(e) => Ok(e.1.deref().clone()),
-            None => Ok(crate::registry::FLUID.default_entry().1.deref().clone()),
+            None => Ok(crate::registry::FLUID
+                .get()
+                .unwrap()
+                .default_entry()
+                .1
+                .deref()
+                .clone()),
         }
     }
 }
@@ -101,7 +109,13 @@ impl Hash for Fluid {
 
 impl Default for Fluid {
     fn default() -> Self {
-        crate::registry::FLUID.default_entry().1.deref().clone()
+        crate::registry::FLUID
+            .get()
+            .unwrap()
+            .default_entry()
+            .1
+            .deref()
+            .clone()
     }
 }
 
@@ -114,6 +128,8 @@ impl FluidState {
     /// Get block of this state.
     pub fn fluid(&self) -> Fluid {
         crate::registry::FLUID
+            .get()
+            .unwrap()
             .get_from_raw(self.fluid.load(std::sync::atomic::Ordering::Relaxed))
             .unwrap()
             .deref()

@@ -67,7 +67,7 @@ impl Registration for Block {
 
 impl RegistryAccess for Block {
     fn registry() -> &'static crate::registry::Registry<Self> {
-        crate::registry::BLOCK.deref()
+        crate::registry::BLOCK.get().unwrap()
     }
 }
 
@@ -83,6 +83,8 @@ impl serde::Serialize for Block {
         S: serde::Serializer,
     {
         crate::registry::BLOCK
+            .get()
+            .unwrap()
             .get_from_raw(self.index_of())
             .unwrap()
             .key()
@@ -97,19 +99,33 @@ impl<'de> serde::Deserialize<'de> for Block {
         D: serde::Deserializer<'de>,
     {
         let id = rimecraft_primitives::Id::deserialize(deserializer)?;
-        Ok(crate::registry::BLOCK.get_from_id(&id).map_or_else(
-            || {
-                tracing::debug!("Tried to load invalid block: {id}");
-                *crate::registry::BLOCK.default_entry().1.deref()
-            },
-            |e| *e.1.deref(),
-        ))
+        Ok(crate::registry::BLOCK
+            .get()
+            .unwrap()
+            .get_from_id(&id)
+            .map_or_else(
+                || {
+                    tracing::debug!("tried to load invalid block: {id}");
+                    *crate::registry::BLOCK
+                        .get()
+                        .unwrap()
+                        .default_entry()
+                        .1
+                        .deref()
+                },
+                |e| *e.1.deref(),
+            ))
     }
 }
 
 impl Default for Block {
     fn default() -> Self {
-        *crate::registry::BLOCK.default_entry().1.deref()
+        *crate::registry::BLOCK
+            .get()
+            .unwrap()
+            .default_entry()
+            .1
+            .deref()
     }
 }
 
@@ -138,6 +154,8 @@ impl BlockState {
     /// Get block of this state.
     pub fn block(&self) -> Block {
         *crate::registry::BLOCK
+            .get()
+            .unwrap()
             .get_from_raw(self.block.load(std::sync::atomic::Ordering::Relaxed))
             .unwrap()
             .deref()
