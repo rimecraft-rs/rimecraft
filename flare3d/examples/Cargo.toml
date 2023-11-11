@@ -3,7 +3,7 @@ name = "flare3d-example"
 version = "0.1.0"
 edition = "2021"
 authors = ["KrLite"]
-description = "Example of flare3d"
+description = "Example of Flare3d"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = ["game-development"]
@@ -13,6 +13,6 @@ maintenance = { status = "actively-developed" }
 
 [dependencies]
 flare3d = { path = "../" }
-winit = "0.28"
+winit = "0.29"
 wgpu = "0.18"
-futures = "0.3.29"
+futures-executor = "0.3"
