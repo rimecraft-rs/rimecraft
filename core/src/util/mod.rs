@@ -2,8 +2,9 @@ pub mod fmt;
 pub mod math;
 
 use fmt::Formatting;
+use serde::{Deserialize, Serialize};
 
-use std::{fmt::UpperHex, str::FromStr};
+use std::{fmt::UpperHex, ops::Deref, str::FromStr};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 #[repr(u8)]
@@ -64,5 +65,40 @@ impl FromStr for RGB {
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.parse().map(RGB::new)
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone, Copy)]
+pub struct Stringified<T>(pub T);
+
+impl<T> Deref for Stringified<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> Serialize for Stringified<T>
+where
+    T: ToString,
+{
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.0.to_string())
+    }
+}
+
+impl<'de, T> Deserialize<'de> for Stringified<T>
+where
+    T: FromStr,
+    <T as FromStr>::Err: std::fmt::Display,
+{
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+        String::deserialize(deserializer)?
+            .parse()
+            .map(Stringified)
+            .map_err(D::Error::custom)
     }
 }

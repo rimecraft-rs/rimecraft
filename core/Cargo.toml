@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 rimecraft-primitives = { path = "../primitives", features = [
     "serde",
-    "edcode"
+    "edcode",
 ] }
 rimecraft-caches = { path = "../util/caches", features = ["arc"] }
 rimecraft-collections = { path = "../util/collections", features = [
@@ -26,7 +26,7 @@ serde_json = "1.0"
 toml = "0.8"
 uuid = { version = "1.4", features = ["v3", "v4"] }
 md-5 = "0.10"
-url = "2.4"
+url = { version = "2.4", features = ["serde"] }
 sysinfo = "0.29"
 bytes = "1.4"
 glam = "0.24"

@@ -1,2 +1,1 @@
-pub trait Random {
-}
+pub trait Random {}

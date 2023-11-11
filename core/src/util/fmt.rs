@@ -1,6 +1,5 @@
 use std::{collections::HashMap, fmt::Display, ops::Deref, str::FromStr};
 
-use fastnbt::de;
 use once_cell::sync::Lazy;
 
 use super::RGB;

@@ -10,6 +10,7 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     hash::{Hash, Hasher},
+    sync::Arc,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -28,8 +29,9 @@ rimecraft_primitives::update_trait_object!(UpdDebug);
 /// # MCJE Reference
 ///
 /// This type represents `net.minecraft.text.HoverEvent` (yarn).
+#[derive(Clone)]
 pub struct HoverEvent {
-    contents: Box<dyn UpdDebug + Send + Sync>,
+    contents: Arc<dyn UpdDebug + Send + Sync>,
     action: &'static ErasedAction,
 }
 
@@ -40,7 +42,7 @@ impl HoverEvent {
         T: ErasedSerDeUpdate + Debug + Hash + Send + Sync + 'static,
     {
         Self {
-            contents: Box::new(contents),
+            contents: Arc::new(contents),
             action: ErasedAction::from_name(action.name)
                 .ok_or(Error::ActionNotRegistered(action.name))
                 .unwrap(),
@@ -129,7 +131,7 @@ impl<'de> Deserialize<'de> for HoverEvent {
             .map_err(D::Error::custom)?;
 
         Ok(Self {
-            contents: contents_obj,
+            contents: contents_obj.into(),
             action,
         })
     }
