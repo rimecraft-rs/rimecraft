@@ -2,12 +2,11 @@ use flare3d::state::State;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    keyboard::{Key, NamedKey},
     window::WindowBuilder,
 };
 
 fn main() {
-    let event_loop = EventLoop::new().unwrap();
+    let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     let mut state = futures::executor::block_on(State::new(&window));
 
@@ -20,10 +19,10 @@ fn main() {
                     match event {
                         WindowEvent::CloseRequested
                         | WindowEvent::KeyboardInput {
-                            event:
-                                KeyEvent {
+                            input:
+                                KeyboardInput {
                                     state: ElementState::Pressed,
-                                    logical_key: Key::Named(NamedKey::Escape),
+                                    virtual_keycode: Some(VirtualKeyCode::Escape),
                                     ..
                                 },
                             ..
