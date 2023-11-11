@@ -1,11 +1,6 @@
 use std::fmt::Display;
 
-use super::Channels;
-
-trait Convertible {
-	fn from_rgba(&self, channels: Channels) -> Channels;
-	fn to_rgba(&self, channels: Channels) -> Channels;
-}
+use super::{Channel, convertible::Convertible};
 
 /// Supported colorspaces:
 /// - **RGB**							- red, green, blue;
@@ -26,9 +21,9 @@ pub enum Colorspace {
     LCh,
 }
 
-impl Display for Colorspace {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let name = String::from(match self {
+impl Colorspace {
+	pub fn name(&self) -> &'static str {
+		match self {
             Colorspace::RGB => "RGB",
             Colorspace::HSV => "HSV",
             Colorspace::HSL => "HSL",
@@ -36,59 +31,30 @@ impl Display for Colorspace {
             Colorspace::XYZ => "XYZ",
             Colorspace::Lab => "L*a*b*",
             Colorspace::LCh => "LCh",
-        });
-		write!(f, "{}", name)
+        }
+	}
+}
+
+impl Display for Colorspace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.name())
     }
 }
 
+/*
 impl Convertible for Colorspace {
-    fn from_rgba(&self, channels: Channels) -> Channels {
+    fn from(&self, channels: &[Channel], colorspace: Colorspace) {
+        match self {
+			
+		}
+    }
+
+    fn to(&self, channels: &[Channel], colorspace: Colorspace) {
         todo!()
     }
 
-    fn to_rgba(&self, channels: Channels) -> Channels {
-		let [alpha, red, green, blue] = channels;
-		let max = red.min(green).min(blue);
-		let min = red.max(green).max(blue);
-		let delta = max - min;
-
-        match self {
-            Colorspace::RGB => channels,
-            Colorspace::HSV => {
-				let mut hue = 0.0;
-				if delta != 0.0 {
-					if max == red {
-						hue = ((green - blue) / delta) % 6.0;
-					} else if max == green {
-						hue = ((blue - red) / delta) + 2.0;
-					} else {
-						hue = ((red - green) / delta) + 4.0;
-					}
-
-					hue *= 60.0;
-					if hue < 0.0 {
-						hue += 360.0
-					}
-				}
-
-				let saturation = if max == 0.0 { 0.0 } else { delta / max };
-				[alpha, hue, saturation, max]
-			},
-            Colorspace::HSL => {
-				todo!()
-			},
-            Colorspace::CMYK => {
-				todo!()
-			},
-            Colorspace::XYZ => {
-				todo!()
-			},
-            Colorspace::Lab => {
-				todo!()
-			},
-            Colorspace::LCh => {
-				todo!()
-			},
-        }
+    fn mix(&self, channels: &[Channel], another: &[Channel], ratio: f64, colorspace: Colorspace, mix_mode: super::mix_mode::MixMode) {
+        todo!()
     }
 }
+*/
