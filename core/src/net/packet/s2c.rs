@@ -46,26 +46,23 @@ impl<'de> Decode<'de> for LoginCompression {
 
 impl<L> super::Packet<L> for LoginCompression where L: listener::Accept<Self> {}
 
-pub struct LoginDisconnect<T> {
-    reason: T,
+pub struct LoginDisconnect {
+    reason: Text,
 }
 
-impl<T> LoginDisconnect<T> {
+impl LoginDisconnect {
     #[inline]
-    pub fn new(reason: T) -> Self {
+    pub fn new(reason: Text) -> Self {
         Self { reason }
     }
 
     #[inline]
-    pub fn reason(&self) -> &T {
+    pub fn reason(&self) -> &Text {
         &self.reason
     }
 }
 
-impl<T> Encode for LoginDisconnect<T>
-where
-    T: Text,
-{
+impl Encode for LoginDisconnect {
     fn encode<B>(&self, _buf: &mut B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
@@ -74,10 +71,7 @@ where
     }
 }
 
-impl<'de, T> Decode<'de> for LoginDisconnect<T>
-where
-    T: Text,
-{
+impl<'de> Decode<'de> for LoginDisconnect {
     type Output = Self;
 
     fn decode<B>(_buf: &'de mut B) -> anyhow::Result<Self::Output>
@@ -88,12 +82,7 @@ where
     }
 }
 
-impl<L, T> super::Packet<L> for LoginDisconnect<T>
-where
-    L: listener::Accept<Self>,
-    T: Text,
-{
-}
+impl<L> super::Packet<L> for LoginDisconnect where L: listener::Accept<Self> {}
 
 pub struct LoginHello {
     server_id: String,
