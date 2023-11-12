@@ -1,5 +1,13 @@
+use cgmath::{
+    perspective, Deg, InnerSpace, Matrix4, Point3, Quaternion, Rad, Rotation, Rotation3,
+    SquareMatrix, Vector3,
+};
 use wgpu::util::DeviceExt;
-use winit::window::Window;
+use winit::{
+    event::{ElementState, KeyEvent, WindowEvent},
+    keyboard::{KeyCode, PhysicalKey},
+    window::Window,
+};
 
 use crate::texture;
 
@@ -55,19 +63,16 @@ const VERTICES: &[Vertex] = &[
 ];
 
 const INDICES: &[u16] = &[0, 1, 4, 1, 2, 4, 2, 3, 4];
-
-#[rustfmt::skip]
-pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 0.5, 0.0,
-    0.0, 0.0, 0.5, 1.0,
+const NUM_INSTANCES_PER_ROW: u32 = 10;
+const INSTANCE_DISPLACEMENT: Vector3<f32> = Vector3::new(
+    NUM_INSTANCES_PER_ROW as f32 * 0.5,
+    0.0,
+    NUM_INSTANCES_PER_ROW as f32 * 0.5,
 );
 
 struct Camera {
-    eye: cgmath::Point3<f32>,
-    target: cgmath::Point3<f32>,
-    up: cgmath::Vector3<f32>,
+    eye: Point3<f32>,
+    direction: Vector3<f32>,
     aspect: f32,
     fovy: f32,
     znear: f32,
@@ -75,11 +80,11 @@ struct Camera {
 }
 
 impl Camera {
-    fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
+    fn build_view_projection_matrix(&self) -> Matrix4<f32> {
+        let view = Matrix4::look_at_rh(self.eye, self.eye + self.direction, Vector3::unit_y());
+        let proj = perspective(Deg(self.fovy), self.aspect, self.znear, self.zfar);
 
-        OPENGL_TO_WGPU_MATRIX * proj * view
+        proj * view
     }
 }
 
@@ -91,14 +96,202 @@ struct CameraUniform {
 
 impl CameraUniform {
     fn new() -> Self {
-        use cgmath::SquareMatrix;
         Self {
-            view_proj: cgmath::Matrix4::identity().into(),
+            view_proj: Matrix4::identity().into(),
         }
     }
 
     fn update_view_proj(&mut self, camera: &Camera) {
         self.view_proj = camera.build_view_projection_matrix().into();
+    }
+}
+
+struct CameraController {
+    speed: f32,
+    forward: bool,
+    backward: bool,
+    strafe_left: bool,
+    strafe_right: bool,
+    fly: bool,
+    dive: bool,
+    turn_up: bool,
+    turn_down: bool,
+    turn_left: bool,
+    turn_right: bool,
+}
+
+impl CameraController {
+    fn new(speed: f32) -> Self {
+        Self {
+            speed,
+            forward: false,
+            backward: false,
+            strafe_left: false,
+            strafe_right: false,
+            fly: false,
+            dive: false,
+            turn_up: false,
+            turn_down: false,
+            turn_left: false,
+            turn_right: false,
+        }
+    }
+
+    fn process_events(&mut self, event: &WindowEvent) -> bool {
+        match event {
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        state,
+                        physical_key: PhysicalKey::Code(key_code),
+                        ..
+                    },
+                ..
+            } => {
+                let is_pressed = *state == ElementState::Pressed;
+                match key_code {
+                    KeyCode::KeyW => {
+                        self.forward = is_pressed;
+                        true
+                    }
+                    KeyCode::KeyS => {
+                        self.backward = is_pressed;
+                        true
+                    }
+                    KeyCode::KeyA => {
+                        self.strafe_left = is_pressed;
+                        true
+                    }
+                    KeyCode::KeyD => {
+                        self.strafe_right = is_pressed;
+                        true
+                    }
+                    KeyCode::Space => {
+                        self.fly = is_pressed;
+                        true
+                    }
+                    KeyCode::ShiftLeft | KeyCode::ShiftRight => {
+                        self.dive = is_pressed;
+                        true
+                    }
+                    KeyCode::ArrowUp => {
+                        self.turn_up = is_pressed;
+                        true
+                    }
+                    KeyCode::ArrowDown => {
+                        self.turn_down = is_pressed;
+                        true
+                    }
+                    KeyCode::ArrowLeft => {
+                        self.turn_left = is_pressed;
+                        true
+                    }
+                    KeyCode::ArrowRight => {
+                        self.turn_right = is_pressed;
+                        true
+                    }
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+
+    fn update_camera(&self, camera: &mut Camera) {
+        camera.direction = camera.direction.normalize();
+
+        let plane_normal = Vector3::<f32>::unit_y();
+        let forward = camera.direction - (camera.direction.dot(plane_normal) * plane_normal);
+        let forward_normal = forward.normalize();
+
+        if self.fly {
+            camera.eye += plane_normal * self.speed;
+        }
+        if self.dive {
+            camera.eye -= plane_normal * self.speed;
+        }
+
+        if self.forward {
+            camera.eye += forward_normal * self.speed;
+        }
+        if self.backward {
+            camera.eye -= forward_normal * self.speed;
+        }
+
+        let right_normal = forward_normal.cross(plane_normal).normalize();
+
+        if self.strafe_right {
+            camera.eye += right_normal * self.speed;
+        }
+        if self.strafe_left {
+            camera.eye -= right_normal * self.speed;
+        }
+
+		let rotation = 1.0;
+
+        if self.turn_right {
+            camera.direction = Quaternion::from_angle_y(Deg(-rotation)).rotate_vector(camera.direction);
+        }
+        if self.turn_left {
+            camera.direction = Quaternion::from_angle_y(Deg(rotation)).rotate_vector(camera.direction);
+        }
+        if self.turn_up {
+            camera.direction = Quaternion::from_axis_angle(right_normal, Deg(rotation)).rotate_vector(camera.direction);
+        }
+        if self.turn_down {
+            camera.direction = Quaternion::from_axis_angle(right_normal, Deg(-rotation)).rotate_vector(camera.direction);
+        }
+    }
+}
+
+struct Instance {
+    position: Vector3<f32>,
+    rotation: Quaternion<f32>,
+}
+
+impl Instance {
+    fn to_raw(&self) -> InstanceRaw {
+        InstanceRaw {
+            model: (Matrix4::from_translation(self.position) * Matrix4::from(self.rotation)).into(),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct InstanceRaw {
+    model: [[f32; 4]; 4],
+}
+
+impl InstanceRaw {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        use std::mem;
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 5,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 6,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
+                    shader_location: 7,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 12]>() as wgpu::BufferAddress,
+                    shader_location: 8,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+            ],
+        }
     }
 }
 
@@ -117,6 +310,9 @@ pub struct State {
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+    camera_controller: CameraController,
+    instances: Vec<Instance>,
+    instance_buffer: wgpu::Buffer,
 }
 
 impl State {
@@ -205,8 +401,7 @@ impl State {
 
         let camera = Camera {
             eye: (0.0, 1.0, 2.0).into(),
-            target: (0.0, 0.0, 0.0).into(),
-            up: cgmath::Vector3::unit_y(),
+            direction: Vector3::unit_x(),
             aspect: config.width as f32 / config.height as f32,
             fovy: 45.0,
             znear: 0.1,
@@ -215,6 +410,7 @@ impl State {
 
         let mut camera_uniform = CameraUniform::new();
         camera_uniform.update_view_proj(&camera);
+
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
             contents: bytemuck::cast_slice(&[camera_uniform]),
@@ -256,7 +452,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                buffers: &[Vertex::desc(), InstanceRaw::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -296,6 +492,38 @@ impl State {
             usage: wgpu::BufferUsages::INDEX,
         });
 
+        let camera_controller = CameraController::new(0.2);
+
+        let instances = (0..NUM_INSTANCES_PER_ROW)
+            .flat_map(|z| {
+                (0..NUM_INSTANCES_PER_ROW).map(move |x| {
+                    let position = Vector3 {
+                        x: x as f32,
+                        y: 0.0,
+                        z: z as f32,
+                    } - INSTANCE_DISPLACEMENT;
+
+                    let rotation = if position.magnitude().abs() <= std::f32::EPSILON {
+                        Quaternion::from_axis_angle(Vector3::unit_z(), Rad(0.0))
+                    } else {
+                        Quaternion::from_axis_angle(
+                            position.normalize(),
+                            Rad(std::f32::consts::FRAC_PI_4),
+                        )
+                    };
+
+                    Instance { position, rotation }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
         Self {
             size,
             surface,
@@ -311,6 +539,9 @@ impl State {
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            camera_controller,
+            instances,
+            instance_buffer,
         }
     }
 }
@@ -325,7 +556,15 @@ impl State {
         }
     }
 
-    pub fn update(&mut self) {}
+    pub fn update(&mut self) {
+        self.camera_controller.update_camera(&mut self.camera);
+        self.camera_uniform.update_view_proj(&self.camera);
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::cast_slice(&[self.camera_uniform]),
+        );
+    }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
@@ -362,14 +601,19 @@ impl State {
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
-            render_pass.draw_indexed(0..INDICES.len() as u32, 0, 0..1);
+            render_pass.draw_indexed(0..INDICES.len() as _, 0, 0..self.instances.len() as _);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
 
         Ok(())
+    }
+
+    pub fn input(&mut self, event: &WindowEvent) -> bool {
+        self.camera_controller.process_events(event)
     }
 }

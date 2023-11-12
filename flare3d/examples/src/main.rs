@@ -2,7 +2,7 @@ use flare3d::state::State;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    keyboard::{Key, NamedKey},
+    keyboard::{PhysicalKey, KeyCode},
     window::WindowBuilder,
 };
 
@@ -17,32 +17,37 @@ fn main() {
 
             match event {
                 Event::WindowEvent { window_id, event } if window_id == window.id() => {
-                    match event {
-                        WindowEvent::CloseRequested
-                        | WindowEvent::KeyboardInput {
-                            event:
-                                KeyEvent {
-                                    state: ElementState::Pressed,
-                                    logical_key: Key::Named(NamedKey::Escape),
-                                    ..
-                                },
-                            ..
-                        } => target.exit(),
-                        WindowEvent::Resized(physical_size) => {
-                            state.resize(physical_size);
-                        }
-                        WindowEvent::RedrawRequested => {
-                            state.update();
-                            match state.render() {
-                                Ok(_) => {}
-                                Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
-                                Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
-                                Err(e) => eprintln!("{:?}", e),
+                    if !state.input(&event) {
+                        match event {
+                            WindowEvent::CloseRequested
+                            | WindowEvent::KeyboardInput {
+                                event:
+                                    KeyEvent {
+                                        state: ElementState::Pressed,
+                                        physical_key: PhysicalKey::Code(KeyCode::Escape),
+                                        ..
+                                    },
+                                ..
+                            } => target.exit(),
+                            WindowEvent::Resized(physical_size) => {
+                                state.resize(physical_size);
                             }
+                            WindowEvent::RedrawRequested => {
+                                state.update();
+                                match state.render() {
+                                    Ok(_) => {}
+                                    Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
+                                    Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
+                                    Err(e) => eprintln!("{:?}", e),
+                                }
+                            },
+                            _ => (),
                         }
-                        _ => (),
                     }
                 }
+				Event::AboutToWait => {
+					window.request_redraw();
+				}
                 _ => (),
             }
         })
