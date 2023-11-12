@@ -1,19 +1,23 @@
 use std::{
     borrow::Cow,
-    fmt::Display,
+    fmt::{Debug, Display},
     hash::{Hash, Hasher},
     path::PathBuf,
     str::FromStr,
+    sync::Arc,
 };
 
-use rimecraft_primitives::{id, Id};
+use rimecraft_primitives::{combine_traits, id, Id};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::{Stringified, RGB};
 
+use visit::{ErasedVisit, ErasedVisitStyled};
+
 use super::fmt::Formatting;
 
+pub mod content;
 pub mod visit;
 
 /// An error that can occur when processing a [`Text`].
@@ -31,10 +35,53 @@ pub enum Error {
     InvalidName(String),
 }
 
+combine_traits! {
+    trait ErasedContentDeb: ErasedVisit, ErasedVisitStyled, Debug
+}
+
 #[derive(Debug)]
 pub struct Text {
+    content: Arc<dyn ErasedContentDeb + Send + Sync>,
     sibs: Vec<Self>,
     style: Style,
+}
+
+impl Text {
+    #[inline]
+    pub fn siblings(&self) -> &[Self] {
+        &self.sibs
+    }
+
+    #[inline]
+    pub fn siblings_mut(&mut self) -> &mut [Self] {
+        &mut self.sibs
+    }
+
+    #[inline]
+    pub fn style(&self) -> &Style {
+        &self.style
+    }
+
+    #[inline]
+    pub fn set_style(&mut self, style: Style) {
+        self.style = style;
+    }
+
+    #[inline]
+    pub fn push(&mut self, value: Self) {
+        self.sibs.push(value)
+    }
+
+    pub fn styled<F>(&mut self, f: F)
+    where
+        F: FnOnce(Style) -> Style,
+    {
+        self.style = f(std::mem::take(&mut self.style))
+    }
+
+    pub fn fill_style(&mut self, style_override: Style) {
+        self.style = style_override.with_parent(std::mem::take(&mut self.style));
+    }
 }
 
 /// The style of a [`Text`], representing cosmetic attributes.
@@ -45,7 +92,7 @@ pub struct Text {
 /// # MCJE Reference
 ///
 /// This type represents `net.minecraft.text.Style` (yarn).
-#[derive(Clone, PartialEq, Debug, Default, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Default, Deserialize)]
 pub struct Style {
     /// The color of this style.
     #[serde(default)]

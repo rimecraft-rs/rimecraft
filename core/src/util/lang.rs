@@ -1,3 +1,4 @@
+/// Represents a language.
 pub trait Lang {
     /// Returns the translation of given translation key and
     /// fallback language if translation is not found.
