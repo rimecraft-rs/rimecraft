@@ -1,7 +1,4 @@
-use cgmath::{
-    perspective, Deg, InnerSpace, Matrix4, Point3, Quaternion, Rad, Rotation, Rotation3,
-    SquareMatrix, Vector3,
-};
+use glam::{Vec3, Mat4, Quat};
 use wgpu::util::DeviceExt;
 use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
@@ -64,15 +61,15 @@ const VERTICES: &[Vertex] = &[
 
 const INDICES: &[u16] = &[0, 1, 4, 1, 2, 4, 2, 3, 4];
 const NUM_INSTANCES_PER_ROW: u32 = 10;
-const INSTANCE_DISPLACEMENT: Vector3<f32> = Vector3::new(
+const INSTANCE_DISPLACEMENT: Vec3 = Vec3::new(
     NUM_INSTANCES_PER_ROW as f32 * 0.5,
     0.0,
     NUM_INSTANCES_PER_ROW as f32 * 0.5,
 );
 
 struct Camera {
-    eye: Point3<f32>,
-    direction: Vector3<f32>,
+    eye: Vec3,
+    direction: Vec3,
     aspect: f32,
     fovy: f32,
     znear: f32,
@@ -80,9 +77,9 @@ struct Camera {
 }
 
 impl Camera {
-    fn build_view_projection_matrix(&self) -> Matrix4<f32> {
-        let view = Matrix4::look_at_rh(self.eye, self.eye + self.direction, Vector3::unit_y());
-        let proj = perspective(Deg(self.fovy), self.aspect, self.znear, self.zfar);
+    fn build_view_projection_matrix(&self) -> Mat4 {
+        let view = Mat4::look_at_rh(self.eye, self.eye + self.direction, Vec3::Y);
+        let proj = Mat4::perspective_rh(self.fovy.to_radians(), self.aspect, self.znear, self.zfar);
 
         proj * view
     }
@@ -97,12 +94,12 @@ struct CameraUniform {
 impl CameraUniform {
     fn new() -> Self {
         Self {
-            view_proj: Matrix4::identity().into(),
+            view_proj: Mat4::IDENTITY.to_cols_array_2d(),
         }
     }
 
     fn update_view_proj(&mut self, camera: &Camera) {
-        self.view_proj = camera.build_view_projection_matrix().into();
+        self.view_proj = camera.build_view_projection_matrix().to_cols_array_2d();
     }
 }
 
@@ -200,7 +197,7 @@ impl CameraController {
     fn update_camera(&self, camera: &mut Camera) {
         camera.direction = camera.direction.normalize();
 
-        let plane_normal = Vector3::<f32>::unit_y();
+        let plane_normal = Vec3::Y;
         let forward = camera.direction - (camera.direction.dot(plane_normal) * plane_normal);
         let forward_normal = forward.normalize();
 
@@ -227,32 +224,32 @@ impl CameraController {
             camera.eye -= right_normal * self.speed;
         }
 
-		let rotation = 1.0;
+		let rotation = 1.0_f32.to_radians();
 
         if self.turn_right {
-            camera.direction = Quaternion::from_angle_y(Deg(-rotation)).rotate_vector(camera.direction);
+            camera.direction = Quat::from_rotation_y(-rotation) * camera.direction;
         }
         if self.turn_left {
-            camera.direction = Quaternion::from_angle_y(Deg(rotation)).rotate_vector(camera.direction);
+            camera.direction = Quat::from_rotation_y(rotation) * camera.direction;
         }
         if self.turn_up {
-            camera.direction = Quaternion::from_axis_angle(right_normal, Deg(rotation)).rotate_vector(camera.direction);
+            camera.direction = Quat::from_axis_angle(right_normal, rotation) * camera.direction;
         }
         if self.turn_down {
-            camera.direction = Quaternion::from_axis_angle(right_normal, Deg(-rotation)).rotate_vector(camera.direction);
+            camera.direction = Quat::from_axis_angle(right_normal, -rotation) * camera.direction;
         }
     }
 }
 
 struct Instance {
-    position: Vector3<f32>,
-    rotation: Quaternion<f32>,
+    position: Vec3,
+    rotation: Quat,
 }
 
 impl Instance {
     fn to_raw(&self) -> InstanceRaw {
         InstanceRaw {
-            model: (Matrix4::from_translation(self.position) * Matrix4::from(self.rotation)).into(),
+            model: (Mat4::from_translation(self.position) * Mat4::from_quat(self.rotation)).to_cols_array_2d(),
         }
     }
 }
@@ -401,7 +398,7 @@ impl State {
 
         let camera = Camera {
             eye: (0.0, 1.0, 2.0).into(),
-            direction: Vector3::unit_x(),
+            direction: Vec3::X,
             aspect: config.width as f32 / config.height as f32,
             fovy: 45.0,
             znear: 0.1,
@@ -497,18 +494,18 @@ impl State {
         let instances = (0..NUM_INSTANCES_PER_ROW)
             .flat_map(|z| {
                 (0..NUM_INSTANCES_PER_ROW).map(move |x| {
-                    let position = Vector3 {
+                    let position = Vec3 {
                         x: x as f32,
                         y: 0.0,
                         z: z as f32,
                     } - INSTANCE_DISPLACEMENT;
 
-                    let rotation = if position.magnitude().abs() <= std::f32::EPSILON {
-                        Quaternion::from_axis_angle(Vector3::unit_z(), Rad(0.0))
+                    let rotation = if position.length().abs() <= std::f32::EPSILON {
+                        Quat::from_axis_angle(Vec3::Z, 0.0)
                     } else {
-                        Quaternion::from_axis_angle(
+                        Quat::from_axis_angle(
                             position.normalize(),
-                            Rad(std::f32::consts::FRAC_PI_4),
+                            std::f32::consts::FRAC_PI_4,
                         )
                     };
 
