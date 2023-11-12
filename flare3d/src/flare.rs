@@ -1,2 +1,1 @@
-pub struct Flare {
-}
+pub struct Flare {}
