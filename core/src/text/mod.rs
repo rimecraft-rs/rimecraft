@@ -180,27 +180,31 @@ impl Hash for Text {
 }
 
 impl Visit<()> for Text {
-    fn visit<V: visit::Visitor<()>>(&self, mut visitor: V) -> Option<()> {
+    fn visit<V: visit::Visitor<()> + ?Sized>(&self, mut visitor: &mut V) -> Option<()> {
         if visit::ErasedVisit::visit(&*self.content, &mut visitor).is_some() {
             Some(())
         } else {
             self.sibs
                 .iter()
-                .find(|text| visit::Visit::visit(*text, &mut visitor).is_some())
+                .find(|text| visit::Visit::visit(*text, visitor).is_some())
                 .map(|_| ())
         }
     }
 }
 
 impl StyledVisit<Style> for Text {
-    fn visit<V: visit::StyleVisitor<Style>>(&self, mut visitor: V, style: &Style) -> Option<Style> {
+    fn visit<V: visit::StyleVisitor<Style> + ?Sized>(
+        &self,
+        mut visitor: &mut V,
+        style: &Style,
+    ) -> Option<Style> {
         let style2 = self.style.clone().with_parent(style.clone());
         if let Some(value) = visit::ErasedVisitStyled::visit(&*self.content, &mut visitor, &style2)
         {
             Some(value)
         } else {
             for text in &self.sibs {
-                if let Some(value) = visit::StyledVisit::visit(text, &mut visitor, &style2) {
+                if let Some(value) = visit::StyledVisit::visit(text, visitor, &style2) {
                     return Some(value);
                 }
             }
@@ -221,7 +225,7 @@ impl Display for Text {
             }
         }
 
-        visit::Visit::visit(self, Vis { f });
+        visit::Visit::visit(self, &mut Vis { f });
         Ok(())
     }
 }

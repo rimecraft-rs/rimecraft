@@ -7,18 +7,18 @@ pub trait Visit<T> {
     /// Supplies this visitable's literal content to the visitor.
     /// Returns `None` if the visit finished, or a terminating
     /// result from the visitor.
-    fn visit<V: Visitor<T>>(&self, visitor: V) -> Option<T>;
+    fn visit<V: Visitor<T> + ?Sized>(&self, visitor: &mut V) -> Option<T>;
 }
 
 macro_rules! erased_text_visit {
     ($($v:vis trait $n:ident, $t:ty => $vi:ty);+) => {
-        $($v trait $n { fn visit(&self, visitor: $vi) -> Option<$t>; }
-        impl<T: Visit<$t>> $n for T { #[inline] fn visit(&self, visitor: $vi) -> Option<$t> { Visit::visit(self, visitor) } })+
+        $($v trait $n { fn visit(&self, visitor: &mut $vi) -> Option<$t>; }
+        impl<T: Visit<$t>> $n for T { #[inline] fn visit(&self, visitor: &mut $vi) -> Option<$t> { Visit::visit(self, visitor) } })+
     };
 }
 
 erased_text_visit! {
-    pub trait ErasedVisit, () => &mut dyn Visitor<()>
+    pub trait ErasedVisit, () => dyn Visitor<()>
 }
 
 /// Creates a `Visit` from a plain string.
@@ -33,18 +33,18 @@ pub trait StyledVisit<T> {
     /// to the visitor.
     /// Returns `None` if the visit finished, or a terminating
     /// result from the visitor.
-    fn visit<V: StyleVisitor<T>>(&self, visitor: V, style: &Style) -> Option<T>;
+    fn visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T>;
 }
 
 macro_rules! erased_text_styled_visit {
     ($($v:vis trait $n:ident, $t:ty => $vi:ty);+) => {
-        $($v trait $n { fn visit(&self, visitor: $vi, style: &Style) -> Option<$t>; }
-        impl<T: StyledVisit<$t>> $n for T { #[inline] fn visit(&self, visitor: $vi, style: &Style) -> Option<$t> { StyledVisit::visit(self, visitor, style) } })+
+        $($v trait $n { fn visit(&self, visitor: &mut $vi, style: &Style) -> Option<$t>; }
+        impl<T: StyledVisit<$t>> $n for T { #[inline] fn visit(&self, visitor: &mut $vi, style: &Style) -> Option<$t> { StyledVisit::visit(self, visitor, style) } })+
     };
 }
 
 erased_text_styled_visit! {
-    pub trait ErasedVisitStyled, Style => &mut dyn StyleVisitor<Style>
+    pub trait ErasedVisitStyled, Style => dyn StyleVisitor<Style>
 }
 
 /// Creates a `Visit` from a plain string and a root style.
@@ -54,13 +54,13 @@ pub fn styled(s: &str, style: Style) -> Styled<'_> {
 }
 
 impl<T> Visit<T> for () {
-    fn visit<V: Visitor<T>>(&self, _: V) -> Option<T> {
+    fn visit<V: Visitor<T> + ?Sized>(&self, _: &mut V) -> Option<T> {
         None
     }
 }
 
 impl<T> StyledVisit<T> for () {
-    fn visit<V: StyleVisitor<T>>(&self, _: V, _: &Style) -> Option<T> {
+    fn visit<V: StyleVisitor<T> + ?Sized>(&self, _: &mut V, _: &Style) -> Option<T> {
         None
     }
 }
@@ -109,13 +109,13 @@ where
 pub struct Plain<'a>(Cow<'a, str>);
 
 impl<'a, T> Visit<T> for Plain<'a> {
-    fn visit<V: Visitor<T>>(&self, mut visitor: V) -> Option<T> {
+    fn visit<V: Visitor<T> + ?Sized>(&self, visitor: &mut V) -> Option<T> {
         visitor.accept(&self.0)
     }
 }
 
 impl<'a, T> StyledVisit<T> for Plain<'a> {
-    fn visit<V: StyleVisitor<T>>(&self, mut visitor: V, style: &Style) -> Option<T> {
+    fn visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T> {
         visitor.accept(style, &self.0)
     }
 }
@@ -124,13 +124,13 @@ impl<'a, T> StyledVisit<T> for Plain<'a> {
 pub struct Styled<'a>(Cow<'a, str>, Style);
 
 impl<'a, T> Visit<T> for Styled<'a> {
-    fn visit<V: Visitor<T>>(&self, mut visitor: V) -> Option<T> {
+    fn visit<V: Visitor<T> + ?Sized>(&self, visitor: &mut V) -> Option<T> {
         visitor.accept(&self.0)
     }
 }
 
 impl<'a, T> StyledVisit<T> for Styled<'a> {
-    fn visit<V: StyleVisitor<T>>(&self, mut visitor: V, style: &Style) -> Option<T> {
+    fn visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T> {
         visitor.accept(&self.1.clone().with_parent(style.clone()), &self.0)
     }
 }
