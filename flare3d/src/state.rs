@@ -1,4 +1,7 @@
-use cgmath::{InnerSpace, Rad, Rotation3, SquareMatrix};
+use cgmath::{
+    perspective, Deg, InnerSpace, Matrix4, Point3, Quaternion, Rad, Rotation, Rotation3,
+    SquareMatrix, Vector3,
+};
 use wgpu::util::DeviceExt;
 use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
@@ -61,16 +64,15 @@ const VERTICES: &[Vertex] = &[
 
 const INDICES: &[u16] = &[0, 1, 4, 1, 2, 4, 2, 3, 4];
 const NUM_INSTANCES_PER_ROW: u32 = 10;
-const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
+const INSTANCE_DISPLACEMENT: Vector3<f32> = Vector3::new(
     NUM_INSTANCES_PER_ROW as f32 * 0.5,
     0.0,
     NUM_INSTANCES_PER_ROW as f32 * 0.5,
 );
 
 struct Camera {
-    eye: cgmath::Point3<f32>,
-    target: cgmath::Point3<f32>,
-    up: cgmath::Vector3<f32>,
+    eye: Point3<f32>,
+    direction: Vector3<f32>,
     aspect: f32,
     fovy: f32,
     znear: f32,
@@ -78,9 +80,9 @@ struct Camera {
 }
 
 impl Camera {
-    fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
+    fn build_view_projection_matrix(&self) -> Matrix4<f32> {
+        let view = Matrix4::look_at_rh(self.eye, self.eye + self.direction, Vector3::unit_y());
+        let proj = perspective(Deg(self.fovy), self.aspect, self.znear, self.zfar);
 
         proj * view
     }
@@ -95,7 +97,7 @@ struct CameraUniform {
 impl CameraUniform {
     fn new() -> Self {
         Self {
-            view_proj: cgmath::Matrix4::identity().into(),
+            view_proj: Matrix4::identity().into(),
         }
     }
 
@@ -106,20 +108,32 @@ impl CameraUniform {
 
 struct CameraController {
     speed: f32,
-    is_forward_pressed: bool,
-    is_backward_pressed: bool,
-    is_left_pressed: bool,
-    is_right_pressed: bool,
+    forward: bool,
+    backward: bool,
+    strafe_left: bool,
+    strafe_right: bool,
+    fly: bool,
+    dive: bool,
+    turn_up: bool,
+    turn_down: bool,
+    turn_left: bool,
+    turn_right: bool,
 }
 
 impl CameraController {
     fn new(speed: f32) -> Self {
         Self {
             speed,
-            is_forward_pressed: false,
-            is_backward_pressed: false,
-            is_left_pressed: false,
-            is_right_pressed: false,
+            forward: false,
+            backward: false,
+            strafe_left: false,
+            strafe_right: false,
+            fly: false,
+            dive: false,
+            turn_up: false,
+            turn_down: false,
+            turn_left: false,
+            turn_right: false,
         }
     }
 
@@ -136,20 +150,44 @@ impl CameraController {
             } => {
                 let is_pressed = *state == ElementState::Pressed;
                 match key_code {
-                    KeyCode::KeyW | KeyCode::ArrowUp => {
-                        self.is_forward_pressed = is_pressed;
+                    KeyCode::KeyW => {
+                        self.forward = is_pressed;
                         true
                     }
-                    KeyCode::KeyA | KeyCode::ArrowLeft => {
-                        self.is_left_pressed = is_pressed;
+                    KeyCode::KeyS => {
+                        self.backward = is_pressed;
                         true
                     }
-                    KeyCode::KeyS | KeyCode::ArrowDown => {
-                        self.is_backward_pressed = is_pressed;
+                    KeyCode::KeyA => {
+                        self.strafe_left = is_pressed;
                         true
                     }
-                    KeyCode::KeyD | KeyCode::ArrowRight => {
-                        self.is_right_pressed = is_pressed;
+                    KeyCode::KeyD => {
+                        self.strafe_right = is_pressed;
+                        true
+                    }
+                    KeyCode::Space => {
+                        self.fly = is_pressed;
+                        true
+                    }
+                    KeyCode::ShiftLeft | KeyCode::ShiftRight => {
+                        self.dive = is_pressed;
+                        true
+                    }
+                    KeyCode::ArrowUp => {
+                        self.turn_up = is_pressed;
+                        true
+                    }
+                    KeyCode::ArrowDown => {
+                        self.turn_down = is_pressed;
+                        true
+                    }
+                    KeyCode::ArrowLeft => {
+                        self.turn_left = is_pressed;
+                        true
+                    }
+                    KeyCode::ArrowRight => {
+                        self.turn_right = is_pressed;
                         true
                     }
                     _ => false,
@@ -160,42 +198,61 @@ impl CameraController {
     }
 
     fn update_camera(&self, camera: &mut Camera) {
-        let forward = camera.target - camera.eye;
-        let forward_norm = forward.normalize();
-        let forward_mag = forward.magnitude();
+        camera.direction = camera.direction.normalize();
 
-        if self.is_forward_pressed && forward_mag > self.speed {
-            camera.eye += forward_norm * self.speed;
+        let plane_normal = Vector3::<f32>::unit_y();
+        let forward = camera.direction - (camera.direction.dot(plane_normal) * plane_normal);
+        let forward_normal = forward.normalize();
+
+        if self.fly {
+            camera.eye += plane_normal * self.speed;
         }
-        if self.is_backward_pressed {
-            camera.eye -= forward_norm * self.speed;
+        if self.dive {
+            camera.eye -= plane_normal * self.speed;
         }
 
-        let right = forward_norm.cross(camera.up);
-
-        let forward = camera.target - camera.eye;
-        let forward_mag = forward.magnitude();
-
-        if self.is_right_pressed {
-            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
+        if self.forward {
+            camera.eye += forward_normal * self.speed;
         }
-        if self.is_left_pressed {
-            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
+        if self.backward {
+            camera.eye -= forward_normal * self.speed;
+        }
+
+        let right_normal = forward_normal.cross(plane_normal).normalize();
+
+        if self.strafe_right {
+            camera.eye += right_normal * self.speed;
+        }
+        if self.strafe_left {
+            camera.eye -= right_normal * self.speed;
+        }
+
+		let rotation = 1.0;
+
+        if self.turn_right {
+            camera.direction = Quaternion::from_angle_y(Deg(-rotation)).rotate_vector(camera.direction);
+        }
+        if self.turn_left {
+            camera.direction = Quaternion::from_angle_y(Deg(rotation)).rotate_vector(camera.direction);
+        }
+        if self.turn_up {
+            camera.direction = Quaternion::from_axis_angle(right_normal, Deg(rotation)).rotate_vector(camera.direction);
+        }
+        if self.turn_down {
+            camera.direction = Quaternion::from_axis_angle(right_normal, Deg(-rotation)).rotate_vector(camera.direction);
         }
     }
 }
 
 struct Instance {
-    position: cgmath::Vector3<f32>,
-    rotation: cgmath::Quaternion<f32>,
+    position: Vector3<f32>,
+    rotation: Quaternion<f32>,
 }
 
 impl Instance {
     fn to_raw(&self) -> InstanceRaw {
         InstanceRaw {
-            model: (cgmath::Matrix4::from_translation(self.position)
-                * cgmath::Matrix4::from(self.rotation))
-            .into(),
+            model: (Matrix4::from_translation(self.position) * Matrix4::from(self.rotation)).into(),
         }
     }
 }
@@ -344,8 +401,7 @@ impl State {
 
         let camera = Camera {
             eye: (0.0, 1.0, 2.0).into(),
-            target: (0.0, 0.0, 0.0).into(),
-            up: cgmath::Vector3::unit_y(),
+            direction: Vector3::unit_x(),
             aspect: config.width as f32 / config.height as f32,
             fovy: 45.0,
             znear: 0.1,
@@ -441,16 +497,16 @@ impl State {
         let instances = (0..NUM_INSTANCES_PER_ROW)
             .flat_map(|z| {
                 (0..NUM_INSTANCES_PER_ROW).map(move |x| {
-                    let position = cgmath::Vector3 {
+                    let position = Vector3 {
                         x: x as f32,
                         y: 0.0,
                         z: z as f32,
                     } - INSTANCE_DISPLACEMENT;
 
                     let rotation = if position.magnitude().abs() <= std::f32::EPSILON {
-                        cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), Rad(0.0))
+                        Quaternion::from_axis_angle(Vector3::unit_z(), Rad(0.0))
                     } else {
-                        cgmath::Quaternion::from_axis_angle(
+                        Quaternion::from_axis_angle(
                             position.normalize(),
                             Rad(std::f32::consts::FRAC_PI_4),
                         )
@@ -484,8 +540,8 @@ impl State {
             camera_buffer,
             camera_bind_group,
             camera_controller,
-			instances,
-			instance_buffer,
+            instances,
+            instance_buffer,
         }
     }
 }
@@ -545,7 +601,7 @@ impl State {
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-			render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
             render_pass.draw_indexed(0..INDICES.len() as _, 0, 0..self.instances.len() as _);
