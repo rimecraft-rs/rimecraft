@@ -1,3 +1,6 @@
-use super::visit::{StyledVisit, Visit};
+use super::{
+    visit::{StyledVisit, Visit},
+    Style,
+};
 
-pub trait Content: Visit + StyledVisit {}
+pub trait Content: Visit<()> + StyledVisit<Style> {}

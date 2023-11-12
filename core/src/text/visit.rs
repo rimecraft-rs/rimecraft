@@ -3,17 +3,17 @@ use std::borrow::Cow;
 use super::Style;
 
 /// Types that can supply strings to a [`Visitor`].
-pub trait Visit {
+pub trait Visit<T> {
     /// Supplies this visitable's literal content to the visitor.
     /// Returns `None` if the visit finished, or a terminating
     /// result from the visitor.
-    fn visit<T, V: Visitor<T>>(&self, visitor: V) -> Option<T>;
+    fn visit<V: Visitor<T>>(&self, visitor: V) -> Option<T>;
 }
 
 macro_rules! erased_text_visit {
     ($($v:vis trait $n:ident, $t:ty => $vi:ty);+) => {
         $($v trait $n { fn visit(&self, visitor: $vi) -> Option<$t>; }
-        impl<T: Visit> $n for T { #[inline] fn visit(&self, visitor: $vi) -> Option<$t> { Visit::visit(self, visitor) } })+
+        impl<T: Visit<$t>> $n for T { #[inline] fn visit(&self, visitor: $vi) -> Option<$t> { Visit::visit(self, visitor) } })+
     };
 }
 
@@ -28,18 +28,18 @@ pub fn plain(s: &str) -> Plain<'_> {
 }
 
 /// Types that can supply strings to a [`StyleVisitor`] with a style context.
-pub trait StyledVisit {
+pub trait StyledVisit<T> {
     /// Supplies this visitable's literal content and contextual style
     /// to the visitor.
     /// Returns `None` if the visit finished, or a terminating
     /// result from the visitor.
-    fn visit<T, V: StyleVisitor<T>>(&self, visitor: V, style: &Style) -> Option<T>;
+    fn visit<V: StyleVisitor<T>>(&self, visitor: V, style: &Style) -> Option<T>;
 }
 
 macro_rules! erased_text_styled_visit {
     ($($v:vis trait $n:ident, $t:ty => $vi:ty);+) => {
         $($v trait $n { fn visit(&self, visitor: $vi, style: &Style) -> Option<$t>; }
-        impl<T: StyledVisit> $n for T { #[inline] fn visit(&self, visitor: $vi, style: &Style) -> Option<$t> { StyledVisit::visit(self, visitor, style) } })+
+        impl<T: StyledVisit<$t>> $n for T { #[inline] fn visit(&self, visitor: $vi, style: &Style) -> Option<$t> { StyledVisit::visit(self, visitor, style) } })+
     };
 }
 
@@ -53,14 +53,14 @@ pub fn styled(s: &str, style: Style) -> Styled<'_> {
     Styled(Cow::Borrowed(s), style)
 }
 
-impl Visit for () {
-    fn visit<T, V: Visitor<T>>(&self, _: V) -> Option<T> {
+impl<T> Visit<T> for () {
+    fn visit<V: Visitor<T>>(&self, _: V) -> Option<T> {
         None
     }
 }
 
-impl StyledVisit for () {
-    fn visit<T, V: StyleVisitor<T>>(&self, _: V, _: &Style) -> Option<T> {
+impl<T> StyledVisit<T> for () {
+    fn visit<V: StyleVisitor<T>>(&self, _: V, _: &Style) -> Option<T> {
         None
     }
 }
@@ -108,14 +108,14 @@ where
 /// The `Visit` returned from [`plain`].
 pub struct Plain<'a>(Cow<'a, str>);
 
-impl<'a> Visit for Plain<'a> {
-    fn visit<T, V: Visitor<T>>(&self, mut visitor: V) -> Option<T> {
+impl<'a, T> Visit<T> for Plain<'a> {
+    fn visit<V: Visitor<T>>(&self, mut visitor: V) -> Option<T> {
         visitor.accept(&self.0)
     }
 }
 
-impl<'a> StyledVisit for Plain<'a> {
-    fn visit<T, V: StyleVisitor<T>>(&self, mut visitor: V, style: &Style) -> Option<T> {
+impl<'a, T> StyledVisit<T> for Plain<'a> {
+    fn visit<V: StyleVisitor<T>>(&self, mut visitor: V, style: &Style) -> Option<T> {
         visitor.accept(style, &self.0)
     }
 }
@@ -123,14 +123,14 @@ impl<'a> StyledVisit for Plain<'a> {
 /// The `Visit` returned from [`styled`].
 pub struct Styled<'a>(Cow<'a, str>, Style);
 
-impl<'a> Visit for Styled<'a> {
-    fn visit<T, V: Visitor<T>>(&self, mut visitor: V) -> Option<T> {
+impl<'a, T> Visit<T> for Styled<'a> {
+    fn visit<V: Visitor<T>>(&self, mut visitor: V) -> Option<T> {
         visitor.accept(&self.0)
     }
 }
 
-impl<'a> StyledVisit for Styled<'a> {
-    fn visit<T, V: StyleVisitor<T>>(&self, mut visitor: V, style: &Style) -> Option<T> {
+impl<'a, T> StyledVisit<T> for Styled<'a> {
+    fn visit<V: StyleVisitor<T>>(&self, mut visitor: V, style: &Style) -> Option<T> {
         visitor.accept(&self.1.clone().with_parent(style.clone()), &self.0)
     }
 }

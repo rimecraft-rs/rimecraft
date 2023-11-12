@@ -19,7 +19,10 @@ use crate::{
 
 use visit::{ErasedVisit, ErasedVisitStyled};
 
-use self::{content::Content, visit::CharVisitor};
+use self::{
+    content::Content,
+    visit::{CharVisitor, StyledVisit, Visit},
+};
 
 use super::fmt::Formatting;
 
@@ -61,6 +64,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct Text {
     content: Arc<dyn ErasedContent>,
     sibs: Vec<Self>,
@@ -172,6 +176,53 @@ impl Hash for Text {
         self.sibs.hash(state);
         self.style.hash(state);
         self.content_hash.hash(state);
+    }
+}
+
+impl Visit<()> for Text {
+    fn visit<V: visit::Visitor<()>>(&self, mut visitor: V) -> Option<()> {
+        if visit::ErasedVisit::visit(&*self.content, &mut visitor).is_some() {
+            Some(())
+        } else {
+            self.sibs
+                .iter()
+                .find(|text| visit::Visit::visit(*text, &mut visitor).is_some())
+                .map(|_| ())
+        }
+    }
+}
+
+impl StyledVisit<Style> for Text {
+    fn visit<V: visit::StyleVisitor<Style>>(&self, mut visitor: V, style: &Style) -> Option<Style> {
+        let style2 = self.style.clone().with_parent(style.clone());
+        if let Some(value) = visit::ErasedVisitStyled::visit(&*self.content, &mut visitor, &style2)
+        {
+            Some(value)
+        } else {
+            for text in &self.sibs {
+                if let Some(value) = visit::StyledVisit::visit(text, &mut visitor, &style2) {
+                    return Some(value);
+                }
+            }
+            None
+        }
+    }
+}
+
+impl Display for Text {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        struct Vis<'a, 'b> {
+            f: &'a mut std::fmt::Formatter<'b>,
+        }
+
+        impl visit::Visitor<()> for Vis<'_, '_> {
+            fn accept(&mut self, as_str: &str) -> Option<()> {
+                self.f.write_str(as_str).err().map(|_| ())
+            }
+        }
+
+        visit::Visit::visit(self, Vis { f });
+        Ok(())
     }
 }
 
