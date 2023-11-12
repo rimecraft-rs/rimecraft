@@ -37,7 +37,7 @@ pub enum Error {
 //TODO: Implement net.minecraft.text.Text
 pub trait Text {
     fn style(&self) -> &Style;
-    fn siblings(&self) -> Vec<Box<dyn Text>>;
+    fn siblings<T: Text>(&self) -> Vec<T>;
     //TODO: Implement net.minecraft.text.OrderedText
     fn as_ordered_text(&self);
 }
