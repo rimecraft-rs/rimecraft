@@ -14,10 +14,7 @@ use crate::{Stringified, RGB};
 
 use super::fmt::Formatting;
 
-pub mod hover_event;
 pub mod visit;
-
-pub use hover_event::HoverEvent;
 
 /// An error that can occur when processing a [`Text`].
 #[derive(thiserror::Error, Debug)]
@@ -34,12 +31,10 @@ pub enum Error {
     InvalidName(String),
 }
 
-//TODO: Implement net.minecraft.text.Text
-pub trait Text {
-    fn style(&self) -> &Style;
-    fn siblings(&self) -> Vec<Box<dyn Text>>;
-    //TODO: Implement net.minecraft.text.OrderedText
-    fn as_ordered_text(&self);
+#[derive(Debug)]
+pub struct Text {
+    sibs: Vec<Self>,
+    style: Style,
 }
 
 /// The style of a [`Text`], representing cosmetic attributes.
@@ -400,9 +395,7 @@ impl Serialize for Style {
                     let mut count = 0;
                     $(if self.$f.is_some() { count += 1; })*
                     let mut state = serializer.serialize_struct("Style", count)?;
-                    $(if let Some(value) = &self.$f {
-                        state.serialize_field(stringify!($f), value)?;
-                    })*
+                    $(if let Some(value) = &self.$f { state.serialize_field(stringify!($f), value)?; })*
                     state.end()
                 }
             };
@@ -450,6 +443,19 @@ impl ClickEvent {
     pub fn is_user_definable(self) -> bool {
         !matches!(self, Self::OpenFile(_))
     }
+}
+
+/// Represents an action that should be performed when the text is hovered.
+///
+/// # MCJE Reference
+///
+/// This type represents `net.minecraft.text.HoverEvent` (yarn).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "action", content = "contents")]
+pub enum HoverEvent {
+    ShowText,
+    ShowItem,
+    ShowEntity,
 }
 
 /// Represents an RGB color of a [`Text`].
