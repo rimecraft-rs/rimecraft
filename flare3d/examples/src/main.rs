@@ -40,11 +40,14 @@ fn main() {
                                     Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
                                     Err(e) => eprintln!("{:?}", e),
                                 }
-                            }
+                            },
                             _ => (),
                         }
                     }
                 }
+				Event::AboutToWait => {
+					window.request_redraw();
+				}
                 _ => (),
             }
         })
