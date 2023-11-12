@@ -134,3 +134,25 @@ impl<'a> StyledVisit for Styled<'a> {
         visitor.accept(&self.1.clone().with_parent(style.clone()), &self.0)
     }
 }
+
+/// A visitor for single characters in a string.
+pub trait CharVisitor {
+    /// Visits a single character.
+    ///
+    /// Multiple surrogate characters are converted into one single `code_point`
+    /// when passed into this method.
+    ///
+    /// Returns `true` to continue visiting other characters, or `false` to
+    /// terminate the visit.
+    fn accept(&mut self, index: usize, style: &Style, code_point: u32) -> bool;
+}
+
+impl<T> CharVisitor for T
+where
+    T: (FnMut(usize, &Style, u32) -> bool) + ?Sized,
+{
+    #[inline]
+    fn accept(&mut self, index: usize, style: &Style, code_point: u32) -> bool {
+        self(index, style, code_point)
+    }
+}

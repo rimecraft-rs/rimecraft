@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    collections::hash_map::DefaultHasher,
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
     path::PathBuf,
@@ -11,9 +12,14 @@ use rimecraft_primitives::{combine_traits, id, Id};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::{Stringified, RGB};
+use crate::{
+    lang::{self, Lang},
+    Stringified, RGB,
+};
 
 use visit::{ErasedVisit, ErasedVisitStyled};
+
+use self::{content::Content, visit::CharVisitor};
 
 use super::fmt::Formatting;
 
@@ -36,42 +42,81 @@ pub enum Error {
 }
 
 combine_traits! {
-    trait ErasedContentDeb: ErasedVisit, ErasedVisitStyled, Debug
+    pub trait ErasedContent: ErasedVisit, ErasedVisitStyled, Debug, Send, Sync
 }
 
-#[derive(Debug)]
+/// An object that can supply character code points to a
+/// visitor, with a style context.
+pub trait OrderedText {
+    fn accept(&self, visitor: &mut dyn CharVisitor) -> bool;
+}
+
+impl<T> OrderedText for Box<T>
+where
+    T: OrderedText + ?Sized,
+{
+    #[inline]
+    fn accept(&self, visitor: &mut dyn CharVisitor) -> bool {
+        self.as_ref().accept(visitor)
+    }
+}
+
 pub struct Text {
-    content: Arc<dyn ErasedContentDeb + Send + Sync>,
+    content: Arc<dyn ErasedContent>,
     sibs: Vec<Self>,
     style: Style,
+
+    /// Hash code of `content`.
+    content_hash: u64,
 }
 
 impl Text {
+    fn new<T: 'static>(content: T, siblings: Vec<Self>, style: Style) -> Self
+    where
+        T: Content + Hash + Debug + Send + Sync,
+    {
+        let mut hasher = DefaultHasher::new();
+        content.hash(&mut hasher);
+
+        Self {
+            content: Arc::new(content),
+            sibs: siblings,
+            style,
+            content_hash: hasher.finish(),
+        }
+    }
+
+    /// Returns the content of this text.
+    #[inline]
+    pub fn content(&self) -> &dyn ErasedContent {
+        &*self.content
+    }
+
+    /// Returns the siblings of this text.
     #[inline]
     pub fn siblings(&self) -> &[Self] {
         &self.sibs
     }
 
-    #[inline]
-    pub fn siblings_mut(&mut self) -> &mut [Self] {
-        &mut self.sibs
-    }
-
+    /// Returns the style of this text.
     #[inline]
     pub fn style(&self) -> &Style {
         &self.style
     }
 
+    /// Sets the style of this text.
     #[inline]
     pub fn set_style(&mut self, style: Style) {
         self.style = style;
     }
 
+    /// Pushes a text to this text's siblings.
     #[inline]
     pub fn push(&mut self, value: Self) {
         self.sibs.push(value)
     }
 
+    /// Updates the style of this text.
     pub fn styled<F>(&mut self, f: F)
     where
         F: FnOnce(Style) -> Style,
@@ -79,8 +124,54 @@ impl Text {
         self.style = f(std::mem::take(&mut self.style))
     }
 
+    /// Fills the absent parts of this text's style with definitions
+    /// from the given style.
     pub fn fill_style(&mut self, style_override: Style) {
         self.style = style_override.with_parent(std::mem::take(&mut self.style));
+    }
+
+    /// Adds a formatting to this text's style.
+    pub fn formatted(&mut self, fmt: Formatting) {
+        self.style = std::mem::take(&mut self.style).with_formatting(fmt);
+    }
+
+    /// Adds some formattings to this text's style.
+    pub fn multi_formatted(&mut self, fmts: &[Formatting]) {
+        self.style = std::mem::take(&mut self.style).with_formattings(fmts);
+    }
+
+    pub fn to_ordered_text(&self) -> impl OrderedText + '_ {
+        lang::global().unwrap().reorder(self)
+    }
+}
+
+impl<T> From<T> for Text
+where
+    T: Content + Hash + Debug + Send + Sync + 'static,
+{
+    /// Creates a piece of mutable text with the given content,
+    /// with no sibling and style.
+    #[inline]
+    fn from(value: T) -> Self {
+        Self::new(value, vec![], Style::EMPTY)
+    }
+}
+
+impl Debug for Text {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Text")
+            .field("content", &self.content)
+            .field("style", &self.style)
+            .field("siblings", &self.sibs)
+            .finish()
+    }
+}
+
+impl Hash for Text {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.sibs.hash(state);
+        self.style.hash(state);
+        self.content_hash.hash(state);
     }
 }
 
@@ -92,7 +183,7 @@ impl Text {
 /// # MCJE Reference
 ///
 /// This type represents `net.minecraft.text.Style` (yarn).
-#[derive(Clone, PartialEq, Eq, Debug, Default, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Default, Deserialize, Hash)]
 pub struct Style {
     /// The color of this style.
     #[serde(default)]
