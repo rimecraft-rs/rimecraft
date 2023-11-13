@@ -130,3 +130,9 @@ pub trait Nameable {
         None
     }
 }
+
+#[repr(u8)]
+pub enum ClickType {
+    Left,
+    Right,
+}
