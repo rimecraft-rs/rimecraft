@@ -1,4 +1,4 @@
-use rimecraft_primitives::{Id, id};
+use rimecraft_primitives::{id, Id};
 
 #[inline]
 pub fn root_key() -> Id {

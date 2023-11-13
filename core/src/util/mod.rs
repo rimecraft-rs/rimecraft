@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use std::{fmt::UpperHex, ops::Deref, str::FromStr};
 
+use crate::text::Text;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 #[repr(u8)]
 pub enum Rarity {
@@ -101,5 +103,30 @@ where
             .parse()
             .map(Stringified)
             .map_err(D::Error::custom)
+    }
+}
+
+/// Represents something that can be named, such as block entities or entities.
+///
+/// # MCJE Reference
+///
+/// This trait represents `net.minecraft.util.Nameable` (yarn)
+pub trait Nameable {
+    /// This should return `custom_name` if it exists, otherwise the default
+    /// name. This should not have styling applied.
+    fn name(&self) -> Text;
+
+    fn has_custom_name(&self) -> bool {
+        self.custom_name().is_some()
+    }
+
+    /// By default, this returns the result of `name`. The return value can
+    /// have styling applied.
+    fn display_name(&self) -> Text {
+        self.name()
+    }
+
+    fn custom_name(&self) -> Option<Text> {
+        None
     }
 }
