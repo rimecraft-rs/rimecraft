@@ -2,7 +2,7 @@ use glam::{Mat4, Quat, Vec3};
 use wgpu::util::DeviceExt;
 use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
-    keyboard::{KeyCode, PhysicalKey},
+    keyboard::{Key, KeyCode, PhysicalKey},
     window::Window,
 };
 
@@ -105,12 +105,18 @@ impl CameraUniform {
 
 struct CameraController {
     speed: f32,
+
+    mv_speed: f32,
+    keep_mv_speed: bool,
+    mv_acceleration: f32,
+
     forward: bool,
     backward: bool,
     strafe_left: bool,
     strafe_right: bool,
     fly: bool,
     dive: bool,
+
     turn_up: bool,
     turn_down: bool,
     turn_left: bool,
@@ -131,6 +137,9 @@ impl CameraController {
             turn_down: false,
             turn_left: false,
             turn_right: false,
+            mv_acceleration: -0.01,
+            mv_speed: 0.0,
+            keep_mv_speed: false,
         }
     }
 
@@ -147,22 +156,42 @@ impl CameraController {
             } => {
                 let is_pressed = *state == ElementState::Pressed;
                 match key_code {
-                    KeyCode::KeyW => {
-                        self.forward = is_pressed;
+                    KeyCode::KeyW | KeyCode::KeyA | KeyCode::KeyS | KeyCode::KeyD => {
+                        if is_pressed {
+                            self.keep_mv_speed = true;
+                            match key_code {
+                                KeyCode::KeyW => {
+                                    self.forward = true;
+                                    self.backward = false;
+                                    self.strafe_left = false;
+                                    self.strafe_right = false;
+                                }
+                                KeyCode::KeyS => {
+                                    self.forward = false;
+                                    self.backward = true;
+                                    self.strafe_left = false;
+                                    self.strafe_right = false;
+                                }
+                                KeyCode::KeyA => {
+                                    self.forward = false;
+                                    self.backward = false;
+                                    self.strafe_left = true;
+                                    self.strafe_right = false;
+                                }
+                                KeyCode::KeyD => {
+                                    self.forward = false;
+                                    self.backward = false;
+                                    self.strafe_left = false;
+                                    self.strafe_right = true;
+                                }
+                                _ => unreachable!(),
+                            }
+                        } else {
+                            self.keep_mv_speed = false
+                        }
                         true
                     }
-                    KeyCode::KeyS => {
-                        self.backward = is_pressed;
-                        true
-                    }
-                    KeyCode::KeyA => {
-                        self.strafe_left = is_pressed;
-                        true
-                    }
-                    KeyCode::KeyD => {
-                        self.strafe_right = is_pressed;
-                        true
-                    }
+
                     KeyCode::Space => {
                         self.fly = is_pressed;
                         true
@@ -194,7 +223,16 @@ impl CameraController {
         }
     }
 
-    fn update_camera(&self, camera: &mut Camera) {
+    fn update_camera(&mut self, camera: &mut Camera) {
+        if !self.keep_mv_speed {
+            self.mv_speed += self.mv_acceleration;
+            if self.mv_speed <= 0.0 {
+                self.mv_speed = 0.0
+            }
+        } else {
+            self.mv_speed = self.speed
+        }
+
         camera.direction = camera.direction.normalize();
 
         let plane_normal = Vec3::Y;
@@ -209,19 +247,19 @@ impl CameraController {
         }
 
         if self.forward {
-            camera.eye += forward_normal * self.speed;
+            camera.eye += forward_normal * self.mv_speed;
         }
         if self.backward {
-            camera.eye -= forward_normal * self.speed;
+            camera.eye -= forward_normal * self.mv_speed;
         }
 
         let right_normal = forward_normal.cross(plane_normal).normalize();
 
         if self.strafe_right {
-            camera.eye += right_normal * self.speed;
+            camera.eye += right_normal * self.mv_speed;
         }
         if self.strafe_left {
-            camera.eye -= right_normal * self.speed;
+            camera.eye -= right_normal * self.mv_speed;
         }
 
         let rotation = 1.0_f32.to_radians();

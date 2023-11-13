@@ -2,7 +2,7 @@ use flare3d::state::State;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    keyboard::{PhysicalKey, KeyCode},
+    keyboard::{KeyCode, PhysicalKey},
     window::WindowBuilder,
 };
 
@@ -40,14 +40,14 @@ fn main() {
                                     Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
                                     Err(e) => eprintln!("{:?}", e),
                                 }
-                            },
+                            }
                             _ => (),
                         }
                     }
                 }
-				Event::AboutToWait => {
-					window.request_redraw();
-				}
+                Event::AboutToWait => {
+                    window.request_redraw();
+                }
                 _ => (),
             }
         })
