@@ -20,7 +20,7 @@ use crate::{
 use visit::{ErasedVisit, ErasedVisitStyled};
 
 use self::{
-    content::Content,
+    content::ContentDeprecated,
     visit::{CharVisitor, StyledVisit, Visit},
 };
 
@@ -77,7 +77,7 @@ pub struct Text {
 impl Text {
     fn new<T: 'static>(content: T, siblings: Vec<Self>, style: Style) -> Self
     where
-        T: Content + Hash + Debug + Send + Sync,
+        T: ContentDeprecated + Hash + Debug + Send + Sync,
     {
         let mut hasher = DefaultHasher::new();
         content.hash(&mut hasher);
@@ -151,7 +151,7 @@ impl Text {
 
 impl<T> From<T> for Text
 where
-    T: Content + Hash + Debug + Send + Sync + 'static,
+    T: ContentDeprecated + Hash + Debug + Send + Sync + 'static,
 {
     /// Creates a piece of mutable text with the given content,
     /// with no sibling and style.
@@ -193,18 +193,18 @@ impl Visit<()> for Text {
 }
 
 impl StyledVisit<Style> for Text {
-    fn visit<V: visit::StyleVisitor<Style> + ?Sized>(
+    fn styled_visit<V: visit::StyleVisitor<Style> + ?Sized>(
         &self,
         mut visitor: &mut V,
         style: &Style,
     ) -> Option<Style> {
         let style2 = self.style.clone().with_parent(style.clone());
-        if let Some(value) = visit::ErasedVisitStyled::visit(&*self.content, &mut visitor, &style2)
+        if let Some(value) = visit::ErasedVisitStyled::styled_visit(&*self.content, &mut visitor, &style2)
         {
             Some(value)
         } else {
             for text in &self.sibs {
-                if let Some(value) = visit::StyledVisit::visit(text, visitor, &style2) {
+                if let Some(value) = visit::StyledVisit::styled_visit(text, visitor, &style2) {
                     return Some(value);
                 }
             }

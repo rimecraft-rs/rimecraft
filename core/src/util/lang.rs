@@ -1,6 +1,6 @@
 use std::{
     fmt::Debug,
-    sync::{Arc, OnceLock},
+    sync::{Arc, OnceLock,Weak}, ops::Deref,
 };
 
 use parking_lot::RwLock;
@@ -99,5 +99,53 @@ impl Lang for Global {
     #[inline]
     fn reorder<'a>(&self, text: &'a Text) -> Box<dyn OrderedText + Send + Sync + 'a> {
         self.guard.reorder(text)
+    }
+}
+
+pub struct LangDepended<T> {
+    inner: RwLock<LangDependedInner<T>>,
+}
+
+impl<T> LangDepended<T> {
+    pub fn new(inner: T) -> Self {
+        Self {
+            inner: RwLock::new(LangDependedInner {
+                lang: Arc::downgrade(&INSTANCE.get().unwrap().read().clone()),
+                inner,
+            }),
+        }
+    }
+
+    pub fn get(&self) -> LangDependedRef<'_, T> {
+        LangDependedRef {
+            inner: self.inner.read(),
+        }
+    }
+
+    fn update(&mut self) {
+        let lang = Arc::downgrade(&INSTANCE.get().unwrap().read().clone());
+
+        if !self.inner.read().lang.ptr_eq(&lang) {
+            let mut inner = self.inner.write();
+            inner.lang = lang;
+            
+        }
+    }
+}
+
+struct LangDependedInner<T> {
+    lang: Weak<dyn DebugLang>,
+    inner: T,
+}
+
+pub struct LangDependedRef<'a, T> {
+    inner: parking_lot::RwLockReadGuard<'a, LangDependedInner<T>>,
+}
+
+impl<'a, T> Deref for LangDependedRef<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner.inner
     }
 }

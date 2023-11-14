@@ -33,13 +33,13 @@ pub trait StyledVisit<T> {
     /// to the visitor.
     /// Returns `None` if the visit finished, or a terminating
     /// result from the visitor.
-    fn visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T>;
+    fn styled_visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T>;
 }
 
 macro_rules! erased_text_styled_visit {
     ($($v:vis trait $n:ident, $t:ty => $vi:ty);+) => {
-        $($v trait $n { fn visit(&self, visitor: &mut $vi, style: &Style) -> Option<$t>; }
-        impl<T: StyledVisit<$t>> $n for T { #[inline] fn visit(&self, visitor: &mut $vi, style: &Style) -> Option<$t> { StyledVisit::visit(self, visitor, style) } })+
+        $($v trait $n { fn styled_visit(&self, visitor: &mut $vi, style: &Style) -> Option<$t>; }
+        impl<T: StyledVisit<$t>> $n for T { #[inline] fn styled_visit(&self, visitor: &mut $vi, style: &Style) -> Option<$t> { StyledVisit::styled_visit(self, visitor, style) } })+
     };
 }
 
@@ -60,7 +60,7 @@ impl<T> Visit<T> for () {
 }
 
 impl<T> StyledVisit<T> for () {
-    fn visit<V: StyleVisitor<T> + ?Sized>(&self, _: &mut V, _: &Style) -> Option<T> {
+    fn styled_visit<V: StyleVisitor<T> + ?Sized>(&self, _: &mut V, _: &Style) -> Option<T> {
         None
     }
 }
@@ -115,7 +115,7 @@ impl<'a, T> Visit<T> for Plain<'a> {
 }
 
 impl<'a, T> StyledVisit<T> for Plain<'a> {
-    fn visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T> {
+    fn styled_visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T> {
         visitor.accept(style, &self.0)
     }
 }
@@ -130,7 +130,7 @@ impl<'a, T> Visit<T> for Styled<'a> {
 }
 
 impl<'a, T> StyledVisit<T> for Styled<'a> {
-    fn visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T> {
+    fn styled_visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T> {
         visitor.accept(&self.1.clone().with_parent(style.clone()), &self.0)
     }
 }

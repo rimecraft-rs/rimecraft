@@ -136,3 +136,13 @@ pub enum ClickType {
     Left,
     Right,
 }
+
+pub trait Clear{
+    fn clear(&self);
+}
+
+fn clear_obj(o:Option<&dyn Clear>) {
+    if o.is_some(){
+        o.unwrap().clear()
+    }
+}
