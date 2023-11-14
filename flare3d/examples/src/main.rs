@@ -33,12 +33,14 @@ fn main() {
                                 state.resize(physical_size);
                             }
                             WindowEvent::RedrawRequested => {
-                                state.update();
-                                match state.render() {
-                                    Ok(_) => {}
-                                    Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
-                                    Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
-                                    Err(e) => eprintln!("{:?}", e),
+                                if state.do_render() {
+                                    state.update();
+                                    match state.render() {
+                                        Ok(_) => {}
+                                        Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
+                                        Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
+                                        Err(e) => eprintln!("{:?}", e),
+                                    }
                                 }
                             }
                             _ => (),

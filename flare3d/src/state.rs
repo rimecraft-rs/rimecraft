@@ -2,7 +2,7 @@ use glam::{Mat4, Quat, Vec3};
 use wgpu::util::DeviceExt;
 use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
-    keyboard::{Key, KeyCode, PhysicalKey},
+    keyboard::{KeyCode, PhysicalKey},
     window::Window,
 };
 
@@ -350,6 +350,7 @@ pub struct State {
     instances: Vec<Instance>,
     instance_buffer: wgpu::Buffer,
     depth_texture: Texture,
+    should_render: bool,
 }
 
 impl State {
@@ -586,6 +587,7 @@ impl State {
             instances,
             instance_buffer,
             depth_texture,
+            should_render: false,
         }
     }
 }
@@ -667,6 +669,21 @@ impl State {
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
-        self.camera_controller.process_events(event)
+        match event {
+            WindowEvent::Occluded(val) => {
+                self.should_render = *val;
+                true
+            }
+            WindowEvent::Focused(val)=>{
+                self.should_render = !*val;
+                true
+            }
+            _ => self.camera_controller.process_events(event),
+        }
+    }
+
+    #[inline]
+    pub fn do_render(&self) -> bool {
+        !self.should_render
     }
 }
