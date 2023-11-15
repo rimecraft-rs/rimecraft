@@ -23,8 +23,8 @@ erased_text_visit! {
 
 /// Creates a `Visit` from a plain string.
 #[inline]
-pub fn plain(s: &str) -> Plain<'_> {
-    Plain(Cow::Borrowed(s))
+pub fn plain(s: Cow<'_, str>) -> Plain<'_> {
+    Plain(s)
 }
 
 /// Types that can supply strings to a [`StyleVisitor`] with a style context.
@@ -53,8 +53,8 @@ erased_text_styled_visit! {
 
 /// Creates a `Visit` from a plain string and a root style.
 #[inline]
-pub fn styled(s: &str, style: Style) -> Styled<'_> {
-    Styled(Cow::Borrowed(s), style)
+pub fn styled(s: Cow<'_, str>, style: Style) -> Styled<'_> {
+    Styled(s, style)
 }
 
 impl<T> Visit<T> for () {
@@ -110,6 +110,7 @@ where
 }
 
 /// The `Visit` returned from [`plain`].
+#[derive(Debug, Clone)]
 pub struct Plain<'a>(Cow<'a, str>);
 
 impl<'a, T> Visit<T> for Plain<'a> {
@@ -129,6 +130,7 @@ impl<'a, T> StyledVisit<T> for Plain<'a> {
 }
 
 /// The `Visit` returned from [`styled`].
+#[derive(Debug, Clone)]
 pub struct Styled<'a>(Cow<'a, str>, Style);
 
 impl<'a, T> Visit<T> for Styled<'a> {

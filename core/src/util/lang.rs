@@ -37,7 +37,7 @@ pub trait LangExt: Lang {
 impl<T: Lang + ?Sized> LangExt for T {}
 
 combine_traits! {
-    pub(crate) trait DebugLang: Lang, Debug, Send, Sync
+    pub trait DebugLang: Lang, Debug, Send, Sync
 }
 
 /// Direction of a language.
@@ -103,48 +103,119 @@ impl Lang for Global {
     }
 }
 
+/// A value that depends on the global language instance.
+/// When the global language instance has been changed,
+/// the inner value will be updated.
+///
+/// See [`UpdateLang`].
+#[derive(Debug)]
 pub struct LangDepended<T> {
     inner: RwLock<LangDependedInner<T>>,
 }
 
 impl<T> LangDepended<T> {
+    /// Creates a new [`LangDepended`] with given inner value.
+    /// 
+    /// This action does not acquire the global language instance.
     pub fn new(inner: T) -> Self {
         Self {
             inner: RwLock::new(LangDependedInner {
-                lang: Arc::downgrade(&INSTANCE.get().unwrap().read().clone()),
+                lang: None,
                 inner,
             }),
         }
     }
+}
 
+impl<T: UpdateLang> LangDepended<T> {
+    /// Gets the inner value.
+    ///
+    /// When the global language instance has been changed,
+    /// the inner value will be updated.
+    #[inline]
     pub fn get(&self) -> LangDependedRef<'_, T> {
+        self.update();
         LangDependedRef {
             inner: self.inner.read(),
         }
     }
 
-    fn update(&mut self) {
-        let lang = Arc::downgrade(&INSTANCE.get().unwrap().read().clone());
+    fn update(&self) {
+        let lang_arc = INSTANCE.get().unwrap().read().clone();
+        let lang = Arc::downgrade(&lang_arc);
 
-        if !self.inner.read().lang.ptr_eq(&lang) {
+        if !self.inner.read().lang.as_ref().is_some_and(|e| e.ptr_eq(&lang)) {
             let mut inner = self.inner.write();
-            inner.lang = lang;
+            inner.lang = Some(lang);
+            inner.inner.update_from_lang(&*lang_arc);
+        }
+    }
+
+    /// Gets the mutable inner value.
+    ///
+    /// When the global language instance has been changed,
+    /// the inner value will be updated.
+    #[inline]
+    pub fn get_mut(&mut self) -> &mut T {
+        self.update_mut();
+        &mut self.inner.get_mut().inner
+    }
+
+    fn update_mut(&mut self) {
+        let lang_arc = INSTANCE.get().unwrap().read().clone();
+        let lang = Arc::downgrade(&lang_arc);
+        let inner = self.inner.get_mut();
+
+        if !inner.lang.as_ref().is_some_and(|e| e.ptr_eq(&lang)) {
+            inner.lang = Some(lang);
+            inner.inner.update_from_lang(&*lang_arc);
         }
     }
 }
 
+impl<T> Clone for LangDepended<T> where T: Clone {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            inner: RwLock::new(self.inner.read().clone()),
+        }
+    }
+}
+
+/// Represents types that can be updated after the change of
+/// global language instance.
+///
+/// See [`LangDepended`].
+pub trait UpdateLang {
+    /// Updates this value from given language.
+    fn update_from_lang(&mut self, lang: &dyn DebugLang);
+}
+
+#[derive(Debug, Clone)]
 struct LangDependedInner<T> {
-    lang: Weak<dyn DebugLang>,
+    lang: Option<Weak<dyn DebugLang>>,
     inner: T,
 }
 
+/// Read RAII guard of [`LangDepended`], represented as
+/// a reference.
+///
+/// See [`LangDepended::get`].
 pub struct LangDependedRef<'a, T> {
     inner: parking_lot::RwLockReadGuard<'a, LangDependedInner<T>>,
 }
 
-impl<'a, T> Deref for LangDependedRef<'a, T> {
+impl<T> AsRef<T> for LangDependedRef<'_, T> {
+    #[inline]
+    fn as_ref(&self) -> &T {
+        &self.inner.inner
+    }
+}
+
+impl<T> Deref for LangDependedRef<'_, T> {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.inner.inner
     }

@@ -20,7 +20,7 @@ use crate::{
 use visit::{ErasedVisit, ErasedVisitStyled};
 
 use self::{
-    content::ContentDeprecated,
+    content::{ContentDeprecated, Content},
     visit::{CharVisitor, StyledVisit, Visit},
 };
 
@@ -66,34 +66,26 @@ where
 
 #[derive(Clone)]
 pub struct Text {
-    content: Arc<dyn ErasedContent>,
+    content: Content,
     sibs: Vec<Self>,
     style: Style,
 
-    /// Hash code of `content`.
-    content_hash: u64,
 }
 
 impl Text {
-    fn new<T: 'static>(content: T, siblings: Vec<Self>, style: Style) -> Self
-    where
-        T: ContentDeprecated + Hash + Debug + Send + Sync,
+    fn new(content: Content, siblings: Vec<Self>, style: Style) -> Self
     {
-        let mut hasher = DefaultHasher::new();
-        content.hash(&mut hasher);
-
         Self {
-            content: Arc::new(content),
+            content: content,
             sibs: siblings,
             style,
-            content_hash: hasher.finish(),
         }
     }
 
     /// Returns the content of this text.
     #[inline]
-    pub fn content(&self) -> &dyn ErasedContent {
-        &*self.content
+    pub fn content(&self) -> &Content {
+        &self.content
     }
 
     /// Returns the siblings of this text.
@@ -149,14 +141,12 @@ impl Text {
     }
 }
 
-impl<T> From<T> for Text
-where
-    T: ContentDeprecated + Hash + Debug + Send + Sync + 'static,
+impl From<Content> for Text
 {
     /// Creates a piece of mutable text with the given content,
     /// with no sibling and style.
     #[inline]
-    fn from(value: T) -> Self {
+    fn from(value: Content) -> Self {
         Self::new(value, vec![], Style::EMPTY)
     }
 }
@@ -175,41 +165,36 @@ impl Hash for Text {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.sibs.hash(state);
         self.style.hash(state);
-        self.content_hash.hash(state);
     }
 }
 
-impl Visit<()> for Text {
-    fn visit<V: visit::Visitor<()> + ?Sized>(&self, mut visitor: &mut V) -> Option<()> {
-        if visit::ErasedVisit::visit(&*self.content, &mut visitor).is_some() {
-            Some(())
+impl<T> Visit<T> for Text {
+    fn visit<V: visit::Visitor<T> + ?Sized>(&self, mut visitor: &mut V) -> Option<T> {
+        if let Some(val) = visit::Visit::visit(&self.content, visitor) {
+            Some(val)
         } else {
             self.sibs
                 .iter()
-                .find(|text| visit::Visit::visit(*text, visitor).is_some())
-                .map(|_| ())
+                .find_map(|text| visit::Visit::visit(text, visitor))
         }
     }
 }
 
-impl StyledVisit<Style> for Text {
-    fn styled_visit<V: visit::StyleVisitor<Style> + ?Sized>(
+impl<T> StyledVisit<T> for Text {
+    fn styled_visit<V: visit::StyleVisitor<T> + ?Sized>(
         &self,
         mut visitor: &mut V,
         style: &Style,
-    ) -> Option<Style> {
+    ) -> Option<T> {
         let style2 = self.style.clone().with_parent(style.clone());
         if let Some(value) =
-            visit::ErasedVisitStyled::styled_visit(&*self.content, &mut visitor, &style2)
+            visit::StyledVisit::styled_visit(&self.content, visitor, &style2)
         {
             Some(value)
         } else {
-            for text in &self.sibs {
-                if let Some(value) = visit::StyledVisit::styled_visit(text, visitor, &style2) {
-                    return Some(value);
-                }
-            }
-            None
+            self.sibs
+                .iter()
+                .find_map(|text| visit::StyledVisit::styled_visit(text, visitor, &style2))
         }
     }
 }
