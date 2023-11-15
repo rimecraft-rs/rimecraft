@@ -199,7 +199,8 @@ impl StyledVisit<Style> for Text {
         style: &Style,
     ) -> Option<Style> {
         let style2 = self.style.clone().with_parent(style.clone());
-        if let Some(value) = visit::ErasedVisitStyled::styled_visit(&*self.content, &mut visitor, &style2)
+        if let Some(value) =
+            visit::ErasedVisitStyled::styled_visit(&*self.content, &mut visitor, &style2)
         {
             Some(value)
         } else {

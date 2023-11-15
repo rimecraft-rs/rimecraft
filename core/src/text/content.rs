@@ -54,7 +54,5 @@ pub struct Translatable {
 }
 
 impl Translatable {
-    fn translations(&self) -> Vec<Text> {
-
-    }
+    fn translations(&self) -> Vec<Text> {}
 }

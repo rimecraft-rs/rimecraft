@@ -1,6 +1,7 @@
 use std::{
     fmt::Debug,
-    sync::{Arc, OnceLock,Weak}, ops::Deref,
+    ops::Deref,
+    sync::{Arc, OnceLock, Weak},
 };
 
 use parking_lot::RwLock;
@@ -128,7 +129,6 @@ impl<T> LangDepended<T> {
         if !self.inner.read().lang.ptr_eq(&lang) {
             let mut inner = self.inner.write();
             inner.lang = lang;
-            
         }
     }
 }

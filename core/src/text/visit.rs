@@ -33,7 +33,11 @@ pub trait StyledVisit<T> {
     /// to the visitor.
     /// Returns `None` if the visit finished, or a terminating
     /// result from the visitor.
-    fn styled_visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T>;
+    fn styled_visit<V: StyleVisitor<T> + ?Sized>(
+        &self,
+        visitor: &mut V,
+        style: &Style,
+    ) -> Option<T>;
 }
 
 macro_rules! erased_text_styled_visit {
@@ -115,7 +119,11 @@ impl<'a, T> Visit<T> for Plain<'a> {
 }
 
 impl<'a, T> StyledVisit<T> for Plain<'a> {
-    fn styled_visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T> {
+    fn styled_visit<V: StyleVisitor<T> + ?Sized>(
+        &self,
+        visitor: &mut V,
+        style: &Style,
+    ) -> Option<T> {
         visitor.accept(style, &self.0)
     }
 }
@@ -130,7 +138,11 @@ impl<'a, T> Visit<T> for Styled<'a> {
 }
 
 impl<'a, T> StyledVisit<T> for Styled<'a> {
-    fn styled_visit<V: StyleVisitor<T> + ?Sized>(&self, visitor: &mut V, style: &Style) -> Option<T> {
+    fn styled_visit<V: StyleVisitor<T> + ?Sized>(
+        &self,
+        visitor: &mut V,
+        style: &Style,
+    ) -> Option<T> {
         visitor.accept(&self.1.clone().with_parent(style.clone()), &self.0)
     }
 }

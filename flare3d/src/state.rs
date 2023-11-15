@@ -680,7 +680,7 @@ impl State {
                 self.should_render = *val;
                 true
             }
-            WindowEvent::Focused(val)=>{
+            WindowEvent::Focused(val) => {
                 self.should_render = !*val;
                 true
             }
