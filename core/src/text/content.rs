@@ -1,4 +1,5 @@
 use parking_lot::RwLock;
+use lazy_regex::Captures;
 
 use std::{
     any::Any,
@@ -114,7 +115,8 @@ static T_ARG_FMT: lazy_regex::Lazy<lazy_regex::Regex> =
 impl TranslatableInner {
     fn update_parts(&mut self, translation: &str) -> Result<(), TranslationError> {
         let mut last_end = 0;
-        for m in T_ARG_FMT.find_iter(translation) {
+        
+        for (g,m) in T_ARG_FMT.captures_iter(translation).map(|e|e.extract()) {
             if last_end != m.start() {
                 self.parts.push(VisitAbst::Plain(visit::plain(Cow::Owned(
                     translation[last_end..m.start()].to_owned(),
