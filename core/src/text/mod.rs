@@ -1,11 +1,9 @@
 use std::{
     borrow::Cow,
-    collections::hash_map::DefaultHasher,
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
     path::PathBuf,
     str::FromStr,
-    sync::Arc,
 };
 
 use rimecraft_primitives::{combine_traits, id, Id};
@@ -20,7 +18,7 @@ use crate::{
 use visit::{ErasedVisit, ErasedVisitStyled};
 
 use self::{
-    content::{ContentDeprecated, Content},
+    content::Content,
     visit::{CharVisitor, StyledVisit, Visit},
 };
 
@@ -28,6 +26,7 @@ use super::fmt::Formatting;
 
 pub mod content;
 pub mod visit;
+mod ser_de;
 
 /// An error that can occur when processing a [`Text`].
 #[derive(thiserror::Error, Debug)]
@@ -64,17 +63,15 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Text {
     content: Content,
     sibs: Vec<Self>,
     style: Style,
-
 }
 
 impl Text {
-    fn new(content: Content, siblings: Vec<Self>, style: Style) -> Self
-    {
+    fn new(content: Content, siblings: Vec<Self>, style: Style) -> Self {
         Self {
             content: content,
             sibs: siblings,
@@ -141,8 +138,7 @@ impl Text {
     }
 }
 
-impl From<Content> for Text
-{
+impl From<Content> for Text {
     /// Creates a piece of mutable text with the given content,
     /// with no sibling and style.
     #[inline]
@@ -169,7 +165,7 @@ impl Hash for Text {
 }
 
 impl<T> Visit<T> for Text {
-    fn visit<V: visit::Visitor<T> + ?Sized>(&self, mut visitor: &mut V) -> Option<T> {
+    fn visit<V: visit::Visitor<T> + ?Sized>(&self, visitor: &mut V) -> Option<T> {
         if let Some(val) = visit::Visit::visit(&self.content, visitor) {
             Some(val)
         } else {
@@ -183,13 +179,11 @@ impl<T> Visit<T> for Text {
 impl<T> StyledVisit<T> for Text {
     fn styled_visit<V: visit::StyleVisitor<T> + ?Sized>(
         &self,
-        mut visitor: &mut V,
+        visitor: &mut V,
         style: &Style,
     ) -> Option<T> {
         let style2 = self.style.clone().with_parent(style.clone());
-        if let Some(value) =
-            visit::StyledVisit::styled_visit(&self.content, visitor, &style2)
-        {
+        if let Some(value) = visit::StyledVisit::styled_visit(&self.content, visitor, &style2) {
             Some(value)
         } else {
             self.sibs
@@ -558,6 +552,31 @@ impl Style {
             }
         }
     }
+
+    pub(crate) fn count_non_empty_fields(&self) -> usize {
+        macro_rules! count {
+            ($($f:ident),*) => {
+                {
+                    let mut count = 0;
+                    $(if self.$f.is_some() { count += 1; })*
+                    return count;
+                }
+            };
+        }
+
+        count! {
+            color,
+            bold,
+            italic,
+            underlined,
+            strikethrough,
+            obfuscated,
+            click,
+            hover,
+            insertion,
+            font
+        }
+    }
 }
 
 impl Serialize for Style {
@@ -571,9 +590,7 @@ impl Serialize for Style {
             ($($f:ident),*) => {
                 {
                     use serde::ser::SerializeStruct;
-                    let mut count = 0;
-                    $(if self.$f.is_some() { count += 1; })*
-                    let mut state = serializer.serialize_struct("Style", count)?;
+                    let mut state = serializer.serialize_struct("Style", self.count_non_empty_fields())?;
                     $(if let Some(value) = &self.$f { state.serialize_field(stringify!($f), value)?; })*
                     state.end()
                 }

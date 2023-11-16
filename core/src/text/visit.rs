@@ -23,7 +23,7 @@ erased_text_visit! {
 
 /// Creates a `Visit` from a plain string.
 #[inline]
-pub fn plain(s: Cow<'_, str>) -> Plain<'_> {
+pub const fn plain(s: Cow<'_, str>) -> Plain<'_> {
     Plain(s)
 }
 
@@ -53,7 +53,7 @@ erased_text_styled_visit! {
 
 /// Creates a `Visit` from a plain string and a root style.
 #[inline]
-pub fn styled(s: Cow<'_, str>, style: Style) -> Styled<'_> {
+pub const fn styled(s: Cow<'_, str>, style: Style) -> Styled<'_> {
     Styled(s, style)
 }
 

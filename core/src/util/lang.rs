@@ -115,14 +115,11 @@ pub struct LangDepended<T> {
 
 impl<T> LangDepended<T> {
     /// Creates a new [`LangDepended`] with given inner value.
-    /// 
+    ///
     /// This action does not acquire the global language instance.
     pub fn new(inner: T) -> Self {
         Self {
-            inner: RwLock::new(LangDependedInner {
-                lang: None,
-                inner,
-            }),
+            inner: RwLock::new(LangDependedInner { lang: None, inner }),
         }
     }
 }
@@ -133,21 +130,27 @@ impl<T: UpdateLang> LangDepended<T> {
     /// When the global language instance has been changed,
     /// the inner value will be updated.
     #[inline]
-    pub fn get(&self) -> LangDependedRef<'_, T> {
-        self.update();
+    pub fn get(&self, cx: &T::Context) -> LangDependedRef<'_, T> {
+        self.update(cx);
         LangDependedRef {
             inner: self.inner.read(),
         }
     }
 
-    fn update(&self) {
+    fn update(&self, cx: &T::Context) {
         let lang_arc = INSTANCE.get().unwrap().read().clone();
         let lang = Arc::downgrade(&lang_arc);
 
-        if !self.inner.read().lang.as_ref().is_some_and(|e| e.ptr_eq(&lang)) {
+        if !self
+            .inner
+            .read()
+            .lang
+            .as_ref()
+            .is_some_and(|e| e.ptr_eq(&lang))
+        {
             let mut inner = self.inner.write();
             inner.lang = Some(lang);
-            inner.inner.update_from_lang(&*lang_arc);
+            inner.inner.update_from_lang(&*lang_arc, cx);
         }
     }
 
@@ -156,24 +159,27 @@ impl<T: UpdateLang> LangDepended<T> {
     /// When the global language instance has been changed,
     /// the inner value will be updated.
     #[inline]
-    pub fn get_mut(&mut self) -> &mut T {
-        self.update_mut();
+    pub fn get_mut(&mut self, cx: &T::Context) -> &mut T {
+        self.update_mut(cx);
         &mut self.inner.get_mut().inner
     }
 
-    fn update_mut(&mut self) {
+    fn update_mut(&mut self, cx: &T::Context) {
         let lang_arc = INSTANCE.get().unwrap().read().clone();
         let lang = Arc::downgrade(&lang_arc);
         let inner = self.inner.get_mut();
 
         if !inner.lang.as_ref().is_some_and(|e| e.ptr_eq(&lang)) {
             inner.lang = Some(lang);
-            inner.inner.update_from_lang(&*lang_arc);
+            inner.inner.update_from_lang(&*lang_arc, cx);
         }
     }
 }
 
-impl<T> Clone for LangDepended<T> where T: Clone {
+impl<T> Clone for LangDepended<T>
+where
+    T: Clone,
+{
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -187,8 +193,10 @@ impl<T> Clone for LangDepended<T> where T: Clone {
 ///
 /// See [`LangDepended`].
 pub trait UpdateLang {
+    type Context: ?Sized;
+
     /// Updates this value from given language.
-    fn update_from_lang(&mut self, lang: &dyn DebugLang);
+    fn update_from_lang(&mut self, lang: &dyn DebugLang, cx: &Self::Context);
 }
 
 #[derive(Debug, Clone)]
