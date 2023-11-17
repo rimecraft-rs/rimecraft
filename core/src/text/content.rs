@@ -142,6 +142,7 @@ impl<T> visit::StyledVisit<T> for Translatable {
     }
 }
 
+#[allow(unused)]
 #[derive(Debug, Clone)]
 enum VisitAbst {
     Plain(visit::Plain<'static>),
@@ -308,7 +309,7 @@ impl UpdateLang for TranslatableParts {
             .as_ref()
             .map_or_else(
                 || lang.translation_or_key(&cx.key),
-                |fallback| lang.translation(&cx.key).unwrap_or(&fallback),
+                |fallback| lang.translation(&cx.key).unwrap_or(fallback),
             )
             .to_owned();
         self.parts.clear();

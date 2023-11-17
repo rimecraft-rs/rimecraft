@@ -6,13 +6,11 @@ use std::{
     str::FromStr,
 };
 
-use rimecraft_primitives::{combine_traits, id, Id};
+use rimecraft_primitives::{id, Id};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::{Stringified, RGB};
-
-use visit::{ErasedVisit, ErasedVisitStyled};
 
 use self::{
     content::Content,
@@ -24,6 +22,9 @@ use super::fmt::Formatting;
 pub mod content;
 mod ser_de;
 pub mod visit;
+
+#[cfg(test)]
+mod tests;
 
 /// An error that can occur when processing a [`Text`].
 #[derive(thiserror::Error, Debug)]
@@ -38,10 +39,6 @@ pub enum Error {
     Formatting(super::fmt::Error),
     #[error("invalid name: {0}")]
     InvalidName(String),
-}
-
-combine_traits! {
-    pub trait ErasedContent: ErasedVisit, ErasedVisitStyled, Debug, Send, Sync
 }
 
 /// An object that can supply character code points to a

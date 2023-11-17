@@ -10,17 +10,6 @@ pub trait Visit<T> {
     fn visit<V: Visitor<T> + ?Sized>(&self, visitor: &mut V) -> Option<T>;
 }
 
-macro_rules! erased_text_visit {
-    ($($v:vis trait $n:ident, $t:ty => $vi:ty);+) => {
-        $($v trait $n { fn visit(&self, visitor: &mut $vi) -> Option<$t>; }
-        impl<T: Visit<$t>> $n for T { #[inline] fn visit(&self, visitor: &mut $vi) -> Option<$t> { Visit::visit(self, visitor) } })+
-    };
-}
-
-erased_text_visit! {
-    pub trait ErasedVisit, () => dyn Visitor<()>
-}
-
 /// Creates a `Visit` from a plain string.
 #[inline]
 pub const fn plain(s: Cow<'_, str>) -> Plain<'_> {
@@ -38,17 +27,6 @@ pub trait StyledVisit<T> {
         visitor: &mut V,
         style: &Style,
     ) -> Option<T>;
-}
-
-macro_rules! erased_text_styled_visit {
-    ($($v:vis trait $n:ident, $t:ty => $vi:ty);+) => {
-        $($v trait $n { fn styled_visit(&self, visitor: &mut $vi, style: &Style) -> Option<$t>; }
-        impl<T: StyledVisit<$t>> $n for T { #[inline] fn styled_visit(&self, visitor: &mut $vi, style: &Style) -> Option<$t> { StyledVisit::styled_visit(self, visitor, style) } })+
-    };
-}
-
-erased_text_styled_visit! {
-    pub trait ErasedVisitStyled, Style => dyn StyleVisitor<Style>
 }
 
 /// Creates a `Visit` from a plain string and a root style.
@@ -110,7 +88,7 @@ where
 }
 
 /// The `Visit` returned from [`plain`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Plain<'a>(Cow<'a, str>);
 
 impl<'a, T> Visit<T> for Plain<'a> {
@@ -130,7 +108,7 @@ impl<'a, T> StyledVisit<T> for Plain<'a> {
 }
 
 /// The `Visit` returned from [`styled`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Styled<'a>(Cow<'a, str>, Style);
 
 impl<'a, T> Visit<T> for Styled<'a> {
