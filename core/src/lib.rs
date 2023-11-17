@@ -6,7 +6,6 @@ pub mod item;
 pub mod net;
 /// Registry stuffs for managing almost all parts of in-game components.
 pub mod registry;
-pub mod server;
 pub mod state;
 pub mod text;
 mod util;
