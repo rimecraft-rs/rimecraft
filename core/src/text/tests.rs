@@ -1,9 +1,4 @@
-use std::sync::Arc;
-
-use super::{
-    content::{Translatable, TranslatableArg},
-    Text,
-};
+use super::Text;
 
 #[test]
 fn to_string() {
@@ -49,14 +44,15 @@ fn ser_de() {
         Default::default(),
     );
     text.push(Text::new(
-        super::content::Content::Translatable(Translatable::new(
-            std::borrow::Cow::Borrowed("item.rimecraft.gold_ingot"),
-            None,
-            vec![TranslatableArg::Display(Arc::new(
+        crate::text::content::Content::Empty,
+        vec![Text::new(
+            super::content::Content::Literal(std::borrow::Cow::Borrowed(
                 "玩Blue Archive的人素质都很差",
-            ))],
-        )),
-        vec![],
+                // 狠狠同意了
+            )),
+            vec![],
+            Default::default(),
+        )],
         Default::default(),
     ));
     text.push(Text::new(
