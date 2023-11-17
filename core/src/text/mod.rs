@@ -10,10 +10,7 @@ use rimecraft_primitives::{combine_traits, id, Id};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::{
-    lang::{self, Lang},
-    Stringified, RGB,
-};
+use crate::{Stringified, RGB};
 
 use visit::{ErasedVisit, ErasedVisitStyled};
 
@@ -25,8 +22,8 @@ use self::{
 use super::fmt::Formatting;
 
 pub mod content;
-pub mod visit;
 mod ser_de;
+pub mod visit;
 
 /// An error that can occur when processing a [`Text`].
 #[derive(thiserror::Error, Debug)]
@@ -63,6 +60,14 @@ where
     }
 }
 
+/// A text.
+///
+/// Each text has a tree structure, embodying all its siblings (see [`Self::siblings`]).
+///
+/// # Serialization
+///
+/// This type implements [`Serialize`] and [`Deserialize`].
+/// For the format, see [Minecraft Wiki](https://minecraft.wiki/w/Raw_JSON_text_format).
 #[derive(Clone, Default)]
 pub struct Text {
     content: Content,
@@ -71,9 +76,10 @@ pub struct Text {
 }
 
 impl Text {
-    fn new(content: Content, siblings: Vec<Self>, style: Style) -> Self {
+    /// Creates a piece of text with the given content,
+    const fn new(content: Content, siblings: Vec<Self>, style: Style) -> Self {
         Self {
-            content: content,
+            content,
             sibs: siblings,
             style,
         }
@@ -131,10 +137,6 @@ impl Text {
     /// Adds some formattings to this text's style.
     pub fn multi_formatted(&mut self, fmts: &[Formatting]) {
         self.style = std::mem::take(&mut self.style).with_formattings(fmts);
-    }
-
-    pub fn to_ordered_text(&self) -> impl OrderedText + '_ {
-        lang::global().unwrap().reorder(self)
     }
 }
 

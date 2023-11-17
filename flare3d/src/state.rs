@@ -353,7 +353,7 @@ pub struct State {
     /// # FIXME
     /// There is a memory leak when the window is occluded on the `Apple M1`
     /// platform. This field will stop `request_render()` when the window is
-    /// occluded or not focused. It decreases the speed of mamory leak, but
+    /// occluded or not focused. It decreases the speed of memory leak, but
     /// the problem still exists. Find more in the issue section of the
     /// __gfx-rs/wgpu__ repository.
     should_render: bool,

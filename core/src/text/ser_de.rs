@@ -1,5 +1,3 @@
-use std::{collections::HashMap, sync::Arc};
-
 use serde::{Deserialize, Serialize};
 
 use crate::text::content::{Content, Translatable, TranslatableArg};
@@ -7,7 +5,7 @@ use crate::text::content::{Content, Translatable, TranslatableArg};
 use super::Text;
 
 impl Serialize for Text {
-    fn serialize<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -18,6 +16,8 @@ impl Serialize for Text {
         if !self.sibs.is_empty() {
             fields += 1;
         }
+
+        #[allow(clippy::single_match)]
         match self.content {
             Content::Translatable(ref val) => {
                 if val.fallback().is_some() {
@@ -76,12 +76,11 @@ impl Serialize for Text {
                 }
             }
         }
-        todo!()
+        state.end()
     }
 }
 
 impl<'de> Deserialize<'de> for Text {
-    /// See [Minecraft Wiki](https://minecraft.wiki/w/Raw_JSON_text_format).
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -169,28 +168,19 @@ impl<'de> Deserialize<'de> for Text {
             where
                 A: serde::de::MapAccess<'de>,
             {
-                #[derive(Deserialize, Debug, Hash, PartialEq, Eq, Clone, Copy)]
-                #[serde(field_identifier, rename_all = "lowercase")]
-                enum Field {
-                    Text,
-                    Translate,
-                    Fallback,
-                    With,
-                    Extra,
-                }
-                let mut m = HashMap::new();
-                while let Some((key, value)) = map.next_entry::<Field, serde_json::Value>()? {
+                let mut m = serde_json::Map::new();
+                while let Some((key, value)) = map.next_entry::<String, serde_json::Value>()? {
                     m.insert(key, value);
                 }
 
                 use serde::de::Error;
                 let mut text: Text;
-                if let Some(val) = m.remove(&Field::Text) {
+                if let Some(val) = m.remove("text") {
                     // Literal content
                     text = val.as_str().map_or_else(Default::default, |str| {
                         Content::Literal(std::borrow::Cow::Owned(str.to_owned())).into()
                     })
-                } else if let Some(val) = m.remove(&Field::Translate) {
+                } else if let Some(val) = m.remove("translate") {
                     // Translatable content
                     let str;
                     if let serde_json::Value::String(s) = val {
@@ -198,8 +188,8 @@ impl<'de> Deserialize<'de> for Text {
                     } else {
                         return Err(A::Error::custom("expected string for \"translate\" field"));
                     };
-                    let fallback_val = m.remove(&Field::Fallback);
-                    if let Some(with_val) = m.remove(&Field::With) {
+                    let fallback_val = m.remove("fallback");
+                    if let Some(with_val) = m.remove("with") {
                         let with;
                         if let serde_json::Value::Array(w) = with_val {
                             with = w
@@ -208,7 +198,7 @@ impl<'de> Deserialize<'de> for Text {
                         };
 
                         let mut args: Vec<TranslatableArg> = Vec::with_capacity(with.len());
-                        for obj in with.into_iter().map(|e| serde_json::from_value::<Text>(e)) {
+                        for obj in with.into_iter().map(serde_json::from_value::<Text>) {
                             args.push(obj.map_err(A::Error::custom)?.into());
                         }
                         text = Content::Translatable(Translatable::new(
@@ -237,10 +227,10 @@ impl<'de> Deserialize<'de> for Text {
                     return Err(A::Error::custom("don't know kow to turn {m:?} into a Text"));
                 }
 
-                if let Some(val) = m.remove(&Field::Extra) {
+                if let Some(val) = m.remove("extra") {
                     let mut sibs = Vec::new();
                     if let serde_json::Value::Array(arr) = val {
-                        for obj in arr.into_iter().map(|e| serde_json::from_value::<Text>(e)) {
+                        for obj in arr.into_iter().map(serde_json::from_value::<Text>) {
                             sibs.push(obj.map_err(A::Error::custom)?);
                         }
                     } else {
@@ -249,12 +239,15 @@ impl<'de> Deserialize<'de> for Text {
                     text.sibs = sibs;
                 }
 
-                text.set_style(serde_json::from_value(m).map_err(A::Error::custom)?);
+                text.set_style(
+                    serde_json::from_value(serde_json::Value::Object(m))
+                        .map_err(A::Error::custom)?,
+                );
 
-                todo!()
+                Ok(text)
             }
         }
 
-        todo!()
+        deserializer.deserialize_any(TextVisitor)
     }
 }

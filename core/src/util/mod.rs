@@ -45,12 +45,12 @@ pub struct RGB {
 
 impl RGB {
     #[inline]
-    pub fn new(value: u32) -> Self {
+    pub const fn new(value: u32) -> Self {
         Self { value }
     }
 
     #[inline]
-    pub fn value(self) -> u32 {
+    pub const fn value(self) -> u32 {
         self.value
     }
 }
@@ -139,10 +139,4 @@ pub enum ClickType {
 
 pub trait Clear {
     fn clear(&self);
-}
-
-fn clear_obj(o: Option<&dyn Clear>) {
-    if o.is_some() {
-        o.unwrap().clear()
-    }
 }
