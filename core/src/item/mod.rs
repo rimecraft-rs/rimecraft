@@ -62,7 +62,7 @@ impl Registration for Item {
 
 impl RegistryAccess for Item {
     fn registry() -> &'static crate::registry::Registry<Self> {
-        crate::registry::ITEM.deref()
+        crate::registry::ITEM.get().unwrap()
     }
 }
 
@@ -72,6 +72,8 @@ impl serde::Serialize for Item {
         S: serde::Serializer,
     {
         crate::registry::ITEM
+            .get()
+            .unwrap()
             .get_from_raw(self.index_of())
             .unwrap()
             .key()
@@ -86,19 +88,33 @@ impl<'de> serde::Deserialize<'de> for Item {
         D: serde::Deserializer<'de>,
     {
         let id = Id::deserialize(deserializer)?;
-        Ok(crate::registry::ITEM.get_from_id(&id).map_or_else(
-            || {
-                tracing::debug!("tried to load invalid item: {id}");
-                crate::registry::ITEM.default_entry().1.as_item()
-            },
-            |e| *e.1.deref(),
-        ))
+        Ok(crate::registry::ITEM
+            .get()
+            .unwrap()
+            .get_from_id(&id)
+            .map_or_else(
+                || {
+                    tracing::debug!("tried to load invalid item: {id}");
+                    crate::registry::ITEM
+                        .get()
+                        .unwrap()
+                        .default_entry()
+                        .1
+                        .as_item()
+                },
+                |e| *e.1.deref(),
+            ))
     }
 }
 
 impl Default for Item {
     fn default() -> Self {
-        *crate::registry::ITEM.default_entry().1.deref()
+        *crate::registry::ITEM
+            .get()
+            .unwrap()
+            .default_entry()
+            .1
+            .deref()
     }
 }
 
@@ -123,6 +139,8 @@ impl AsItem for crate::registry::Entry<Item> {
 impl std::fmt::Display for Item {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         crate::registry::ITEM
+            .get()
+            .unwrap()
             .get_from_raw(self.index_of())
             .ok_or(std::fmt::Error)?
             .key()
@@ -200,6 +218,8 @@ impl ItemStack {
     /// Whether the target item holder matches the provided predicate.
     pub fn matches<F: Fn(&crate::registry::Entry<Item>) -> bool>(&self, f: F) -> bool {
         f(crate::registry::ITEM
+            .get()
+            .unwrap()
             .get_from_raw(self.item.index_of())
             .unwrap())
     }

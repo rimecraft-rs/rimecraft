@@ -1,8 +1,8 @@
-use rimecraft_primitives::Id;
+use rimecraft_primitives::{id, Id};
 
 #[inline]
 pub fn root_key() -> Id {
-    Id::new("core", "root".to_string())
+    id!("root")
 }
 
 pub static ITEM: super::Freezer<crate::item::Item> = super::Freezer::new(super::Builder::new());

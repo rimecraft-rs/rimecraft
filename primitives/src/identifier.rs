@@ -3,6 +3,8 @@
 static NAMESPACE_CACHES: once_cell::sync::Lazy<rimecraft_caches::Caches<String>> =
     once_cell::sync::Lazy::new(rimecraft_caches::Caches::new);
 
+const DEFAULT_NAMESPACE: &str = "rimecraft";
+
 /// An identifier used to identify things,
 /// containing a namespace and a path.
 ///
@@ -12,7 +14,7 @@ static NAMESPACE_CACHES: once_cell::sync::Lazy<rimecraft_caches::Caches<String>>
 #[derive(PartialEq, Eq, Clone, Hash, Debug)]
 pub struct Identifier {
     #[cfg(feature = "caches")]
-    namespace: &'static str,
+    namespace: crate::Ref<'static, String>,
 
     #[cfg(not(feature = "caches"))]
     namespace: String,
@@ -28,32 +30,24 @@ impl Identifier {
     /// Panics when either namespace or path contains
     /// non-[a-z0-9/._-] characters.
     #[inline]
-    pub fn new(namespace: &str, path: String) -> Self {
+    pub fn new(namespace: String, path: String) -> Self {
         Self::try_new(namespace, path).unwrap()
     }
 
     /// Creates a new identifier.
     #[cfg(feature = "caches")]
-    pub fn try_new(namespace: &str, path: String) -> Result<Self, Error> {
-        let namespace_owned = namespace.to_owned();
-        if Self::is_path_valid(&path) {
-            if !NAMESPACE_CACHES.contains(&namespace_owned) && !Self::is_namespace_valid(namespace)
-            {
-                return Err(Error::InvalidChars {
-                    namespace: namespace_owned,
-                    path,
-                });
+    pub fn try_new(namespace: String, path: String) -> Result<Self, Error> {
+        if is_path_valid(&path) {
+            if !NAMESPACE_CACHES.contains(&namespace) && !is_namespace_valid(&namespace) {
+                return Err(Error::InvalidChars { namespace, path });
             }
 
             Ok(Self {
-                namespace: NAMESPACE_CACHES.get(namespace_owned).as_str(),
+                namespace: crate::Ref(NAMESPACE_CACHES.get(namespace)),
                 path,
             })
         } else {
-            Err(Error::InvalidChars {
-                namespace: namespace_owned,
-                path,
-            })
+            Err(Error::InvalidChars { namespace, path })
         }
     }
 
@@ -96,45 +90,17 @@ impl Identifier {
     /// not exist or is the first character.
     fn split(id: &str, delimiter: char) -> Result<Self, Error> {
         if let Some(arr) = id.split_once(delimiter) {
-            Self::try_new(arr.0, arr.1.to_owned())
+            Self::try_new(arr.0.to_owned(), arr.1.to_owned())
         } else {
-            Self::try_new("unknown", id.to_owned())
+            Self::try_new(DEFAULT_NAMESPACE.to_owned(), id.to_owned())
         }
-    }
-
-    /// Whether `namespace` can be used as an identifier's namespace
-    pub fn is_namespace_valid(namespace: &str) -> bool {
-        for c in namespace.chars() {
-            if !(c == '_' || c == '-' || c >= 'a' || c <= 'z' || c >= '0' || c <= '9' || c == '.') {
-                return false;
-            }
-        }
-        true
-    }
-
-    /// Whether `path` can be used as an identifier's path
-    pub fn is_path_valid(path: &str) -> bool {
-        for c in path.chars() {
-            if !(c == '_'
-                || c == '-'
-                || c >= 'a'
-                || c <= 'z'
-                || c >= '0'
-                || c <= '9'
-                || c == '.'
-                || c == '/')
-            {
-                return false;
-            }
-        }
-        true
     }
 
     /// Gets the namespace of this id.
     #[inline]
     pub fn namespace(&self) -> &str {
         #[cfg(feature = "caches")]
-        return self.namespace;
+        return self.namespace.0;
 
         #[cfg(not(feature = "caches"))]
         return &self.namespace;
@@ -145,6 +111,93 @@ impl Identifier {
     pub fn path(&self) -> &str {
         &self.path
     }
+
+    /// Trimming the formatting of this identifier.
+    ///
+    /// # Examples
+    /// ```
+    /// # use rimecraft_primitives::id;
+    /// assert_eq!(id!("rimecraft", "gold_ingot").trim_fmt(), "gold_ingot");
+    /// ```
+    #[inline]
+    pub fn trim_fmt(&self) -> String {
+        if *self.namespace == DEFAULT_NAMESPACE {
+            self.path.to_owned()
+        } else {
+            self.to_string()
+        }
+    }
+}
+
+/// Creates a new [`Identifier`].
+///
+/// # Examples
+///
+/// ```
+/// # use rimecraft_primitives::id;
+/// // Either parse or create an identifier directly.
+/// assert_eq!(id!("namespace:path").to_string(), "namespace:path");
+/// assert_eq!(id!("namespace", "path").to_string(), "namespace:path");
+///
+/// // By default, the namespace is rimecraft.
+/// assert_eq!(id!("path").to_string(), "rimecraft:path");
+///
+/// // Concat paths with slashes.
+/// assert_eq!(id!["namespace", "path", "path1", "path2"].to_string(), "namespace:path/path1/path2");
+/// ```
+#[macro_export]
+macro_rules! id {
+    ($ns:expr, $p:expr) => {
+        {
+            $crate::identifier::Identifier::new($ns.to_string(), $p.to_string())
+        }
+    };
+
+    ($ns:expr, $p:expr, $( $pp:expr ),+) => {
+        {
+            let mut path = String::new();
+            path.push_str($p.as_ref());
+            $(
+                path.push('/');
+                path.push_str($pp.as_ref());
+            )*
+            $crate::identifier::Identifier::new($ns.to_string(), path)
+        }
+    };
+
+    ($n:expr) => {
+        {
+            $crate::identifier::Identifier::parse($n.as_ref())
+        }
+    }
+}
+
+/// Whether `namespace` can be used as an identifier's namespace
+pub fn is_namespace_valid(namespace: &str) -> bool {
+    for c in namespace.chars() {
+        if !(c == '_' || c == '-' || c >= 'a' || c <= 'z' || c >= '0' || c <= '9' || c == '.') {
+            return false;
+        }
+    }
+    true
+}
+
+/// Whether `path` can be used as an identifier's path
+pub fn is_path_valid(path: &str) -> bool {
+    for c in path.chars() {
+        if !(c == '_'
+            || c == '-'
+            || c >= 'a'
+            || c <= 'z'
+            || c >= '0'
+            || c <= '9'
+            || c == '.'
+            || c == '/')
+        {
+            return false;
+        }
+    }
+    true
 }
 
 /// Error variants of [`Identifier`].
@@ -160,7 +213,7 @@ impl std::fmt::Display for Identifier {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         #[cfg(feature = "caches")]
-        return write!(f, "{}:{}", self.namespace, self.path);
+        return write!(f, "{}:{}", self.namespace.0, self.path);
 
         #[cfg(not(feature = "caches"))]
         return write!(f, "{}:{}", self.namespace, self.path);

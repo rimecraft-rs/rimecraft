@@ -7,7 +7,7 @@ use std::{
 use bytes::Bytes;
 use rimecraft_edcode::Encode;
 use rimecraft_event::Event;
-use rimecraft_primitives::{Id, SerDeUpdate};
+use rimecraft_primitives::{id, Id, SerDeUpdate};
 use tracing::{trace_span, warn};
 
 /// Represents a type of component that can be attached
@@ -478,12 +478,12 @@ fn net_event_comp() -> Component<BytesPEvent> {
 
 #[inline]
 fn net_send_event_comp_id() -> Id {
-    Id::new("core", "net_send".to_string())
+    id!("net_send")
 }
 
 #[inline]
 fn net_recv_event_comp_id() -> Id {
-    Id::new("core", "net_recv".to_string())
+    id!("net_recv")
 }
 
 static NBT_SAVE_ID: once_cell::sync::Lazy<Id> = once_cell::sync::Lazy::new(nbt_save_event_comp_id);
@@ -638,18 +638,18 @@ fn nbt_event_comp() -> Component<ValuePEvent> {
 
 #[inline]
 fn nbt_save_event_comp_id() -> Id {
-    Id::new("core", "nbt_save".to_string())
+    id!("nbt_save")
 }
 
 #[inline]
 fn nbt_read_event_comp_id() -> Id {
-    Id::new("core", "nbt_read".to_string())
+    id!("nbt_write")
 }
 
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
-    use rimecraft_primitives::Id;
+    use rimecraft_primitives::id;
 
     use crate::component::Stored;
 
@@ -659,7 +659,7 @@ mod tests {
     fn register() {
         let mut components = Components::new();
 
-        let id = Id::new("test", "comp".to_string());
+        let id = id!("test", "comp");
         components.register(id.clone(), Component(114_i32));
 
         assert_eq!(components.get::<Component<i32>>(&id).unwrap().0, 114);
@@ -670,11 +670,11 @@ mod tests {
     fn net_sync() {
         let mut components_0 = Components::builder().net_sync().build();
 
-        let id_0 = Id::new("test", "comp0".to_string());
+        let id_0 = id!("test", "comp0");
         components_0.register(id_0.clone(), Synced(Component(114_i32), id_0.clone()));
-        let id_1 = Id::new("test", "comp1".to_string());
+        let id_1 = id!("test", "comp1");
         components_0.register(id_1.clone(), Synced(Component(514_i32), id_1.clone()));
-        let id_2 = Id::new("test", "comp2".to_string());
+        let id_2 = id!("test", "comp2");
         components_0.register(id_2.clone(), Component(514_i32));
 
         let mut bytes = BytesMut::new();
@@ -714,11 +714,11 @@ mod tests {
     fn nbt_rw() {
         let mut components_0 = Components::builder().nbt_storing().build();
 
-        let id_0 = Id::new("test", "comp0".to_string());
+        let id_0 = id!("test", "comp0");
         components_0.register(id_0.clone(), Stored(Component(114_i32), id_0.clone()));
-        let id_1 = Id::new("test", "comp1".to_string());
+        let id_1 = id!("test", "comp1");
         components_0.register(id_1.clone(), Stored(Component(514_i32), id_1.clone()));
-        let id_2 = Id::new("test", "comp2".to_string());
+        let id_2 = id!("test", "comp2");
         components_0.register(id_2.clone(), Component(514_i32));
 
         let nbt = fastnbt::to_value(components_0).unwrap();

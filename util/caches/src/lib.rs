@@ -4,9 +4,7 @@ pub mod arc;
 #[cfg(test)]
 mod tests;
 
-use std::hash::Hash;
-
-use dashmap::DashMap;
+use std::{collections::HashMap, hash::Hash, sync::Mutex};
 
 #[cfg(feature = "arc")]
 pub use arc::Caches as ArcCaches;
@@ -19,7 +17,7 @@ pub struct Caches<T>
 where
     T: Hash + Eq + 'static,
 {
-    map: DashMap<&'static T, *const T>,
+    map: Mutex<HashMap<&'static T, *const T>>,
 }
 
 impl<T> Caches<T>
@@ -37,12 +35,13 @@ where
     /// If an equaled value doesn't exist in this caches, the value
     /// will be leaked into heap.
     pub fn get(&self, value: T) -> &T {
-        if let Some(v) = self.map.get(&value) {
+        let mut guard = self.map.lock().unwrap();
+        if let Some(v) = guard.get(&value) {
             unsafe { &**v }
         } else {
             let ptr = Box::into_raw(Box::new(value));
             let refe = unsafe { &*ptr };
-            self.map.insert(refe, ptr as *const T);
+            guard.insert(refe, ptr as *const T);
             refe
         }
     }
@@ -50,7 +49,7 @@ where
     /// Whether this caches contains the value.
     #[inline]
     pub fn contains(&self, value: &T) -> bool {
-        self.map.contains_key(value)
+        self.map.lock().unwrap().contains_key(value)
     }
 }
 
@@ -61,7 +60,7 @@ where
     #[inline]
     fn default() -> Self {
         Self {
-            map: DashMap::new(),
+            map: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -71,7 +70,7 @@ where
     T: Hash + Eq,
 {
     fn drop(&mut self) {
-        let map = std::mem::take(&mut self.map);
+        let map = std::mem::take(self.map.get_mut().unwrap());
         for (_, v) in map {
             unsafe { drop(Box::from_raw(v as *mut T)) };
         }

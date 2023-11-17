@@ -3,7 +3,7 @@ mod id {
 
     #[test]
     fn to_str() {
-        let id = Id::new("modid", "example_path".to_string());
+        let id = Id::new("modid".to_string(), "example_path".to_string());
         assert_eq!(id.to_string(), "modid:example_path");
     }
 

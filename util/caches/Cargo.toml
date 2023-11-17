@@ -12,7 +12,7 @@ categories = ["caching"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-dashmap = "5.5"
 
 [features]
+default = ["arc"]
 arc = []
