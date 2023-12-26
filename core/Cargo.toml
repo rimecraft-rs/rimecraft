@@ -28,7 +28,7 @@ toml = "0.8"
 uuid = { version = "1.4", features = ["v3", "v4"] }
 md-5 = "0.10"
 url = { version = "2.4", features = ["serde"] }
-sysinfo = "0.29"
+sysinfo = "0.30"
 bytes = "1.4"
 glam = "0.25"
 anyhow = "*"
