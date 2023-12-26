@@ -30,7 +30,7 @@ md-5 = "0.10"
 url = { version = "2.4", features = ["serde"] }
 sysinfo = "0.29"
 bytes = "1.4"
-glam = "0.24"
+glam = "0.25"
 anyhow = "*"
 fastsnbt = "*"
 fastnbt = "*"
