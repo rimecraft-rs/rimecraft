@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 /// Used for caching namespaces at runtime.
 #[cfg(feature = "caches")]
 static NAMESPACE_CACHES: once_cell::sync::Lazy<rimecraft_caches::Caches<String>> =
@@ -126,6 +128,15 @@ impl Identifier {
         } else {
             self.to_string()
         }
+    }
+}
+
+impl FromStr for Identifier {
+    type Err = Error;
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::try_parse(s)
     }
 }
 
