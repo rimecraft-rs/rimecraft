@@ -98,104 +98,75 @@ impl<'de> Decode<'de> for bool {
 }
 
 #[cfg(feature = "nbt")]
-impl<T> Encode for Nbt<'_, T>
+impl<T> Encode for Nbt<T>
 where
     T: serde::Serialize,
 {
-    type Error = Infallible;
+    type Error = fastnbt::error::Error;
 
     #[inline]
     fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
-        struct WriteAdapt<'a, T: 'a>(pub &'a mut T);
-
-        impl<T> std::io::Write for WriteAdapt<'_, T>
-        where
-            T: bytes::BufMut,
-        {
-            #[inline]
-            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-                unsafe { &mut *(self.0 as *mut T as *mut bytes::buf::Writer<T>) }.write(buf)
-            }
-
-            #[inline]
-            fn flush(&mut self) -> std::io::Result<()> {
-                unsafe { &mut *(self.0 as *mut T as *mut bytes::buf::Writer<T>) }.flush()
-            }
-        }
-
-        fastnbt::to_writer(WriteAdapt(buf), self.0)?;
-        Ok(())
+        fastnbt::to_writer(bytes::BufMut::writer(buf), &self.0)
     }
 }
 
 #[cfg(feature = "nbt")]
-impl<'de, T> Decode<'de> for Nbt<'_, T>
+impl<'de, T> Decode<'de> for Nbt<T>
 where
-    T: serde::Deserialize<'de>,
+    T: for<'a> serde::Deserialize<'a>,
 {
     type Output = T;
 
-    type Error = Infallible;
+    type Error = fastnbt::error::Error;
 
     #[inline]
     fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
-        struct ReadAdapt<'a, T: 'a>(pub &'a mut T);
-
-        impl<T> std::io::Read for ReadAdapt<'_, T>
-        where
-            T: bytes::Buf,
-        {
-            #[inline]
-            fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-                unsafe { &mut *(self.0 as *mut T as *mut bytes::buf::Reader<T>) }.read(buf)
-            }
-        }
-
-        Ok(fastnbt::from_reader(ReadAdapt(buf))?)
+        fastnbt::from_reader(bytes::Buf::reader(buf))
     }
 }
 
 #[cfg(feature = "json")]
-impl<T> Encode for Json<'_, T>
+impl<T> Encode for Json<T>
 where
     T: serde::Serialize,
 {
-    type Error = Infallible;
+    type Error = serde_json::Error;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
-        serde_json::to_string(&self.0)?.encode(buf)
+        let vec = serde_json::to_vec(&self.0)?;
+        VarI32(vec.len() as i32).encode(&mut buf).unwrap();
+        buf.put_slice(&vec);
+        Ok(())
     }
 }
 
 #[cfg(feature = "json")]
-impl<'de, T> Decode<'de> for Json<'_, T>
+impl<'de, T> Decode<'de> for Json<T>
 where
-    T: serde::de::DeserializeOwned,
+    T: for<'a> serde::de::Deserialize<'a>,
 {
     type Output = T;
+
+    type Error = ErrorWithVarI32Len<serde_json::Error>;
 
     fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
         let len = VarI32::decode(buf)? as usize;
-        let mut vec = Vec::with_capacity(len);
-
-        for _ in 0..len {
-            vec.push(buf.get_u8());
-        }
-
-        Ok(serde_json::from_reader(vec.as_slice())?)
+        use std::io::Read;
+        serde_json::from_reader(bytes::Buf::reader(buf).take(len as u64))
+            .map_err(ErrorWithVarI32Len::Target)
     }
 }
 
@@ -341,7 +312,7 @@ where
     K: Encode,
     V: Encode,
 {
-    type Error = KvError<<K as Encode>::Error, <V as Encode>::Error>;
+    type Error = EitherError<<K as Encode>::Error, <V as Encode>::Error>;
 
     #[inline]
     fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
@@ -350,8 +321,8 @@ where
     {
         VarI32(self.len() as i32).encode(buf).unwrap();
         for (key, value) in self.iter() {
-            key.encode(buf).map_err(KvError::Key)?;
-            value.encode(buf).map_err(KvError::Value)?;
+            key.encode(buf).map_err(EitherError::A)?;
+            value.encode(buf).map_err(EitherError::B)?;
         }
         Ok(())
     }
@@ -365,7 +336,7 @@ where
 {
     type Output = std::collections::HashMap<OK, OV>;
 
-    type Error = ErrorWithVarI32Len<KvError<ErrK, ErrV>>;
+    type Error = ErrorWithVarI32Len<EitherError<ErrK, ErrV>>;
 
     fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
@@ -374,8 +345,8 @@ where
         let len = VarI32::decode(buf)? as usize;
         let mut map = std::collections::HashMap::with_capacity(len);
         for _ in 0..len {
-            let obj = K::decode(buf).map_err(|e| ErrorWithVarI32Len::Target(KvError::Key(e)))?;
-            let obj1 = V::decode(buf).map_err(|e| ErrorWithVarI32Len::Target(KvError::Value(e)))?;
+            let obj = K::decode(buf).map_err(|e| ErrorWithVarI32Len::Target(EitherError::A(e)))?;
+            let obj1 = V::decode(buf).map_err(|e| ErrorWithVarI32Len::Target(EitherError::B(e)))?;
             map.insert(obj, obj1);
         }
         Ok(map)
@@ -457,7 +428,7 @@ impl<'de> Decode<'de> for uuid::Uuid {
 
 #[cfg(feature = "nbt")]
 impl Encode for std::collections::HashMap<String, fastnbt::Value> {
-    type Error = Infallible;
+    type Error = fastnbt::error::Error;
 
     #[inline]
     fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
@@ -472,7 +443,7 @@ impl Encode for std::collections::HashMap<String, fastnbt::Value> {
 impl<'de> Decode<'de> for std::collections::HashMap<String, fastnbt::Value> {
     type Output = std::collections::HashMap<String, fastnbt::Value>;
 
-    type Error = Infallible;
+    type Error = fastnbt::error::Error;
 
     #[inline]
     fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>

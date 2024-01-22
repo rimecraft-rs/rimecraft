@@ -73,11 +73,11 @@ where
 
 /// Layer for encoding and decoding in nbt binary format for packets.
 #[cfg(feature = "nbt")]
-pub struct Nbt<'a, T>(pub &'a T);
+pub struct Nbt<T>(pub T);
 
 /// Layer for encoding and decoding in json utf8 for packets.
 #[cfg(feature = "json")]
-pub struct Json<'a, T>(pub &'a T);
+pub struct Json<T>(pub T);
 
 /// Represents a variable integer.
 pub struct VarI32(pub i32);

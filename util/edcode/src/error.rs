@@ -44,29 +44,29 @@ impl<T> From<VarI32TooBigError> for ErrorWithVarI32Len<T> {
 }
 
 #[derive(Debug)]
-pub enum KvError<K, V> {
-    Key(K),
-    Value(V),
+pub enum EitherError<T1, T2> {
+    A(T1),
+    B(T2),
 }
 
-impl<K: std::fmt::Display, V: std::fmt::Display> std::fmt::Display for KvError<K, V> {
+impl<T1: std::fmt::Display, T2: std::fmt::Display> std::fmt::Display for EitherError<T1, T2> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            KvError::Key(e) => write!(f, "key error: {}", e),
-            KvError::Value(e) => write!(f, "value error: {}", e),
+            EitherError::A(e) => write!(f, "A error: {}", e),
+            EitherError::B(e) => write!(f, "B error: {}", e),
         }
     }
 }
 
-impl<K: std::error::Error + 'static, V: std::error::Error + 'static> std::error::Error
-    for KvError<K, V>
+impl<T1: std::error::Error + 'static, T2: std::error::Error + 'static> std::error::Error
+    for EitherError<T1, T2>
 {
     #[inline]
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            KvError::Key(e) => Some(e),
-            KvError::Value(e) => Some(e),
+            EitherError::A(e) => Some(e),
+            EitherError::B(e) => Some(e),
         }
     }
 }
