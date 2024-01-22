@@ -12,7 +12,6 @@ categories = ["encoding"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-anyhow = "1.0"
 bytes = "1.5"
 serde = { version = "1.0", optional = true }
 # custom formats

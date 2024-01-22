@@ -1,7 +1,23 @@
-use std::hash::Hash;
+use std::{convert::Infallible, hash::Hash};
 
 use rimecraft_collections::PackedArray;
-use rimecraft_edcode::{Decode, Encode, VarI32};
+use rimecraft_edcode::{error::ErrorWithVarI32Err, Decode, Encode, VarI32};
+
+pub mod error {
+    #[derive(Debug)]
+    pub struct RawIdNotFoundError;
+
+    impl std::fmt::Display for RawIdNotFoundError {
+        #[inline]
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "raw id not found in the target id list")
+        }
+    }
+
+    impl std::error::Error for RawIdNotFoundError {}
+}
+
+use error::*;
 
 /// A palette maps objects from and to small integer IDs that uses less
 /// number of bits to make storage smaller.
@@ -139,7 +155,9 @@ impl<'a, T> Encode for Palette<'a, T>
 where
     T: Eq + Copy + Hash + 'a,
 {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    type Error = Infallible;
+
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -179,7 +197,9 @@ impl<'a, T> rimecraft_edcode::Update for Palette<'a, T>
 where
     T: Eq + Copy + Hash + 'a,
 {
-    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    type Error = ErrorWithVarI32Err<RawIdNotFoundError>;
+
+    fn update<B>(&mut self, buf: &mut B) -> Result<(), <Self as rimecraft_edcode::Update>::Error>
     where
         B: bytes::Buf,
     {
@@ -197,22 +217,18 @@ where
                     self.ids
                         .get(VarI32::decode(buf)? as usize)
                         .copied()
-                        .ok_or_else(|| {
-                            anyhow::anyhow!("raw id not found in the target id list.")
-                        })?,
+                        .ok_or_else(|| ErrorWithVarI32Err::Target(RawIdNotFoundError))?,
                 );
             }
             Inner::BiMap(bimap) => {
-                *bimap = {
-                    let mut map = bimap::BiMap::new();
-                    for _ in 0..VarI32::decode(buf)? {
-                        map.insert(
-                            map.len(),
-                            *self.ids.get(VarI32::decode(buf)? as usize).unwrap(),
-                        );
-                    }
-                    map
+                let mut map = bimap::BiMap::new();
+                for _ in 0..VarI32::decode(buf)? {
+                    map.insert(
+                        map.len(),
+                        *self.ids.0.get(VarI32::decode(buf)? as usize).unwrap(),
+                    );
                 }
+                *bimap = map
             }
         }
 

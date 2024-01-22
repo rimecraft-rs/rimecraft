@@ -1,4 +1,4 @@
-/// Used for caching namespaces in runtime.
+/// Used for caching namespaces at runtime.
 #[cfg(feature = "caches")]
 static NAMESPACE_CACHES: once_cell::sync::Lazy<rimecraft_caches::Caches<String>> =
     once_cell::sync::Lazy::new(rimecraft_caches::Caches::new);
@@ -254,8 +254,10 @@ impl<'de> serde::Deserialize<'de> for Identifier {
 
 #[cfg(feature = "edcode")]
 impl rimecraft_edcode::Encode for Identifier {
+    type Error = std::convert::Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -267,11 +269,19 @@ impl rimecraft_edcode::Encode for Identifier {
 impl<'de> rimecraft_edcode::Decode<'de> for Identifier {
     type Output = Self;
 
+    type Error = rimecraft_edcode::error::EitherError<
+        Error,
+        rimecraft_edcode::error::ErrorWithVarI32Err<std::string::FromUtf8Error>,
+    >;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
-        Ok(Self::try_parse(&String::decode(buf)?)?)
+        use rimecraft_edcode::error::EitherError;
+        String::decode(buf)
+            .map_err(EitherError::B)
+            .and_then(|s| Self::try_parse(&s).map_err(EitherError::A))
     }
 }

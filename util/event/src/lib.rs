@@ -22,11 +22,9 @@ where
 
     invoker_factory: fn(&'static [&'static T]) -> Box<T>,
 
-    // 0: raw listeners with phases
-    //
-    // 1: cached invoker
-    //
-    // 2: cached listener references
+    /// 0: raw listeners with phases\
+    /// 1: cached invoker\
+    /// 2: cached listener references
     lis_cac: RwLock<LisCac<T, Phase>>,
 }
 

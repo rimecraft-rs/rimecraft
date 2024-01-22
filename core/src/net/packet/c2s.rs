@@ -1,11 +1,17 @@
-use anyhow::Ok;
+use std::convert::Infallible;
 
 use bytes::Bytes;
-use rimecraft_edcode::{Decode, Encode, VarI32};
+use rimecraft_edcode::{
+    error::{ErrorWithVarI32Err, VarI32TooBigError},
+    Decode, Encode, VarI32,
+};
 use rsa::RsaPrivateKey;
 
-use crate::net::listener;
+use crate::{net::listener, BoxedError};
 
+use super::error::*;
+
+#[derive(Debug)]
 pub struct Handshake {
     proto_ver: i32,
     addr: String,
@@ -33,7 +39,7 @@ impl Handshake {
     }
 
     #[inline]
-    pub fn address(&self) -> &str {
+    pub fn addr(&self) -> &str {
         &self.addr
     }
 
@@ -49,8 +55,10 @@ impl Handshake {
 }
 
 impl Encode for Handshake {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -64,13 +72,15 @@ impl Encode for Handshake {
 impl<'de> Decode<'de> for Handshake {
     type Output = Self;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    type Error = BoxedError;
+
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
         let proto_ver = VarI32::decode(buf)?;
         let addr = String::decode(buf)?;
-        let port = i16::decode(buf)? as u16;
+        let port = i16::decode(buf).unwrap() as u16;
         let state = VarI32::decode(buf)?;
 
         Ok(Self {
@@ -78,7 +88,7 @@ impl<'de> Decode<'de> for Handshake {
             addr,
             port,
             intended_state: ConnectionIntent::n(state)
-                .ok_or_else(|| anyhow::anyhow!("unknown connection intent: {state}"))?,
+                .ok_or(UnknownConnectionIntentError(state))?,
         })
     }
 }
@@ -94,7 +104,7 @@ where
 }
 
 #[repr(i32)]
-#[derive(Clone, Copy, PartialEq, Eq, enumn::N)]
+#[derive(Clone, Copy, PartialEq, Eq, enumn::N, Debug)]
 pub enum ConnectionIntent {
     Status,
     Login,
@@ -110,14 +120,17 @@ impl ConnectionIntent {
     }
 }
 
+#[derive(Debug)]
 pub struct LoginHello {
     name: String,
     profile_id: uuid::Uuid,
 }
 
 impl Encode for LoginHello {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Infallible>
     where
         B: bytes::BufMut,
     {
@@ -129,13 +142,15 @@ impl Encode for LoginHello {
 impl<'de> Decode<'de> for LoginHello {
     type Output = Self;
 
+    type Error = BoxedError;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
         let name = String::decode(buf)?;
-        let uuid = uuid::Uuid::decode(buf)?;
+        let uuid = uuid::Uuid::decode(buf).unwrap();
 
         Ok(Self {
             name,
@@ -146,6 +161,7 @@ impl<'de> Decode<'de> for LoginHello {
 
 impl<L> super::Packet<L> for LoginHello where L: listener::Accept<Self> {}
 
+#[derive(Debug)]
 pub struct LoginQueryRes {
     query_id: i32,
     res: Option<bytes::Bytes>,
@@ -159,7 +175,9 @@ impl LoginQueryRes {
 }
 
 impl Encode for LoginQueryRes {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    type Error = Infallible;
+
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -178,7 +196,9 @@ impl Encode for LoginQueryRes {
 impl<'de> Decode<'de> for LoginQueryRes {
     type Output = Self;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    type Error = ErrorWithVarI32Err<PayloadTooLargeError>;
+
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -187,8 +207,10 @@ impl<'de> Decode<'de> for LoginQueryRes {
         impl<'de> Decode<'de> for NullableRes {
             type Output = bytes::Bytes;
 
+            type Error = PayloadTooLargeError;
+
             #[inline]
-            fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+            fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
             where
                 B: bytes::Buf,
             {
@@ -198,16 +220,15 @@ impl<'de> Decode<'de> for LoginQueryRes {
                     buf.advance(remaining);
                     Ok(Bytes::new())
                 } else {
-                    Err(anyhow::anyhow!(
-                        "payload may not be larger than {} bytes",
-                        super::QUERY_MAX_PAYLOAD_LEN
-                    ))
+                    Err(PayloadTooLargeError {
+                        max: super::QUERY_MAX_PAYLOAD_LEN,
+                    })
                 }
             }
         }
 
         let qid = VarI32::decode(buf)?;
-        let res = Option::<NullableRes>::decode(buf)?;
+        let res = Option::<NullableRes>::decode(buf).map_err(ErrorWithVarI32Err::Target)?;
 
         Ok(Self { query_id: qid, res })
     }
@@ -215,12 +236,13 @@ impl<'de> Decode<'de> for LoginQueryRes {
 
 impl<L> super::Packet<L> for LoginQueryRes where L: listener::Accept<Self> {}
 
+#[derive(Debug)]
 pub struct LoginKey {
     encrypted_secret_key: Bytes,
 
     /// The nonce value.
     ///
-    /// This value is either encrypted (the left side of {@code Either}) or signed
+    /// This value is either encrypted (the left side of `Either`) or signed
     /// (the right side). If encrypted, then it must be done so using the server's public key
     /// and the server verifies it by decrypting and comparing nonces. If signed, then it must
     /// be done so using the user's private key provided from Mojang's server, and the server
@@ -229,8 +251,10 @@ pub struct LoginKey {
 }
 
 impl Encode for LoginKey {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -242,8 +266,10 @@ impl Encode for LoginKey {
 impl<'de> Decode<'de> for LoginKey {
     type Output = LoginKey;
 
+    type Error = VarI32TooBigError;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -260,23 +286,22 @@ impl<'de> Decode<'de> for LoginKey {
 impl<L> super::Packet<L> for LoginKey where L: listener::Accept<Self> {}
 
 impl LoginKey {
-    #[inline]
     pub fn new<R>(
         rng: &mut R,
         secret_key: &[u8],
         public_key: &rsa::RsaPublicKey,
         nonce: &[u8],
-    ) -> anyhow::Result<LoginKey>
+    ) -> Result<LoginKey, rsa::Error>
     where
         R: rsa::rand_core::CryptoRngCore,
     {
         Ok(Self {
             encrypted_secret_key: public_key
                 .encrypt(rng, rsa::pkcs1v15::Pkcs1v15Encrypt, secret_key)?
-                .try_into()?,
+                .into(),
             nonce: public_key
                 .encrypt(rng, rsa::pkcs1v15::Pkcs1v15Encrypt, nonce)?
-                .try_into()?,
+                .into(),
         })
     }
 
@@ -294,6 +319,7 @@ impl LoginKey {
     }
 }
 
+#[derive(Debug)]
 pub struct QueryPing {
     start_time: u64,
 }
@@ -305,8 +331,10 @@ impl QueryPing {
 }
 
 impl Encode for QueryPing {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -318,8 +346,10 @@ impl Encode for QueryPing {
 impl<'de> Decode<'de> for QueryPing {
     type Output = Self;
 
+    type Error = Infallible;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -331,11 +361,14 @@ impl<'de> Decode<'de> for QueryPing {
 
 impl<L> super::Packet<L> for QueryPing where L: listener::Accept<Self> {}
 
+#[derive(Debug)]
 pub struct QueryReq;
 
 impl Encode for QueryReq {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, _buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, _buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -346,8 +379,10 @@ impl Encode for QueryReq {
 impl<'de> Decode<'de> for QueryReq {
     type Output = Self;
 
+    type Error = Infallible;
+
     #[inline]
-    fn decode<B>(_buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(_buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {

@@ -1,10 +1,12 @@
-use std::hash::Hash;
+use std::{convert::Infallible, hash::Hash, string::FromUtf8Error};
 
-use super::*;
+use crate::{error::*, *};
 
 impl Encode for bytes::Bytes {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -17,8 +19,10 @@ impl Encode for bytes::Bytes {
 impl<'de> Decode<'de> for bytes::Bytes {
     type Output = bytes::Bytes;
 
+    type Error = VarI32TooBigError;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -27,285 +31,50 @@ impl<'de> Decode<'de> for bytes::Bytes {
     }
 }
 
-impl Encode for u8 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_u8(*self);
-        Ok(())
-    }
+macro_rules! edcode_primitive {
+    ($($t:ty => $fe:ident, $fd:ident),*) => {
+        $(
+            impl Encode for $t {
+                type Error = Infallible;
+
+                #[inline]
+                fn encode<B: bytes::BufMut>(&self, buf: &mut B) -> Result<(), Self::Error> {
+                    buf.$fe(*self);
+                    Ok(())
+                }
+            }
+
+            impl<'de> Decode<'de> for $t {
+                type Output = $t;
+                type Error = Infallible;
+
+                #[inline]
+                fn decode<B: bytes::Buf>(buf: &'de mut B) -> Result<Self::Output, Self::Error>{
+                    Ok(buf.$fd())
+                }
+            }
+        )*
+    };
 }
 
-impl<'de> Decode<'de> for u8 {
-    type Output = u8;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_u8())
-    }
-}
-
-impl Encode for i8 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_i8(*self);
-        Ok(())
-    }
-}
-
-impl<'de> Decode<'de> for i8 {
-    type Output = i8;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_i8())
-    }
-}
-
-impl Encode for u16 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_u16(*self);
-        Ok(())
-    }
-}
-
-impl<'de> Decode<'de> for u16 {
-    type Output = u16;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_u16())
-    }
-}
-
-impl Encode for i16 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_i16(*self);
-        Ok(())
-    }
-}
-
-impl<'de> Decode<'de> for i16 {
-    type Output = i16;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_i16())
-    }
-}
-
-impl Encode for u32 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_u32(*self);
-        Ok(())
-    }
-}
-
-impl<'de> Decode<'de> for u32 {
-    type Output = u32;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_u32())
-    }
-}
-
-impl Encode for i32 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_i32(*self);
-        Ok(())
-    }
-}
-
-impl<'de> Decode<'de> for i32 {
-    type Output = i32;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_i32())
-    }
-}
-
-impl Encode for u64 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_u64(*self);
-        Ok(())
-    }
-}
-
-impl<'de> Decode<'de> for u64 {
-    type Output = u64;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_u64())
-    }
-}
-
-impl Encode for i64 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_i64(*self);
-        Ok(())
-    }
-}
-
-impl<'de> Decode<'de> for i64 {
-    type Output = i64;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_i64())
-    }
-}
-
-impl Encode for u128 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_u128(*self);
-        Ok(())
-    }
-}
-
-impl<'de> Decode<'de> for u128 {
-    type Output = u128;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_u128())
-    }
-}
-
-impl Encode for i128 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_i128(*self);
-        Ok(())
-    }
-}
-
-impl<'de> Decode<'de> for i128 {
-    type Output = i128;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_i128())
-    }
-}
-
-impl Encode for f32 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_f32(*self);
-        Ok(())
-    }
-}
-
-impl<'de> Decode<'de> for f32 {
-    type Output = f32;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_f32())
-    }
-}
-
-impl Encode for f64 {
-    #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
-    where
-        B: bytes::BufMut,
-    {
-        buf.put_f64(*self);
-        Ok(())
-    }
-}
-
-impl<'de> Decode<'de> for f64 {
-    type Output = f64;
-
-    #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
-    where
-        B: bytes::Buf,
-    {
-        Ok(buf.get_f64())
-    }
+edcode_primitive! {
+    u8 => put_u8, get_u8,
+    u16 => put_u16, get_u16,
+    u32 => put_u32, get_u32,
+    u64 => put_u64, get_u64,
+    i8 => put_i8, get_i8,
+    i16 => put_i16, get_i16,
+    i32 => put_i32, get_i32,
+    i64 => put_i64, get_i64,
+    f32 => put_f32, get_f32,
+    f64 => put_f64, get_f64
 }
 
 impl Encode for bool {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -317,8 +86,10 @@ impl Encode for bool {
 impl<'de> Decode<'de> for bool {
     type Output = bool;
 
+    type Error = Infallible;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -327,103 +98,82 @@ impl<'de> Decode<'de> for bool {
 }
 
 #[cfg(feature = "nbt")]
-impl<T> Encode for Nbt<'_, T>
+impl<T> Encode for Nbt<T>
 where
     T: serde::Serialize,
 {
+    type Error = fastnbt::error::Error;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
-        struct WriteAdapt<'a, T: 'a>(pub &'a mut T);
-
-        impl<T> std::io::Write for WriteAdapt<'_, T>
-        where
-            T: bytes::BufMut,
-        {
-            #[inline]
-            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-                unsafe { &mut *(self.0 as *mut T as *mut bytes::buf::Writer<T>) }.write(buf)
-            }
-
-            #[inline]
-            fn flush(&mut self) -> std::io::Result<()> {
-                unsafe { &mut *(self.0 as *mut T as *mut bytes::buf::Writer<T>) }.flush()
-            }
-        }
-
-        fastnbt::to_writer(WriteAdapt(buf), self.0)?;
-        Ok(())
+        fastnbt::to_writer(bytes::BufMut::writer(buf), &self.0)
     }
 }
 
 #[cfg(feature = "nbt")]
-impl<'de, T> Decode<'de> for Nbt<'_, T>
+impl<'de, T> Decode<'de> for Nbt<T>
 where
-    T: serde::Deserialize<'de>,
+    T: for<'a> serde::Deserialize<'a>,
 {
     type Output = T;
 
+    type Error = fastnbt::error::Error;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
-        struct ReadAdapt<'a, T: 'a>(pub &'a mut T);
-
-        impl<T> std::io::Read for ReadAdapt<'_, T>
-        where
-            T: bytes::Buf,
-        {
-            #[inline]
-            fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-                unsafe { &mut *(self.0 as *mut T as *mut bytes::buf::Reader<T>) }.read(buf)
-            }
-        }
-
-        Ok(fastnbt::from_reader(ReadAdapt(buf))?)
+        fastnbt::from_reader(bytes::Buf::reader(buf))
     }
 }
 
 #[cfg(feature = "json")]
-impl<T> Encode for Json<'_, T>
+impl<T> Encode for Json<T>
 where
     T: serde::Serialize,
 {
+    type Error = serde_json::Error;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
-        serde_json::to_string(&self.0)?.encode(buf)
+        let vec = serde_json::to_vec(&self.0)?;
+        VarI32(vec.len() as i32).encode(&mut buf).unwrap();
+        buf.put_slice(&vec);
+        Ok(())
     }
 }
 
 #[cfg(feature = "json")]
-impl<'de, T> Decode<'de> for Json<'_, T>
+impl<'de, T> Decode<'de> for Json<T>
 where
-    T: serde::de::DeserializeOwned,
+    T: for<'a> serde::de::Deserialize<'a>,
 {
     type Output = T;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    type Error = ErrorWithVarI32Err<serde_json::Error>;
+
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
         let len = VarI32::decode(buf)? as usize;
-        let mut vec = Vec::with_capacity(len);
-
-        for _ in 0..len {
-            vec.push(buf.get_u8());
-        }
-
-        Ok(serde_json::from_reader(vec.as_slice())?)
+        use std::io::Read;
+        serde_json::from_reader(bytes::Buf::reader(buf).take(len as u64))
+            .map_err(ErrorWithVarI32Err::Target)
     }
 }
 
 impl Encode for VarI32 {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    type Error = Infallible;
+
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -446,7 +196,9 @@ impl Encode for VarI32 {
 impl<'de> Decode<'de> for VarI32 {
     type Output = i32;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    type Error = VarI32TooBigError;
+
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -464,15 +216,17 @@ impl<'de> Decode<'de> for VarI32 {
             pos += 7;
 
             if pos >= 32 {
-                return Err(anyhow::anyhow!("VarI32 too big"));
+                return Err(VarI32TooBigError);
             }
         }
     }
 }
 
 impl Encode for str {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -484,8 +238,10 @@ impl Encode for str {
 }
 
 impl Encode for String {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -496,18 +252,16 @@ impl Encode for String {
 impl<'de> Decode<'de> for String {
     type Output = String;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    type Error = ErrorWithVarI32Err<FromUtf8Error>;
+
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
         let len = VarI32::decode(buf)? as usize;
-        let mut vec = Vec::with_capacity(len);
-
-        for _ in 0..len {
-            vec.push(buf.get_u8());
-        }
-
-        Ok(String::from_utf8(vec)?)
+        let mut vec = vec![0; len];
+        buf.copy_to_slice(&mut vec[..]);
+        Ok(String::from_utf8(vec).map_err(ErrorWithVarI32Err::Target)?)
     }
 }
 
@@ -515,35 +269,38 @@ impl<T> Encode for [T]
 where
     T: Encode,
 {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    type Error = <T as Encode>::Error;
+
+    #[inline]
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
-        VarI32(self.len() as i32).encode(buf)?;
-
+        VarI32(self.len() as i32).encode(buf).unwrap();
         for object in self.iter() {
             object.encode(buf)?;
         }
-
         Ok(())
     }
 }
 
-impl<'de, T, O> Decode<'de> for Vec<T>
+impl<'de, T, O, Err> Decode<'de> for Vec<T>
 where
-    T: for<'a> Decode<'a, Output = O>,
+    T: for<'a> Decode<'a, Output = O, Error = Err>,
 {
     type Output = Vec<O>;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    type Error = ErrorWithVarI32Err<Err>;
+
+    fn decode<B>(mut buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
-        let len = VarI32::decode(buf)? as usize;
+        let len = VarI32::decode(&mut buf)? as usize;
         let mut vec = Vec::with_capacity(len);
 
         for _ in 0..len {
-            vec.push(T::decode(buf)?);
+            vec.push(T::decode(&mut buf).map_err(ErrorWithVarI32Err::Target)?);
         }
 
         Ok(vec)
@@ -555,42 +312,43 @@ where
     K: Encode,
     V: Encode,
 {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    type Error = EitherError<<K as Encode>::Error, <V as Encode>::Error>;
+
+    #[inline]
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
-        VarI32(self.len() as i32).encode(buf)?;
-
+        VarI32(self.len() as i32).encode(buf).unwrap();
         for (key, value) in self.iter() {
-            key.encode(buf)?;
-            value.encode(buf)?;
+            key.encode(buf).map_err(EitherError::A)?;
+            value.encode(buf).map_err(EitherError::B)?;
         }
-
         Ok(())
     }
 }
 
-impl<'de, K, V, OK, OV> Decode<'de> for std::collections::HashMap<K, V>
+impl<'de, K, V, OK, OV, ErrK, ErrV> Decode<'de> for std::collections::HashMap<K, V>
 where
-    K: for<'a> Decode<'a, Output = OK>,
-    V: for<'a> Decode<'a, Output = OV>,
+    K: for<'a> Decode<'a, Output = OK, Error = ErrK>,
+    V: for<'a> Decode<'a, Output = OV, Error = ErrV>,
     OK: Hash + Eq,
 {
     type Output = std::collections::HashMap<OK, OV>;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    type Error = ErrorWithVarI32Err<EitherError<ErrK, ErrV>>;
+
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
         let len = VarI32::decode(buf)? as usize;
         let mut map = std::collections::HashMap::with_capacity(len);
-
         for _ in 0..len {
-            let obj = K::decode(buf)?;
-            let obj1 = V::decode(buf)?;
+            let obj = K::decode(buf).map_err(|e| ErrorWithVarI32Err::Target(EitherError::A(e)))?;
+            let obj1 = V::decode(buf).map_err(|e| ErrorWithVarI32Err::Target(EitherError::B(e)))?;
             map.insert(obj, obj1);
         }
-
         Ok(map)
     }
 }
@@ -599,15 +357,18 @@ impl<T> Encode for Option<T>
 where
     T: Encode,
 {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    type Error = <T as Encode>::Error;
+
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
         if let Some(value) = self {
-            true.encode(buf)?;
+            true.encode(buf).unwrap();
             value.encode(buf)
         } else {
-            false.encode(buf)
+            false.encode(buf).unwrap();
+            Ok(())
         }
     }
 }
@@ -618,11 +379,13 @@ where
 {
     type Output = Option<OT>;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    type Error = <T as Decode<'de>>::Error;
+
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
-        Ok(if bool::decode(buf)? {
+        Ok(if bool::decode(buf).unwrap() {
             Some(T::decode(buf)?)
         } else {
             None
@@ -632,8 +395,10 @@ where
 
 #[cfg(feature = "uuid")]
 impl Encode for uuid::Uuid {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -648,8 +413,10 @@ impl Encode for uuid::Uuid {
 impl<'de> Decode<'de> for uuid::Uuid {
     type Output = uuid::Uuid;
 
+    type Error = Infallible;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -661,8 +428,10 @@ impl<'de> Decode<'de> for uuid::Uuid {
 
 #[cfg(feature = "nbt")]
 impl Encode for std::collections::HashMap<String, fastnbt::Value> {
+    type Error = fastnbt::error::Error;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -674,8 +443,10 @@ impl Encode for std::collections::HashMap<String, fastnbt::Value> {
 impl<'de> Decode<'de> for std::collections::HashMap<String, fastnbt::Value> {
     type Output = std::collections::HashMap<String, fastnbt::Value>;
 
+    type Error = fastnbt::error::Error;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -685,8 +456,10 @@ impl<'de> Decode<'de> for std::collections::HashMap<String, fastnbt::Value> {
 
 #[cfg(feature = "glam")]
 impl Encode for glam::Vec3 {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -701,8 +474,10 @@ impl Encode for glam::Vec3 {
 impl<'de> Decode<'de> for glam::Vec3 {
     type Output = glam::Vec3;
 
+    type Error = Infallible;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -715,8 +490,10 @@ impl<'de> Decode<'de> for glam::Vec3 {
 
 #[cfg(feature = "glam")]
 impl Encode for glam::Quat {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -732,8 +509,10 @@ impl Encode for glam::Quat {
 impl<'de> Decode<'de> for glam::Quat {
     type Output = glam::Quat;
 
+    type Error = Infallible;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -746,8 +525,10 @@ impl<'de> Decode<'de> for glam::Quat {
 }
 
 impl super::Encode for () {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, _buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, _buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -758,8 +539,10 @@ impl super::Encode for () {
 impl<'de> super::Decode<'de> for () {
     type Output = ();
 
+    type Error = Infallible;
+
     #[inline]
-    fn decode<B>(_buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(_buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {

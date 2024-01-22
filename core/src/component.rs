@@ -10,6 +10,8 @@ use rimecraft_event::Event;
 use rimecraft_primitives::{id, Id, SerDeUpdate};
 use tracing::{trace_span, warn};
 
+use crate::BoxedError;
+
 /// Represents a type of component that can be attached
 /// on [`Components`].
 pub trait Attach {
@@ -119,7 +121,9 @@ pub enum ComponentsError {
 }
 
 impl Encode for Components {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    type Error = BoxedError;
+
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -127,12 +131,15 @@ impl Encode for Components {
 
         let mut hashmap = HashMap::new();
         event.invoker()(&mut hashmap)?;
-        hashmap.encode(buf)
+        hashmap.encode(buf)?;
+        Ok(())
     }
 }
 
 impl rimecraft_edcode::Update for Components {
-    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    type Error = BoxedError;
+
+    fn update<B>(&mut self, buf: &mut B) -> Result<(), <Self as rimecraft_edcode::Update>::Error>
     where
         B: bytes::Buf,
     {
@@ -143,7 +150,9 @@ impl rimecraft_edcode::Update for Components {
             .unwrap();
 
         let mut hashmap = HashMap::<Id, Bytes>::decode(buf)?;
-        event.invoker()(&mut hashmap)
+        event.invoker()(&mut hashmap)?;
+
+        Ok(())
     }
 }
 
@@ -269,8 +278,10 @@ impl<T> Encode for Component<T>
 where
     T: Encode,
 {
+    type Error = <T as Encode>::Error;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -282,8 +293,10 @@ impl<T> rimecraft_edcode::Update for Component<T>
 where
     T: rimecraft_edcode::Update,
 {
+    type Error = <T as rimecraft_edcode::Update>::Error;
+
     #[inline]
-    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    fn update<B>(&mut self, buf: &mut B) -> Result<(), <Self as rimecraft_edcode::Update>::Error>
     where
         B: bytes::Buf,
     {
@@ -329,13 +342,13 @@ static NET_RECV_ID: once_cell::sync::Lazy<Id> = once_cell::sync::Lazy::new(net_r
 /// The `1` field is the component id which is used
 /// to be registered into components.
 #[derive(Debug)]
-pub struct Synced<T>(pub T, pub Id)
-where
-    T: Attach + rimecraft_edcode::Update + 'static;
+pub struct Synced<T>(pub T, pub Id);
 
 impl<T> Attach for Synced<T>
 where
     T: Attach + rimecraft_edcode::Update + 'static,
+    <T as rimecraft_edcode::Update>::Error: std::error::Error + Send + Sync + 'static,
+    <T as Encode>::Error: std::error::Error + Send + Sync + 'static,
 {
     fn on_attach(&mut self, components: &mut Components) {
         self.0.on_attach(components);
@@ -375,7 +388,7 @@ where
                 let this = unsafe { &mut *ptr };
                 let mut bytes = map.remove(&this.1).unwrap();
 
-                this.0.update(&mut bytes)
+                this.0.update(&mut bytes).map_err(From::from)
             })),
             Err(err) => {
                 warn!("network receiving event not found: {err}");
@@ -410,8 +423,10 @@ impl<T> Encode for Synced<T>
 where
     T: Attach + rimecraft_edcode::Update + 'static,
 {
+    type Error = <T as Encode>::Error;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -423,8 +438,10 @@ impl<T> rimecraft_edcode::Update for Synced<T>
 where
     T: Attach + rimecraft_edcode::Update + 'static,
 {
+    type Error = <T as rimecraft_edcode::Update>::Error;
+
     #[inline]
-    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    fn update<B>(&mut self, buf: &mut B) -> Result<(), <Self as rimecraft_edcode::Update>::Error>
     where
         B: bytes::Buf,
     {
@@ -495,9 +512,7 @@ static NBT_READ_ID: once_cell::sync::Lazy<Id> = once_cell::sync::Lazy::new(nbt_r
 /// The `1` field is the component id which is used
 /// to be registered into components.
 #[derive(Debug)]
-pub struct Stored<T>(pub T, pub Id)
-where
-    T: Attach + SerDeUpdate + 'static;
+pub struct Stored<T>(pub T, pub Id);
 
 impl<T> Attach for Stored<T>
 where
@@ -571,8 +586,10 @@ impl<T> Encode for Stored<T>
 where
     T: Attach + SerDeUpdate + Encode + 'static,
 {
+    type Error = <T as Encode>::Error;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -584,8 +601,10 @@ impl<T> rimecraft_edcode::Update for Stored<T>
 where
     T: Attach + SerDeUpdate + rimecraft_edcode::Update + 'static,
 {
+    type Error = <T as rimecraft_edcode::Update>::Error;
+
     #[inline]
-    fn update<B>(&mut self, buf: &mut B) -> anyhow::Result<()>
+    fn update<B>(&mut self, buf: &mut B) -> Result<(), <Self as rimecraft_edcode::Update>::Error>
     where
         B: bytes::Buf,
     {
