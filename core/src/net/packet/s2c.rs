@@ -1,10 +1,18 @@
+use std::{convert::Infallible, string::FromUtf8Error};
+
 use bytes::Bytes;
-use rimecraft_edcode::{Decode, Encode, VarI32};
+use rimecraft_edcode::{
+    error::{ErrorWithVarI32Err, VarI32TooBigError},
+    Decode, Encode, VarI32,
+};
 use rimecraft_primitives::Id;
 use rsa::{pkcs8::DecodePublicKey, RsaPublicKey};
 
-use crate::{net::listener, text::Text};
+use crate::{net::listener, text::Text, BoxedError};
 
+use super::error::PayloadTooLargeError;
+
+#[derive(Debug)]
 pub struct LoginCompression {
     threshold: i32,
 }
@@ -15,14 +23,17 @@ impl LoginCompression {
         Self { threshold }
     }
 
+    #[inline]
     pub fn threshold(&self) -> i32 {
         self.threshold
     }
 }
 
 impl Encode for LoginCompression {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -33,8 +44,10 @@ impl Encode for LoginCompression {
 impl<'de> Decode<'de> for LoginCompression {
     type Output = Self;
 
+    type Error = VarI32TooBigError;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -46,6 +59,7 @@ impl<'de> Decode<'de> for LoginCompression {
 
 impl<L> super::Packet<L> for LoginCompression where L: listener::Accept<Self> {}
 
+#[derive(Debug)]
 pub struct LoginDisconnect {
     reason: Text,
 }
@@ -63,7 +77,9 @@ impl LoginDisconnect {
 }
 
 impl Encode for LoginDisconnect {
-    fn encode<B>(&self, _buf: &mut B) -> anyhow::Result<()>
+    type Error = Infallible;
+
+    fn encode<B>(&self, _buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -74,7 +90,9 @@ impl Encode for LoginDisconnect {
 impl<'de> Decode<'de> for LoginDisconnect {
     type Output = Self;
 
-    fn decode<B>(_buf: &'de mut B) -> anyhow::Result<Self::Output>
+    type Error = Infallible;
+
+    fn decode<B>(_buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -84,6 +102,7 @@ impl<'de> Decode<'de> for LoginDisconnect {
 
 impl<L> super::Packet<L> for LoginDisconnect where L: listener::Accept<Self> {}
 
+#[derive(Debug)]
 pub struct LoginHello {
     server_id: String,
     pub_key: Bytes,
@@ -118,8 +137,10 @@ impl LoginHello {
 }
 
 impl Encode for LoginHello {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -132,8 +153,10 @@ impl Encode for LoginHello {
 impl<'de> Decode<'de> for LoginHello {
     type Output = Self;
 
+    type Error = ErrorWithVarI32Err<FromUtf8Error>;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -151,6 +174,7 @@ impl<'de> Decode<'de> for LoginHello {
 
 impl<L> super::Packet<L> for LoginHello where L: listener::Accept<Self> {}
 
+#[derive(Debug)]
 pub struct LoginQueryReq {
     query_id: i32,
     channel: Id,
@@ -179,8 +203,10 @@ impl LoginQueryReq {
 }
 
 impl Encode for LoginQueryReq {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -194,7 +220,9 @@ impl Encode for LoginQueryReq {
 impl<'de> Decode<'de> for LoginQueryReq {
     type Output = Self;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    type Error = BoxedError;
+
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -212,10 +240,10 @@ impl<'de> Decode<'de> for LoginQueryReq {
                 payload,
             })
         } else {
-            Err(anyhow::anyhow!(
-                "payload may not be larger than {} bytes",
-                super::QUERY_MAX_PAYLOAD_LEN
-            ))
+            Err(PayloadTooLargeError {
+                max: super::QUERY_MAX_PAYLOAD_LEN,
+            }
+            .into())
         }
     }
 }
@@ -224,6 +252,7 @@ impl<L> super::Packet<L> for LoginQueryReq where L: listener::Accept<Self> {}
 
 //TODO: LoginSuccessS2CPacket and authlib's GameProfile implementation
 
+#[derive(Debug)]
 pub struct PingResult {
     start_time: u64,
 }
@@ -241,8 +270,10 @@ impl PingResult {
 }
 
 impl Encode for PingResult {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -254,8 +285,10 @@ impl Encode for PingResult {
 impl<'de> Decode<'de> for PingResult {
     type Output = Self;
 
+    type Error = Infallible;
+
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {

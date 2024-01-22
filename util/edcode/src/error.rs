@@ -11,35 +11,35 @@ impl std::fmt::Display for VarI32TooBigError {
 impl std::error::Error for VarI32TooBigError {}
 
 #[derive(Debug)]
-pub enum ErrorWithVarI32Len<T> {
+pub enum ErrorWithVarI32Err<T> {
     Target(T),
-    Len(VarI32TooBigError),
+    Var(VarI32TooBigError),
 }
 
-impl<T: std::fmt::Display> std::fmt::Display for ErrorWithVarI32Len<T> {
+impl<T: std::fmt::Display> std::fmt::Display for ErrorWithVarI32Err<T> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorWithVarI32Len::Target(e) => write!(f, "{}", e),
-            ErrorWithVarI32Len::Len(e) => write!(f, "variable length error: {}", e),
+            ErrorWithVarI32Err::Target(e) => write!(f, "{}", e),
+            ErrorWithVarI32Err::Var(e) => write!(f, "variable integer error: {}", e),
         }
     }
 }
 
-impl<T: std::error::Error + 'static> std::error::Error for ErrorWithVarI32Len<T> {
+impl<T: std::error::Error + 'static> std::error::Error for ErrorWithVarI32Err<T> {
     #[inline]
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            ErrorWithVarI32Len::Target(e) => Some(e),
-            ErrorWithVarI32Len::Len(e) => Some(e),
+            ErrorWithVarI32Err::Target(e) => Some(e),
+            ErrorWithVarI32Err::Var(e) => Some(e),
         }
     }
 }
 
-impl<T> From<VarI32TooBigError> for ErrorWithVarI32Len<T> {
+impl<T> From<VarI32TooBigError> for ErrorWithVarI32Err<T> {
     #[inline]
     fn from(value: VarI32TooBigError) -> Self {
-        Self::Len(value)
+        Self::Var(value)
     }
 }
 

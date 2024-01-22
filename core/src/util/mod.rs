@@ -9,6 +9,8 @@ use std::{fmt::UpperHex, ops::Deref, str::FromStr};
 
 use crate::text::Text;
 
+pub(crate) type BoxedError = Box<dyn std::error::Error + Send + Sync>;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 #[repr(u8)]
 pub enum Rarity {

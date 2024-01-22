@@ -1,7 +1,10 @@
 pub mod c2s;
 pub mod s2c;
 
-use anyhow::Ok;
+pub mod error;
+
+use std::convert::Infallible;
+
 use rimecraft_edcode::Encode;
 
 use super::listener::*;
@@ -93,8 +96,10 @@ impl<T> Encode for Bundled<T>
 where
     T: Listener + ?Sized,
 {
+    type Error = Infallible;
+
     #[inline]
-    fn encode<B>(&self, _buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, _buf: &mut B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {

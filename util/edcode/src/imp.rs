@@ -157,7 +157,7 @@ where
 {
     type Output = T;
 
-    type Error = ErrorWithVarI32Len<serde_json::Error>;
+    type Error = ErrorWithVarI32Err<serde_json::Error>;
 
     fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
@@ -166,7 +166,7 @@ where
         let len = VarI32::decode(buf)? as usize;
         use std::io::Read;
         serde_json::from_reader(bytes::Buf::reader(buf).take(len as u64))
-            .map_err(ErrorWithVarI32Len::Target)
+            .map_err(ErrorWithVarI32Err::Target)
     }
 }
 
@@ -252,7 +252,7 @@ impl Encode for String {
 impl<'de> Decode<'de> for String {
     type Output = String;
 
-    type Error = ErrorWithVarI32Len<FromUtf8Error>;
+    type Error = ErrorWithVarI32Err<FromUtf8Error>;
 
     fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
@@ -261,7 +261,7 @@ impl<'de> Decode<'de> for String {
         let len = VarI32::decode(buf)? as usize;
         let mut vec = vec![0; len];
         buf.copy_to_slice(&mut vec[..]);
-        Ok(String::from_utf8(vec).map_err(ErrorWithVarI32Len::Target)?)
+        Ok(String::from_utf8(vec).map_err(ErrorWithVarI32Err::Target)?)
     }
 }
 
@@ -290,7 +290,7 @@ where
 {
     type Output = Vec<O>;
 
-    type Error = ErrorWithVarI32Len<Err>;
+    type Error = ErrorWithVarI32Err<Err>;
 
     fn decode<B>(mut buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
@@ -300,7 +300,7 @@ where
         let mut vec = Vec::with_capacity(len);
 
         for _ in 0..len {
-            vec.push(T::decode(&mut buf).map_err(ErrorWithVarI32Len::Target)?);
+            vec.push(T::decode(&mut buf).map_err(ErrorWithVarI32Err::Target)?);
         }
 
         Ok(vec)
@@ -336,7 +336,7 @@ where
 {
     type Output = std::collections::HashMap<OK, OV>;
 
-    type Error = ErrorWithVarI32Len<EitherError<ErrK, ErrV>>;
+    type Error = ErrorWithVarI32Err<EitherError<ErrK, ErrV>>;
 
     fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
     where
@@ -345,8 +345,8 @@ where
         let len = VarI32::decode(buf)? as usize;
         let mut map = std::collections::HashMap::with_capacity(len);
         for _ in 0..len {
-            let obj = K::decode(buf).map_err(|e| ErrorWithVarI32Len::Target(EitherError::A(e)))?;
-            let obj1 = V::decode(buf).map_err(|e| ErrorWithVarI32Len::Target(EitherError::B(e)))?;
+            let obj = K::decode(buf).map_err(|e| ErrorWithVarI32Err::Target(EitherError::A(e)))?;
+            let obj1 = V::decode(buf).map_err(|e| ErrorWithVarI32Err::Target(EitherError::B(e)))?;
             map.insert(obj, obj1);
         }
         Ok(map)

@@ -271,7 +271,7 @@ impl<'de> rimecraft_edcode::Decode<'de> for Identifier {
 
     type Error = rimecraft_edcode::error::EitherError<
         Error,
-        rimecraft_edcode::error::ErrorWithVarI32Len<std::string::FromUtf8Error>,
+        rimecraft_edcode::error::ErrorWithVarI32Err<std::string::FromUtf8Error>,
     >;
 
     #[inline]
