@@ -1,16 +1,3 @@
 [workspace]
 resolver = "2"
-members = [
-    "core",
-    "primitives",
-    "flare3d",
-    # Utils
-    "util/caches",
-    "util/nbt_ext",
-    "util/event",
-    "util/edcode",
-    "util/collections",
-    "util/freezer",
-    # Examples
-    "flare3d/examples",
-]
+members = ["core", "primitives", "flare3d", "util/*", "flare3d/examples"]

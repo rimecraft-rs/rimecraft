@@ -19,10 +19,12 @@ once_cell = { version = "1.18", optional = true }
 rimecraft-edcode = { path = "../util/edcode", optional = true }
 bytes = { version = "*", optional = true }
 anyhow = { version = "*", optional = true }
-erased-serde = { version = "0.4", optional = true }
+rimecraft-serde-update = { path = "../util/serde-update", optional = true, features = [
+    "erased",
+] }
 
 [features]
 default = ["caches"]
-serde = ["dep:serde", "dep:erased-serde"]
+serde = ["dep:serde", "dep:rimecraft-serde-update"]
 caches = ["dep:rimecraft-caches", "dep:once_cell"]
 edcode = ["dep:rimecraft-edcode", "dep:bytes", "dep:anyhow"]
