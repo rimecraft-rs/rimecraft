@@ -6,7 +6,7 @@ use super::Event;
 
 #[test]
 fn registering_invoking() {
-    let mut event: DefaultEvent<dyn Fn(&str) -> bool> = Event::new(|listeners| {
+    let mut event: DefaultEvent<dyn Fn(&str) -> bool + Send + Sync> = Event::new(|listeners| {
         Arc::new(move |string| {
             for listener in &listeners {
                 if !listener(string) {
@@ -50,7 +50,7 @@ fn registering_invoking() {
 
 #[test]
 fn phases() {
-    let mut event: DefaultEvent<dyn Fn(&mut String)> = Event::new(|listeners| {
+    let mut event: DefaultEvent<dyn Fn(&mut String) + Send + Sync> = Event::new(|listeners| {
         Arc::new(move |string| {
             for listener in &listeners {
                 listener(string);
