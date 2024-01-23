@@ -261,7 +261,7 @@ impl<'de> Decode<'de> for String {
         let len = VarI32::decode(buf)? as usize;
         let mut vec = vec![0; len];
         buf.copy_to_slice(&mut vec[..]);
-        Ok(String::from_utf8(vec).map_err(ErrorWithVarI32Err::Target)?)
+        String::from_utf8(vec).map_err(ErrorWithVarI32Err::Target)
     }
 }
 
