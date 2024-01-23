@@ -2,11 +2,12 @@ use std::{
     any::{type_name, TypeId},
     collections::HashMap,
     ops::{Deref, DerefMut},
+    sync::Arc,
 };
 
 use bytes::Bytes;
 use rimecraft_edcode::Encode;
-use rimecraft_event::Event;
+use rimecraft_event::{DefaultEvent, Event};
 use rimecraft_primitives::{id, Id, SerDeUpdate};
 use tracing::{trace_span, warn};
 
@@ -196,12 +197,12 @@ impl From<ComponentsBuilder> for Components {
     }
 }
 
-type CompPEvent = Event<dyn Fn(TypeId, &mut Components)>;
+type CompPEvent = DefaultEvent<dyn Fn(TypeId, &mut Components) + Send + Sync>;
 
 static ATTACH_EVENTS: parking_lot::RwLock<CompPEvent> =
     parking_lot::RwLock::new(Event::new(|listeners| {
-        Box::new(move |type_id, components| {
-            for listener in listeners {
+        Arc::new(move |type_id, components| {
+            for listener in &listeners {
                 listener(type_id, components)
             }
         })
@@ -362,34 +363,37 @@ where
 
         let _ = span.enter();
 
-        match components
-            .get_mut::<Component<Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>>>(
-                &NET_SEND_ID,
-            ) {
-            Ok(Component(event)) => event.register(Box::new(move |map| {
-                let this = unsafe { &*ptr };
+        match components.get_mut::<Component<BytesPEvent>>(&NET_SEND_ID) {
+            Ok(Component(event)) => rimecraft_event::register!(
+                event,
+                Arc::new(move |map| {
+                    let this = unsafe { &*ptr };
 
-                map.insert(this.1.clone(), {
-                    let mut bytes_mut = bytes::BytesMut::new();
-                    this.0.encode(&mut bytes_mut)?;
+                    map.insert(this.1.clone(), {
+                        let mut bytes_mut = bytes::BytesMut::new();
+                        this.0.encode(&mut bytes_mut)?;
 
-                    bytes_mut.into()
-                });
+                        bytes_mut.into()
+                    });
 
-                Ok(())
-            })),
+                    Ok(())
+                })
+            ),
             Err(err) => {
                 warn!("network sending event not found: {err}");
             }
         }
 
         match components.get_mut::<Component<BytesPEvent>>(&NET_RECV_ID) {
-            Ok(Component(event)) => event.register(Box::new(move |map| {
-                let this = unsafe { &mut *ptr };
-                let mut bytes = map.remove(&this.1).unwrap();
+            Ok(Component(event)) => rimecraft_event::register!(
+                event,
+                Arc::new(move |map| {
+                    let this = unsafe { &mut *ptr };
+                    let mut bytes = map.remove(&this.1).unwrap();
 
-                this.0.update(&mut bytes).map_err(From::from)
-            })),
+                    this.0.update(&mut bytes).map_err(From::from)
+                })
+            ),
             Err(err) => {
                 warn!("network receiving event not found: {err}");
             }
@@ -478,13 +482,14 @@ where
     }
 }
 
-type BytesPEvent = Event<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()>>;
+type BytesPEvent =
+    DefaultEvent<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()> + Send + Sync>;
 
 #[inline]
 fn net_event_comp() -> Component<BytesPEvent> {
     Component(Event::new(|listeners| {
-        Box::new(move |map| {
-            for listener in listeners {
+        Arc::new(move |map| {
+            for listener in &listeners {
                 listener(map)?;
             }
 
@@ -530,29 +535,32 @@ where
 
         let _ = span.enter();
 
-        match components.get_mut::<Component<
-            Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>,
-        >>(&NBT_SAVE_ID)
-        {
-            Ok(Component(event)) => event.register(Box::new(move |map| {
-                let this = unsafe { &*ptr };
-                map.insert(
-                    this.1.clone(),
-                    this.0.serialize(&mut fastnbt::value::Serializer)?,
-                );
+        match components.get_mut::<Component<ValuePEvent>>(&NBT_SAVE_ID) {
+            Ok(Component(event)) => rimecraft_event::register!(
+                event,
+                Arc::new(move |map| {
+                    let this = unsafe { &*ptr };
+                    map.insert(
+                        this.1.clone(),
+                        this.0.serialize(&mut fastnbt::value::Serializer)?,
+                    );
 
-                Ok(())
-            })),
+                    Ok(())
+                })
+            ),
             Err(err) => {
                 warn!("nbt saving event not found: {err}");
             }
         }
 
         match components.get_mut::<Component<ValuePEvent>>(&NBT_READ_ID) {
-            Ok(Component(event)) => event.register(Box::new(move |map| {
-                let this = unsafe { &mut *ptr };
-                this.0.update(&map.remove(&this.1).unwrap())
-            })),
+            Ok(Component(event)) => rimecraft_event::register!(
+                event,
+                Arc::new(move |map| {
+                    let this = unsafe { &mut *ptr };
+                    this.0.update(&map.remove(&this.1).unwrap())
+                })
+            ),
             Err(err) => {
                 warn!("nbt reading event not found: {err}");
             }
@@ -641,12 +649,14 @@ where
     }
 }
 
-type ValuePEvent = Event<dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()>>;
+type ValuePEvent = DefaultEvent<
+    dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()> + Send + Sync,
+>;
 
 fn nbt_event_comp() -> Component<ValuePEvent> {
     Component(Event::new(|listeners| {
-        Box::new(move |map| {
-            for listener in listeners {
+        Arc::new(move |map| {
+            for listener in &listeners {
                 listener(map)?;
             }
 
