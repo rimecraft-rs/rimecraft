@@ -1,127 +1,136 @@
 #[cfg(test)]
 mod tests;
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::ops::Deref;
 
-use parking_lot::RwLock;
-
-/// Listeners and cache.
-type LisCac<T, Phase> = (Vec<(Phase, *const T)>, Option<Box<T>>, Vec<&'static T>);
+use parking_lot::{RwLock, RwLockReadGuard};
 
 /// A type containing listeners of this event,
 /// which can be invoked by an invoker.
 ///
 /// The listeners are sorted by phases ([`i8`] by default)
 /// that can be called in order.
-pub struct Event<T, Phase = i8>
-where
-    T: ?Sized + 'static,
-{
-    /// Whether listeners has been modified before requesting the invoker.
-    dirty: AtomicBool,
-
-    invoker_factory: fn(&'static [&'static T]) -> Box<T>,
-
-    /// 0: raw listeners with phases\
-    /// 1: cached invoker\
-    /// 2: cached listener references
-    lis_cac: RwLock<LisCac<T, Phase>>,
+pub struct Event<T, F, P> {
+    listeners: Vec<(T, P)>,
+    factory: F,
+    invoker: RwLock<Option<T>>,
 }
 
-impl<T, Phase> Event<T, Phase>
-where
-    T: ?Sized,
-    Phase: Ord,
-{
-    /// Create a new event with provided event factory.
-    ///
-    /// To avoid lifetime problems in the factory, listeners
-    /// provided are all in static references so that they're
-    /// able to be copied and moved.
-    /// So you should add a `move` keyword before the closure
-    /// to return in the factory.
-    pub const fn new(factory: fn(&'static [&'static T]) -> Box<T>) -> Self {
-        Self {
-            lis_cac: RwLock::new((Vec::new(), None, Vec::new())),
-            invoker_factory: factory,
-            dirty: AtomicBool::new(false),
-        }
-    }
-
-    /// Get the invoker of this event.
-    ///
-    /// Once the invoker is created, it will be cached until
-    /// the next modification of listeners, and will be re-created
-    /// by the factory.
-    pub fn invoker(&self) -> &T {
-        if self.dirty.load(Ordering::Acquire) {
-            let mut write_guard = self.lis_cac.write();
-            write_guard.0.sort_by(|e0, e1| Phase::cmp(&e0.0, &e1.0));
-            self.dirty.store(false, Ordering::Release);
-
-            write_guard.2 = write_guard.0.iter().map(|e| unsafe { &*e.1 }).collect();
-            write_guard.1 = Some((self.invoker_factory)(unsafe {
-                &*(&write_guard.2 as *const Vec<&'static T>)
-            }));
-        } else if self.lis_cac.read().1.is_none() {
-            let mut write_guard = self.lis_cac.write();
-            write_guard.1 = Some((self.invoker_factory)(unsafe {
-                &*(&write_guard.2 as *const Vec<&'static T>)
-            }));
-        }
-
-        unsafe { &*(&**self.lis_cac.read().1.as_ref().unwrap() as *const T) }
-    }
-
-    /// Register a listener to this event for the specified phase.
-    pub fn register_with_phase(&mut self, listener: Box<T>, phase: Phase) {
-        self.lis_cac
-            .get_mut()
-            .0
-            .push((phase, Box::into_raw(listener)));
-
-        if !self.dirty.load(Ordering::Acquire) {
-            self.dirty.store(true, Ordering::Release);
-        }
-    }
+/// A sequence of listeners.
+#[derive(Debug)]
+pub struct Listeners<T> {
+    empty: bool,
+    inner: std::vec::IntoIter<T>,
 }
 
-impl<T, Phase> Event<T, Phase>
-where
-    T: ?Sized,
-    Phase: Ord + Default,
-{
-    /// Register a listener to this event for the default phase.
+impl<T> Listeners<T> {
+    /// Whether there are no listeners
+    /// in this sequence.
     #[inline]
-    pub fn register(&mut self, listener: Box<T>) {
-        self.register_with_phase(listener, Default::default())
+    pub const fn is_empty(&self) -> bool {
+        self.empty
     }
 }
 
-impl<T, Phase> Drop for Event<T, Phase>
-where
-    T: ?Sized,
-{
-    fn drop(&mut self) {
-        let mut vec = Vec::new();
-        std::mem::swap(&mut self.lis_cac.get_mut().0, &mut vec);
+impl<T: Deref> Iterator for Listeners<T> {
+    type Item = Listener<T>;
 
-        for value in vec {
-            let _ = unsafe { Box::from_raw(value.1 as *mut T) };
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|val| Listener { inner: val })
+    }
+}
+
+/// A cell that can be dereferenced
+/// to the listener.
+#[derive(Debug)]
+pub struct Listener<T> {
+    inner: T,
+}
+
+impl<T: Deref> Deref for Listener<T> {
+    type Target = <T as Deref>::Target;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &*self.inner
+    }
+}
+
+#[derive(Debug)]
+pub struct Invoker<'a, T> {
+    inner: RwLockReadGuard<'a, Option<T>>,
+}
+
+impl<'a, T: Deref> Deref for Invoker<'a, T> {
+    type Target = <T as Deref>::Target;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &*self.inner.as_ref().unwrap()
+    }
+}
+
+impl<T, F, P> Event<T, F, P> {
+    /// Creates a new event with provided invoker factory.
+    pub const fn new(factory: F) -> Self {
+        Self {
+            listeners: Vec::new(),
+            factory,
+            invoker: RwLock::new(None),
         }
     }
+
+    #[inline]
+    fn make_dirty(&mut self) {
+        self.invoker.get_mut().take();
+    }
+
+    /// Registers a listener with given phase into
+    /// this event.
+    #[inline]
+    pub fn register<L>(&mut self, listener: L, phase: P)
+    where
+        T: From<L>,
+    {
+        self.listeners.push((listener.into(), phase));
+        self.make_dirty()
+    }
 }
 
-unsafe impl<T, Phase> Send for Event<T, Phase>
+impl<T, F, P> Event<T, F, P>
 where
-    T: ?Sized,
-    Phase: Ord + Send,
+    F: Fn(Listeners<T>) -> T,
+    P: Ord,
+    T: Clone,
 {
-}
+    /// Obtains the invoker of this event.
+    pub fn invoker(&self) -> Invoker<'_, T> {
+        {
+            let rg = self.invoker.read();
+            if rg.as_ref().is_some() {
+                return Invoker { inner: rg };
+            }
+        }
 
-unsafe impl<T, Phase> Sync for Event<T, Phase>
-where
-    T: ?Sized,
-    Phase: Ord + Sync,
-{
+        let mut listeners = self
+            .listeners
+            .iter()
+            .map(|(l, p)| (l.clone(), p))
+            .collect::<Vec<_>>();
+        listeners.sort_unstable_by_key(|(_, p)| *p);
+        let listeners = Listeners {
+            empty: listeners.is_empty(),
+            inner: listeners
+                .into_iter()
+                .map(|(l, _)| l)
+                .collect::<Vec<_>>()
+                .into_iter(),
+        };
+
+        *self.invoker.write() = Some((self.factory)(listeners));
+        Invoker {
+            inner: self.invoker.read(),
+        }
+    }
 }
