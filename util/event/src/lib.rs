@@ -1,14 +1,11 @@
-#[cfg(test)]
-mod tests;
-
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 use parking_lot::{RwLock, RwLockReadGuard};
 
 /// A type containing listeners of this event,
 /// which can be invoked by an invoker.
 ///
-/// The listeners are sorted by phases ([`i8`] by default)
+/// The listeners are sorted by phases,
 /// that can be called in order.
 pub struct Event<T, F, P> {
     listeners: Vec<(T, P)>,
@@ -19,25 +16,51 @@ pub struct Event<T, F, P> {
 /// A sequence of listeners.
 #[derive(Debug)]
 pub struct Listeners<T> {
-    empty: bool,
-    inner: std::vec::IntoIter<T>,
+    inner: Arc<Vec<T>>,
 }
 
 impl<T> Listeners<T> {
     /// Whether there are no listeners
     /// in this sequence.
     #[inline]
-    pub const fn is_empty(&self) -> bool {
-        self.empty
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
     }
 }
 
-impl<T: Deref> Iterator for Listeners<T> {
-    type Item = Listener<T>;
+impl<'a, T: Deref> IntoIterator for &'a Listeners<T> {
+    type Item = &'a <T as Deref>::Target;
+
+    type IntoIter = ListenersIter<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        ListenersIter {
+            inner: self.inner.iter(),
+        }
+    }
+}
+
+impl<T> Clone for Listeners<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ListenersIter<'a, T> {
+    inner: std::slice::Iter<'a, T>,
+}
+
+impl<'a, T: Deref> Iterator for ListenersIter<'a, T> {
+    type Item = &'a <T as Deref>::Target;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|val| Listener { inner: val })
+        self.inner.next().map(Deref::deref)
     }
 }
 
@@ -53,7 +76,7 @@ impl<T: Deref> Deref for Listener<T> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &*self.inner
+        &self.inner
     }
 }
 
@@ -67,7 +90,7 @@ impl<'a, T: Deref> Deref for Invoker<'a, T> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &*self.inner.as_ref().unwrap()
+        self.inner.as_ref().unwrap()
     }
 }
 
@@ -89,11 +112,8 @@ impl<T, F, P> Event<T, F, P> {
     /// Registers a listener with given phase into
     /// this event.
     #[inline]
-    pub fn register<L>(&mut self, listener: L, phase: P)
-    where
-        T: From<L>,
-    {
-        self.listeners.push((listener.into(), phase));
+    pub fn register(&mut self, listener: T, phase: P) {
+        self.listeners.push((listener, phase));
         self.make_dirty()
     }
 }
@@ -118,14 +138,9 @@ where
             .iter()
             .map(|(l, p)| (l.clone(), p))
             .collect::<Vec<_>>();
-        listeners.sort_unstable_by_key(|(_, p)| *p);
+        listeners.sort_by_key(|(_, p)| *p);
         let listeners = Listeners {
-            empty: listeners.is_empty(),
-            inner: listeners
-                .into_iter()
-                .map(|(l, _)| l)
-                .collect::<Vec<_>>()
-                .into_iter(),
+            inner: Arc::new(listeners.into_iter().map(|(l, _)| l).collect()),
         };
 
         *self.invoker.write() = Some((self.factory)(listeners));
@@ -134,3 +149,21 @@ where
         }
     }
 }
+
+/// Registers a listener into the event.
+#[macro_export]
+macro_rules! register {
+    ($e:expr, $l:expr, $p:expr$(,)?) => {
+        $e.register($l, $p)
+    };
+    ($e:expr, $l:expr$(,)?) => {
+        $crate::register!($e, $l, ::core::default::Default::default())
+    };
+}
+
+pub type InvokerFactory<T> = fn(Listeners<T>) -> T;
+
+pub type DefaultEvent<T, P = i8> = Event<Arc<T>, InvokerFactory<Arc<T>>, P>;
+
+#[cfg(test)]
+mod tests;
