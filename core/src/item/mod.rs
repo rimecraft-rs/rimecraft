@@ -20,7 +20,6 @@ pub struct ItemDescriptor {
     pub sync_nbt: bool,
     pub max_damage: u32,
     pub max_count: u8,
-    pub components: crate::component::Components,
 }
 
 impl Default for ItemDescriptor {
@@ -30,7 +29,6 @@ impl Default for ItemDescriptor {
             sync_nbt: true,
             max_damage: 0,
             max_count: 64,
-            components: crate::component::Components::new(),
         }
     }
 }
@@ -237,7 +235,7 @@ impl ItemStack {
     #[inline]
     pub fn get_or_init_nbt(&mut self) -> &mut rimecraft_nbt_ext::Compound {
         self.nbt
-            .get_or_insert_with(|| rimecraft_nbt_ext::Compound::new())
+            .get_or_insert_with(rimecraft_nbt_ext::Compound::new)
     }
 
     pub fn set_nbt(&mut self, nbt: Option<rimecraft_nbt_ext::Compound>) {

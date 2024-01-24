@@ -6,13 +6,13 @@ authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Traits describing types that can be updated from a serialized representation"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
-categories = ["data-structures"]
+categories = ["rust-patterns"]
 
 [badges]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde = "1.0"
 erased-serde = { version = "0.4", optional = true }
 
 

@@ -3,25 +3,19 @@ pub mod erased;
 
 /// Represent types that are able to be updated
 /// through serializing and deserializing.
-pub trait Update: serde::Serialize {
+pub trait Update<'de>: serde::Serialize {
     /// Update this type from a deserializer.
-    fn update<'de, D>(
-        &'de mut self,
-        deserializer: D,
-    ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+    fn update<D>(&mut self, deserializer: D) -> Result<(), <D as serde::Deserializer<'de>>::Error>
     where
         D: serde::Deserializer<'de>;
 }
 
-impl<T> Update for T
+impl<'de, T> Update<'de> for T
 where
-    T: serde::Serialize + for<'de> serde::Deserialize<'de>,
+    T: serde::Serialize + serde::Deserialize<'de>,
 {
     #[inline]
-    fn update<'de, D>(
-        &'de mut self,
-        deserializer: D,
-    ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+    fn update<D>(&mut self, deserializer: D) -> Result<(), <D as serde::Deserializer<'de>>::Error>
     where
         D: serde::Deserializer<'de>,
     {

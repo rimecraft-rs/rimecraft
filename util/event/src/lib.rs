@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::{ops::Deref, rc::Rc, sync::Arc};
 
 use parking_lot::{RwLock, RwLockReadGuard};
 
@@ -20,6 +20,13 @@ pub struct Listeners<T> {
 }
 
 impl<T> Listeners<T> {
+    /// Returns the number of listeners
+    /// in this sequence.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
     /// Whether there are no listeners
     /// in this sequence.
     #[inline]
@@ -116,6 +123,18 @@ impl<T, F, P> Event<T, F, P> {
         self.listeners.push((listener, phase));
         self.make_dirty()
     }
+
+    /// Returns the number of listeners.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.listeners.len()
+    }
+
+    /// Returns whether there are no listeners.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.listeners.is_empty()
+    }
 }
 
 impl<T, F, P> Event<T, F, P>
@@ -162,8 +181,8 @@ macro_rules! register {
 }
 
 pub type InvokerFactory<T> = fn(Listeners<T>) -> T;
-
-pub type DefaultEvent<T, P = i8> = Event<Arc<T>, InvokerFactory<Arc<T>>, P>;
+pub type DefaultSyncEvent<T, P = i8> = Event<Arc<T>, InvokerFactory<Arc<T>>, P>;
+pub type DefaultEvent<T, P = i8> = Event<Rc<T>, InvokerFactory<Rc<T>>, P>;
 
 #[cfg(test)]
 mod tests;

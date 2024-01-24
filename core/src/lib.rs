@@ -1,5 +1,4 @@
 pub mod block;
-pub mod component;
 pub mod entity;
 pub mod fluid;
 pub mod item;
