@@ -2,6 +2,7 @@ use std::{
     any::Any,
     borrow::Borrow,
     collections::HashMap,
+    convert::Infallible,
     hash::Hash,
     marker::PhantomData,
     ops::{Deref, DerefMut},
@@ -14,7 +15,7 @@ pub mod serde;
 /// [`Attachments`] instance.
 pub trait Attach<K>: Sized {
     /// The actual stored type.
-    type Attached: From<Self>;
+    type Attached;
 
     /// The error type.
     type Error;
@@ -25,6 +26,8 @@ pub trait Attach<K>: Sized {
     fn attach(&mut self, attachments: &mut Attachments<K>, key: &K) -> Result<(), Self::Error> {
         Ok(())
     }
+
+    fn into_attached(self) -> Self::Attached;
 }
 
 /// Type of an attachment.
@@ -96,26 +99,25 @@ impl<K: Hash + Eq> Attachments<K> {
     {
         let key = ty.key.to_owned().into();
         val.attach(self, &key)?;
-        self.raw
-            .insert(key, Box::new(<T as Attach<K>>::Attached::from(val)));
+        self.raw.insert(key, Box::new(val.into_attached()));
         Ok(())
     }
 
     /// Returns a reference to the attached value
     /// with given [`Type`].
     #[inline]
-    pub fn get<'a, T: Any, Q>(
+    pub fn get<'a, T, Q>(
         &'a self,
-        ty: &Type<Q, T>,
+        ty: &Type<&Q, <T as Attach<K>>::Attached>,
     ) -> Option<<<T as Attach<K>>::Attached as AsAttachment<'a>>::Output>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
         T: Attach<K>,
         <T as Attach<K>>::Attached: AsAttachment<'a> + Any + Send + Sync + 'static,
     {
         self.raw
-            .get(&ty.key)
+            .get(ty.key)
             .and_then(|val| val.downcast_ref::<<T as Attach<K>>::Attached>())
             .map(|val| val.as_attachment())
     }
@@ -123,18 +125,18 @@ impl<K: Hash + Eq> Attachments<K> {
     /// Returns a mutable reference to the attached
     /// value with given [`Type`].
     #[inline]
-    pub fn get_mut<'a, T: Any, Q>(
+    pub fn get_mut<'a, T, Q>(
         &'a mut self,
-        ty: &Type<Q, T>,
+        ty: &Type<&Q, T>,
     ) -> Option<<<T as Attach<K>>::Attached as AsAttachmentMut<'a>>::Output>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
         T: Attach<K>,
         <T as Attach<K>>::Attached: AsAttachmentMut<'a> + Any + Send + Sync + 'static,
     {
         self.raw
-            .get_mut(&ty.key)
+            .get_mut(ty.key)
             .and_then(|val| val.downcast_mut::<<T as Attach<K>>::Attached>())
             .map(|val| val.as_attachment_mut())
     }
@@ -142,13 +144,13 @@ impl<K: Hash + Eq> Attachments<K> {
     /// Whether the attachments contains a value
     /// with given [`Type`].
     #[inline]
-    pub fn contains<T: Any, Q>(&self, ty: &Type<Q, T>) -> bool
+    pub fn contains<T: Any, Q>(&self, ty: &Type<&Q, T>) -> bool
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
         T: Send + Sync + 'static,
     {
-        self.raw.get(&ty.key).is_some_and(|val| val.is::<T>())
+        self.raw.get(ty.key).is_some_and(|val| val.is::<T>())
     }
 }
 
@@ -229,3 +231,36 @@ where
         &mut *self
     }
 }
+
+/// A simple attachment that does not require
+/// any attachment logic.
+pub struct Simple<T>(pub T);
+
+impl<T, K> Attach<K> for Simple<T> {
+    type Attached = Self;
+    type Error = Infallible;
+
+    #[inline]
+    fn into_attached(self) -> Self::Attached {
+        self
+    }
+}
+
+impl<T> Deref for Simple<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for Simple<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[cfg(test)]
+mod tests;

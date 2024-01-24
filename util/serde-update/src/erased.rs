@@ -67,8 +67,17 @@ where
     }
 }
 
-#[derive(serde::Serialize)]
 pub struct ErasedWrapper<'a, 'de>(pub &'a mut dyn ErasedUpdate<'de>);
+
+impl<'a, 'de> serde::Serialize for ErasedWrapper<'a, 'de> {
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
 
 impl<'a, 'de> Update<'de> for ErasedWrapper<'a, 'de> {
     #[inline]

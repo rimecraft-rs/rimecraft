@@ -27,3 +27,6 @@ serde = [
     "dep:rimecraft-serde-update",
     "dep:parking_lot",
 ]
+
+[dev-dependencies]
+fastnbt = "2.4"

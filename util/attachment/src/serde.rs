@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    convert::Infallible,
     hash::Hash,
     ops::{Deref, DerefMut},
     sync::Arc,
@@ -59,25 +60,18 @@ impl<T> Persistent<T> {
 
 impl<T, K> Attach<K> for Persistent<T>
 where
-    T: serde::Serialize
-        + for<'de> rimecraft_serde_update::Update<'de>
-        + Attach<K>
-        + Send
-        + Sync
-        + 'static,
+    T: serde::Serialize + for<'de> rimecraft_serde_update::Update<'de> + Send + Sync + 'static,
     K: Clone + Hash + Eq + Send + Sync + 'static,
 {
     type Attached = Self;
 
-    type Error = <T as Attach<K>>::Error;
+    type Error = Infallible;
 
     fn attach(
         &mut self,
         attachments: &mut crate::Attachments<K>,
         key: &K,
     ) -> Result<(), Self::Error> {
-        self.inner.write().attach(attachments, key)?;
-
         let inner = self.inner.clone();
         attachments
             .serde_state
@@ -89,6 +83,11 @@ where
             .update
             .insert(key.clone(), Box::new(move || Box::new(inner.write_arc())));
         Ok(())
+    }
+
+    #[inline]
+    fn into_attached(self) -> Self::Attached {
+        self
     }
 }
 
