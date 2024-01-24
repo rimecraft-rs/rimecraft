@@ -5,10 +5,10 @@ use crate::*;
 macro_rules! __internal_update_from_erased {
     () => {
         #[inline]
-        fn update<'de, D>(
-            &'de mut self,
+        fn update<D>(
+            &mut self,
             deserializer: D,
-        ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+        ) -> Result<(), <D as serde::Deserializer<'de>>::Error>
         where
             D: serde::Deserializer<'de>,
         {
@@ -23,44 +23,44 @@ macro_rules! __internal_update_from_erased {
 /// that implements [`ErasedUpdate`].
 #[macro_export]
 macro_rules! update_trait_object {
-    ($t:path) => {
-        impl $crate::Update for dyn $t {
+    ($($t:tt)*) => {
+        impl<'de> $crate::Update<'de> for dyn $($t)* {
             $crate::__internal_update_from_erased!();
         }
 
-        impl $crate::Update for dyn $t + Send {
+        impl<'de> $crate::Update<'de> for dyn $($t)* + Send {
             $crate::__internal_update_from_erased!();
         }
 
-        impl $crate::Update for dyn $t + Sync {
+        impl<'de> $crate::Update<'de> for dyn $($t)* + Sync {
             $crate::__internal_update_from_erased!();
         }
 
-        impl $crate::Update for dyn $t + Send + Sync {
+        impl<'de> $crate::Update<'de> for dyn $($t)* + Send + Sync {
             $crate::__internal_update_from_erased!();
         }
     };
 }
 
 /// [`Update`] but type erased.
-pub trait ErasedUpdate: erased_serde::Serialize {
+pub trait ErasedUpdate<'de>: erased_serde::Serialize {
     /// Update this type from an erased deserializer.
-    fn erased_update<'de>(
-        &'de mut self,
+    fn erased_update(
+        &mut self,
         deserializer: &mut dyn erased_serde::Deserializer<'de>,
     ) -> Result<(), erased_serde::Error>;
 }
 
-erased_serde::serialize_trait_object!(ErasedUpdate);
-crate::update_trait_object!(ErasedUpdate);
+erased_serde::serialize_trait_object!(<'de> ErasedUpdate<'de>);
+crate::update_trait_object!(ErasedUpdate<'de>);
 
-impl<T> ErasedUpdate for T
+impl<'de, T> ErasedUpdate<'de> for T
 where
-    T: ?Sized + Update,
+    T: ?Sized + Update<'de>,
 {
     #[inline]
-    fn erased_update<'de>(
-        &'de mut self,
+    fn erased_update(
+        &mut self,
         deserializer: &mut dyn erased_serde::Deserializer<'de>,
     ) -> Result<(), erased_serde::Error> {
         self.update(deserializer)
@@ -68,14 +68,11 @@ where
 }
 
 #[derive(serde::Serialize)]
-pub struct ErasedWrapper<'a>(pub &'a mut dyn ErasedUpdate);
+pub struct ErasedWrapper<'a, 'de>(pub &'a mut dyn ErasedUpdate<'de>);
 
-impl Update for ErasedWrapper<'_> {
+impl<'a, 'de> Update<'de> for ErasedWrapper<'a, 'de> {
     #[inline]
-    fn update<'de, D>(
-        &'de mut self,
-        deserializer: D,
-    ) -> Result<(), <D as serde::Deserializer<'_>>::Error>
+    fn update<D>(&mut self, deserializer: D) -> Result<(), <D as serde::Deserializer<'de>>::Error>
     where
         D: serde::Deserializer<'de>,
     {

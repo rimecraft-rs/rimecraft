@@ -7,7 +7,7 @@ use std::{
 
 use bytes::Bytes;
 use rimecraft_edcode::Encode;
-use rimecraft_event::{DefaultEvent, Event};
+use rimecraft_event::{DefaultSyncEvent, Event};
 use rimecraft_primitives::{id, Id, SerDeUpdate};
 use tracing::{trace_span, warn};
 
@@ -197,7 +197,7 @@ impl From<ComponentsBuilder> for Components {
     }
 }
 
-type CompPEvent = DefaultEvent<dyn Fn(TypeId, &mut Components) + Send + Sync>;
+type CompPEvent = DefaultSyncEvent<dyn Fn(TypeId, &mut Components) + Send + Sync>;
 
 static ATTACH_EVENTS: parking_lot::RwLock<CompPEvent> =
     parking_lot::RwLock::new(Event::new(|listeners| {
@@ -483,7 +483,7 @@ where
 }
 
 type BytesPEvent =
-    DefaultEvent<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()> + Send + Sync>;
+    DefaultSyncEvent<dyn Fn(&mut HashMap<Id, Bytes>) -> anyhow::Result<()> + Send + Sync>;
 
 #[inline]
 fn net_event_comp() -> Component<BytesPEvent> {
@@ -649,7 +649,7 @@ where
     }
 }
 
-type ValuePEvent = DefaultEvent<
+type ValuePEvent = DefaultSyncEvent<
     dyn Fn(&mut HashMap<Id, fastnbt::Value>) -> fastnbt::error::Result<()> + Send + Sync,
 >;
 

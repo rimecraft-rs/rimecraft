@@ -6,7 +6,7 @@ authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Traits describing types that can be updated from a serialized representation"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
-categories = ["data-structures"]
+categories = ["rust-patterns"]
 
 [badges]
 maintenance = { status = "passively-maintained" }
