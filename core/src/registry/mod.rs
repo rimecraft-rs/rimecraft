@@ -9,7 +9,6 @@ pub use tag::Key as TagKey;
 
 /// Represents a registration and its id and tags.
 pub struct Entry<T> {
-    components: crate::component::Components,
     key: Key<T>,
     pub tags: parking_lot::RwLock<Vec<tag::Key<T>>>,
     value: T,
@@ -25,16 +24,6 @@ impl<T> Entry<T> {
     #[inline]
     pub fn is_in(&self, tag: &tag::Key<T>) -> bool {
         self.tags.read().contains(tag)
-    }
-
-    #[inline]
-    pub fn components(&self) -> &crate::component::Components {
-        &self.components
-    }
-
-    #[inline]
-    pub fn components_mut(&mut self) -> &mut crate::component::Components {
-        &mut self.components
     }
 }
 
@@ -159,7 +148,7 @@ impl<T: PartialEq + Eq> rimecraft_collections::Index<Entry<T>> for Registry<T> {
         self.entries
             .iter()
             .enumerate()
-            .find(|e| e.1 as *const Entry<T> as usize == value as *const Entry<T> as usize)
+            .find(|e| std::ptr::eq(e.1, value))
             .map(|e| e.0)
     }
 
@@ -212,10 +201,6 @@ where
                     value: e.1 .0,
                     key: Key::new(opts.0, e.1 .1.clone()),
                     tags: parking_lot::RwLock::new(Vec::new()),
-                    components: crate::component::Components::builder()
-                        .net_sync()
-                        .register_defaults::<Entry<T>>()
-                        .build(),
                 }
             })
             .collect::<Vec<_>>();
@@ -235,13 +220,13 @@ where
                 let mut map = std::collections::HashMap::new();
 
                 for e in entries.iter().enumerate() {
-                    map.insert(e.1.key.clone(), e.0);
+                    map.insert(e.1.key, e.0);
                 }
 
                 map
             },
 
-            default: opts.1.map(|e| id_map.get(&e).copied()).flatten(),
+            default: opts.1.and_then(|e| id_map.get(&e).copied()),
             entries,
             id_map,
             key: opts.0,
@@ -291,7 +276,7 @@ impl<T> Key<T> {
 
     /// Return `Some(_)` if the key is of reg, otherwise `None`.
     pub fn cast<E>(&self, reg: &Key<Registry<E>>) -> Option<Key<E>> {
-        if self.is_of(&reg) {
+        if self.is_of(reg) {
             Some(Key {
                 inner: self.inner,
                 _type: std::marker::PhantomData,
