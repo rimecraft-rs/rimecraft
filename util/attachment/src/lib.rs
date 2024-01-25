@@ -27,6 +27,7 @@ pub trait Attach<K>: Sized {
         Ok(())
     }
 
+    /// Converts the type into the attached type.
     fn into_attached(self) -> Self::Attached;
 }
 
@@ -191,17 +192,26 @@ impl<K, T> From<K> for Type<K, T> {
 #[allow(dead_code)]
 type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
+/// Trait for types that can be dereferenced
+/// into an attachment.
 pub trait AsAttachment<'a> {
+    /// The target type.
     type Target: ?Sized + 'a;
 
+    /// The output type.
     type Output: Deref<Target = Self::Target> + 'a;
 
+    /// Dereferences the type into an attachment.
     fn as_attachment(&'a self) -> Self::Output;
 }
 
+/// Trait for types that can be dereferenced
+/// mutably into an attachment.
 pub trait AsAttachmentMut<'a>: AsAttachment<'a> {
+    /// The output type.
     type Output: Deref<Target = <Self as AsAttachment<'a>>::Target> + DerefMut + 'a;
 
+    /// Dereferences the type mutably into an attachment.
     fn as_attachment_mut(&'a mut self) -> <Self as AsAttachmentMut<'a>>::Output;
 }
 

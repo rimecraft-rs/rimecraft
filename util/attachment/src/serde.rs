@@ -1,3 +1,5 @@
+//! Serde support for [`Attachments`].
+
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -115,7 +117,7 @@ impl<'a, T: 'a> AsAttachmentMut<'a> for Persistent<T> {
     }
 }
 
-pub trait AsErasedSerialize {
+trait AsErasedSerialize {
     fn as_serialize(&self) -> &dyn erased_serde::Serialize;
 }
 
@@ -130,7 +132,7 @@ where
     }
 }
 
-pub(crate) trait AsErasedUpdate {
+trait AsErasedUpdate {
     fn as_update(&mut self) -> &mut dyn for<'de> rimecraft_serde_update::erased::ErasedUpdate<'de>;
 }
 
