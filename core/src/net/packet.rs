@@ -99,7 +99,7 @@ where
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, _buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, _buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {

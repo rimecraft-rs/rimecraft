@@ -33,7 +33,7 @@ impl Encode for LoginCompression {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -41,13 +41,13 @@ impl Encode for LoginCompression {
     }
 }
 
-impl<'de> Decode<'de> for LoginCompression {
+impl Decode for LoginCompression {
     type Output = Self;
 
     type Error = VarI32TooBigError;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -79,7 +79,7 @@ impl LoginDisconnect {
 impl Encode for LoginDisconnect {
     type Error = Infallible;
 
-    fn encode<B>(&self, _buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, _buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -87,12 +87,12 @@ impl Encode for LoginDisconnect {
     }
 }
 
-impl<'de> Decode<'de> for LoginDisconnect {
+impl Decode for LoginDisconnect {
     type Output = Self;
 
     type Error = Infallible;
 
-    fn decode<B>(_buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(_buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -140,29 +140,29 @@ impl Encode for LoginHello {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
-        self.server_id.encode(buf)?;
-        self.pub_key.encode(buf)?;
-        self.nonce.encode(buf)
+        self.server_id.encode(&mut buf)?;
+        self.pub_key.encode(&mut buf)?;
+        self.nonce.encode(&mut buf)
     }
 }
 
-impl<'de> Decode<'de> for LoginHello {
+impl Decode for LoginHello {
     type Output = Self;
 
     type Error = ErrorWithVarI32Err<FromUtf8Error>;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
-        let server_id = String::decode(buf)?;
-        let pub_key = Bytes::decode(buf)?;
-        let nonce = Bytes::decode(buf)?;
+        let server_id = String::decode(&mut buf)?;
+        let pub_key = Bytes::decode(&mut buf)?;
+        let nonce = Bytes::decode(&mut buf)?;
 
         Ok(Self {
             server_id,
@@ -206,28 +206,28 @@ impl Encode for LoginQueryReq {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
-        VarI32(self.query_id).encode(buf)?;
-        self.channel.encode(buf)?;
+        VarI32(self.query_id).encode(&mut buf)?;
+        self.channel.encode(&mut buf)?;
         buf.put_slice(&self.payload[..]);
         Ok(())
     }
 }
 
-impl<'de> Decode<'de> for LoginQueryReq {
+impl Decode for LoginQueryReq {
     type Output = Self;
 
     type Error = BoxedError;
 
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
-        let query_id = VarI32::decode(buf)?;
-        let channel = Id::decode(buf)?;
+        let query_id = VarI32::decode(&mut buf)?;
+        let channel = Id::decode(&mut buf)?;
 
         let remaining = buf.remaining();
         if remaining <= super::QUERY_MAX_PAYLOAD_LEN {
@@ -273,7 +273,7 @@ impl Encode for PingResult {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -282,13 +282,13 @@ impl Encode for PingResult {
     }
 }
 
-impl<'de> Decode<'de> for PingResult {
+impl Decode for PingResult {
     type Output = Self;
 
     type Error = Infallible;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {

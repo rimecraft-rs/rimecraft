@@ -6,27 +6,27 @@ impl Encode for bytes::Bytes {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
-        VarI32(self.len() as i32).encode(buf)?;
+        VarI32(self.len() as i32).encode(&mut buf)?;
         buf.put_slice(&self[..]);
         Ok(())
     }
 }
 
-impl<'de> Decode<'de> for bytes::Bytes {
+impl Decode for bytes::Bytes {
     type Output = bytes::Bytes;
 
     type Error = VarI32TooBigError;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
-        let len = VarI32::decode(buf)? as usize;
+        let len = VarI32::decode(&mut buf)? as usize;
         Ok(buf.copy_to_bytes(len))
     }
 }
@@ -38,18 +38,18 @@ macro_rules! edcode_primitive {
                 type Error = Infallible;
 
                 #[inline]
-                fn encode<B: bytes::BufMut>(&self, buf: &mut B) -> Result<(), Self::Error> {
+                fn encode<B: bytes::BufMut>(&self, mut buf: B) -> Result<(), Self::Error> {
                     buf.$fe(*self);
                     Ok(())
                 }
             }
 
-            impl<'de> Decode<'de> for $t {
+            impl Decode for $t {
                 type Output = $t;
                 type Error = Infallible;
 
                 #[inline]
-                fn decode<B: bytes::Buf>(buf: &'de mut B) -> Result<Self::Output, Self::Error>{
+                fn decode<B: bytes::Buf>(mut buf: B) -> Result<Self::Output, Self::Error>{
                     Ok(buf.$fd())
                 }
             }
@@ -74,7 +74,7 @@ impl Encode for bool {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -83,13 +83,13 @@ impl Encode for bool {
     }
 }
 
-impl<'de> Decode<'de> for bool {
+impl Decode for bool {
     type Output = bool;
 
     type Error = Infallible;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -105,7 +105,7 @@ where
     type Error = fastnbt::error::Error;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -123,7 +123,7 @@ where
     type Error = fastnbt::error::Error;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -139,7 +139,7 @@ where
     type Error = serde_json::Error;
 
     #[inline]
-    fn encode<B>(&self, mut buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -159,7 +159,7 @@ where
 
     type Error = ErrorWithVarI32Err<serde_json::Error>;
 
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -173,7 +173,7 @@ where
 impl Encode for VarI32 {
     type Error = Infallible;
 
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -193,12 +193,12 @@ impl Encode for VarI32 {
     }
 }
 
-impl<'de> Decode<'de> for VarI32 {
+impl Decode for VarI32 {
     type Output = i32;
 
     type Error = VarI32TooBigError;
 
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -226,12 +226,12 @@ impl Encode for str {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
         let bs = self.as_bytes();
-        VarI32(bs.len() as i32).encode(buf)?;
+        VarI32(bs.len() as i32).encode(&mut buf)?;
         buf.put_slice(bs);
         Ok(())
     }
@@ -241,7 +241,7 @@ impl Encode for String {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -249,16 +249,16 @@ impl Encode for String {
     }
 }
 
-impl<'de> Decode<'de> for String {
+impl Decode for String {
     type Output = String;
 
     type Error = ErrorWithVarI32Err<FromUtf8Error>;
 
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
-        let len = VarI32::decode(buf)? as usize;
+        let len = VarI32::decode(&mut buf)? as usize;
         let mut vec = vec![0; len];
         buf.copy_to_slice(&mut vec[..]);
         String::from_utf8(vec).map_err(ErrorWithVarI32Err::Target)
@@ -272,27 +272,27 @@ where
     type Error = <T as Encode>::Error;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
-        VarI32(self.len() as i32).encode(buf).unwrap();
+        VarI32(self.len() as i32).encode(&mut buf).unwrap();
         for object in self.iter() {
-            object.encode(buf)?;
+            object.encode(&mut buf)?;
         }
         Ok(())
     }
 }
 
-impl<'de, T, O, Err> Decode<'de> for Vec<T>
+impl<T, O, Err> Decode for Vec<T>
 where
-    T: for<'a> Decode<'a, Output = O, Error = Err>,
+    T: for<'a> Decode<Output = O, Error = Err>,
 {
     type Output = Vec<O>;
 
     type Error = ErrorWithVarI32Err<Err>;
 
-    fn decode<B>(mut buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -315,38 +315,40 @@ where
     type Error = EitherError<<K as Encode>::Error, <V as Encode>::Error>;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
-        VarI32(self.len() as i32).encode(buf).unwrap();
+        VarI32(self.len() as i32).encode(&mut buf).unwrap();
         for (key, value) in self.iter() {
-            key.encode(buf).map_err(EitherError::A)?;
-            value.encode(buf).map_err(EitherError::B)?;
+            key.encode(&mut buf).map_err(EitherError::A)?;
+            value.encode(&mut buf).map_err(EitherError::B)?;
         }
         Ok(())
     }
 }
 
-impl<'de, K, V, OK, OV, ErrK, ErrV> Decode<'de> for std::collections::HashMap<K, V>
+impl<K, V, OK, OV, ErrK, ErrV> Decode for std::collections::HashMap<K, V>
 where
-    K: for<'a> Decode<'a, Output = OK, Error = ErrK>,
-    V: for<'a> Decode<'a, Output = OV, Error = ErrV>,
+    K: for<'a> Decode<Output = OK, Error = ErrK>,
+    V: for<'a> Decode<Output = OV, Error = ErrV>,
     OK: Hash + Eq,
 {
     type Output = std::collections::HashMap<OK, OV>;
 
     type Error = ErrorWithVarI32Err<EitherError<ErrK, ErrV>>;
 
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
-        let len = VarI32::decode(buf)? as usize;
+        let len = VarI32::decode(&mut buf)? as usize;
         let mut map = std::collections::HashMap::with_capacity(len);
         for _ in 0..len {
-            let obj = K::decode(buf).map_err(|e| ErrorWithVarI32Err::Target(EitherError::A(e)))?;
-            let obj1 = V::decode(buf).map_err(|e| ErrorWithVarI32Err::Target(EitherError::B(e)))?;
+            let obj =
+                K::decode(&mut buf).map_err(|e| ErrorWithVarI32Err::Target(EitherError::A(e)))?;
+            let obj1 =
+                V::decode(&mut buf).map_err(|e| ErrorWithVarI32Err::Target(EitherError::B(e)))?;
             map.insert(obj, obj1);
         }
         Ok(map)
@@ -359,34 +361,34 @@ where
 {
     type Error = <T as Encode>::Error;
 
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
         if let Some(value) = self {
-            true.encode(buf).unwrap();
-            value.encode(buf)
+            true.encode(&mut buf).unwrap();
+            value.encode(&mut buf)
         } else {
-            false.encode(buf).unwrap();
+            false.encode(&mut buf).unwrap();
             Ok(())
         }
     }
 }
 
-impl<'de, T, OT> Decode<'de> for Option<T>
+impl<T, OT> Decode for Option<T>
 where
-    T: Decode<'de, Output = OT>,
+    T: Decode<Output = OT>,
 {
     type Output = Option<OT>;
 
-    type Error = <T as Decode<'de>>::Error;
+    type Error = <T as Decode>::Error;
 
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
-        Ok(if bool::decode(buf).unwrap() {
-            Some(T::decode(buf)?)
+        Ok(if bool::decode(&mut buf).unwrap() {
+            Some(T::decode(&mut buf)?)
         } else {
             None
         })
@@ -398,7 +400,7 @@ impl Encode for uuid::Uuid {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -410,13 +412,13 @@ impl Encode for uuid::Uuid {
 }
 
 #[cfg(feature = "uuid")]
-impl<'de> Decode<'de> for uuid::Uuid {
+impl Decode for uuid::Uuid {
     type Output = uuid::Uuid;
 
     type Error = Infallible;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -431,7 +433,7 @@ impl Encode for std::collections::HashMap<String, fastnbt::Value> {
     type Error = fastnbt::error::Error;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -440,13 +442,13 @@ impl Encode for std::collections::HashMap<String, fastnbt::Value> {
 }
 
 #[cfg(feature = "nbt")]
-impl<'de> Decode<'de> for std::collections::HashMap<String, fastnbt::Value> {
+impl Decode for std::collections::HashMap<String, fastnbt::Value> {
     type Output = std::collections::HashMap<String, fastnbt::Value>;
 
     type Error = fastnbt::error::Error;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -459,7 +461,7 @@ impl Encode for glam::Vec3 {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -471,13 +473,13 @@ impl Encode for glam::Vec3 {
 }
 
 #[cfg(feature = "glam")]
-impl<'de> Decode<'de> for glam::Vec3 {
+impl Decode for glam::Vec3 {
     type Output = glam::Vec3;
 
     type Error = Infallible;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -493,7 +495,7 @@ impl Encode for glam::Quat {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -506,13 +508,13 @@ impl Encode for glam::Quat {
 }
 
 #[cfg(feature = "glam")]
-impl<'de> Decode<'de> for glam::Quat {
+impl Decode for glam::Quat {
     type Output = glam::Quat;
 
     type Error = Infallible;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -524,11 +526,11 @@ impl<'de> Decode<'de> for glam::Quat {
     }
 }
 
-impl super::Encode for () {
+impl Encode for () {
     type Error = Infallible;
 
     #[inline]
-    fn encode<B>(&self, _buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, _buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -536,13 +538,13 @@ impl super::Encode for () {
     }
 }
 
-impl<'de> super::Decode<'de> for () {
+impl Decode for () {
     type Output = ();
 
     type Error = Infallible;
 
     #[inline]
-    fn decode<B>(_buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(_buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {

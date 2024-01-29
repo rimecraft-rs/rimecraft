@@ -268,7 +268,7 @@ impl rimecraft_edcode::Encode for Identifier {
     type Error = std::convert::Infallible;
 
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -277,7 +277,7 @@ impl rimecraft_edcode::Encode for Identifier {
 }
 
 #[cfg(feature = "edcode")]
-impl<'de> rimecraft_edcode::Decode<'de> for Identifier {
+impl rimecraft_edcode::Decode for Identifier {
     type Output = Self;
 
     type Error = rimecraft_edcode::error::EitherError<
@@ -286,7 +286,7 @@ impl<'de> rimecraft_edcode::Decode<'de> for Identifier {
     >;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {

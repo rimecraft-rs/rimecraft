@@ -157,34 +157,35 @@ where
 {
     type Error = Infallible;
 
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
         match &self.inner {
             Inner::Vector(vec) => {
-                VarI32(vec.len() as i32).encode(buf)?;
+                VarI32(vec.len() as i32).encode(&mut buf)?;
 
                 for value in vec {
-                    VarI32(self.ids.index_of(value).map(|e| e as i32).unwrap_or(-1)).encode(buf)?;
+                    VarI32(self.ids.index_of(value).map(|e| e as i32).unwrap_or(-1))
+                        .encode(&mut buf)?;
                 }
             }
             Inner::Indexed(_) => (),
             Inner::Singular(option) => {
                 if let Some(entry) = option {
                     VarI32(self.ids.index_of(&entry).map(|e| e as i32).unwrap_or(-1))
-                        .encode(buf)?;
+                        .encode(&mut buf)?;
                 } else {
                     panic!("use of uninitialized palette");
                 }
             }
             Inner::BiMap(bimap) => {
                 let i = self.len();
-                VarI32(i as i32).encode(buf)?;
+                VarI32(i as i32).encode(&mut buf)?;
 
                 for entry in bimap.iter() {
                     VarI32(self.ids.index_of(entry.1).map(|e| e as i32).unwrap_or(-1))
-                        .encode(buf)?;
+                        .encode(&mut buf)?;
                 }
             }
         }
@@ -199,7 +200,7 @@ where
 {
     type Error = ErrorWithVarI32Err<RawIdNotFoundError>;
 
-    fn update<B>(&mut self, buf: &mut B) -> Result<(), <Self as rimecraft_edcode::Update>::Error>
+    fn update<B>(&mut self, mut buf: B) -> Result<(), <Self as rimecraft_edcode::Update>::Error>
     where
         B: bytes::Buf,
     {
@@ -207,25 +208,25 @@ where
             Inner::Vector(vec) => {
                 *vec = Vec::new();
 
-                for _ in 0..VarI32::decode(buf)? {
-                    vec.push(*self.ids.0.get(VarI32::decode(buf)? as usize).unwrap());
+                for _ in 0..VarI32::decode(&mut buf)? {
+                    vec.push(*self.ids.0.get(VarI32::decode(&mut buf)? as usize).unwrap());
                 }
             }
             Inner::Indexed(_) => (),
             Inner::Singular(option) => {
                 *option = Some(
                     self.ids
-                        .get(VarI32::decode(buf)? as usize)
+                        .get(VarI32::decode(&mut buf)? as usize)
                         .copied()
                         .ok_or_else(|| ErrorWithVarI32Err::Target(RawIdNotFoundError))?,
                 );
             }
             Inner::BiMap(bimap) => {
                 let mut map = bimap::BiMap::new();
-                for _ in 0..VarI32::decode(buf)? {
+                for _ in 0..VarI32::decode(&mut buf)? {
                     map.insert(
                         map.len(),
-                        *self.ids.0.get(VarI32::decode(buf)? as usize).unwrap(),
+                        *self.ids.0.get(VarI32::decode(&mut buf)? as usize).unwrap(),
                     );
                 }
                 *bimap = map
@@ -504,7 +505,7 @@ where
             .for_each(|id| action(data.2.get(id as usize).unwrap()))
     }
 
-    pub fn read_buf<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    pub fn read_buf<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::Buf,
     {
@@ -521,7 +522,7 @@ where
         Ok(())
     }
 
-    pub fn write_buf<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    pub fn write_buf<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -530,8 +531,8 @@ where
         let data = data_r1.unwrap();
 
         buf.put_u8(data.1.element_bits() as u8);
-        data.2.encode(buf)?;
-        data.1.data().encode(buf)?;
+        data.2.encode(&mut buf)?;
+        data.1.data().encode(&mut buf)?;
 
         Ok(())
     }
