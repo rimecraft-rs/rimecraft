@@ -316,6 +316,7 @@ impl<'a, K, T> IntoIterator for &'a Registry<K, T> {
     }
 }
 
+/// Mutable registry of various in-game components.
 pub struct RegistryMut<K, T> {
     key: Key<K, Registry<K, T>>,
     entries: Vec<(T, RefEntry<K, T>)>,
@@ -323,6 +324,7 @@ pub struct RegistryMut<K, T> {
 }
 
 impl<K, T> RegistryMut<K, T> {
+    /// Creates a new mutable registry.
     #[inline]
     pub fn new(key: Key<K, Registry<K, T>>) -> Self {
         Self {

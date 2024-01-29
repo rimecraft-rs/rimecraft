@@ -1,3 +1,5 @@
+//! Tag related types.
+
 use std::{collections::HashMap, hash::Hash};
 
 use crate::{key::Key, Registry};
@@ -97,5 +99,99 @@ impl<'a, K, T> Iterator for Iter<'a, K, T> {
                 },
             )
         })
+    }
+}
+
+#[cfg(feature = "serde")]
+pub mod serde {
+    //! Helper module for serde support.
+
+    use std::str::FromStr;
+
+    use crate::ProvideRegistry;
+
+    use super::TagKey;
+
+    /// `TagKey` serialize and deserailize wrapper
+    /// without `#` prefix.
+    #[derive(Debug, Clone, Copy)]
+    pub struct Unprefixed<T>(pub T);
+
+    impl<'a, K, T> serde::Serialize for Unprefixed<&'a TagKey<K, T>>
+    where
+        K: serde::Serialize,
+    {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.0.id.serialize(serializer)
+        }
+    }
+
+    impl<K, T> serde::Serialize for Unprefixed<TagKey<K, T>>
+    where
+        K: serde::Serialize,
+    {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            Unprefixed(&self.0).serialize(serializer)
+        }
+    }
+
+    impl<'de, 'r, K, T> serde::Deserialize<'de> for Unprefixed<TagKey<K, T>>
+    where
+        K: serde::Deserialize<'de> + Clone + 'r,
+        T: ProvideRegistry<'r, K, T> + 'r,
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            Ok(Unprefixed(TagKey {
+                registry: T::registry().key.clone(),
+                id: K::deserialize(deserializer)?,
+            }))
+        }
+    }
+
+    impl<K, T> serde::Serialize for TagKey<K, T>
+    where
+        K: ToString,
+    {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            format!("#{}", self.id.to_string()).serialize(serializer)
+        }
+    }
+
+    impl<'de, 'r, K, T> serde::Deserialize<'de> for TagKey<K, T>
+    where
+        K: FromStr + Clone + 'r,
+        T: ProvideRegistry<'r, K, T> + 'r,
+        <K as FromStr>::Err: std::fmt::Display,
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let value = String::deserialize(deserializer)?;
+            let id = value
+                .strip_prefix('#')
+                .ok_or_else(|| serde::de::Error::custom("not a tag key"))?
+                .parse::<K>()
+                .map_err(serde::de::Error::custom)?;
+            Ok(Self {
+                registry: T::registry().key.clone(),
+                id,
+            })
+        }
     }
 }

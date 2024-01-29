@@ -1,3 +1,5 @@
+//! Registry entry types.
+
 use std::{collections::HashSet, hash::Hash, ops::Deref};
 
 use parking_lot::RwLock;
@@ -93,6 +95,7 @@ impl<K, T> RefEntry<K, T> {
     }
 }
 
+/// Guard of tags.
 pub struct TagsGuard<'a, K, T> {
     inner: parking_lot::RwLockReadGuard<'a, HashSet<TagKey<K, T>>>,
 }

@@ -1,4 +1,8 @@
+//! Registry key related types.
+
 use std::{hash::Hash, marker::PhantomData};
+
+use crate::ProvideRegistry;
 
 /// A key for a value in a registry in a context
 /// where a root registry is available.
@@ -79,5 +83,35 @@ impl<K, T> AsRef<K> for Key<K, T> {
     #[inline]
     fn as_ref(&self) -> &K {
         &self.value
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<K, T> serde::Serialize for Key<K, T>
+where
+    K: serde::Serialize,
+{
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.value.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'r, 'de, K, T> serde::Deserialize<'de> for Key<K, T>
+where
+    K: serde::Deserialize<'de> + Clone + 'r,
+    T: ProvideRegistry<'r, K, T> + 'r,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let registry = T::registry();
+        let value = K::deserialize(deserializer)?;
+        Ok(Self::new(registry.key.value.clone(), value))
     }
 }
