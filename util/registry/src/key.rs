@@ -1,0 +1,83 @@
+use std::{hash::Hash, marker::PhantomData};
+
+/// A key for a value in a registry in a context
+/// where a root registry is available.
+pub struct Key<K, T> {
+    /// The id of the registry in the root registry.
+    registry: K,
+    /// The id of the value in the registry specified
+    /// by [`Self::registry`].
+    value: K,
+
+    _marker: PhantomData<T>,
+}
+
+impl<K, T> Key<K, T> {
+    /// Creates a new key.
+    #[inline]
+    pub const fn new(registry: K, value: K) -> Self {
+        Self {
+            registry,
+            value,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Gets the id of the value in the registry.
+    #[inline]
+    pub fn value(&self) -> &K {
+        &self.value
+    }
+
+    /// Gets the id of the registry in the root registry.
+    #[inline]
+    pub fn registry(&self) -> &K {
+        &self.registry
+    }
+}
+
+impl<K: Hash, T> Hash for Key<K, T> {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.registry.hash(state);
+        self.value.hash(state);
+    }
+}
+
+impl<K: Clone, T> Clone for Key<K, T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            registry: self.registry.clone(),
+            value: self.value.clone(),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<K: Copy, T> Copy for Key<K, T> {}
+
+impl<K: std::fmt::Debug, T> std::fmt::Debug for Key<K, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RegistryKey")
+            .field(&self.registry)
+            .field(&self.value)
+            .finish()
+    }
+}
+
+impl<K: PartialEq, T> PartialEq for Key<K, T> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.registry == other.registry && self.value == other.value
+    }
+}
+
+impl<K: Eq, T> Eq for Key<K, T> {}
+
+impl<K, T> AsRef<K> for Key<K, T> {
+    #[inline]
+    fn as_ref(&self) -> &K {
+        &self.value
+    }
+}

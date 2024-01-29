@@ -106,11 +106,14 @@ pub trait Freeze<T> {
     fn freeze(self, opts: Self::Opts) -> T;
 }
 
-impl<T> Freeze<T> for T {
+impl<T, U> Freeze<U> for T
+where
+    T: Into<U>,
+{
     type Opts = ();
 
     #[inline]
-    fn freeze(self, _opts: Self::Opts) -> T {
-        self
+    fn freeze(self, _opts: Self::Opts) -> U {
+        self.into()
     }
 }
