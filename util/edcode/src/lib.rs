@@ -4,6 +4,8 @@ mod imp;
 #[cfg(test)]
 mod tests;
 
+pub use bytes;
+
 /// Describes types that can be encoded into a packet buffer.
 pub trait Encode {
     type Error;

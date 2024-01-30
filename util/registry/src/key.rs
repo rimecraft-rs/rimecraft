@@ -2,8 +2,6 @@
 
 use std::{hash::Hash, marker::PhantomData};
 
-use crate::ProvideRegistry;
-
 /// A key for a value in a registry in a context
 /// where a root registry is available.
 pub struct Key<K, T> {
@@ -37,6 +35,17 @@ impl<K, T> Key<K, T> {
     #[inline]
     pub fn registry(&self) -> &K {
         &self.registry
+    }
+}
+
+impl<K, T> Key<K, T>
+where
+    K: Root,
+{
+    /// Creates a new key with the root registry.
+    #[inline]
+    pub fn with_root(value: K) -> Self {
+        Self::new(K::root(), value)
     }
 }
 
@@ -86,32 +95,138 @@ impl<K, T> AsRef<K> for Key<K, T> {
     }
 }
 
-#[cfg(feature = "serde")]
-impl<K, T> serde::Serialize for Key<K, T>
-where
-    K: serde::Serialize,
-{
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.value.serialize(serializer)
-    }
+/// Trait for presenting root registry key ID.
+pub trait Root: Sized {
+    fn root() -> Self;
 }
 
 #[cfg(feature = "serde")]
-impl<'r, 'de, K, T> serde::Deserialize<'de> for Key<K, T>
-where
-    K: serde::Deserialize<'de> + Clone + 'r,
-    T: ProvideRegistry<'r, K, T> + 'r,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+mod serde {
+    use crate::ProvideRegistry;
+
+    use super::Key;
+
+    impl<K, T> serde::Serialize for Key<K, T>
     where
-        D: serde::Deserializer<'de>,
+        K: serde::Serialize,
     {
-        let registry = T::registry();
-        let value = K::deserialize(deserializer)?;
-        Ok(Self::new(registry.key.value.clone(), value))
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.value.serialize(serializer)
+        }
+    }
+
+    impl<'r, 'de, K, T> serde::Deserialize<'de> for Key<K, T>
+    where
+        K: serde::Deserialize<'de> + Clone + 'r,
+        T: ProvideRegistry<'r, K, T> + 'r,
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let registry = T::registry();
+            let value = K::deserialize(deserializer)?;
+            Ok(Self::new(registry.key.value.clone(), value))
+        }
+    }
+}
+
+#[cfg(feature = "edcode")]
+pub mod edcode {
+    //! Helper module for `edcode` support.
+
+    use rimecraft_edcode::{bytes, Decode, Encode};
+
+    use crate::ProvideRegistry;
+
+    use super::{Key, Root};
+
+    impl<K, T> Encode for Key<K, T>
+    where
+        K: Encode,
+    {
+        type Error = <K as Encode>::Error;
+
+        #[inline]
+        fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+        where
+            B: bytes::BufMut,
+        {
+            self.value.encode(buf)
+        }
+    }
+
+    impl<'r, K, O, T> Decode for Key<K, T>
+    where
+        K: Decode<Output = O> + ToOwned<Owned = O> + 'r,
+        T: ProvideRegistry<'r, K, T> + 'r,
+    {
+        type Output = Key<O, T>;
+
+        type Error = <K as Decode>::Error;
+
+        #[inline]
+        fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
+        where
+            B: bytes::Buf,
+        {
+            let value = K::decode(buf)?;
+            Ok(Key::new(T::registry().key.value.to_owned(), value))
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct RegRef<T>(pub T);
+
+    impl<'a, K, T> Encode for RegRef<&'a Key<K, T>>
+    where
+        K: Encode,
+    {
+        type Error = <K as Encode>::Error;
+
+        #[inline]
+        fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+        where
+            B: bytes::BufMut,
+        {
+            self.0.value.encode(buf)
+        }
+    }
+
+    impl<K, T> Encode for RegRef<Key<K, T>>
+    where
+        K: Encode,
+    {
+        type Error = <K as Encode>::Error;
+
+        #[inline]
+        fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+        where
+            B: bytes::BufMut,
+        {
+            RegRef(&self.0).encode(buf)
+        }
+    }
+
+    impl<'r, K, T> Decode for RegRef<Key<K, T>>
+    where
+        K: Decode<Output = K> + Clone + Root + 'r,
+    {
+        type Output = Key<K, T>;
+
+        type Error = <K as Decode>::Error;
+
+        #[inline]
+        fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
+        where
+            B: bytes::Buf,
+        {
+            let value = K::decode(buf)?;
+            Ok(Key::new(K::root(), value))
+        }
     }
 }

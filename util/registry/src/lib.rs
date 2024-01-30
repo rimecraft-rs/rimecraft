@@ -439,48 +439,166 @@ where
 }
 
 #[cfg(feature = "serde")]
-impl<'a, K, T> serde::Serialize for Reg<'a, K, T>
-where
-    K: serde::Serialize,
-{
-    /// Serializes this registration using the ID
-    /// (or the raw ID, if not human readable).
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+pub mod serde {
+    //! Helper module for `serde` support.
+
+    use std::hash::Hash;
+
+    use crate::{entry::RefEntry, ProvideRegistry, Reg};
+
+    impl<'a, K, T> serde::Serialize for Reg<'a, K, T>
     where
-        S: serde::Serializer,
+        K: serde::Serialize,
     {
-        if serializer.is_human_readable() {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
             let entry: &RefEntry<_, _> = self.as_ref();
             entry.key.value().serialize(serializer)
-        } else {
-            serializer.serialize_i32(self.raw as i32)
         }
     }
-}
 
-#[cfg(feature = "serde")]
-impl<'a, 'r, 'de, K, T> serde::Deserialize<'de> for Reg<'a, K, T>
-where
-    'r: 'a,
-    T: ProvideRegistry<'r, K, T> + 'r,
-    K: serde::Deserialize<'de> + Hash + Eq + std::fmt::Debug + 'r,
-{
-    /// Deserializes this registration using the ID
-    /// (or the raw ID, if not human readable).
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    impl<'a, 'r, 'de, K, T> serde::Deserialize<'de> for Reg<'a, K, T>
     where
-        D: serde::Deserializer<'de>,
+        'r: 'a,
+        T: ProvideRegistry<'r, K, T> + 'r,
+        K: serde::Deserialize<'de> + Hash + Eq + std::fmt::Debug + 'r,
     {
-        if deserializer.is_human_readable() {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
             let key = K::deserialize(deserializer)?;
             T::registry()
                 .get(&key)
                 .ok_or_else(|| serde::de::Error::custom(format!("key {key:?} not found")))
-        } else {
+        }
+    }
+
+    /// Wrapper for serializing a compressed entry.
+    #[derive(Debug, Clone, Copy)]
+    pub struct Compressed<T>(pub T);
+
+    impl<'s, 'a, K, T> serde::Serialize for Compressed<&'s Reg<'a, K, T>>
+    where
+        K: serde::Serialize,
+    {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            serializer.serialize_i32(self.0.raw as i32)
+        }
+    }
+
+    impl<'a, K, T> serde::Serialize for Compressed<Reg<'a, K, T>>
+    where
+        K: serde::Serialize,
+    {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            Compressed(&self.0).serialize(serializer)
+        }
+    }
+
+    impl<'a, 'r, 'de, K, T> serde::Deserialize<'de> for Compressed<Reg<'a, K, T>>
+    where
+        'r: 'a,
+        T: ProvideRegistry<'r, K, T> + 'r,
+        K: serde::Deserialize<'de> + Hash + Eq + std::fmt::Debug + 'r,
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
             let raw = i32::deserialize(deserializer)? as usize;
             T::registry()
                 .of_raw(raw)
+                .map(Compressed)
                 .ok_or_else(|| serde::de::Error::custom(format!("raw id {raw} not found")))
         }
     }
 }
+
+#[cfg(feature = "edcode")]
+pub mod edcode {
+    //! Helper module for `edcode` support.
+
+    use std::convert::Infallible;
+
+    use rimecraft_edcode::{error::VarI32TooBigError, Decode, Encode, VarI32};
+
+    use crate::{ProvideRegistry, Reg};
+
+    #[derive(Debug)]
+    pub enum Error<K> {
+        InvalidKey(K),
+        InvalidRawId(usize),
+        VarI32(VarI32TooBigError),
+    }
+
+    impl<K> std::fmt::Display for Error<K>
+    where
+        K: std::fmt::Debug,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Error::InvalidKey(id) => write!(f, "element not found for key {id:?}"),
+                Error::InvalidRawId(id) => write!(f, "element not found for raw id {id}"),
+                Error::VarI32(err) => write!(f, "{err}"),
+            }
+        }
+    }
+
+    impl<K> std::error::Error for Error<K> where K: std::fmt::Debug {}
+
+    impl<K> From<VarI32TooBigError> for Error<K> {
+        #[inline]
+        fn from(value: VarI32TooBigError) -> Self {
+            Self::VarI32(value)
+        }
+    }
+
+    impl<'a, K, T> Encode for Reg<'a, K, T> {
+        type Error = Infallible;
+
+        #[inline]
+        fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+        where
+            B: rimecraft_edcode::bytes::BufMut,
+        {
+            VarI32(self.raw as i32).encode(buf)
+        }
+    }
+
+    impl<'a, 'r, K, T> Decode for Reg<'a, K, T>
+    where
+        'r: 'a,
+        K: 'r,
+        T: ProvideRegistry<'r, K, T> + 'r,
+    {
+        type Output = Self;
+
+        type Error = Error<K>;
+
+        fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
+        where
+            B: rimecraft_edcode::bytes::Buf,
+        {
+            let id = VarI32::decode(buf)? as usize;
+            T::registry()
+                .of_raw(id)
+                .map(From::from)
+                .ok_or_else(|| Error::InvalidRawId(id))
+        }
+    }
+}
+
+#[allow(dead_code)]
+type BoxedError = Box<dyn std::error::Error + Send + Sync>;

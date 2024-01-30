@@ -1,10 +1,10 @@
 //! Registry entry types.
 
-use std::{collections::HashSet, hash::Hash, ops::Deref};
+use std::{collections::HashSet, ops::Deref};
 
 use parking_lot::RwLock;
 
-use crate::{key::Key, tag::TagKey, ProvideRegistry};
+use crate::{key::Key, tag::TagKey};
 
 /// Type holds a value that can be registered
 /// in a registry.
@@ -116,36 +116,147 @@ impl<'a, K: std::fmt::Debug, T> std::fmt::Debug for TagsGuard<'a, K, T> {
 }
 
 #[cfg(feature = "serde")]
-impl<K, T> serde::Serialize for RefEntry<K, T>
-where
-    K: serde::Serialize,
-{
-    /// Serializes the registry entry using the ID.
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+mod serde {
+    //! Helper module for `serde` support.
+
+    use std::hash::Hash;
+
+    use crate::ProvideRegistry;
+
+    use super::RefEntry;
+
+    impl<K, T> serde::Serialize for RefEntry<K, T>
     where
-        S: serde::Serializer,
+        K: serde::Serialize,
     {
-        self.key.value().serialize(serializer)
+        /// Serializes the registry entry using the ID.
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.key.value().serialize(serializer)
+        }
+    }
+
+    impl<'a, 'r, 'de, K, T> serde::Deserialize<'de> for &'a RefEntry<K, T>
+    where
+        'r: 'a,
+        K: serde::Deserialize<'de> + Hash + Eq + std::fmt::Debug + 'r,
+        T: ProvideRegistry<'r, K, T> + 'r,
+    {
+        /// Deserializes the registry entry using the ID.
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let id = K::deserialize(deserializer)?;
+            T::registry()
+                .get(&id)
+                .map(From::from)
+                .ok_or_else(|| serde::de::Error::custom(format!("unknown registry key {id:?}")))
+        }
     }
 }
 
-#[cfg(feature = "serde")]
-impl<'a, 'r, 'de, K, T> serde::Deserialize<'de> for &'a RefEntry<K, T>
-where
-    'r: 'a,
-    K: serde::Deserialize<'de> + Hash + Eq + std::fmt::Debug + 'r,
-    T: ProvideRegistry<'r, K, T> + 'r,
-{
-    /// Deserializes the registry entry using the ID.
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+#[cfg(feature = "edcode")]
+mod edcode {
+    //! Helper module for `edcode` support.
+
+    use std::hash::Hash;
+
+    use rimecraft_edcode::{error::EitherError, Decode, Encode, VarI32};
+
+    use crate::{edcode::Error, ProvideRegistry, Reg};
+
+    use super::{Entry, RefEntry};
+
+    impl<'r, K, T> Encode for RefEntry<K, T>
     where
-        D: serde::Deserializer<'de>,
+        K: Hash + Eq + Clone + 'r,
+        T: ProvideRegistry<'r, K, T> + 'r,
     {
-        let id = K::deserialize(deserializer)?;
-        T::registry()
-            .get(&id)
-            .map(From::from)
-            .ok_or_else(|| serde::de::Error::custom(format!("unknown registry key {id:?}")))
+        type Error = Error<K>;
+
+        fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+        where
+            B: rimecraft_edcode::bytes::BufMut,
+        {
+            let id = Reg::raw_id(
+                T::registry()
+                    .get(self.key())
+                    .ok_or_else(|| Error::InvalidKey(self.key().value().clone()))?,
+            );
+            VarI32((id + 1) as i32).encode(buf).unwrap();
+            Ok(())
+        }
+    }
+
+    impl<'a, 'r, K, T> Decode for &'a RefEntry<K, T>
+    where
+        'r: 'a,
+        K: 'r,
+        T: ProvideRegistry<'r, K, T> + 'r,
+    {
+        type Output = Self;
+
+        type Error = Error<K>;
+
+        fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
+        where
+            B: rimecraft_edcode::bytes::Buf,
+        {
+            let id = (VarI32::decode(buf)? - 1) as usize;
+            T::registry()
+                .of_raw(id)
+                .map(From::from)
+                .ok_or_else(|| Error::InvalidRawId(id))
+        }
+    }
+
+    impl<'a, 'r, K, T> Encode for Entry<'a, K, T>
+    where
+        K: Hash + Eq + Clone + 'r,
+        T: ProvideRegistry<'r, K, T> + Encode + 'r,
+    {
+        type Error = EitherError<Error<K>, <T as Encode>::Error>;
+
+        fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
+        where
+            B: rimecraft_edcode::bytes::BufMut,
+        {
+            match self {
+                Entry::Direct(value) => {
+                    VarI32(0).encode(&mut buf).unwrap();
+                    value.encode(buf).map_err(EitherError::B)
+                }
+                Entry::Ref(entry) => entry.encode(buf).map_err(EitherError::A),
+            }
+        }
+    }
+
+    impl<'a, 'r, K, T> Decode for Entry<'a, K, T>
+    where
+        'r: 'a,
+        K: 'r,
+        T: ProvideRegistry<'r, K, T> + Decode<Output = T> + 'r,
+    {
+        type Output = Self;
+
+        type Error = EitherError<Error<K>, <T as Decode>::Error>;
+
+        fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
+        where
+            B: rimecraft_edcode::bytes::Buf,
+        {
+            let id = VarI32::decode(&mut buf).map_err(|err| EitherError::A(err.into()))?;
+            match id {
+                0 => T::decode(buf).map(Entry::Direct).map_err(EitherError::B),
+                id => T::registry()
+                    .of_raw((id - 1) as usize)
+                    .map(|r| Entry::Ref(r.into()))
+                    .ok_or_else(|| EitherError::A(Error::InvalidRawId((id - 1) as usize))),
+            }
+        }
     }
 }
