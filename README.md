@@ -9,7 +9,7 @@
   <h5><br /></h5>
 </div>
 
-###### <p align="center">**Rimecraft** is Committed to Becoming a Fully-Featured, Flexible and Libre Rust Implementation of **[Minecraft.](https://minecraft.net)**</p>
+###### <p align="center">**Rimecraft** is committed to becoming a fully-featured, flexible and libre Rust implementation of **[Minecraft.](https://minecraft.net)**</p>
 
 <br />
 
