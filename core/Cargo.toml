@@ -17,7 +17,7 @@ rimecraft-collections = { path = "../util/collections", features = [
 rimecraft-edcode = { path = "../util/edcode", features = ["uuid"] }
 rimecraft-event = { path = "../util/event" }
 rimecraft-freezer = { path = "../util/freezer" }
-rimecraft-nbt-ext = { path = "../util/nbt_ext" }
+rimecraft-nbt-ext = { path = "../util/nbt-ext" }
 rimecraft-attachment = { path = "../util/attachment" }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
