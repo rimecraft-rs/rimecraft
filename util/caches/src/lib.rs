@@ -1,3 +1,5 @@
+#![deprecated = "use crate `rimecraft-interner` instead"]
+
 #[cfg(feature = "arc")]
 pub mod arc;
 

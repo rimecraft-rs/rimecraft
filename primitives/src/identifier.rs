@@ -14,6 +14,7 @@ const DEFAULT_NAMESPACE: &str = "rimecraft";
 ///
 /// This type represents `net.minecraft.util.Identifier` (yarn).
 #[derive(PartialEq, Eq, Clone, Hash, Debug)]
+#[deprecated = "use crate `rimecraft-identifier` instead"]
 pub struct Identifier {
     #[cfg(feature = "caches")]
     namespace: crate::Ref<'static, String>,
