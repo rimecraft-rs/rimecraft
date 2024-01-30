@@ -17,6 +17,5 @@ serde = { version = "1.0", optional = true }
 rimecraft-edcode = { path = "../edcode", optional = true }
 
 [features]
-default = ["serde", "edcode"]
 serde = ["dep:serde"]
 edcode = ["dep:rimecraft-edcode"]
