@@ -1,0 +1,17 @@
+[package]
+name = "rimecraft-interner"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Safe reference-counted interners"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["data-structure"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+dashmap = "5.5"
+
+[features]
