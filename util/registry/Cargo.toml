@@ -1,0 +1,22 @@
+[package]
+name = "rimecraft-registry"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Minecraft Registry implementation"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["data-structures"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+parking_lot = "0.12"
+serde = { version = "1.0", optional = true }
+rimecraft-edcode = { path = "../edcode", optional = true }
+
+[features]
+default = ["serde", "edcode"]
+serde = ["dep:serde"]
+edcode = ["dep:rimecraft-edcode"]

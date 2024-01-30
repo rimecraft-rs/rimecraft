@@ -6,7 +6,7 @@ use super::*;
 
 impl Encode for bytes::Bytes {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -16,11 +16,11 @@ impl Encode for bytes::Bytes {
     }
 }
 
-impl<'de> Decode<'de> for bytes::Bytes {
+impl Decode for bytes::Bytes {
     type Output = bytes::Bytes;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -31,7 +31,7 @@ impl<'de> Decode<'de> for bytes::Bytes {
 
 impl Encode for u8 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -40,11 +40,11 @@ impl Encode for u8 {
     }
 }
 
-impl<'de> Decode<'de> for u8 {
+impl Decode for u8 {
     type Output = u8;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -54,7 +54,7 @@ impl<'de> Decode<'de> for u8 {
 
 impl Encode for i8 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -63,11 +63,11 @@ impl Encode for i8 {
     }
 }
 
-impl<'de> Decode<'de> for i8 {
+impl Decode for i8 {
     type Output = i8;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -77,7 +77,7 @@ impl<'de> Decode<'de> for i8 {
 
 impl Encode for u16 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -86,11 +86,11 @@ impl Encode for u16 {
     }
 }
 
-impl<'de> Decode<'de> for u16 {
+impl Decode for u16 {
     type Output = u16;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -100,7 +100,7 @@ impl<'de> Decode<'de> for u16 {
 
 impl Encode for i16 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -109,11 +109,11 @@ impl Encode for i16 {
     }
 }
 
-impl<'de> Decode<'de> for i16 {
+impl Decode for i16 {
     type Output = i16;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -123,7 +123,7 @@ impl<'de> Decode<'de> for i16 {
 
 impl Encode for u32 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -132,11 +132,11 @@ impl Encode for u32 {
     }
 }
 
-impl<'de> Decode<'de> for u32 {
+impl Decode for u32 {
     type Output = u32;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -146,7 +146,7 @@ impl<'de> Decode<'de> for u32 {
 
 impl Encode for i32 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -155,11 +155,11 @@ impl Encode for i32 {
     }
 }
 
-impl<'de> Decode<'de> for i32 {
+impl Decode for i32 {
     type Output = i32;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -169,7 +169,7 @@ impl<'de> Decode<'de> for i32 {
 
 impl Encode for u64 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -178,11 +178,11 @@ impl Encode for u64 {
     }
 }
 
-impl<'de> Decode<'de> for u64 {
+impl Decode for u64 {
     type Output = u64;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -192,7 +192,7 @@ impl<'de> Decode<'de> for u64 {
 
 impl Encode for i64 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -201,11 +201,11 @@ impl Encode for i64 {
     }
 }
 
-impl<'de> Decode<'de> for i64 {
+impl Decode for i64 {
     type Output = i64;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -215,7 +215,7 @@ impl<'de> Decode<'de> for i64 {
 
 impl Encode for u128 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -224,11 +224,11 @@ impl Encode for u128 {
     }
 }
 
-impl<'de> Decode<'de> for u128 {
+impl Decode for u128 {
     type Output = u128;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -238,7 +238,7 @@ impl<'de> Decode<'de> for u128 {
 
 impl Encode for i128 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -247,11 +247,11 @@ impl Encode for i128 {
     }
 }
 
-impl<'de> Decode<'de> for i128 {
+impl Decode for i128 {
     type Output = i128;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -261,7 +261,7 @@ impl<'de> Decode<'de> for i128 {
 
 impl Encode for f32 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -270,11 +270,11 @@ impl Encode for f32 {
     }
 }
 
-impl<'de> Decode<'de> for f32 {
+impl Decode for f32 {
     type Output = f32;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -284,7 +284,7 @@ impl<'de> Decode<'de> for f32 {
 
 impl Encode for f64 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -293,11 +293,11 @@ impl Encode for f64 {
     }
 }
 
-impl<'de> Decode<'de> for f64 {
+impl Decode for f64 {
     type Output = f64;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -307,7 +307,7 @@ impl<'de> Decode<'de> for f64 {
 
 impl Encode for bool {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -316,11 +316,11 @@ impl Encode for bool {
     }
 }
 
-impl<'de> Decode<'de> for bool {
+impl Decode for bool {
     type Output = bool;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -333,7 +333,7 @@ where
     T: serde::Serialize,
 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -349,7 +349,7 @@ where
     type Output = T;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -362,7 +362,7 @@ where
     T: serde::Serialize,
 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -376,7 +376,7 @@ where
 {
     type Output = T;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -392,7 +392,7 @@ where
 }
 
 impl Encode for crate::util::VarInt {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -412,10 +412,10 @@ impl Encode for crate::util::VarInt {
     }
 }
 
-impl<'de> Decode<'de> for crate::util::VarInt {
+impl Decode for crate::util::VarInt {
     type Output = i32;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -441,7 +441,7 @@ impl<'de> Decode<'de> for crate::util::VarInt {
 
 impl Encode for str {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -454,7 +454,7 @@ impl Encode for str {
 
 impl Encode for String {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -462,9 +462,9 @@ impl Encode for String {
     }
 }
 
-impl<'de> Decode<'de> for String {
+impl Decode for String {
     type Output = String;
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -484,7 +484,7 @@ where
     T: Registration,
 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -498,7 +498,7 @@ where
 {
     type Output = T;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -520,7 +520,7 @@ impl<T> Encode for [T]
 where
     T: Encode,
 {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -540,7 +540,7 @@ where
 {
     type Output = Vec<O>;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -560,7 +560,7 @@ where
     K: Encode,
     V: Encode,
 {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -583,7 +583,7 @@ where
 {
     type Output = std::collections::HashMap<OK, OV>;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -604,7 +604,7 @@ impl<T> Encode for Option<T>
 where
     T: Encode,
 {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -623,7 +623,7 @@ where
 {
     type Output = Option<OT>;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -637,7 +637,7 @@ where
 
 impl Encode for BlockPos {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -646,11 +646,11 @@ impl Encode for BlockPos {
     }
 }
 
-impl<'de> Decode<'de> for BlockPos {
+impl Decode for BlockPos {
     type Output = BlockPos;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -660,7 +660,7 @@ impl<'de> Decode<'de> for BlockPos {
 
 impl Encode for crate::util::math::ChunkPos {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -669,11 +669,11 @@ impl Encode for crate::util::math::ChunkPos {
     }
 }
 
-impl<'de> Decode<'de> for crate::util::math::ChunkPos {
+impl Decode for crate::util::math::ChunkPos {
     type Output = crate::util::math::ChunkPos;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -683,7 +683,7 @@ impl<'de> Decode<'de> for crate::util::math::ChunkPos {
 
 impl Encode for uuid::Uuid {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -694,11 +694,11 @@ impl Encode for uuid::Uuid {
     }
 }
 
-impl<'de> Decode<'de> for uuid::Uuid {
+impl Decode for uuid::Uuid {
     type Output = uuid::Uuid;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -710,7 +710,7 @@ impl<'de> Decode<'de> for uuid::Uuid {
 
 impl Encode for rimecraft_nbt_ext::Compound {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -718,11 +718,11 @@ impl Encode for rimecraft_nbt_ext::Compound {
     }
 }
 
-impl<'de> Decode<'de> for rimecraft_nbt_ext::Compound {
+impl Decode for rimecraft_nbt_ext::Compound {
     type Output = rimecraft_nbt_ext::Compound;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -732,7 +732,7 @@ impl<'de> Decode<'de> for rimecraft_nbt_ext::Compound {
 
 impl Encode for glam::Vec3 {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -743,11 +743,11 @@ impl Encode for glam::Vec3 {
     }
 }
 
-impl<'de> Decode<'de> for glam::Vec3 {
+impl Decode for glam::Vec3 {
     type Output = glam::Vec3;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -760,7 +760,7 @@ impl<'de> Decode<'de> for glam::Vec3 {
 
 impl Encode for glam::Quat {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -772,11 +772,11 @@ impl Encode for glam::Quat {
     }
 }
 
-impl<'de> Decode<'de> for glam::Quat {
+impl Decode for glam::Quat {
     type Output = glam::Quat;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -789,7 +789,7 @@ impl<'de> Decode<'de> for glam::Quat {
 }
 
 impl Encode for crate::item::ItemStack {
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -815,10 +815,10 @@ impl Encode for crate::item::ItemStack {
     }
 }
 
-impl<'de> Decode<'de> for crate::item::ItemStack {
+impl Decode for crate::item::ItemStack {
     type Output = crate::item::ItemStack;
 
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -835,7 +835,7 @@ impl<'de> Decode<'de> for crate::item::ItemStack {
 
 impl Encode for Id {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -843,11 +843,11 @@ impl Encode for Id {
     }
 }
 
-impl<'de> Decode<'de> for Id {
+impl Decode for Id {
     type Output = Id;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -857,7 +857,7 @@ impl<'de> Decode<'de> for Id {
 
 impl<T> Encode for crate::registry::Key<T> {
     #[inline]
-    fn encode<B>(&self, buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, mut buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {
@@ -872,7 +872,7 @@ where
     type Output = crate::registry::Key<T>;
 
     #[inline]
-    fn decode<B>(buf: &'de mut B) -> anyhow::Result<Self::Output>
+    fn decode<B>(mut buf: B) -> anyhow::Result<Self::Output>
     where
         B: bytes::Buf,
     {
@@ -883,7 +883,7 @@ where
 
 impl super::Encode for () {
     #[inline]
-    fn encode<B>(&self, _buf: &mut B) -> anyhow::Result<()>
+    fn encode<B>(&self, _buf: B) -> anyhow::Result<()>
     where
         B: bytes::BufMut,
     {

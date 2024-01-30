@@ -4,12 +4,14 @@ mod imp;
 #[cfg(test)]
 mod tests;
 
+pub use bytes;
+
 /// Describes types that can be encoded into a packet buffer.
 pub trait Encode {
     type Error;
 
     /// Encode into a buffer.
-    fn encode<B>(&self, buf: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut;
 }
@@ -33,14 +35,14 @@ where
 }
 
 /// Describes types that can be decoded from a packet buffer.
-pub trait Decode<'de> {
+pub trait Decode {
     /// The resulting type.
     type Output;
 
     type Error;
 
     /// Decode from a buffer.
-    fn decode<B>(buf: &'de mut B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf;
 }
@@ -50,19 +52,19 @@ pub trait Update: Encode {
     type Error;
 
     /// Update from a buffer.
-    fn update<B>(&mut self, buf: &mut B) -> Result<(), <Self as Update>::Error>
+    fn update<B>(&mut self, buf: B) -> Result<(), <Self as Update>::Error>
     where
         B: bytes::Buf;
 }
 
 impl<T, E> Update for T
 where
-    T: Encode<Error = E> + for<'de> Decode<'de, Output = T, Error = E>,
+    T: Encode<Error = E> + Decode<Output = T, Error = E>,
 {
     type Error = E;
 
     #[inline]
-    fn update<B>(&mut self, buf: &mut B) -> Result<(), <Self as Update>::Error>
+    fn update<B>(&mut self, buf: B) -> Result<(), <Self as Update>::Error>
     where
         B: bytes::Buf,
     {
