@@ -359,7 +359,7 @@ pub struct State<'s> {
     should_render: bool,
 }
 
-impl <'s> State<'s> {
+impl<'s> State<'s> {
     pub async fn new(window: &'s Window) -> State<'s> {
         let size = window.inner_size();
 
@@ -399,7 +399,7 @@ impl <'s> State<'s> {
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: Default::default(),
             view_formats: vec![],
-			desired_maximum_frame_latency: 0
+            desired_maximum_frame_latency: 0,
         };
         surface.configure(&device, &config);
 
@@ -599,7 +599,7 @@ impl <'s> State<'s> {
     }
 }
 
-impl <'s> State<'s> {
+impl<'s> State<'s> {
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.size = new_size;

@@ -12,7 +12,7 @@ fn main() {
     let mut state = futures_executor::block_on(State::new(&window));
 
     event_loop
-        .run(move |event, target| {
+        .run(|event, target| {
             target.set_control_flow(ControlFlow::Wait);
 
             match event {
