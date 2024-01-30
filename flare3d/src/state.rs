@@ -331,9 +331,9 @@ impl InstanceRaw {
     }
 }
 
-pub struct State {
+pub struct State<'s> {
     pub size: winit::dpi::PhysicalSize<u32>,
-    surface: wgpu::Surface,
+    surface: wgpu::Surface<'s>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
@@ -359,8 +359,8 @@ pub struct State {
     should_render: bool,
 }
 
-impl State {
-    pub async fn new(window: &Window) -> Self {
+impl <'s> State<'s> {
+    pub async fn new(window: &'s Window) -> State<'s> {
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -381,8 +381,8 @@ impl State {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::default(),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
                     label: None,
                 },
                 None,
@@ -399,6 +399,7 @@ impl State {
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: Default::default(),
             view_formats: vec![],
+			desired_maximum_frame_latency: 0
         };
         surface.configure(&device, &config);
 
@@ -598,7 +599,7 @@ impl State {
     }
 }
 
-impl State {
+impl <'s> State<'s> {
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.size = new_size;

@@ -14,5 +14,5 @@ maintenance = { status = "actively-developed" }
 [dependencies]
 flare3d = { path = "../" }
 winit = "0.29"
-wgpu = "0.19"
+wgpu = "0.19.1"
 futures-executor = "0.3"

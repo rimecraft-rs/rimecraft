@@ -23,7 +23,7 @@ winit = { version = "0.29", default-features = false, features = [
   "wayland-dlopen",
   "wayland-csd-adwaita",
 ] }
-wgpu = "0.19"
+wgpu = "0.19.1"
 tracing = "0.1"
 bytemuck = { version = "1.4", features = ["derive"] }
 anyhow = "1.0"
