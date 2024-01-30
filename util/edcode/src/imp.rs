@@ -105,7 +105,7 @@ where
     type Error = fastnbt::error::Error;
 
     #[inline]
-    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
+    fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -114,7 +114,7 @@ where
 }
 
 #[cfg(feature = "nbt")]
-impl<'de, T> Decode<'de> for Nbt<T>
+impl<T> Decode for Nbt<T>
 where
     T: for<'a> serde::Deserialize<'a>,
 {
@@ -123,7 +123,7 @@ where
     type Error = fastnbt::error::Error;
 
     #[inline]
-    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {
@@ -151,7 +151,7 @@ where
 }
 
 #[cfg(feature = "json")]
-impl<'de, T> Decode<'de> for Json<T>
+impl<T> Decode for Json<T>
 where
     T: for<'a> serde::de::Deserialize<'a>,
 {
@@ -163,7 +163,7 @@ where
     where
         B: bytes::Buf,
     {
-        let len = VarI32::decode(buf)? as usize;
+        let len = VarI32::decode(&mut buf)? as usize;
         use std::io::Read;
         serde_json::from_reader(bytes::Buf::reader(buf).take(len as u64))
             .map_err(ErrorWithVarI32Err::Target)
