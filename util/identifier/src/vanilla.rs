@@ -238,3 +238,11 @@ mod tests {
         assert_eq!(id, Identifier::new(Namespace::new("foo"), Path::new("bar")));
     }
 }
+
+#[cfg(feature = "vanilla-registry")]
+impl ::rimecraft_registry::key::Root for Identifier {
+    #[inline]
+    fn root() -> Self {
+        Self::new(Default::default(), Path::new("root"))
+    }
+}
