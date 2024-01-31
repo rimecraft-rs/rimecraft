@@ -1,3 +1,9 @@
+//! Registry related stuffs used to register various
+//! in-game components.
+//!
+//! Registry system allows the game to enumerate all known types of
+//! something, and to assign a unique identifier to each of those.
+
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -23,7 +29,7 @@ pub struct Registry<K, T> {
     tv: RwLock<HashMap<TagKey<K, T>, Vec<usize>>>,
 }
 
-/// Reference of an entry.
+/// Reference of a registration.
 pub struct Reg<'a, K, T> {
     raw: usize,
     registry: &'a Registry<K, T>,
@@ -144,7 +150,7 @@ where
     }
 }
 
-impl<'a, K: std::fmt::Debug, T: std::fmt::Debug> std::fmt::Debug for Reg<'a, K, T> {
+impl<K: std::fmt::Debug, T: std::fmt::Debug> std::fmt::Debug for Reg<'_, K, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RegRef")
             .field("raw", &self.raw)
@@ -181,23 +187,23 @@ impl<'a, K, T> From<Reg<'a, K, T>> for &'a RefEntry<K, T> {
     }
 }
 
-impl<'a, K, T> AsRef<RefEntry<K, T>> for Reg<'a, K, T> {
+impl<K, T> AsRef<RefEntry<K, T>> for Reg<'_, K, T> {
     #[inline]
     fn as_ref(&self) -> &RefEntry<K, T> {
         &self.registry.entries[self.raw]
     }
 }
 
-impl<'a, K, T> Copy for Reg<'a, K, T> {}
+impl<K, T> Copy for Reg<'_, K, T> {}
 
-impl<'a, K, T> Clone for Reg<'a, K, T> {
+impl<K, T> Clone for Reg<'_, K, T> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, K, T> Deref for Reg<'a, K, T> {
+impl<K, T> Deref for Reg<'_, K, T> {
     type Target = T;
 
     #[inline]
@@ -317,6 +323,7 @@ impl<'a, K, T> IntoIterator for &'a Registry<K, T> {
 }
 
 /// Mutable registry of various in-game components.
+#[derive(Debug)]
 pub struct RegistryMut<K, T> {
     key: Key<K, Registry<K, T>>,
     entries: Vec<(T, RefEntry<K, T>)>,
@@ -341,6 +348,11 @@ where
 {
     /// Registers a new entry and returns
     /// its raw id if successful.
+    ///
+    /// # Errors
+    ///
+    /// Returns back the given key and value if
+    /// registration with the key already exists.
     pub fn register(&mut self, key: Key<K, T>, value: T) -> Result<usize, (Key<K, T>, T)> {
         if self.keys.contains(&key) {
             return Err((key, value));
@@ -387,11 +399,13 @@ where
 
 /// Trait for providing a registry from reference.
 pub trait ProvideRegistryRef<'r, K, T> {
+    /// Gets the registry from reference.
     fn registry_ref(&self) -> &'r Registry<K, T>;
 }
 
 /// Trait for providing a registry.
 pub trait ProvideRegistry<'r, K, T> {
+    /// Gets the registry.
     fn registry() -> &'r Registry<K, T>;
 }
 
@@ -409,7 +423,10 @@ impl<K, T> Registry<K, T>
 where
     K: Hash + Eq + Clone,
 {
-    pub fn populate_tags<'a, I>(&'a self, entries: I)
+    /// Binds given tags to entries, and
+    /// removes old tag bindings.
+    #[doc(alias = "populate_tags")]
+    pub fn bind_tags<'a, I>(&'a self, entries: I)
     where
         I: IntoIterator<Item = (TagKey<K, T>, Vec<&'a RefEntry<K, T>>)>,
     {
@@ -446,7 +463,7 @@ pub mod serde {
 
     use crate::{entry::RefEntry, ProvideRegistry, Reg};
 
-    impl<'a, K, T> serde::Serialize for Reg<'a, K, T>
+    impl<K, T> serde::Serialize for Reg<'_, K, T>
     where
         K: serde::Serialize,
     {
@@ -481,7 +498,7 @@ pub mod serde {
     #[derive(Debug, Clone, Copy)]
     pub struct Compressed<T>(pub T);
 
-    impl<'s, 'a, K, T> serde::Serialize for Compressed<&'s Reg<'a, K, T>>
+    impl<K, T> serde::Serialize for Compressed<&Reg<'_, K, T>>
     where
         K: serde::Serialize,
     {
@@ -494,7 +511,7 @@ pub mod serde {
         }
     }
 
-    impl<'a, K, T> serde::Serialize for Compressed<Reg<'a, K, T>>
+    impl<K, T> serde::Serialize for Compressed<Reg<'_, K, T>>
     where
         K: serde::Serialize,
     {
@@ -565,7 +582,7 @@ pub mod edcode {
         }
     }
 
-    impl<'a, K, T> Encode for Reg<'a, K, T> {
+    impl<K, T> Encode for Reg<'_, K, T> {
         type Error = Infallible;
 
         #[inline]

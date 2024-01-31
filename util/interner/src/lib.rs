@@ -1,4 +1,19 @@
-#![forbid(unsafe_code)]
+#![forbid(unsafe_code, missing_docs)]
+
+//! Safe reference-counted interners.
+//!
+//! # Examples
+//!
+//! ```
+//! # use rimecraft_interner::Interner;
+//! let interner: Interner<'static, str> = Interner::new();
+//!
+//! interner.obtain("wow");
+//! interner.obtain("mom");
+//!
+//! assert_eq!(&*interner.obtain("wow"), "wow");
+//! assert_eq!(&*interner.obtain("mom"), "mom");
+//! ```
 
 use std::{
     borrow::Borrow,
@@ -12,7 +27,7 @@ use dashmap::DashSet;
 
 /// A reference-counted interner.
 pub struct Interner<'a, T: ?Sized> {
-    map: DashSet<Node<'a, T>>,
+    inner: DashSet<Node<'a, T>>,
 }
 
 #[derive(Debug)]
@@ -101,41 +116,45 @@ where
     #[inline]
     pub fn new() -> Self {
         Self {
-            map: DashSet::new(),
+            inner: DashSet::new(),
         }
     }
 
     /// Shrinks the interner's internal storage.
     pub fn shrink(&self) {
-        self.map.retain(|node| {
+        self.inner.retain(|node| {
             let Node(Ref::Weak(weak)) = node else {
                 unreachable!()
             };
             weak.strong_count() > 0
         });
-        self.map.shrink_to_fit()
+        self.inner.shrink_to_fit()
     }
 
     /// Gets or interns a value, returning a reference
     /// to the interned value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rimecraft_interner::Interner;
+    /// let interner: Interner<'static, str> = Interner::new();
+    /// assert_eq!(&*interner.obtain("ferris"), "ferris");
+    /// ```
     pub fn obtain<Q>(&self, value: Q) -> Arc<T>
     where
         Q: Deref<Target = T> + IntoBoxed<T>,
     {
-        if let Some(v) = self.map.get(&Ref::Strong(&*value)) {
+        if let Some(v) = self.inner.get(&Ref::Strong(&*value)) {
             let Node(Ref::Weak(ref weak)) = *v else {
                 unreachable!()
             };
             weak.upgrade().unwrap().clone()
         } else {
-            self.insert(value.into_boxed().into())
+            let value = value.into_boxed().into();
+            self.inner.insert(Node(Ref::Weak(Arc::downgrade(&value))));
+            value
         }
-    }
-
-    #[inline]
-    fn insert(&self, value: Arc<T>) -> Arc<T> {
-        self.map.insert(Node(Ref::Weak(Arc::downgrade(&value))));
-        value
     }
 }
 
@@ -156,7 +175,9 @@ where
     T: Hash + Eq + std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Interner").field("map", &self.map).finish()
+        f.debug_struct("Interner")
+            .field("map", &self.inner)
+            .finish()
     }
 }
 

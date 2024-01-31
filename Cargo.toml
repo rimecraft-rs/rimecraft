@@ -1,3 +1,31 @@
 [workspace]
 resolver = "2"
 members = ["core", "primitives", "flare3d", "util/*", "flare3d/examples"]
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing-docs = "warn"
+missing-debug-implementations = "deny"
+let-underscore-drop = "warn"
+single-use-lifetimes = "warn"
+trivial-numeric-casts = "warn"
+elided-lifetimes-in-paths = "deny"
+unused-lifetimes = "forbid"
+unused-macro-rules = "warn"
+unused-qualifications = "warn"
+unused-tuple-struct-fields = "warn"
+variant-size-differences = "warn"
+dyn-drop = "forbid"
+ellipsis-inclusive-range-patterns = "forbid"
+exported-private-dependencies = "forbid"
+uncommon-codepoints = "deny"
+
+[workspace.lints.clippy]
+missing-panics-doc = "warn"
+missing-errors-doc = "warn"
+cloned-instead-of-copied = "warn"
+future-not-send = "warn"
+if-not-else = "warn"
+if-then-some-else-none = "warn"
+impl-trait-in-params = "warn"
+macro-use-imports = "forbid"

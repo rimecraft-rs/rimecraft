@@ -50,13 +50,15 @@ impl<K: std::fmt::Debug, T> std::fmt::Debug for TagKey<K, T> {
     }
 }
 
+/// Tags of a registry.
 #[derive(Debug)]
 pub struct Tags<'r, K, T> {
     pub(crate) inner: parking_lot::RwLockReadGuard<'r, HashMap<TagKey<K, T>, Vec<usize>>>,
     pub(crate) registry: &'r Registry<K, T>,
 }
 
-impl<'r, K, T> Tags<'r, K, T> {
+impl<K, T> Tags<'_, K, T> {
+    /// Gets an iterator over the tags.
     #[inline]
     pub fn iter(&self) -> Iter<'_, K, T> {
         Iter {
@@ -66,7 +68,7 @@ impl<'r, K, T> Tags<'r, K, T> {
     }
 }
 
-impl<'a, 'r: 'a, K, T> IntoIterator for &'a Tags<'r, K, T> {
+impl<'a: 'a, K, T> IntoIterator for &'a Tags<'_, K, T> {
     type Item = (&'a TagKey<K, T>, crate::Entries<'a, K, T>);
 
     type IntoIter = Iter<'a, K, T>;
@@ -117,7 +119,7 @@ pub mod serde {
     #[derive(Debug, Clone, Copy)]
     pub struct Unprefixed<T>(pub T);
 
-    impl<'a, K, T> serde::Serialize for Unprefixed<&'a TagKey<K, T>>
+    impl<K, T> serde::Serialize for Unprefixed<&TagKey<K, T>>
     where
         K: serde::Serialize,
     {

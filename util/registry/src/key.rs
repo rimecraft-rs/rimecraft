@@ -97,6 +97,7 @@ impl<K, T> AsRef<K> for Key<K, T> {
 
 /// Trait for presenting root registry key ID.
 pub trait Root: Sized {
+    /// Gets the root registry key ID.
     fn root() -> Self;
 }
 
@@ -182,7 +183,7 @@ pub mod edcode {
     #[derive(Debug, Clone, Copy)]
     pub struct RegRef<T>(pub T);
 
-    impl<'a, K, T> Encode for RegRef<&'a Key<K, T>>
+    impl<K, T> Encode for RegRef<&Key<K, T>>
     where
         K: Encode,
     {

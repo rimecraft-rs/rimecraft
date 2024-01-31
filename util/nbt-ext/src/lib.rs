@@ -1,3 +1,7 @@
+//! Extensions for [`Compound`].
+
+#![forbid(unsafe_code, missing_docs)]
+
 use std::collections::HashMap;
 
 use fastnbt::{ByteArray, IntArray, LongArray, Tag, Value};
@@ -9,46 +13,94 @@ use fastnbt::{ByteArray, IntArray, LongArray, Tag, Value};
 /// This type represents `net.minecraft.nbt.NbtCompound` (yarn).
 pub type Compound = HashMap<String, Value>;
 
-/// Extensions for [`Compound`].
+/// Extension trait for the [`Compound`] type.
+///
+/// Provides additional methods for inserting and retrieving values from a compound tag.
 pub trait CompoundExt {
+    /// Inserts an `i8` value into the compound with the specified key.
     fn insert_i8(&mut self, key: &str, value: i8);
+
+    /// Inserts an `i16` value into the compound with the specified key.
     fn insert_i16(&mut self, key: &str, value: i16);
+
+    /// Inserts an `i32` value into the compound with the specified key.
     fn insert_i32(&mut self, key: &str, value: i32);
+
+    /// Inserts an `i64` value into the compound with the specified key.
     fn insert_i64(&mut self, key: &str, value: i64);
+
+    /// Inserts an `f32` value into the compound with the specified key.
     fn insert_f32(&mut self, key: &str, value: f32);
+
+    /// Inserts an `f64` value into the compound with the specified key.
     fn insert_f64(&mut self, key: &str, value: f64);
+
+    /// Inserts a string value into the compound with the specified key.
     fn insert_str(&mut self, key: &str, value: &str);
+
+    /// Inserts a slice of `i8` values into the compound with the specified key.
     fn insert_i8_slice(&mut self, key: &str, value: &[i8]);
+
+    /// Inserts a slice of `i32` values into the compound with the specified key.
     fn insert_i32_slice(&mut self, key: &str, value: &[i32]);
+
+    /// Inserts a slice of `i64` values into the compound with the specified key.
     fn insert_i64_slice(&mut self, key: &str, value: &[i64]);
 
+    /// Inserts a boolean value into the compound with the specified key.
+    /// The boolean value is internally stored as an `i8` (0 for false, 1 for true).
     #[inline]
     fn insert_bool(&mut self, key: &str, value: bool) {
         self.insert_i8(key, if value { 1 } else { 0 })
     }
 
+    /// Retrieves the tag with the specified key from the compound.
     fn get_tag(&self, key: &str) -> Option<Tag>;
 
-    /// Whether the tag matches with
-    /// tag stored in this compound.
+    /// Checks if the compound contains a tag with the specified key and matching type.
     #[inline]
     fn contains(&self, key: &str, tag: Tag) -> bool {
         self.get_tag(key).map_or(false, |e| e == tag)
     }
 
+    /// Retrieves an `i8` value from the compound with the specified key.
     fn get_i8(&self, key: &str) -> Option<i8>;
+
+    /// Retrieves an `i16` value from the compound with the specified key.
     fn get_i16(&self, key: &str) -> Option<i16>;
+
+    /// Retrieves an `i32` value from the compound with the specified key.
     fn get_i32(&self, key: &str) -> Option<i32>;
+
+    /// Retrieves an `i64` value from the compound with the specified key.
     fn get_i64(&self, key: &str) -> Option<i64>;
+
+    /// Retrieves an `f32` value from the compound with the specified key.
     fn get_f32(&self, key: &str) -> Option<f32>;
+
+    /// Retrieves an `f64` value from the compound with the specified key.
     fn get_f64(&self, key: &str) -> Option<f64>;
+
+    /// Retrieves a string value from the compound with the specified key.
     fn get_str(&self, key: &str) -> Option<&str>;
+
+    /// Retrieves a slice of `i8` values from the compound with the specified key.
     fn get_i8_slice(&self, key: &str) -> Option<&[i8]>;
+
+    /// Retrieves a slice of `i32` values from the compound with the specified key.
     fn get_i32_slice(&self, key: &str) -> Option<&[i32]>;
+
+    /// Retrieves a slice of `i64` values from the compound with the specified key.
     fn get_i64_slice(&self, key: &str) -> Option<&[i64]>;
+
+    /// Retrieves a nested compound tag from the compound with the specified key.
     fn get_compound(&self, key: &str) -> Option<&Compound>;
+
+    /// Retrieves a slice of `Value` tags from the compound with the specified key.
     fn get_slice(&self, key: &str) -> Option<&[Value]>;
 
+    /// Retrieves a boolean value from the compound with the specified key.
+    /// The boolean value is internally stored as an `i8` (0 for false, 1 for true).
     #[inline]
     fn get_bool(&self, key: &str) -> Option<bool> {
         self.get_i8(key).map(|e| e != 0)

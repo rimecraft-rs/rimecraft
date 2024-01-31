@@ -19,3 +19,6 @@ rimecraft-edcode = { path = "../edcode", optional = true }
 [features]
 serde = ["dep:serde"]
 edcode = ["dep:rimecraft-edcode"]
+
+[lints]
+workspace = true

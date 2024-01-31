@@ -16,7 +16,7 @@ pub enum Entry<'a, K, T> {
     Ref(&'a RefEntry<K, T>),
 }
 
-impl<'a, K, T> Entry<'a, K, T> {
+impl<K, T> Entry<'_, K, T> {
     /// Gets the containing value of this entry.
     #[inline]
     pub fn value(&self) -> Option<&T> {
@@ -46,7 +46,7 @@ impl<'a, K, T> Entry<'a, K, T> {
     }
 }
 
-impl<'a, K, T> From<T> for Entry<'a, K, T> {
+impl<K, T> From<T> for Entry<'_, K, T> {
     #[inline]
     fn from(value: T) -> Self {
         Self::Direct(value)
@@ -100,7 +100,7 @@ pub struct TagsGuard<'a, K, T> {
     inner: parking_lot::RwLockReadGuard<'a, HashSet<TagKey<K, T>>>,
 }
 
-impl<'a, K, T> Deref for TagsGuard<'a, K, T> {
+impl<K, T> Deref for TagsGuard<'_, K, T> {
     type Target = HashSet<TagKey<K, T>>;
 
     #[inline]
@@ -109,7 +109,7 @@ impl<'a, K, T> Deref for TagsGuard<'a, K, T> {
     }
 }
 
-impl<'a, K: std::fmt::Debug, T> std::fmt::Debug for TagsGuard<'a, K, T> {
+impl<K: std::fmt::Debug, T> std::fmt::Debug for TagsGuard<'_, K, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("TagsGuard").field(&self.inner).finish()
     }
@@ -214,7 +214,7 @@ mod edcode {
         }
     }
 
-    impl<'a, 'r, K, T> Encode for Entry<'a, K, T>
+    impl<'r, K, T> Encode for Entry<'_, K, T>
     where
         K: Hash + Eq + Clone + 'r,
         T: ProvideRegistry<'r, K, T> + Encode + 'r,
