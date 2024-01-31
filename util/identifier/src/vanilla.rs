@@ -25,7 +25,7 @@ impl Namespace {
     /// # Safety
     ///
     /// The given namespace shoule be all [a-z0-9_.-] character.
-    pub const unsafe fn const_new(value: &'static str) -> Self {
+    pub const fn const_new(value: &'static str) -> Self {
         Self(ArcCowStr::Ref(value))
     }
 
@@ -84,7 +84,7 @@ impl Path {
     ///
     /// The given path shoule be all [a-z0-9/_.-] character.
     #[inline]
-    pub const unsafe fn new_unchecked(value: &'static str) -> Self {
+    pub const fn new_unchecked(value: &'static str) -> Self {
         Self(ArcCowStr::Ref(value))
     }
 
