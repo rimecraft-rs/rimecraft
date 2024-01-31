@@ -12,3 +12,6 @@ categories = ["rust-patterns"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+
+[lints]
+workspace = true

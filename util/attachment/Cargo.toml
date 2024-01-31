@@ -20,7 +20,6 @@ rimecraft-serde-update = { path = "../serde-update", optional = true, features =
 parking_lot = { version = "0.12", optional = true, features = ["arc_lock"] }
 
 [features]
-default = ["serde"]
 serde = [
     "dep:serde",
     "dep:erased-serde",
@@ -30,3 +29,6 @@ serde = [
 
 [dev-dependencies]
 fastnbt = "2.4"
+
+[lints]
+workspace = true

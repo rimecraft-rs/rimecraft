@@ -14,3 +14,6 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 fastnbt = "2.4"
 serde = "1.0"
+
+[lints]
+workspace = true

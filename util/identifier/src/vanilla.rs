@@ -4,6 +4,9 @@ use std::{hash::Hash, str::FromStr, sync::Arc};
 
 use crate::Separate;
 
+/// Namespace of an vanilla Minecraft `Identifier`.
+///
+/// This is the default value of a [`Namespace`].
 pub const MINECRAFT: Namespace = Namespace(ArcCowStr::Ref("minecraft"));
 
 /// Namespace of an vanilla `Identifier`.
@@ -12,6 +15,10 @@ pub struct Namespace(ArcCowStr<'static>);
 
 impl Namespace {
     /// Creates a new `Namespace` from the given value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given namespace is invalid.
     #[inline]
     pub fn new(value: impl Into<Arc<str>>) -> Self {
         let value = value.into();
@@ -70,6 +77,10 @@ pub struct Path(ArcCowStr<'static>);
 
 impl Path {
     /// Creates a new `Path` from the given value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given path is invalid.
     #[inline]
     pub fn new(value: impl Into<Arc<str>>) -> Self {
         let value = value.into();
@@ -79,8 +90,6 @@ impl Path {
 
     /// Creates a new `Path` from the given value
     /// at compile time.
-    ///
-    /// # Safety
     ///
     /// The given path shoule be all [a-z0-9/_.-] character.
     #[inline]
@@ -118,7 +127,7 @@ enum ArcCowStr<'a> {
     Ref(&'a str),
 }
 
-impl<'a> std::fmt::Display for ArcCowStr<'a> {
+impl std::fmt::Display for ArcCowStr<'_> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -128,7 +137,7 @@ impl<'a> std::fmt::Display for ArcCowStr<'a> {
     }
 }
 
-impl<'a> Hash for ArcCowStr<'a> {
+impl Hash for ArcCowStr<'_> {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
@@ -138,7 +147,7 @@ impl<'a> Hash for ArcCowStr<'a> {
     }
 }
 
-impl<'a> PartialEq for ArcCowStr<'a> {
+impl PartialEq for ArcCowStr<'_> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -150,16 +159,16 @@ impl<'a> PartialEq for ArcCowStr<'a> {
     }
 }
 
-impl<'a> Eq for ArcCowStr<'a> {}
+impl Eq for ArcCowStr<'_> {}
 
-impl<'a> PartialOrd for ArcCowStr<'a> {
+impl PartialOrd for ArcCowStr<'_> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a> Ord for ArcCowStr<'a> {
+impl Ord for ArcCowStr<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match (self, other) {
             (ArcCowStr::Arc(s), ArcCowStr::Arc(o)) => s.cmp(o),
@@ -170,7 +179,7 @@ impl<'a> Ord for ArcCowStr<'a> {
     }
 }
 
-impl<'a> AsRef<str> for ArcCowStr<'a> {
+impl AsRef<str> for ArcCowStr<'_> {
     #[inline]
     fn as_ref(&self) -> &str {
         match self {
@@ -203,7 +212,9 @@ fn validate_path(value: &str) -> Result<(), Error> {
 /// Error type for `Namespace` and `Path`.
 #[derive(Debug)]
 pub enum Error {
+    /// The given namespace is invalid.
     InvalidNamespace(String),
+    /// The given path is invalid.
     InvalidPath(String),
 }
 

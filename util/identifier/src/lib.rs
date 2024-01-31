@@ -1,3 +1,5 @@
+//! Rust implementation of Minecraft resource location.
+
 use std::{fmt::Display, str::FromStr};
 
 #[cfg(feature = "vanilla")]
@@ -53,8 +55,11 @@ where
 /// Errors that may occur when parsing an identifier.
 #[derive(Debug)]
 pub enum FromStrError<EN, EP> {
+    /// An error occurred when parsing the namespace.
     Namespace(EN),
+    /// An error occurred when parsing the path.
     Path(EP),
+    /// The separator is not found.
     Separate,
 }
 

@@ -1,7 +1,5 @@
 //! Extensions for [`Compound`].
 
-#![forbid(unsafe_code, missing_docs)]
-
 use std::collections::HashMap;
 
 use fastnbt::{ByteArray, IntArray, LongArray, Tag, Value};

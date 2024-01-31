@@ -21,3 +21,6 @@ serde = ["dep:serde"]
 edcode = ["dep:rimecraft-edcode"]
 vanilla = []
 vanilla-registry = ["vanilla", "dep:rimecraft-registry"]
+
+[lints]
+workspace = true

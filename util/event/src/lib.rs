@@ -1,3 +1,49 @@
+//! Rust implementation of the Fabric API Event system.
+//!
+//! # Examples
+//!
+//! ```
+//! # use rimecraft_event::*;
+//! # use std::sync::Arc;
+//! let mut event: DefaultSyncEvent<dyn Fn(&mut String) + Send + Sync> = Event::new(|listeners| {
+//! Arc::new(move |string| {
+//!     for listener in &listeners {
+//!         listener(string);
+//!     }
+//! })
+//! });
+//!
+//! register!(event, Arc::new(|string| string.push_str("genshin impact ")));
+//! register!(
+//!     event,
+//!     Arc::new(|string| string.push_str("you're right, ")),
+//!     -3,
+//! );
+//! register!(event, Arc::new(|string| string.push_str("but ")), -2);
+//! register!(event, Arc::new(|string| string.push_str("is a...")), 10);
+//!
+//! {
+//!     let mut string = String::new();
+//!     event.invoker()(&mut string);
+//!     assert_eq!(string, "you're right, but genshin impact is a...");
+//! }
+//!
+//! register!(
+//!     event,
+//!     Arc::new(|string| string.push_str("genshin impact, bootstrap! ")),
+//!     -100,
+//! );
+//!
+//! {
+//!     let mut string = String::new();
+//!     event.invoker()(&mut string);
+//!     assert_eq!(
+//!         string,
+//!         "genshin impact, bootstrap! you're right, but genshin impact is a..."
+//!     );
+//! }
+//! ```
+
 use std::{ops::Deref, rc::Rc, sync::Arc};
 
 use parking_lot::{RwLock, RwLockReadGuard};
@@ -7,6 +53,7 @@ use parking_lot::{RwLock, RwLockReadGuard};
 ///
 /// The listeners are sorted by phases,
 /// that can be called in order.
+#[derive(Debug)]
 pub struct Event<T, F, P> {
     listeners: Vec<(T, P)>,
     factory: F,
@@ -57,6 +104,7 @@ impl<T> Clone for Listeners<T> {
     }
 }
 
+/// An iterator over listeners.
 #[derive(Debug)]
 pub struct ListenersIter<'a, T> {
     inner: std::slice::Iter<'a, T>,
@@ -87,12 +135,14 @@ impl<T: Deref> Deref for Listener<T> {
     }
 }
 
+/// A guard that can be dereferenced
+/// to the invoker.
 #[derive(Debug)]
 pub struct Invoker<'a, T> {
     inner: RwLockReadGuard<'a, Option<T>>,
 }
 
-impl<'a, T: Deref> Deref for Invoker<'a, T> {
+impl<T: Deref> Deref for Invoker<'_, T> {
     type Target = <T as Deref>::Target;
 
     #[inline]
@@ -180,8 +230,11 @@ macro_rules! register {
     };
 }
 
+/// Defaulted invoker factory type.
 pub type InvokerFactory<T> = fn(Listeners<T>) -> T;
+/// Defaulted synced event type.
 pub type DefaultSyncEvent<T, P = i8> = Event<Arc<T>, InvokerFactory<Arc<T>>, P>;
+/// Defaulted unsynced event type.
 pub type DefaultEvent<T, P = i8> = Event<Rc<T>, InvokerFactory<Rc<T>>, P>;
 
 #[cfg(test)]

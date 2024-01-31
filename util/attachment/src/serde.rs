@@ -3,6 +3,7 @@
 use std::{
     collections::HashMap,
     convert::Infallible,
+    fmt::Debug,
     hash::Hash,
     ops::{Deref, DerefMut},
     sync::Arc,
@@ -38,8 +39,15 @@ impl<K> Default for State<K> {
     }
 }
 
+impl<K: Debug> Debug for State<K> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("State").finish()
+    }
+}
+
 /// Persistent attachment that can be serialized
 /// and deserialized.
+#[derive(Debug)]
 pub struct Persistent<T> {
     inner: Arc<RwLock<T>>,
 }
@@ -69,11 +77,7 @@ where
 
     type Error = Infallible;
 
-    fn attach(
-        &mut self,
-        attachments: &mut crate::Attachments<K>,
-        key: &K,
-    ) -> Result<(), Self::Error> {
+    fn attach(&mut self, attachments: &mut Attachments<K>, key: &K) -> Result<(), Self::Error> {
         let inner = self.inner.clone();
         attachments
             .serde_state
@@ -153,7 +157,7 @@ pub struct PersistentGuard<'a, T> {
     inner: RwLockReadGuard<'a, T>,
 }
 
-impl<'a, T> Deref for PersistentGuard<'a, T> {
+impl<T> Deref for PersistentGuard<'_, T> {
     type Target = T;
 
     #[inline]
@@ -168,7 +172,7 @@ pub struct PersistentGuardMut<'a, T> {
     inner: RwLockWriteGuard<'a, T>,
 }
 
-impl<'a, T> Deref for PersistentGuardMut<'a, T> {
+impl<T> Deref for PersistentGuardMut<'_, T> {
     type Target = T;
 
     #[inline]
@@ -177,7 +181,7 @@ impl<'a, T> Deref for PersistentGuardMut<'a, T> {
     }
 }
 
-impl<'a, T> DerefMut for PersistentGuardMut<'a, T> {
+impl<T> DerefMut for PersistentGuardMut<'_, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
@@ -210,7 +214,7 @@ where
             state: &'a UpdateState<K>,
         }
 
-        impl<'a, 'de, K> serde::de::Visitor<'de> for Visitor<'a, K>
+        impl<'de, K> serde::de::Visitor<'de> for Visitor<'_, K>
         where
             K: serde::Deserialize<'de> + Hash + Eq,
         {
@@ -234,7 +238,7 @@ where
                         &'a mut dyn rimecraft_serde_update::erased::ErasedUpdate<'de>,
                     );
 
-                    impl<'de, 'a> serde::de::DeserializeSeed<'de> for Seed<'a, 'de> {
+                    impl<'de> serde::de::DeserializeSeed<'de> for Seed<'_, 'de> {
                         type Value = ();
 
                         #[inline]
@@ -243,7 +247,7 @@ where
                             D: serde::Deserializer<'de>,
                         {
                             self.0
-                                .erased_update(&mut <dyn erased_serde::Deserializer>::erase(
+                                .erased_update(&mut <dyn erased_serde::Deserializer<'de>>::erase(
                                     deserializer,
                                 ))
                                 .map_err(serde::de::Error::custom)

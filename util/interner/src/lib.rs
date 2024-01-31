@@ -33,7 +33,7 @@ pub struct Interner<'a, T: ?Sized> {
 #[derive(Debug)]
 struct Node<'a, T: ?Sized>(Ref<'a, T>);
 
-impl<'a, T: ?Sized> Hash for Node<'a, T>
+impl<T: ?Sized> Hash for Node<'_, T>
 where
     T: Hash,
 {
@@ -43,7 +43,7 @@ where
     }
 }
 
-impl<'a, T: ?Sized> PartialEq for Node<'a, T>
+impl<T: ?Sized> PartialEq for Node<'_, T>
 where
     T: PartialEq,
 {
@@ -53,8 +53,9 @@ where
     }
 }
 
-impl<'a, T: ?Sized> Eq for Node<'a, T> where T: Eq {}
+impl<T: ?Sized> Eq for Node<'_, T> where T: Eq {}
 
+#[allow(single_use_lifetimes)]
 impl<'a: 'b, 'b, T: ?Sized> Borrow<Ref<'b, T>> for Node<'a, T> {
     #[inline]
     fn borrow(&self) -> &Ref<'b, T> {
@@ -68,7 +69,7 @@ enum Ref<'a, T: ?Sized> {
     Strong(&'a T),
 }
 
-impl<'a, T: ?Sized> Hash for Ref<'a, T>
+impl<T: ?Sized> Hash for Ref<'_, T>
 where
     T: Hash,
 {
@@ -87,7 +88,7 @@ where
     }
 }
 
-impl<'a, T: ?Sized> PartialEq for Ref<'a, T>
+impl<T: ?Sized> PartialEq for Ref<'_, T>
 where
     T: PartialEq,
 {
@@ -106,9 +107,9 @@ where
     }
 }
 
-impl<'a, T: ?Sized> Eq for Ref<'a, T> where T: Eq {}
+impl<T: ?Sized> Eq for Ref<'_, T> where T: Eq {}
 
-impl<'a, T: ?Sized> Interner<'a, T>
+impl<T: ?Sized> Interner<'_, T>
 where
     T: Hash + Eq,
 {
@@ -149,7 +150,11 @@ where
             let Node(Ref::Weak(ref weak)) = *v else {
                 unreachable!()
             };
-            weak.upgrade().unwrap().clone()
+            if let Some(arc) = weak.upgrade() {
+                arc
+            } else {
+                unreachable!()
+            }
         } else {
             let value = value.into_boxed().into();
             self.inner.insert(Node(Ref::Weak(Arc::downgrade(&value))));
@@ -158,9 +163,9 @@ where
     }
 }
 
-impl<'a, T: ?Sized> Interner<'a, T> where T: Hash + Eq {}
+impl<T: ?Sized> Interner<'_, T> where T: Hash + Eq {}
 
-impl<'a, T: ?Sized> Default for Interner<'a, T>
+impl<T: ?Sized> Default for Interner<'_, T>
 where
     T: Hash + Eq,
 {
@@ -170,9 +175,9 @@ where
     }
 }
 
-impl<'a, T: ?Sized> std::fmt::Debug for Interner<'a, T>
+impl<T: ?Sized> Debug for Interner<'_, T>
 where
-    T: Hash + Eq + std::fmt::Debug,
+    T: Hash + Eq + Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Interner")
@@ -188,7 +193,7 @@ pub trait IntoBoxed<T: ?Sized> {
     fn into_boxed(self) -> Box<T>;
 }
 
-impl<'a, T, S> IntoBoxed<T> for &'a S
+impl<T, S> IntoBoxed<T> for &S
 where
     S: ToOwned<Owned = T>,
 {
@@ -198,7 +203,7 @@ where
     }
 }
 
-impl<'a> IntoBoxed<str> for &'a str {
+impl IntoBoxed<str> for &str {
     #[inline]
     fn into_boxed(self) -> Box<str> {
         self.into()

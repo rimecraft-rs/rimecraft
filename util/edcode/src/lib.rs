@@ -1,3 +1,5 @@
+//! Encoding and decoding utilities for packet buffers.
+
 pub mod error;
 mod imp;
 
@@ -8,9 +10,14 @@ pub use bytes;
 
 /// Describes types that can be encoded into a packet buffer.
 pub trait Encode {
+    /// The error type.
     type Error;
 
     /// Encode into a buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the encoding failed.
     fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut;
@@ -20,6 +27,11 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 /// [`Encode`], but can be used as trait objects.
 pub trait BytesEncode {
+    /// Encodes into a bytes buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the encoding failed.
     fn encode_bytes(&self, bytes: &mut bytes::BytesMut) -> Result<(), BoxedError>;
 }
 
@@ -39,9 +51,14 @@ pub trait Decode {
     /// The resulting type.
     type Output;
 
+    /// The error type.
     type Error;
 
     /// Decode from a buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoding failed.
     fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf;
@@ -49,9 +66,14 @@ pub trait Decode {
 
 /// Represents types that can be updated from a buffer.
 pub trait Update: Encode {
+    /// The error type.
     type Error;
 
     /// Update from a buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoding in place failed.
     fn update<B>(&mut self, buf: B) -> Result<(), <Self as Update>::Error>
     where
         B: bytes::Buf;
@@ -75,13 +97,16 @@ where
 
 /// Layer for encoding and decoding in nbt binary format for packets.
 #[cfg(feature = "nbt")]
+#[derive(Debug)]
 pub struct Nbt<T>(pub T);
 
 /// Layer for encoding and decoding in json utf8 for packets.
 #[cfg(feature = "json")]
+#[derive(Debug)]
 pub struct Json<T>(pub T);
 
 /// Represents a variable integer.
+#[derive(Debug)]
 pub struct VarI32(pub i32);
 
 impl VarI32 {

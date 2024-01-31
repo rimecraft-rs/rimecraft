@@ -1,11 +1,27 @@
+//! Utilities for freezing a mutable value into immutable value.
+//!
+//! # Examples
+//!
+//! ```
+//! # use rimecraft_freezer::Freezer;
+//! let freezer: Freezer<[i32; 3]> = Freezer::new([1, 2, 3]);
+//!
+//! assert_eq!(freezer.get(), None);
+//! freezer.lock().unwrap()[1] = 3;
+//!
+//! assert_eq!(freezer.get_or_freeze(), &[1, 3, 3]);
+//! assert!(freezer.lock().is_none());
+//! ```
+
 use std::{
     ops::{Deref, DerefMut},
     sync::OnceLock,
     sync::{Mutex, MutexGuard},
 };
 
-/// A type that contains either mutable value or immutable value,
+/// A cell that contains either mutable value or immutable value,
 /// where the mutable one can be freezed into the immutable one.
+#[derive(Debug)]
 pub struct Freezer<I, M = I> {
     immutable: OnceLock<I>,
     mutable: Mutex<Option<M>>,
@@ -25,10 +41,15 @@ where
     }
 
     /// Freeze this instance with provided options.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if this instance
+    /// has been already freezed.
     pub fn freeze(&self, opts: M::Opts) {
         assert!(!self.is_freezed(), "cannot freeze a freezed freezer");
 
-        let _ = self
+        let _result = self
             .immutable
             .set(self.mutable.lock().unwrap().take().unwrap().freeze(opts));
     }
@@ -40,10 +61,21 @@ where
     }
 
     /// Locks the mutable value and returns a guard of it.
+    ///
+    /// Returns `None` if this instance has been already freezed.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the lock is held by
+    /// another user and the user panics when holding the lock.
     #[inline]
-    pub fn lock(&self) -> Guard<'_, M> {
-        Guard {
-            inner: self.mutable.lock().unwrap(),
+    pub fn lock(&self) -> Option<Guard<'_, M>> {
+        if self.is_freezed() {
+            None
+        } else {
+            Some(Guard {
+                inner: self.mutable.lock().unwrap(),
+            })
         }
     }
 
@@ -61,6 +93,10 @@ where
 {
     /// Gets the immutable instance, or initialize it with
     /// a default value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the freeze operation was failed.
     pub fn get_or_freeze(&self) -> &I {
         if !self.is_freezed() {
             self.freeze(Default::default());
@@ -71,6 +107,7 @@ where
 }
 
 /// A mutex guard wrapper.
+#[derive(Debug)]
 pub struct Guard<'a, T: 'a> {
     inner: MutexGuard<'a, Option<T>>,
 }
@@ -80,14 +117,14 @@ impl<'a, T: 'a> Deref for Guard<'a, T> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.inner.as_ref().unwrap()
+        self.inner.as_ref().expect("freezer already freezed")
     }
 }
 
 impl<'a, T: 'a> DerefMut for Guard<'a, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.inner.as_mut().unwrap()
+        self.inner.as_mut().expect("freezer already freezed")
     }
 }
 

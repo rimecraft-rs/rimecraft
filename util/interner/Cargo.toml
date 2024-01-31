@@ -14,4 +14,5 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 dashmap = "5.5"
 
-[features]
+[lints]
+workspace = true

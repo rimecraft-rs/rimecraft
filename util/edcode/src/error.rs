@@ -1,3 +1,6 @@
+//! Error types.
+
+/// Variable integer is too big.
 #[derive(Debug)]
 pub struct VarI32TooBigError;
 
@@ -10,9 +13,12 @@ impl std::fmt::Display for VarI32TooBigError {
 
 impl std::error::Error for VarI32TooBigError {}
 
+/// Error with [`VarI32TooBigError`].
 #[derive(Debug)]
 pub enum ErrorWithVarI32Err<T> {
+    /// The target error.
     Target(T),
+    /// The variable integer error.
     Var(VarI32TooBigError),
 }
 
@@ -43,9 +49,12 @@ impl<T> From<VarI32TooBigError> for ErrorWithVarI32Err<T> {
     }
 }
 
+/// Error with two variants.
 #[derive(Debug)]
 pub enum EitherError<T1, T2> {
+    /// The first error.
     A(T1),
+    /// The second error.
     B(T2),
 }
 

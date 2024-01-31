@@ -18,7 +18,7 @@ serde = { version = "1.0", optional = true }
 fastnbt = { version = "2.4", optional = true }
 serde_json = { version = "1.0", optional = true }
 # integrations
-uuid = { version = "1.4", optional = true }
+uuid = { version = "1.7", optional = true }
 glam = { version = "0.25", optional = true }
 
 [features]
@@ -29,3 +29,6 @@ json = ["serde", "dep:serde_json"]
 # integrations
 uuid = ["dep:uuid"]
 glam = ["dep:glam"]
+
+[lints]
+workspace = true

@@ -383,6 +383,7 @@ where
 
     type Error = <T as Decode>::Error;
 
+    #[allow(clippy::if_then_some_else_none)]
     fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
@@ -433,7 +434,7 @@ impl Encode for std::collections::HashMap<String, fastnbt::Value> {
     type Error = fastnbt::error::Error;
 
     #[inline]
-    fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
+    fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
     where
         B: bytes::BufMut,
     {
@@ -448,7 +449,7 @@ impl Decode for std::collections::HashMap<String, fastnbt::Value> {
     type Error = fastnbt::error::Error;
 
     #[inline]
-    fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
     where
         B: bytes::Buf,
     {

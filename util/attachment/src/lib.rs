@@ -1,3 +1,8 @@
+//! Attachments are a way to attach arbitrary data to
+//! an object. This is useful for storing data that
+//! is not directly related to the object, but is
+//! still useful to store.
+
 use std::{
     any::Any,
     borrow::Borrow,
@@ -21,6 +26,10 @@ pub trait Attach<K>: Sized {
     type Error;
 
     /// Called before the type is attached.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the attachment failed.
     #[inline]
     #[allow(unused_variables)]
     fn attach(&mut self, attachments: &mut Attachments<K>, key: &K) -> Result<(), Self::Error> {
@@ -58,6 +67,7 @@ impl<K, T> Type<K, T> {
 type RawAttachments<K> = HashMap<K, Box<dyn Any + Send + Sync>>;
 
 /// Manager of attachments.
+#[derive(Debug)]
 pub struct Attachments<K> {
     raw: RawAttachments<K>,
 
@@ -87,6 +97,11 @@ impl<K: 'static> Default for Attachments<K> {
 impl<K: Hash + Eq> Attachments<K> {
     /// Attaches a value to the attachments with
     /// given [`Type`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the attachment failed.\
+    /// See [`Attach::attach`].
     #[inline]
     pub fn attach<T: Attach<K>, Q>(
         &mut self,
@@ -244,6 +259,7 @@ where
 
 /// A simple attachment that does not require
 /// any attachment logic.
+#[derive(Debug)]
 pub struct Simple<T>(pub T);
 
 impl<T, K> Attach<K> for Simple<T> {

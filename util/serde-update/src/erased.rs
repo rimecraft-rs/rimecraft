@@ -1,3 +1,7 @@
+//! [`Update`] variant for [`erased_serde`].
+
+#![allow(single_use_lifetimes)]
+
 use crate::*;
 
 #[doc(hidden)]
@@ -13,8 +17,10 @@ macro_rules! __internal_update_from_erased {
             D: serde::Deserializer<'de>,
         {
             use serde::de::Error;
-            self.erased_update(&mut <dyn erased_serde::Deserializer>::erase(deserializer))
-                .map_err(D::Error::custom)
+            self.erased_update(&mut <dyn erased_serde::Deserializer<'de>>::erase(
+                deserializer,
+            ))
+            .map_err(D::Error::custom)
         }
     };
 }
@@ -45,6 +51,11 @@ macro_rules! update_trait_object {
 /// [`Update`] but type erased.
 pub trait ErasedUpdate<'de>: erased_serde::Serialize {
     /// Update this type from an erased deserializer.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type
+    /// failed to deserialize in place.
     fn erased_update(
         &mut self,
         deserializer: &mut dyn erased_serde::Deserializer<'de>,
@@ -52,6 +63,7 @@ pub trait ErasedUpdate<'de>: erased_serde::Serialize {
 }
 
 erased_serde::serialize_trait_object!(<'de> ErasedUpdate<'de>);
+
 crate::update_trait_object!(ErasedUpdate<'de>);
 
 impl<'de, T> ErasedUpdate<'de> for T
@@ -67,9 +79,9 @@ where
     }
 }
 
-pub struct ErasedWrapper<'a, 'de>(pub &'a mut dyn ErasedUpdate<'de>);
+struct ErasedWrapper<'a, 'de>(pub &'a mut dyn ErasedUpdate<'de>);
 
-impl<'a, 'de> serde::Serialize for ErasedWrapper<'a, 'de> {
+impl serde::Serialize for ErasedWrapper<'_, '_> {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -79,7 +91,7 @@ impl<'a, 'de> serde::Serialize for ErasedWrapper<'a, 'de> {
     }
 }
 
-impl<'a, 'de> Update<'de> for ErasedWrapper<'a, 'de> {
+impl<'de> Update<'de> for ErasedWrapper<'_, 'de> {
     #[inline]
     fn update<D>(&mut self, deserializer: D) -> Result<(), <D as serde::Deserializer<'de>>::Error>
     where
@@ -87,7 +99,9 @@ impl<'a, 'de> Update<'de> for ErasedWrapper<'a, 'de> {
     {
         use serde::de::Error;
         self.0
-            .erased_update(&mut <dyn erased_serde::Deserializer>::erase(deserializer))
+            .erased_update(&mut <dyn erased_serde::Deserializer<'de>>::erase(
+                deserializer,
+            ))
             .map_err(D::Error::custom)
     }
 }
