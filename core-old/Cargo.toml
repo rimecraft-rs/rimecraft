@@ -1,5 +1,5 @@
 [package]
-name = "rimecraft-core"
+name = "rimecraft-core-old"
 version = "1.20.1"
 edition = "2021"
 authors = ["JieningYu", "C191239"]
