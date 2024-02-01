@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core", "primitives", "flare3d", "util/*", "flare3d/examples"]
+members = ["core-old", "primitives", "flare3d", "util/*", "flare3d/examples"]
 
 [workspace.lints.rust]
 unsafe_code = "deny"
