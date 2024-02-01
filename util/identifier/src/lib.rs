@@ -7,6 +7,7 @@ pub mod vanilla;
 
 /// An identifier used to identify things.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[doc(alias = "ResourceLocation")]
 pub struct Identifier<N, P> {
     namespace: N,
     path: P,

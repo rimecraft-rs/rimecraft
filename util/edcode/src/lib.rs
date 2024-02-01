@@ -107,6 +107,7 @@ pub struct Json<T>(pub T);
 
 /// Represents a variable integer.
 #[derive(Debug)]
+#[doc(alias = "VarInt")]
 pub struct VarI32(pub i32);
 
 impl VarI32 {

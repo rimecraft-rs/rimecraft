@@ -13,11 +13,17 @@ use std::{
 use entry::RefEntry;
 use key::Key;
 use parking_lot::RwLock;
-use tag::{TagKey, Tags};
+use tag::Tags;
 
 pub mod entry;
 pub mod key;
 pub mod tag;
+
+#[doc(alias = "Holder")]
+pub use entry::Entry as RegistryEntry;
+#[doc(alias = "ResourceKey")]
+pub use key::Key as RegistryKey;
+pub use tag::TagKey;
 
 /// Immutable registry of various in-game components.
 #[derive(Debug)]

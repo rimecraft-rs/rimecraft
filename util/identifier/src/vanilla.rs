@@ -229,6 +229,7 @@ impl std::fmt::Display for Error {
 }
 
 /// Identifier of vanilla.
+#[doc(alias = "ResourceLocation")]
 pub type Identifier = crate::Identifier<Namespace, Path>;
 
 #[cfg(test)]

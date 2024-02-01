@@ -48,6 +48,7 @@ macro_rules! formattings {
             derive(serde::Serialize, serde::Deserialize),
             serde(rename_all = "snake_case")
         )]
+        #[doc(alias = "ChatFormatting")]
         pub enum Formatting {
             $(#[doc = "The formatting."] $i),*
         }
