@@ -1,3 +1,5 @@
+#![deprecated = "use crate `rimecraft-fmt` instead"]
+
 use std::{collections::HashMap, fmt::Display, ops::Deref, str::FromStr};
 
 use once_cell::sync::Lazy;

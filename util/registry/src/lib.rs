@@ -636,5 +636,5 @@ impl crate::key::Root for rimecraft_identifier::vanilla::Identifier {
 }
 
 #[cfg(feature = "vanilla-registry")]
-#[doc("Registry using vanilla `Identifier`.")]
+#[doc = "Registry using vanilla `Identifier`."]
 pub type VanillaRegistry<T> = Registry<rimecraft_identifier::vanilla::Identifier, T>;
