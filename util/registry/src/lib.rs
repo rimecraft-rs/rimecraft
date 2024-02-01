@@ -194,6 +194,16 @@ impl<K, T> AsRef<RefEntry<K, T>> for Reg<'_, K, T> {
     }
 }
 
+impl<K, T> PartialEq<T> for Reg<'_, K, T>
+where
+    T: PartialEq,
+{
+    #[inline]
+    fn eq(&self, other: &T) -> bool {
+        self.value == other
+    }
+}
+
 impl<K, T> Copy for Reg<'_, K, T> {}
 
 impl<K, T> Clone for Reg<'_, K, T> {
@@ -340,11 +350,17 @@ impl<K, T> RegistryMut<K, T> {
             keys: HashSet::new(),
         }
     }
+
+    /// Gets the key of this registry.
+    #[inline]
+    pub fn key(&self) -> &Key<K, Registry<K, T>> {
+        &self.key
+    }
 }
 
 impl<K, T> RegistryMut<K, T>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Clone,
 {
     /// Registers a new entry and returns
     /// its raw id if successful.
@@ -358,6 +374,7 @@ where
             return Err((key, value));
         }
         let raw = self.entries.len();
+        self.keys.insert(key.clone());
         self.entries.push((
             value,
             RefEntry {
@@ -636,5 +653,12 @@ impl crate::key::Root for rimecraft_identifier::vanilla::Identifier {
 }
 
 #[cfg(feature = "vanilla-registry")]
-#[doc = "Registry using vanilla `Identifier`."]
+#[doc = "`Registry` using vanilla `Identifier`."]
 pub type VanillaRegistry<T> = Registry<rimecraft_identifier::vanilla::Identifier, T>;
+
+#[cfg(feature = "vanilla-registry")]
+#[doc = "Mutable `Registry` using vanilla `Identifier`."]
+pub type VanillaRegistryMut<T> = RegistryMut<rimecraft_identifier::vanilla::Identifier, T>;
+
+#[cfg(test)]
+mod tests;
