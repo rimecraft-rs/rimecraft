@@ -553,10 +553,14 @@ pub mod edcode {
 
     use crate::{ProvideRegistry, Reg};
 
+    /// Error type for `edcode` support.
     #[derive(Debug)]
     pub enum Error<K> {
+        /// Error for invalid key.
         InvalidKey(K),
+        /// Error for invalid raw id.
         InvalidRawId(usize),
+        /// Error for `VarI32`.
         VarI32(VarI32TooBigError),
     }
 
@@ -619,3 +623,18 @@ pub mod edcode {
 
 #[allow(dead_code)]
 type BoxedError = Box<dyn std::error::Error + Send + Sync>;
+
+#[cfg(feature = "vanilla-identifier")]
+impl crate::key::Root for rimecraft_identifier::vanilla::Identifier {
+    #[inline]
+    fn root() -> Self {
+        Self::new(
+            Default::default(),
+            rimecraft_identifier::vanilla::Path::new_unchecked("root"),
+        )
+    }
+}
+
+#[cfg(feature = "vanilla-registry")]
+#[doc("Registry using vanilla `Identifier`.")]
+pub type VanillaRegistry<T> = Registry<rimecraft_identifier::vanilla::Identifier, T>;

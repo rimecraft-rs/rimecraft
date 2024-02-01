@@ -1,9 +1,9 @@
 [package]
-name = "rimecraft-identifier"
+name = "rimecraft-fmt"
 version = "0.1.0"
 edition = "2021"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
-description = "Rust implementation of Minecraft resource location"
+description = "Minecraft formattings"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
@@ -12,13 +12,6 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-serde = { version = "1.0", optional = true }
-rimecraft-edcode = { path = "../edcode", optional = true }
-
-[features]
-serde = ["dep:serde"]
-edcode = ["dep:rimecraft-edcode"]
-vanilla = []
 
 [lints]
 workspace = true

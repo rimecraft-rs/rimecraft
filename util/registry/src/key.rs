@@ -180,6 +180,7 @@ pub mod edcode {
         }
     }
 
+    /// Serde wrapper for registry reference keys.
     #[derive(Debug, Clone, Copy)]
     pub struct RegRef<T>(pub T);
 
