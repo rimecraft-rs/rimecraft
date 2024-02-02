@@ -102,6 +102,11 @@ impl<'a, K, T> Iterator for Iter<'a, K, T> {
             )
         })
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
 }
 
 #[cfg(feature = "serde")]

@@ -292,6 +292,13 @@ impl<'a, K, T> Iterator for Entries<'a, K, T> {
             }
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match &self.inner {
+            EntriesInner::Direct { iter, .. } => iter.size_hint(),
+            EntriesInner::Raw { iter, .. } => iter.size_hint(),
+        }
+    }
 }
 
 /// Iterator of entry references of a tag.
@@ -308,6 +315,11 @@ impl<'a, K, T> Iterator for OfTag<'a, K, T> {
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().and_then(|i| self.registry.of_raw(i))
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
 }
 
 /// Iterator of entry values.
@@ -322,6 +334,11 @@ impl<'a, K, T> Iterator for Values<'a, K, T> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().and_then(RefEntry::value)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
     }
 }
 
@@ -658,11 +675,11 @@ impl crate::key::Root for rimecraft_identifier::vanilla::Identifier {
     }
 }
 
-#[cfg(feature = "vanilla-registry")]
+#[cfg(feature = "vanilla-identifier")]
 #[doc = "`Registry` using vanilla `Identifier`."]
 pub type VanillaRegistry<T> = Registry<rimecraft_identifier::vanilla::Identifier, T>;
 
-#[cfg(feature = "vanilla-registry")]
+#[cfg(feature = "vanilla-identifier")]
 #[doc = "Mutable `Registry` using vanilla `Identifier`."]
 pub type VanillaRegistryMut<T> = RegistryMut<rimecraft_identifier::vanilla::Identifier, T>;
 
