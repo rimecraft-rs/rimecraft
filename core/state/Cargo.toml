@@ -1,0 +1,17 @@
+[package]
+name = "rimecraft-state"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Minecraft state holders"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+
+[lints]
+workspace = true
