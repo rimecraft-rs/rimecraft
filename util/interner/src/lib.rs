@@ -1,5 +1,3 @@
-#![forbid(unsafe_code, missing_docs)]
-
 //! Safe reference-counted interners.
 //!
 //! # Examples
