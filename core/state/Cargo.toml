@@ -12,6 +12,7 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+regex-lite = "0.1"
 
 [lints]
 workspace = true

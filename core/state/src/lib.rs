@@ -1,4 +1,6 @@
 //! Minecraft state holders.
+//!
+//! This corresponds to `net.minecraft.state` in `yarn`.
 
 use std::{
     borrow::Borrow,
@@ -10,6 +12,9 @@ use std::{
 };
 
 use property::{BiIndex, ErasedProperty, Property, Wrap};
+use regex_lite::Regex;
+
+use crate::property::ErasedWrap;
 
 pub mod property;
 
@@ -287,13 +292,44 @@ impl<'a, T> StatesMut<'a, T> {
     }
 
     /// Adds a property to the states.
-    #[inline]
-    pub fn add<W, G>(&mut self, prop: &'a Property<'_, W>)
+    ///
+    /// # Errors
+    ///
+    /// - Errors if the property name is invalid.
+    /// - Errors if the property contains <= 1 possible values.
+    /// - Errors if the states contains duplicated properties.
+    /// - Errors if any of the value name is invalid.
+    #[allow(clippy::missing_panics_doc)]
+    pub fn add<W, G>(&mut self, prop: &'a Property<'_, W>) -> Result<(), Error>
     where
         W: Wrap<G> + BiIndex<G> + Hash + Eq + Send + Sync + 'static,
         for<'w> &'w W: IntoIterator<Item = G>,
     {
+        static NAME_PAT: OnceLock<Regex> = OnceLock::new();
+        let reg = NAME_PAT.get_or_init(|| Regex::new(r"^[a-z0-9_]+$").unwrap());
+        if !reg.is_match(prop.name()) {
+            return Err(Error::InvalidPropertyName(prop.name().to_owned()));
+        }
+        let mut len = 0;
+        for val in prop.wrap.erased_iter() {
+            len += 1;
+            let name = prop.wrap.erased_to_name(val).expect("invalid value");
+            if !reg.is_match(&name) {
+                return Err(Error::InvalidValueName {
+                    property: prop.name().to_owned(),
+                    value: name.into_owned(),
+                });
+            }
+        }
+        if len <= 1 {
+            return Err(Error::PropertyContainsOneOrNoValue(prop.name().to_owned()));
+        }
+        if self.props.iter().any(|p| p.name == prop.name()) {
+            return Err(Error::DuplicatedProperty(prop.name().to_owned()));
+        }
+
         self.props.push(prop.into());
+        Ok(())
     }
 }
 
@@ -329,6 +365,20 @@ pub enum Error {
     ValueNotFound(isize),
     /// The value is invalid.
     InvalidValue,
+
+    /// The property name is invalid.
+    InvalidPropertyName(String),
+    /// The property contains <= 1 possible values.
+    PropertyContainsOneOrNoValue(String),
+    /// The value name is invalid.
+    InvalidValueName {
+        /// The property name.
+        property: String,
+        /// The value name.
+        value: String,
+    },
+    /// The states contains duplicated properties.
+    DuplicatedProperty(String),
 }
 
 impl Display for Error {
@@ -338,6 +388,14 @@ impl Display for Error {
             Error::TableNotPresent => write!(f, "table not present"),
             Error::ValueNotFound(value) => write!(f, "value not found: {}", value),
             Error::InvalidValue => write!(f, "invalid value"),
+            Error::InvalidPropertyName(name) => write!(f, "invalid property name: {}", name),
+            Error::PropertyContainsOneOrNoValue(prop) => {
+                write!(f, "property {prop} contains <= 1 possible values")
+            }
+            Error::InvalidValueName { property, value } => {
+                write!(f, "invalid value name: {value} for property {property}")
+            }
+            Error::DuplicatedProperty(prop) => write!(f, "duplicated property: {}", prop),
         }
     }
 }

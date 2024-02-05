@@ -12,8 +12,8 @@ static BOOL_PROPERTY: BoolProperty<'static> = BoolProperty::new("bool_property",
 #[test]
 fn states_create() {
     let mut states = StatesMut::new(());
-    states.add(&INT_PROPERTY);
-    states.add(&BOOL_PROPERTY);
+    states.add(&INT_PROPERTY).unwrap();
+    states.add(&BOOL_PROPERTY).unwrap();
     let states = states.freeze();
     assert_eq!(states.len(), 6);
     let default_state = states.default_state();
@@ -25,8 +25,8 @@ fn states_create() {
 #[test]
 fn with_cycle() {
     let mut states = StatesMut::new(());
-    states.add(&INT_PROPERTY);
-    states.add(&BOOL_PROPERTY);
+    states.add(&INT_PROPERTY).unwrap();
+    states.add(&BOOL_PROPERTY).unwrap();
     let states = states.freeze();
 
     let state = states.default_state();
