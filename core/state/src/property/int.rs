@@ -3,7 +3,7 @@ use std::{borrow::Cow, ops::RangeBounds};
 use super::{BiIndex, Wrap};
 
 /// Property data that wraps a range of integers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Data<T>(pub T);
 
 impl<T> BiIndex<i32> for Data<T>

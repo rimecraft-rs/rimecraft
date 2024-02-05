@@ -1,21 +1,25 @@
 //! Minecraft state holders.
 
 use std::{
-    borrow::Cow,
+    borrow::Borrow,
     collections::{BTreeMap, HashMap},
     fmt::{Debug, Display},
-    sync::Arc,
+    hash::Hash,
+    ops::Deref,
+    sync::{Arc, OnceLock, Weak},
 };
 
-use property::{BiIndex, ErasedProperty, Property};
+use property::{BiIndex, ErasedProperty, Property, Wrap};
 
 pub mod property;
 
+// <property> -> <<value> -> <state>>
+type Table<'a, T> = HashMap<ErasedProperty<'a>, HashMap<isize, Weak<T>>>;
+
 /// State of an object.
 pub struct State<'a, T> {
-    pub(crate) entries: HashMap<ErasedProperty<'a>, isize>,
-    // <property> -> <<value> -> <state>>
-    table: Option<HashMap<ErasedProperty<'a>, HashMap<isize, Arc<Self>>>>,
+    pub(crate) entries: Arc<HashMap<ErasedProperty<'a>, isize>>,
+    table: OnceLock<Table<'a, Self>>,
 
     data: T,
 }
@@ -25,10 +29,11 @@ impl<T> State<'_, T> {
     #[inline]
     pub fn get<V, W>(&self, prop: &Property<'_, W>) -> Option<V>
     where
-        W: BiIndex<V>,
+        W: Wrap<V> + BiIndex<V> + Hash + Eq + Send + Sync + 'static,
+        for<'w> &'w W: IntoIterator<Item = V>,
     {
         self.entries
-            .get(prop.name())
+            .get(&ErasedProperty::from(prop))
             .and_then(|&index| prop.wrap.index(index))
     }
 
@@ -36,16 +41,22 @@ impl<T> State<'_, T> {
     ///
     /// # Errors
     ///
-    /// - Errors if the property `prop` is not present in this state.
-    /// - Errors if the table is not present in this state.
-    pub fn cycle<V, W>(&self, prop: &Property<'_, W>) -> Result<&Self, Error>
+    /// Errors if the property `prop` is not present in this state.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the target state was dropped.
+    /// - Panics if this state is not fully initialized.
+    pub fn cycle<V, W>(&self, prop: &Property<'_, W>) -> Result<MaybeArc<'_, Self>, Error>
     where
-        W: BiIndex<V>,
-        for<'a> &'a W: IntoIterator<Item = V>,
+        W: Wrap<V> + BiIndex<V> + Hash + Eq + Send + Sync + 'static,
+        for<'w> &'w W: IntoIterator<Item = V>,
     {
+        let erased = ErasedProperty::from(prop);
+
         let index = *self
             .entries
-            .get(prop.name())
+            .get(&erased)
             .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))?;
         let Some(next) = obtain_next(
             index,
@@ -53,21 +64,18 @@ impl<T> State<'_, T> {
                 .into_iter()
                 .filter_map(|value| prop.wrap.index_of(&value)),
         ) else {
-            return Ok(self);
+            return Ok(MaybeArc::Borrowed(self));
         };
         if next == index {
-            Ok(self)
+            Ok(MaybeArc::Borrowed(self))
         } else {
             self.table
-                .as_ref()
-                .ok_or(Error::TableNotPresent)
-                .and_then(|table| {
-                    table
-                        .get(prop.name())
-                        .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))
-                })
+                .get()
+                .expect("state not initialized")
+                .get(&erased)
+                .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))
                 .and_then(|map| map.get(&next).ok_or(Error::ValueNotFound(index)))
-                .map(Arc::as_ref)
+                .map(|weak| MaybeArc::Arc(weak.upgrade().expect("state was dropped")))
         }
     }
 
@@ -77,36 +85,50 @@ impl<T> State<'_, T> {
     ///
     /// - Errors if the property `prop` is not present in this state.
     /// - Errors if the value `value` is not present in the property `prop`.
-    /// - Errors if the table is not present in this state.
-    pub fn with<V, W>(&self, prop: &Property<'_, W>, value: &V) -> Result<&Self, Error>
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the target state was dropped.
+    /// - Panics if this state is not fully initialized.
+    pub fn with<V, W>(&self, prop: &Property<'_, W>, value: V) -> Result<MaybeArc<'_, Self>, Error>
     where
-        W: BiIndex<V>,
+        W: Wrap<V> + BiIndex<V> + Hash + Eq + Send + Sync + 'static,
+        for<'w> &'w W: IntoIterator<Item = V>,
     {
+        let erased = ErasedProperty::from(prop);
+
         let index = *self
             .entries
-            .get(prop.name())
+            .get(&erased)
             .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))?;
-        let value = prop.wrap.index_of(value).ok_or(Error::InvalidValue)?;
+        let value = prop.wrap.index_of(&value).ok_or(Error::InvalidValue)?;
         if value == index {
-            Ok(self)
+            Ok(MaybeArc::Borrowed(self))
         } else {
             self.table
-                .as_ref()
-                .ok_or(Error::TableNotPresent)
-                .and_then(|table| {
-                    table
-                        .get(prop.name())
-                        .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))
-                })
+                .get()
+                .expect("state not initialized")
+                .get(&erased)
+                .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))
                 .and_then(|map| map.get(&value).ok_or(Error::ValueNotFound(index)))
-                .map(Arc::as_ref)
+                .map(|weak| MaybeArc::Arc(weak.upgrade().expect("state was dropped")))
         }
     }
 
     /// Whether this state contains given property.
     #[inline]
-    pub fn contains<W>(&self, prop: &Property<'_, W>) -> bool {
-        self.entries.contains_key(prop.name())
+    pub fn contains<W, V>(&self, prop: &Property<'_, W>) -> bool
+    where
+        W: Wrap<V> + BiIndex<V> + Hash + Eq + Send + Sync + 'static,
+        for<'w> &'w W: IntoIterator<Item = V>,
+    {
+        self.entries.contains_key(&ErasedProperty::from(prop))
+    }
+
+    /// Gets external data of this state.
+    #[inline]
+    pub fn data(&self) -> &T {
+        &self.data
     }
 }
 
@@ -132,11 +154,168 @@ impl<T: Debug> Debug for State<'_, T> {
     }
 }
 
+/// Immutable instance of states.
+///
+/// See [`StatesMut`] for creating a new instance.
 #[derive(Debug)]
 #[doc(alias = "StateManager")]
 pub struct States<'a, T> {
     states: Vec<Arc<State<'a, T>>>,
-    props: BTreeMap<Cow<'a, str>, ErasedProperty<'a>>,
+    #[allow(unused)]
+    props: BTreeMap<&'a str, ErasedProperty<'a>>,
+
+    data: T,
+}
+
+impl<'a, T> States<'a, T> {
+    fn new<I>(data: T, props: I) -> Self
+    where
+        T: Clone,
+        I: IntoIterator<Item = ErasedProperty<'a>>,
+    {
+        let props: BTreeMap<_, _> = props.into_iter().map(|prop| (prop.name, prop)).collect();
+        let mut iter: Vec<Vec<(ErasedProperty<'a>, isize)>> = vec![Vec::new()];
+        for prop in props.values() {
+            iter = iter
+                .into_iter()
+                .flat_map(|lx| {
+                    prop.wrap
+                        .erased_iter()
+                        .map(|val| {
+                            let mut lx = lx.clone();
+                            lx.push((prop.clone(), val));
+                            lx
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+        }
+        let list = iter
+            .into_iter()
+            .map(|vec| vec.into_iter().collect::<HashMap<_, _>>())
+            .map(Arc::new)
+            .map(|entries| {
+                Arc::new(State {
+                    entries: entries.clone(),
+                    table: OnceLock::new(),
+                    data: data.clone(),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        // Initialize tables
+        for state in list.iter() {
+            let mut table: Table<'a, State<'a, T>> = Table::new();
+            for (prop, s_val) in state.entries.iter() {
+                let mut row = HashMap::new();
+                for val in prop.wrap.erased_iter().filter(|v| v != s_val) {
+                    let Some(s) = list.iter().find(|s| {
+                        s.entries.iter().all(|(p, v)| {
+                            if p == prop {
+                                *v == val
+                            } else {
+                                v == state.entries.get(p).unwrap()
+                            }
+                        })
+                    }) else {
+                        continue;
+                    };
+                    row.insert(val, Arc::downgrade(s));
+                }
+                table.insert(prop.clone(), row);
+            }
+            state.table.set(table).expect("state already initialized");
+        }
+
+        Self {
+            states: list,
+            props,
+            data,
+        }
+    }
+
+    /// Gets all states of this state.
+    #[inline]
+    pub fn states(&self) -> &[Arc<State<'a, T>>] {
+        &self.states
+    }
+
+    /// Gets the external data.
+    #[inline]
+    pub fn data(&self) -> &T {
+        &self.data
+    }
+
+    /// Gets the default state.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no state is available.
+    #[inline]
+    pub fn default_state(&self) -> &Arc<State<'a, T>> {
+        self.states.first().expect("no state available")
+    }
+
+    /// Gets the length of states.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.states.len()
+    }
+
+    /// Whether the states is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
+    }
+}
+
+/// Mutable instance of [`States`].
+#[derive(Debug)]
+pub struct StatesMut<'a, T> {
+    data: T,
+    props: Vec<ErasedProperty<'a>>,
+}
+
+impl<'a, T> StatesMut<'a, T> {
+    /// Creates a new states with given data.
+    #[inline]
+    pub const fn new(data: T) -> Self {
+        Self {
+            data,
+            props: Vec::new(),
+        }
+    }
+
+    /// Adds a property to the states.
+    #[inline]
+    pub fn add<W, G>(&mut self, prop: &'a Property<'_, W>)
+    where
+        W: Wrap<G> + BiIndex<G> + Hash + Eq + Send + Sync + 'static,
+        for<'w> &'w W: IntoIterator<Item = G>,
+    {
+        self.props.push(prop.into());
+    }
+}
+
+impl<'a, T> StatesMut<'a, T>
+where
+    T: Clone,
+{
+    /// Freezes the state.
+    #[inline]
+    pub fn freeze(self) -> States<'a, T> {
+        States::new(self.data, self.props)
+    }
+}
+
+impl<'a, T> From<StatesMut<'a, T>> for States<'a, T>
+where
+    T: Clone,
+{
+    #[inline]
+    fn from(value: StatesMut<'a, T>) -> Self {
+        value.freeze()
+    }
 }
 
 /// Error type for state operations.
@@ -164,3 +343,73 @@ impl Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+/// Cell that can be either an [`Arc`] or a borrowed reference.
+#[derive(Debug)]
+pub enum MaybeArc<'a, T> {
+    /// The reference-counted variant.
+    Arc(Arc<T>),
+    /// The borrowed variant.
+    Borrowed(&'a T),
+}
+
+impl<T> Hash for MaybeArc<'_, T>
+where
+    T: Hash,
+{
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        Borrow::<T>::borrow(self).hash(state)
+    }
+}
+
+impl<T> Borrow<T> for MaybeArc<'_, T> {
+    #[inline]
+    fn borrow(&self) -> &T {
+        match self {
+            MaybeArc::Arc(arc) => arc.as_ref(),
+            MaybeArc::Borrowed(val) => val,
+        }
+    }
+}
+
+impl<T> Clone for MaybeArc<'_, T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        match self {
+            MaybeArc::Arc(arc) => MaybeArc::Arc(Arc::clone(arc)),
+            MaybeArc::Borrowed(val) => MaybeArc::Borrowed(val),
+        }
+    }
+}
+
+impl<T> PartialEq for MaybeArc<'_, T>
+where
+    T: PartialEq,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        Borrow::<T>::borrow(self).eq(Borrow::<T>::borrow(other))
+    }
+}
+
+impl<T> Eq for MaybeArc<'_, T> where T: Eq {}
+
+impl<T> AsRef<T> for MaybeArc<'_, T> {
+    #[inline]
+    fn as_ref(&self) -> &T {
+        Borrow::<T>::borrow(self)
+    }
+}
+
+impl<T> Deref for MaybeArc<'_, T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        Borrow::<T>::borrow(self)
+    }
+}
+
+#[cfg(test)]
+mod tests;

@@ -1,7 +1,7 @@
 use super::{BiIndex, Wrap};
 
 /// Property data that wraps `true` and `false`.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct Data;
 
 impl BiIndex<bool> for Data {

@@ -1,11 +1,6 @@
 //! State property types and traits.
 
-use std::{
-    any::TypeId,
-    borrow::{Borrow, Cow},
-    fmt::Debug,
-    hash::Hash,
-};
+use std::{any::TypeId, borrow::Cow, fmt::Debug, hash::Hash, ops::RangeInclusive};
 
 #[derive(Clone)]
 pub(crate) struct ErasedProperty<'a> {
@@ -42,12 +37,6 @@ impl PartialEq for ErasedProperty<'_> {
 }
 
 impl Eq for ErasedProperty<'_> {}
-
-impl Borrow<str> for ErasedProperty<'_> {
-    fn borrow(&self) -> &str {
-        self.name
-    }
-}
 
 /// Property of a state.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -203,6 +192,7 @@ pub mod data {
 
 /// Property that has integer values.
 #[doc(alias = "IntegerProperty")]
-pub type IntProperty<'a, T> = Property<'a, int::Data<T>>;
+pub type IntProperty<'a, T = RangeInclusive<i32>> = Property<'a, int::Data<T>>;
 /// Property that has boolean values.
-pub type BooleanProperty<'a> = Property<'a, bool::Data>;
+#[doc(alias = "BooleanProperty")]
+pub type BoolProperty<'a> = Property<'a, bool::Data>;
