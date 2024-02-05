@@ -5,14 +5,18 @@
 //! ```
 //! # use rimecraft_event::*;
 //! # use std::sync::Arc;
+//! // Create the event instance.
 //! let mut event: DefaultSyncEvent<dyn Fn(&mut String) + Send + Sync> = Event::new(|listeners| {
-//! Arc::new(move |string| {
-//!     for listener in &listeners {
-//!         listener(string);
-//!     }
-//! })
+//!     Arc::new(move |string| {
+//!         // Call all listeners with the given string reference.
+//!         for listener in &listeners {
+//!             listener(string);
+//!         }
+//!     })
 //! });
 //!
+//! // Subscribe event with ordering.
+//! // In this case, the order type is `i8`.
 //! register!(event, Arc::new(|string| string.push_str("genshin impact ")));
 //! register!(
 //!     event,
@@ -34,6 +38,7 @@
 //!     -100,
 //! );
 //!
+//! // Final result
 //! {
 //!     let mut string = String::new();
 //!     event.invoker()(&mut string);
@@ -55,7 +60,7 @@ use parking_lot::{RwLock, RwLockReadGuard};
 /// that can be called in order.
 #[derive(Debug)]
 pub struct Event<T, F, P> {
-    listeners: Vec<(T, P)>,
+    listeners: Vec<Option<(T, P)>>,
     factory: F,
     invoker: RwLock<Option<T>>,
 }
@@ -168,10 +173,22 @@ impl<T, F, P> Event<T, F, P> {
 
     /// Registers a listener with given phase into
     /// this event.
-    #[inline]
-    pub fn register(&mut self, listener: T, phase: P) {
-        self.listeners.push((listener, phase));
-        self.make_dirty()
+    pub fn register(&mut self, listener: T, phase: P) -> ListenerId {
+        let id = ListenerId(self.listeners.len());
+        self.listeners.push(Some((listener, phase)));
+        self.make_dirty();
+        id
+    }
+
+    /// Unregister a listener with given identifier
+    /// from this event.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given identifier is invalid for this event.
+    pub fn unregister(&mut self, id: ListenerId) {
+        *self.listeners.get_mut(id.0).expect("invalid event id") = None;
+        self.make_dirty();
     }
 
     /// Returns the number of listeners.
@@ -205,6 +222,7 @@ where
         let mut listeners = self
             .listeners
             .iter()
+            .filter_map(Option::as_ref)
             .map(|(l, p)| (l.clone(), p))
             .collect::<Vec<_>>();
         listeners.sort_by_key(|(_, p)| *p);
@@ -218,6 +236,12 @@ where
         }
     }
 }
+
+/// An identifier of the listener.
+///
+/// This can only be used to remove the listener from the event.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct ListenerId(usize);
 
 /// Registers a listener into the event.
 #[macro_export]
