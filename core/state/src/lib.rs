@@ -154,6 +154,7 @@ impl<T: Debug> Debug for State<'_, T> {
 /// See [`StatesMut`] for creating a new instance.
 #[derive(Debug)]
 #[doc(alias = "StateManager")]
+#[doc(alias = "StateDefinition")]
 pub struct States<'a, T> {
     states: Vec<Arc<State<'a, T>>>,
     #[allow(unused)]
