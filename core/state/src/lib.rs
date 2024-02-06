@@ -23,7 +23,7 @@ type Table<'a, T> = HashMap<ErasedProperty<'a>, HashMap<isize, Weak<T>>>;
 
 /// State of an object.
 pub struct State<'a, T> {
-    pub(crate) entries: Arc<HashMap<ErasedProperty<'a>, isize>>,
+    pub(crate) entries: HashMap<ErasedProperty<'a>, isize>,
     table: OnceLock<Table<'a, Self>>,
 
     data: T,
@@ -34,11 +34,10 @@ impl<T> State<'_, T> {
     #[inline]
     pub fn get<V, W>(&self, prop: &Property<'_, W>) -> Option<V>
     where
-        W: Wrap<V> + BiIndex<V> + Hash + Eq + Send + Sync + 'static,
-        for<'w> &'w W: IntoIterator<Item = V>,
+        W: BiIndex<V>,
     {
         self.entries
-            .get(&ErasedProperty::from(prop))
+            .get(prop.name())
             .and_then(|&index| prop.wrap.index(index))
     }
 
@@ -54,14 +53,12 @@ impl<T> State<'_, T> {
     /// - Panics if this state is not fully initialized.
     pub fn cycle<V, W>(&self, prop: &Property<'_, W>) -> Result<MaybeArc<'_, Self>, Error>
     where
-        W: Wrap<V> + BiIndex<V> + Hash + Eq + Send + Sync + 'static,
+        W: BiIndex<V>,
         for<'w> &'w W: IntoIterator<Item = V>,
     {
-        let erased = ErasedProperty::from(prop);
-
         let index = *self
             .entries
-            .get(&erased)
+            .get(prop.name())
             .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))?;
         let Some(next) = obtain_next(
             index,
@@ -77,7 +74,7 @@ impl<T> State<'_, T> {
             self.table
                 .get()
                 .expect("state not initialized")
-                .get(&erased)
+                .get(prop.name())
                 .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))
                 .and_then(|map| map.get(&next).ok_or(Error::ValueNotFound(index)))
                 .map(|weak| MaybeArc::Arc(weak.upgrade().expect("state was dropped")))
@@ -97,14 +94,11 @@ impl<T> State<'_, T> {
     /// - Panics if this state is not fully initialized.
     pub fn with<V, W>(&self, prop: &Property<'_, W>, value: V) -> Result<MaybeArc<'_, Self>, Error>
     where
-        W: Wrap<V> + BiIndex<V> + Hash + Eq + Send + Sync + 'static,
-        for<'w> &'w W: IntoIterator<Item = V>,
+        W: BiIndex<V>,
     {
-        let erased = ErasedProperty::from(prop);
-
         let index = *self
             .entries
-            .get(&erased)
+            .get(prop.name())
             .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))?;
         let value = prop.wrap.index_of(&value).ok_or(Error::InvalidValue)?;
         if value == index {
@@ -113,7 +107,7 @@ impl<T> State<'_, T> {
             self.table
                 .get()
                 .expect("state not initialized")
-                .get(&erased)
+                .get(prop.name())
                 .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))
                 .and_then(|map| map.get(&value).ok_or(Error::ValueNotFound(index)))
                 .map(|weak| MaybeArc::Arc(weak.upgrade().expect("state was dropped")))
@@ -122,12 +116,8 @@ impl<T> State<'_, T> {
 
     /// Whether this state contains given property.
     #[inline]
-    pub fn contains<W, V>(&self, prop: &Property<'_, W>) -> bool
-    where
-        W: Wrap<V> + BiIndex<V> + Hash + Eq + Send + Sync + 'static,
-        for<'w> &'w W: IntoIterator<Item = V>,
-    {
-        self.entries.contains_key(&ErasedProperty::from(prop))
+    pub fn contains<W, V>(&self, prop: &Property<'_, W>) -> bool {
+        self.entries.contains_key(prop.name())
     }
 
     /// Gets external data of this state.
@@ -198,10 +188,9 @@ impl<'a, T> States<'a, T> {
         let list = iter
             .into_iter()
             .map(|vec| vec.into_iter().collect::<HashMap<_, _>>())
-            .map(Arc::new)
             .map(|entries| {
                 Arc::new(State {
-                    entries: entries.clone(),
+                    entries,
                     table: OnceLock::new(),
                     data: data.clone(),
                 })
@@ -302,7 +291,7 @@ impl<'a, T> StatesMut<'a, T> {
     #[allow(clippy::missing_panics_doc)]
     pub fn add<W, G>(&mut self, prop: &'a Property<'_, W>) -> Result<(), Error>
     where
-        W: Wrap<G> + BiIndex<G> + Hash + Eq + Send + Sync + 'static,
+        W: Wrap<G> + BiIndex<G> + Eq + Send + Sync + 'static,
         for<'w> &'w W: IntoIterator<Item = G>,
     {
         static NAME_PAT: OnceLock<Regex> = OnceLock::new();
@@ -466,6 +455,120 @@ impl<T> Deref for MaybeArc<'_, T> {
     #[inline]
     fn deref(&self) -> &Self::Target {
         Borrow::<T>::borrow(self)
+    }
+}
+
+/// Trait for providing [`States`].
+pub trait ProvideStates<'a, 's, T> {
+    /// Gets the states.
+    fn states() -> &'s States<'a, T>;
+}
+
+#[cfg(feature = "serde")]
+pub mod serde {
+    //! Serde support for state.
+
+    use std::marker::PhantomData;
+
+    use ::serde::{ser::SerializeMap, Deserialize, Serialize};
+
+    use super::*;
+
+    impl<T> Serialize for State<'_, T> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: ::serde::Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(self.entries.len()))?;
+            for (prop, val) in &self.entries {
+                map.serialize_entry(
+                    prop.name,
+                    &prop.wrap.erased_to_name(*val).ok_or_else(|| {
+                        ::serde::ser::Error::custom(format!(
+                            "invalid value {val} in property {}",
+                            prop.name
+                        ))
+                    })?,
+                )?;
+            }
+            map.end()
+        }
+    }
+
+    /// A wrapper type for deserializing a state based on a default value
+    /// and updates it.
+    #[derive(Debug, Clone)]
+    pub struct FromDefault<T, P>(pub Arc<T>, PhantomData<P>);
+
+    impl<T, P> FromDefault<T, P> {
+        /// Creates a new instance with given default value.
+        #[inline]
+        pub const fn new(value: Arc<T>) -> Self {
+            Self(value, PhantomData)
+        }
+    }
+
+    impl<T, P> Serialize for FromDefault<State<'_, T>, P> {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: ::serde::Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+
+    impl<'de, 's, 'a, T, P> Deserialize<'de> for FromDefault<State<'a, T>, P>
+    where
+        'a: 's,
+        T: Clone + 's,
+        P: ProvideStates<'a, 's, T> + 's,
+    {
+        #[inline]
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            struct Visitor<'a, T>(Arc<State<'a, T>>);
+
+            impl<'de, 'a, T> ::serde::de::Visitor<'de> for Visitor<'a, T> {
+                type Value = Arc<State<'a, T>>;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    formatter.write_str("a map")
+                }
+
+                fn visit_map<A>(mut self, mut map: A) -> Result<Self::Value, A::Error>
+                where
+                    A: ::serde::de::MapAccess<'de>,
+                {
+                    while let Some((prop, val)) = map.next_entry::<String, isize>()? {
+                        self.0 = self
+                            .0
+                            .table
+                            .get()
+                            .expect("state not initialized")
+                            .get(prop.as_str())
+                            .ok_or_else(|| {
+                                ::serde::de::Error::custom(format!("property {prop} not found"))
+                            })?
+                            .get(&val)
+                            .ok_or_else(|| {
+                                ::serde::de::Error::custom(format!(
+                                    "value {val} not found in property {prop}"
+                                ))
+                            })?
+                            .upgrade()
+                            .expect("state was dropped");
+                    }
+                    Ok(self.0)
+                }
+            }
+
+            deserializer
+                .deserialize_map(Visitor(P::states().default_state().clone()))
+                .map(Self::new)
+        }
     }
 }
 

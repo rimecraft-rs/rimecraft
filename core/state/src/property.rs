@@ -1,14 +1,19 @@
 //! State property types and traits.
 
-use std::{any::TypeId, borrow::Cow, fmt::Debug, hash::Hash, ops::RangeInclusive};
+use std::{
+    any::TypeId,
+    borrow::{Borrow, Cow},
+    fmt::Debug,
+    hash::Hash,
+    marker::PhantomData,
+    ops::RangeInclusive,
+};
 
 #[derive(Clone)]
 pub(crate) struct ErasedProperty<'a> {
     pub name: &'a str,
     pub ty: TypeId,
     pub wrap: &'a (dyn ErasedWrap + Send + Sync),
-
-    wrap_hash: u64,
 }
 
 impl Debug for ErasedProperty<'_> {
@@ -24,15 +29,20 @@ impl Hash for ErasedProperty<'_> {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
-        self.ty.hash(state);
-        self.wrap_hash.hash(state);
+    }
+}
+
+impl Borrow<str> for ErasedProperty<'_> {
+    #[inline]
+    fn borrow(&self) -> &str {
+        self.name
     }
 }
 
 impl PartialEq for ErasedProperty<'_> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.ty == other.ty && self.wrap_hash == other.wrap_hash
+        self.name == other.name && self.ty == other.ty
     }
 }
 
@@ -73,17 +83,14 @@ impl<'a, W> Property<'a, W> {
 
 impl<'a, 'p, W> From<&'a Property<'p, W>> for ErasedProperty<'a>
 where
-    W: ErasedWrap + Hash + Send + Sync + 'static,
+    W: ErasedWrap + Send + Sync + 'static,
 {
+    #[inline]
     fn from(prop: &'a Property<'p, W>) -> Self {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        prop.wrap.hash(&mut hasher);
-
         ErasedProperty {
             name: &prop.name,
             ty: TypeId::of::<W>(),
             wrap: &prop.wrap,
-            wrap_hash: std::hash::Hasher::finish(&hasher),
         }
     }
 }
@@ -196,3 +203,66 @@ pub type IntProperty<'a, T = RangeInclusive<i32>> = Property<'a, int::Data<T>>;
 /// Property that has boolean values.
 #[doc(alias = "BooleanProperty")]
 pub type BoolProperty<'a> = Property<'a, bool::Data>;
+
+/// A property provider.
+pub trait ProvideProperty<'p> {
+    /// The property type.
+    type Property;
+
+    /// Provides a property.
+    fn provide_property() -> &'p Self::Property;
+}
+
+/// A value with property provider.
+#[derive(Debug)]
+pub struct Value<T, P>(pub T, PhantomData<P>);
+
+impl<T, P> Value<T, P> {
+    /// Creates a new value.
+    #[inline]
+    pub const fn new(value: T) -> Self {
+        Self(value, PhantomData)
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde {
+    use ::serde::{Deserialize, Serialize};
+
+    use super::*;
+
+    impl<'p, T, P> Serialize for Value<T, P>
+    where
+        P: ProvideProperty<'p> + 'p,
+        <P as ProvideProperty<'p>>::Property: Wrap<T>,
+    {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: ::serde::Serializer,
+        {
+            let prop = P::provide_property();
+            let name = prop
+                .to_name(&self.0)
+                .ok_or_else(|| ::serde::ser::Error::custom("value is not in the property"))?;
+            name.serialize(serializer)
+        }
+    }
+
+    impl<'p, 'de, T, P> Deserialize<'de> for Value<T, P>
+    where
+        P: ProvideProperty<'p> + 'p,
+        <P as ProvideProperty<'p>>::Property: Wrap<T>,
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            let prop = P::provide_property();
+            let name = <Cow<'_, str>>::deserialize(deserializer)?;
+            let value = prop
+                .parse_name(&name)
+                .ok_or_else(|| ::serde::de::Error::custom("invalid value"))?;
+            Ok(Self::new(value))
+        }
+    }
+}
