@@ -18,8 +18,8 @@ type SerState<K> = Vec<(K, Box<dyn Fn() -> Box<dyn AsErasedSerialize>>)>;
 type UpdateState<K> = HashMap<K, Box<dyn Fn() -> Box<dyn AsErasedUpdate>>>;
 
 pub(crate) struct State<K> {
-    ser: SerState<K>,
-    update: UpdateState<K>,
+    pub ser: SerState<K>,
+    pub update: UpdateState<K>,
 }
 
 impl<K> State<K> {
@@ -121,7 +121,7 @@ impl<'a, T: 'a> AsAttachmentMut<'a> for Persistent<T> {
     }
 }
 
-trait AsErasedSerialize {
+pub(crate) trait AsErasedSerialize {
     fn as_serialize(&self) -> &dyn erased_serde::Serialize;
 }
 
@@ -136,7 +136,7 @@ where
     }
 }
 
-trait AsErasedUpdate {
+pub(crate) trait AsErasedUpdate {
     fn as_update(&mut self) -> &mut dyn for<'de> rimecraft_serde_update::erased::ErasedUpdate<'de>;
 }
 

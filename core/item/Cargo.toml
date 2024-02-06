@@ -1,0 +1,34 @@
+[package]
+name = "rimecraft-item"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Minecraft Item primitives and registry"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+rimecraft-registry = { path = "../../util/registry" }
+rimecraft-fmt = { path = "../../util/fmt" }
+rimecraft-freezer = { path = "../../util/freezer" }
+rimecraft-attachment = { path = "../../util/attachment" }
+rimecraft-serde-update = { path = "../../util/serde-update", optional = true }
+fastnbt = "2.4"
+rimecraft-nbt-ext = { path = "../../util/nbt-ext" }
+serde = { version = "1.0", optional = true, features = ["derive"] }
+
+[features]
+default = ["serde"]
+serde = [
+    "dep:serde",
+    "rimecraft-registry/serde",
+    "rimecraft-attachment/serde",
+    "dep:rimecraft-serde-update",
+]
+
+[lints]
+workspace = true

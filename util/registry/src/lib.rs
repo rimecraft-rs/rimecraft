@@ -8,6 +8,7 @@ use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
     ops::{Deref, Index},
+    sync::OnceLock,
 };
 
 use entry::RefEntry;
@@ -228,6 +229,22 @@ impl<K, T> Deref for Reg<'_, K, T> {
     }
 }
 
+impl<K, T> Hash for Reg<'_, K, T> {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.raw.hash(state)
+    }
+}
+
+impl<K, T> PartialEq for Reg<'_, K, T> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.raw == other.raw
+    }
+}
+
+impl<K, T> Eq for Reg<'_, K, T> {}
+
 /// Trait for converting to a key.
 pub trait AsKey<K, T> {
     /// Converts to a key.
@@ -360,17 +377,17 @@ impl<'a, K, T> IntoIterator for &'a Registry<K, T> {
 pub struct RegistryMut<K, T> {
     key: Key<K, Registry<K, T>>,
     entries: Vec<(T, RefEntry<K, T>)>,
-    keys: HashSet<Key<K, T>>,
+    keys: OnceLock<HashSet<K>>,
 }
 
 impl<K, T> RegistryMut<K, T> {
     /// Creates a new mutable registry.
     #[inline]
-    pub fn new(key: Key<K, Registry<K, T>>) -> Self {
+    pub const fn new(key: Key<K, Registry<K, T>>) -> Self {
         Self {
             key,
             entries: Vec::new(),
-            keys: HashSet::new(),
+            keys: OnceLock::new(),
         }
     }
 
@@ -392,12 +409,17 @@ where
     ///
     /// Returns back the given key and value if
     /// registration with the key already exists.
+    #[allow(clippy::missing_panics_doc)]
     pub fn register(&mut self, key: Key<K, T>, value: T) -> Result<usize, (Key<K, T>, T)> {
-        if self.keys.contains(&key) {
+        if self.keys.get_mut().is_none() {
+            self.keys = HashSet::new().into();
+        }
+        let keys = self.keys.get_mut().expect("keys not initialized");
+        if keys.contains(key.value()) {
             return Err((key, value));
         }
+        keys.insert(key.value().clone());
         let raw = self.entries.len();
-        self.keys.insert(key.clone());
         self.entries.push((
             value,
             RefEntry {
@@ -665,13 +687,18 @@ pub mod edcode {
 type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 #[cfg(feature = "vanilla-identifier")]
+/// Vanilla root registry key.
+pub const VANILLA_ROOT_KEY: rimecraft_identifier::vanilla::Identifier =
+    rimecraft_identifier::vanilla::Identifier::new(
+        rimecraft_identifier::vanilla::MINECRAFT,
+        rimecraft_identifier::vanilla::Path::new_unchecked("root"),
+    );
+
+#[cfg(feature = "vanilla-identifier")]
 impl crate::key::Root for rimecraft_identifier::vanilla::Identifier {
     #[inline]
     fn root() -> Self {
-        Self::new(
-            Default::default(),
-            rimecraft_identifier::vanilla::Path::new_unchecked("root"),
-        )
+        VANILLA_ROOT_KEY
     }
 }
 

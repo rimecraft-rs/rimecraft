@@ -75,7 +75,7 @@ pub struct Attachments<K> {
     serde_state: crate::serde::State<K>,
 }
 
-impl<K: 'static> Attachments<K> {
+impl<K> Attachments<K> {
     /// Creates a new [`Attachments`] instance.
     #[inline]
     pub fn new() -> Self {
@@ -87,7 +87,7 @@ impl<K: 'static> Attachments<K> {
     }
 }
 
-impl<K: 'static> Default for Attachments<K> {
+impl<K> Default for Attachments<K> {
     #[inline]
     fn default() -> Self {
         Self::new()
@@ -167,6 +167,15 @@ impl<K: Hash + Eq> Attachments<K> {
         T: Send + Sync + 'static,
     {
         self.raw.get(ty.key).is_some_and(|val| val.is::<T>())
+    }
+}
+
+impl<K> Attachments<K> {
+    /// Whether the persistent data queue is empty.
+    #[cfg(feature = "serde")]
+    #[inline]
+    pub fn is_persistent_data_empty(&self) -> bool {
+        self.serde_state.ser.is_empty() && self.serde_state.update.is_empty()
     }
 }
 

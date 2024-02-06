@@ -20,7 +20,10 @@ impl Namespace {
     ///
     /// Panics if the given namespace is invalid.
     #[inline]
-    pub fn new(value: impl Into<Arc<str>>) -> Self {
+    pub fn new<T>(value: T) -> Self
+    where
+        T: Into<Arc<str>>,
+    {
         let value = value.into();
         validate_namespace(&value).unwrap();
         Self(ArcCowStr::Arc(value))
@@ -82,7 +85,10 @@ impl Path {
     ///
     /// Panics if the given path is invalid.
     #[inline]
-    pub fn new(value: impl Into<Arc<str>>) -> Self {
+    pub fn new<T>(value: T) -> Self
+    where
+        T: Into<Arc<str>>,
+    {
         let value = value.into();
         validate_path(&value).unwrap();
         Self(ArcCowStr::Arc(value))
