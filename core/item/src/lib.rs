@@ -59,6 +59,16 @@ pub trait ToItem<'s, 'r, K, P> {
     fn to_item(&'s self) -> Item<'r, K, P>;
 }
 
+impl<'ss, 's, 'r, K, P, T> ToItem<'ss, 'r, K, P> for &'s T
+where
+    T: ToItem<'s, 'r, K, P>,
+{
+    #[inline]
+    fn to_item(&'ss self) -> Item<'r, K, P> {
+        (*self).to_item()
+    }
+}
+
 /// The max item count of an `ItemStack`.
 pub const MAX_STACK_COUNT: u32 = 64;
 
