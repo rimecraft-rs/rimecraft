@@ -69,6 +69,13 @@ where
     }
 }
 
+impl<'r, K, P> ToItem<'_, 'r, K, P> for Item<'r, K, P> {
+    #[inline]
+    fn to_item(&'_ self) -> Item<'r, K, P> {
+        *self
+    }
+}
+
 /// The max item count of an `ItemStack`.
 pub const MAX_STACK_COUNT: u32 = 64;
 

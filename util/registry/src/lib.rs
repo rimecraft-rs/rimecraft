@@ -34,6 +34,9 @@ pub struct Registry<K, T> {
     entries: Vec<RefEntry<K, T>>,
     kv: HashMap<K, usize>,
     tv: RwLock<HashMap<TagKey<K, T>, Vec<usize>>>,
+
+    /// The default registration raw id.
+    default: Option<usize>,
 }
 
 /// Reference of a registration.
@@ -154,6 +157,12 @@ impl<K, T> Registry<K, T> {
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
+
+    /// Gets the default entry of this registry.
+    #[inline]
+    pub fn default_entry(&self) -> Option<Reg<'_, K, T>> {
+        self.default.and_then(|raw| self.of_raw(raw))
+    }
 }
 
 impl<K, T, Q> Index<Q> for Registry<K, T>
@@ -257,6 +266,19 @@ impl<K, T> PartialEq for Reg<'_, K, T> {
 }
 
 impl<K, T> Eq for Reg<'_, K, T> {}
+
+impl<'r, K, T> Default for Reg<'r, K, T>
+where
+    K: 'r,
+    T: ProvideRegistry<'r, K, T> + 'r,
+{
+    #[inline]
+    fn default() -> Self {
+        T::registry()
+            .default_entry()
+            .expect("default entry not found in registry")
+    }
+}
 
 /// Trait for converting to a key.
 pub trait AsKey<K, T> {
@@ -391,6 +413,8 @@ pub struct RegistryMut<K, T> {
     key: Key<K, Registry<K, T>>,
     entries: Vec<(T, RefEntry<K, T>)>,
     keys: OnceLock<HashSet<K>>,
+
+    default: Option<usize>,
 }
 
 impl<K, T> RegistryMut<K, T> {
@@ -401,6 +425,7 @@ impl<K, T> RegistryMut<K, T> {
             key,
             entries: Vec::new(),
             keys: OnceLock::new(),
+            default: None,
         }
     }
 
@@ -415,13 +440,11 @@ impl<K, T> RegistryMut<K, T>
 where
     K: Hash + Eq + Clone,
 {
-    /// Registers a new entry and returns
-    /// its raw id if successful.
+    /// Registers a new entry and returns its raw id if successful.
     ///
     /// # Errors
     ///
-    /// Returns back the given key and value if
-    /// registration with the key already exists.
+    /// Returns back the given key and value if registration with the key already exists.
     #[allow(clippy::missing_panics_doc)]
     pub fn register(&mut self, key: Key<K, T>, value: T) -> Result<usize, (Key<K, T>, T)> {
         if self.keys.get_mut().is_none() {
@@ -443,6 +466,19 @@ where
             },
         ));
         Ok(raw)
+    }
+
+    /// Registers a unique default entry of this registry.
+    ///
+    /// See [`Self::register`].
+    #[allow(clippy::missing_errors_doc)]
+    pub fn register_default(&mut self, key: Key<K, T>, value: T) -> Result<usize, (Key<K, T>, T)> {
+        if self.default.is_some() {
+            return Err((key, value));
+        }
+        let id = self.register(key, value)?;
+        self.default = Some(id);
+        Ok(id)
     }
 }
 
@@ -468,6 +504,7 @@ where
                 .collect(),
             tv: RwLock::new(HashMap::new()),
             entries,
+            default: value.default,
         }
     }
 }
