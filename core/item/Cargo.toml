@@ -17,6 +17,7 @@ rimecraft-fmt = { path = "../../util/fmt" }
 rimecraft-freezer = { path = "../../util/freezer" }
 rimecraft-attachment = { path = "../../util/attachment" }
 rimecraft-serde-update = { path = "../../util/serde-update", optional = true }
+rimecraft-serde-humanreadctl = { path = "../../util/serde-humanreadctl", optional = true }
 fastnbt = "2.4"
 rimecraft-nbt-ext = { path = "../../util/nbt-ext" }
 serde = { version = "1.0", optional = true, features = ["derive"] }
@@ -28,6 +29,7 @@ serde = [
     "rimecraft-registry/serde",
     "rimecraft-attachment/serde",
     "dep:rimecraft-serde-update",
+    "dep:rimecraft-serde-humanreadctl",
 ]
 
 [lints]

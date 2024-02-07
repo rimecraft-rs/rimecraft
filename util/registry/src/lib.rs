@@ -37,6 +37,19 @@ pub struct Registry<K, T> {
 }
 
 /// Reference of a registration.
+///
+/// # Serialization and Deserialization
+///
+/// This type can be serialized and deserialized using `serde` and `edcode`.
+/// (with `serde` feature and `edcode` feature respectively)
+///
+/// ## Serde
+///
+/// When serializing this reference with `serde`, it will serialize the ID
+/// of the entry, if the serializer is **human readable**. Otherwise, it will
+/// serialize the **raw ID** of the entry.
+///
+/// This corresponds to the `compressed` option in *Mojang Serialization*.
 pub struct Reg<'a, K, T> {
     raw: usize,
     registry: &'a Registry<K, T>,
@@ -518,7 +531,7 @@ where
 }
 
 #[cfg(feature = "serde")]
-pub mod serde {
+mod serde {
     //! Helper module for `serde` support.
 
     use std::hash::Hash;
@@ -529,13 +542,16 @@ pub mod serde {
     where
         K: serde::Serialize,
     {
-        #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
-            let entry: &RefEntry<_, _> = self.as_ref();
-            entry.key.value().serialize(serializer)
+            if serializer.is_human_readable() {
+                let entry: &RefEntry<_, _> = self.as_ref();
+                entry.key.value().serialize(serializer)
+            } else {
+                serializer.serialize_i32(self.raw as i32)
+            }
         }
     }
 
@@ -549,58 +565,17 @@ pub mod serde {
         where
             D: serde::Deserializer<'de>,
         {
-            let key = K::deserialize(deserializer)?;
-            T::registry()
-                .get(&key)
-                .ok_or_else(|| serde::de::Error::custom(format!("key {key:?} not found")))
-        }
-    }
-
-    /// Wrapper for serializing a compressed entry.
-    #[derive(Debug, Clone, Copy)]
-    pub struct Compressed<T>(pub T);
-
-    impl<K, T> serde::Serialize for Compressed<&Reg<'_, K, T>>
-    where
-        K: serde::Serialize,
-    {
-        #[inline]
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            serializer.serialize_i32(self.0.raw as i32)
-        }
-    }
-
-    impl<K, T> serde::Serialize for Compressed<Reg<'_, K, T>>
-    where
-        K: serde::Serialize,
-    {
-        #[inline]
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            Compressed(&self.0).serialize(serializer)
-        }
-    }
-
-    impl<'a, 'r, 'de, K, T> serde::Deserialize<'de> for Compressed<Reg<'a, K, T>>
-    where
-        'r: 'a,
-        T: ProvideRegistry<'r, K, T> + 'r,
-        K: serde::Deserialize<'de> + Hash + Eq + std::fmt::Debug + 'r,
-    {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            let raw = i32::deserialize(deserializer)? as usize;
-            T::registry()
-                .of_raw(raw)
-                .map(Compressed)
-                .ok_or_else(|| serde::de::Error::custom(format!("raw id {raw} not found")))
+            if deserializer.is_human_readable() {
+                let key = K::deserialize(deserializer)?;
+                T::registry()
+                    .get(&key)
+                    .ok_or_else(|| serde::de::Error::custom(format!("key {key:?} not found")))
+            } else {
+                let raw = i32::deserialize(deserializer)? as usize;
+                T::registry()
+                    .of_raw(raw)
+                    .ok_or_else(|| serde::de::Error::custom(format!("raw id {raw} not found")))
+            }
         }
     }
 }

@@ -5,7 +5,7 @@ use std::{marker::PhantomData, num::NonZeroU32};
 use rimecraft_fmt::Formatting;
 use rimecraft_registry::{ProvideRegistry, Reg};
 
-mod stack;
+pub mod stack;
 
 pub use stack::ItemStack;
 

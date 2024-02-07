@@ -1,3 +1,5 @@
+//! Item stack related types and traits.
+
 use rimecraft_attachment::Attachments;
 use rimecraft_nbt_ext::Compound;
 
@@ -21,7 +23,11 @@ use crate::{Item, ToItem};
     ))
 )]
 pub struct ItemStack<'r, K, P> {
-    #[cfg_attr(feature = "serde", serde(rename = "id"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(rename = "id"),
+        serde(with = "serde_helper::item_serde")
+    )]
     item: Item<'r, K, P>,
 
     #[cfg_attr(feature = "serde", serde(rename = "Count"))]
@@ -33,45 +39,91 @@ pub struct ItemStack<'r, K, P> {
 
     #[cfg_attr(
         feature = "serde",
-        serde(skip_serializing_if = "should_skip_attachment_ser"),
-        serde(default),
-        serde(serialize_with = "ser_attachments"),
-        serde(deserialize_with = "deser_attachments")
+        serde(skip_serializing_if = "serde_helper::should_skip_attachment_ser"),
+        serde(default = "serde_helper::default_attachments"),
+        serde(serialize_with = "serde_helper::ser_attachments"),
+        serde(deserialize_with = "serde_helper::deser_attachments")
     )]
     attachments: (Attachments<K>, PhantomData<P>),
 }
 
 #[cfg(feature = "serde")]
-fn should_skip_attachment_ser<K, P>(attachments: &(Attachments<K>, PhantomData<P>)) -> bool {
-    attachments.0.is_persistent_data_empty()
-}
+mod serde_helper {
+    use super::*;
 
-#[cfg(feature = "serde")]
-fn ser_attachments<K, P, S>(
-    attachments: &(Attachments<K>, PhantomData<P>),
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-    K: serde::Serialize + Hash + Eq,
-{
-    serde::Serialize::serialize(&attachments.0, serializer)
-}
+    #[inline]
+    pub fn default_attachments<K, P>() -> (Attachments<K>, PhantomData<P>)
+    where
+        P: InitAttachments<K>,
+    {
+        let mut att = Attachments::new();
+        P::init_attachments(&mut att);
+        (att, PhantomData)
+    }
 
-#[cfg(feature = "serde")]
-fn deser_attachments<'de, K, P, D>(
-    deserializer: D,
-) -> Result<(Attachments<K>, PhantomData<P>), <D as serde::Deserializer<'de>>::Error>
-where
-    D: serde::Deserializer<'de>,
-    P: InitAttachments<K>,
-    K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + Hash + Eq,
-{
-    use rimecraft_serde_update::Update;
-    let mut attachments = Attachments::new();
-    P::init_attachments(&mut attachments);
-    attachments.update(deserializer)?;
-    Ok((attachments, PhantomData))
+    #[inline]
+    pub fn should_skip_attachment_ser<K, P>(
+        attachments: &(Attachments<K>, PhantomData<P>),
+    ) -> bool {
+        attachments.0.is_persistent_data_empty()
+    }
+
+    #[inline]
+    pub fn ser_attachments<K, P, S>(
+        attachments: &(Attachments<K>, PhantomData<P>),
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+        K: serde::Serialize + Hash + Eq,
+    {
+        serde::Serialize::serialize(&attachments.0, serializer)
+    }
+
+    pub fn deser_attachments<'de, K, P, D>(
+        deserializer: D,
+    ) -> Result<(Attachments<K>, PhantomData<P>), <D as serde::Deserializer<'de>>::Error>
+    where
+        D: serde::Deserializer<'de>,
+        P: InitAttachments<K>,
+        K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + Hash + Eq,
+    {
+        use rimecraft_serde_update::Update;
+        let mut attachments = Attachments::new();
+        P::init_attachments(&mut attachments);
+        attachments.update(deserializer)?;
+        Ok((attachments, PhantomData))
+    }
+
+    pub mod item_serde {
+        use rimecraft_registry::ProvideRegistry;
+        use rimecraft_serde_humanreadctl::HumanReadableControlled;
+        use serde::{Deserialize, Serialize};
+
+        use crate::RawItem;
+
+        use super::*;
+
+        #[inline]
+        pub fn serialize<K, P, S>(item: &Item<'_, K, P>, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+            K: Serialize + Hash + Eq,
+        {
+            item.serialize(HumanReadableControlled::new(serializer, true))
+        }
+
+        #[inline]
+        pub fn deserialize<'rr, 'd, K, P, D>(deserializer: D) -> Result<Item<'rr, K, P>, D::Error>
+        where
+            'rr: 'd,
+            D: serde::Deserializer<'d>,
+            K: Deserialize<'d> + Hash + Eq + std::fmt::Debug + 'rr,
+            P: InitAttachments<K> + ProvideRegistry<'rr, K, RawItem<P>> + 'rr,
+        {
+            Item::deserialize(HumanReadableControlled::new(deserializer, true))
+        }
+    }
 }
 
 impl<'r, K, P> ItemStack<'r, K, P>
