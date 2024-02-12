@@ -47,6 +47,8 @@ pub struct Type<K, T> {
     _marker: PhantomData<T>,
 }
 
+pub use Type as AttachmentType;
+
 impl<K, T> Type<K, T> {
     /// Creates a new [`Type`] from given key.
     #[inline]

@@ -1,4 +1,4 @@
-//! Minecraft Item primitives and registry.
+//! Minecraft Item primitives.
 
 use std::{marker::PhantomData, num::NonZeroU32};
 
@@ -54,6 +54,8 @@ where
 pub type Item<'r, K, P> = Reg<'r, K, RawItem<P>>;
 
 /// A trait for converting a value to an [`Item`].
+#[doc(alias = "ItemConvertible")]
+#[doc(alias = "ItemLike")]
 pub trait ToItem<'s, 'r, K, P> {
     /// Converts the value to an [`Item`].
     fn to_item(&'s self) -> Item<'r, K, P>;
@@ -83,7 +85,7 @@ pub const MAX_STACK_COUNT: u32 = 64;
 ///
 /// A setting configure behaviors common to all items, such as the
 /// stack's max count.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Settings {
     /// The maximum count of the item that can be stacked in a single slot.
     pub max_count: NonZeroU32,
@@ -104,6 +106,9 @@ impl Default for Settings {
         }
     }
 }
+
+#[doc(alias = "ItemProperties")]
+pub use Settings as ItemSettings;
 
 /// Rarity of an item.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Default)]

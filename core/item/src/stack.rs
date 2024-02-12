@@ -4,7 +4,7 @@ use rimecraft_attachment::Attachments;
 use rimecraft_nbt_ext::Compound;
 use rimecraft_registry::ProvideRegistry;
 
-use std::{hash::Hash, marker::PhantomData};
+use std::marker::PhantomData;
 
 use crate::{Item, RawItem, ToItem};
 

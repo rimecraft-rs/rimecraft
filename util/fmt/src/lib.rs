@@ -2,8 +2,8 @@
 
 use std::{fmt::Display, ops::Deref, sync::OnceLock};
 
-pub use hex_color::HexColor;
 use regex_lite::Regex;
+use rgb::RGB8;
 
 /// Color index of a formatting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -113,10 +113,12 @@ macro_rules! formattings {
             /// Returns the color of the formatted text, or
             /// `None` if the formatting has no associated color.
             #[inline]
-            pub const fn color_value(self) -> Option<HexColor> {
+            pub const fn color_value(self) -> Option<RGB8> {
                 if let Some(value) = match self { $(Formatting::$i => $cv),* }
                 {
-                    Some(HexColor::from_u24(value))
+                    let value: u32 = value;
+                    let [_, r, g, b] = value.to_be_bytes();
+                    Some(RGB8 { r, g, b })
                 } else {
                     None
                 }
