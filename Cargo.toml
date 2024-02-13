@@ -7,8 +7,8 @@ members = [
     "flare3d/examples",
 
     # Deprecated
-    "core-old",
-    "primitives",
+    # "core-old",
+    # "primitives",
 ]
 
 [workspace.lints.rust]
