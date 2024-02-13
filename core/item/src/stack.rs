@@ -218,6 +218,8 @@ pub trait InitAttachments<K> {
 mod serde_helper {
     use super::*;
 
+    use std::hash::Hash;
+
     #[inline]
     pub fn default_attachments<K, P>() -> (Attachments<K>, PhantomData<P>)
     where
