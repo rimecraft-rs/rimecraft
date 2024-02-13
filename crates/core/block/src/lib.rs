@@ -4,6 +4,10 @@ use rimecraft_registry::Reg;
 
 use std::marker::PhantomData;
 
+mod pos;
+
+pub use pos::BlockPos;
+
 /// Block containing settings.
 #[derive(Debug)]
 pub struct RawBlock<P> {
