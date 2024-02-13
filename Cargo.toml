@@ -1,14 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "util/*",
-    "core/*",
-    "flare3d",
-    "flare3d/examples",
-
-    # Deprecated
-    # "core-old",
-    # "primitives",
+    "crates/util/*",
+    "crates/core/*",
+    "crates/flare3d",
+    "crates/flare3d/examples",
 ]
 
 [workspace.lints.rust]
