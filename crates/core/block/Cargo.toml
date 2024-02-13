@@ -12,7 +12,7 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-registry = { path = "../../util/registry" }
+rimecraft-registry = { path = "../registry" }
 glam = "0.25"
 rimecraft-state = { path = "../state", optional = true }
 rimecraft-edcode = { path = "../../util/edcode", optional = true }

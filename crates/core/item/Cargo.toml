@@ -12,7 +12,7 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-registry = { path = "../../util/registry" }
+rimecraft-registry = { path = "../registry" }
 rimecraft-fmt = { path = "../../util/fmt" }
 rimecraft-attachment = { path = "../../util/attachment" }
 rimecraft-serde-update = { path = "../../util/serde-update", optional = true }
