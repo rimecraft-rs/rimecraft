@@ -1,0 +1,25 @@
+[package]
+name = "rimecraft-text"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Minecraft Text implementation"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+rgb = "0.8"
+rimecraft-fmt = { path = "../../util/fmt" }
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+
+[features]
+default = ["serde"]
+serde = ["dep:serde"]
+
+[lints]
+workspace = true
