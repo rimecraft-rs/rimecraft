@@ -16,10 +16,10 @@ use crate::{Item, RawItem, ToItem};
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
     serde(bound(
-        serialize = "K: serde::Serialize + Hash + Eq",
+        serialize = "K: serde::Serialize + std::hash::Hash + Eq",
         deserialize = r#"
             'r: 'de,
-            K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + Hash + Eq + std::fmt::Debug + 'r,
+            K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + std::hash::Hash + Eq + std::fmt::Debug + 'r,
             P: InitAttachments<K> + rimecraft_registry::ProvideRegistry<'r, K, crate::RawItem<P>> + 'r"#
     ))
 )]
