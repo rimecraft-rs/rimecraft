@@ -35,6 +35,28 @@ pub struct Text<T, StyleExt> {
 }
 
 impl<T, StyleExt> Text<T, StyleExt> {
+    /// Creates a new text with the given content and style.
+    ///
+    /// See [`Self::with_sibs`] for creating a text with siblings.
+    #[inline]
+    pub const fn new(content: T, style: Style<StyleExt>) -> Self {
+        Self {
+            content,
+            style,
+            sibs: Vec::new(),
+        }
+    }
+
+    /// Creates a new text with the given content, style and siblings.
+    #[inline]
+    pub const fn with_sibs(content: T, style: Style<StyleExt>, sibs: Vec<Self>) -> Self {
+        Self {
+            content,
+            style,
+            sibs,
+        }
+    }
+
     /// Returns the style of this text.
     #[inline]
     pub fn style(&self) -> &Style<StyleExt> {
