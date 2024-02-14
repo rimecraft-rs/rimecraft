@@ -1,4 +1,4 @@
-//! Minecraft Text implementation.
+//! Minecraft Text API.
 
 mod error;
 mod iter;

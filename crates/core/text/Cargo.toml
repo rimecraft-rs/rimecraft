@@ -2,8 +2,8 @@
 name = "rimecraft-text"
 version = "0.1.0"
 edition = "2021"
-authors = ["JieningYu <jiening.yu@outlook.com>"]
-description = "Minecraft Text implementation"
+authors = ["JieningYu <jiening.yu@outlook.com>", "C191239"]
+description = "Minecraft Text API"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
