@@ -10,8 +10,7 @@ mod _serde;
 use std::{fmt::Display, ops::Add};
 
 pub use error::Error;
-use iter::Iter;
-pub use iter::StyledIter;
+pub use iter::{Iter, StyledIter};
 pub use style::Style;
 
 /// A text component.
