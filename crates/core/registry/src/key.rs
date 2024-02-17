@@ -150,10 +150,8 @@ pub mod edcode {
     where
         K: Encode,
     {
-        type Error = <K as Encode>::Error;
-
         #[inline]
-        fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+        fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
         where
             B: bytes::BufMut,
         {
@@ -161,17 +159,13 @@ pub mod edcode {
         }
     }
 
-    impl<'r, K, O, T> Decode for Key<K, T>
+    impl<'r, K, T> Decode for Key<K, T>
     where
-        K: Decode<Output = O> + ToOwned<Owned = O> + 'r,
+        K: Decode + Clone + 'r,
         T: ProvideRegistry<'r, K, T> + 'r,
     {
-        type Output = Key<O, T>;
-
-        type Error = <K as Decode>::Error;
-
         #[inline]
-        fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
+        fn decode<B>(buf: B) -> Result<Self, std::io::Error>
         where
             B: bytes::Buf,
         {
@@ -188,10 +182,8 @@ pub mod edcode {
     where
         K: Encode,
     {
-        type Error = <K as Encode>::Error;
-
         #[inline]
-        fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+        fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
         where
             B: bytes::BufMut,
         {
@@ -203,10 +195,8 @@ pub mod edcode {
     where
         K: Encode,
     {
-        type Error = <K as Encode>::Error;
-
         #[inline]
-        fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+        fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
         where
             B: bytes::BufMut,
         {
@@ -216,19 +206,14 @@ pub mod edcode {
 
     impl<'r, K, T> Decode for RegRef<Key<K, T>>
     where
-        K: Decode<Output = K> + Clone + Root + 'r,
+        K: Decode + Clone + Root + 'r,
     {
-        type Output = Key<K, T>;
-
-        type Error = <K as Decode>::Error;
-
         #[inline]
-        fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
+        fn decode<B>(buf: B) -> Result<Self, std::io::Error>
         where
             B: bytes::Buf,
         {
-            let value = K::decode(buf)?;
-            Ok(Key::new(K::root(), value))
+            Ok(Self(Key::new(K::root(), K::decode(buf)?)))
         }
     }
 }

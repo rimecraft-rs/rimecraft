@@ -1,29 +1,25 @@
 //! Encoding and decoding utilities for packet buffers.
 
-pub mod error;
 mod imp;
 
 #[cfg(test)]
 mod tests;
 
+use std::io;
+
 pub use bytes;
 
 /// Describes types that can be encoded into a packet buffer.
 pub trait Encode {
-    /// The error type.
-    type Error;
-
     /// Encode into a buffer.
     ///
     /// # Errors
     ///
     /// Returns an error if the encoding failed.
-    fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+    fn encode<B>(&self, buf: B) -> Result<(), io::Error>
     where
         B: bytes::BufMut;
 }
-
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 /// [`Encode`], but can be used as trait objects.
 pub trait BytesEncode {
@@ -32,61 +28,49 @@ pub trait BytesEncode {
     /// # Errors
     ///
     /// Returns an error if the encoding failed.
-    fn encode_bytes(&self, bytes: &mut bytes::BytesMut) -> Result<(), BoxedError>;
+    fn encode_bytes(&self, bytes: &mut bytes::BytesMut) -> Result<(), io::Error>;
 }
 
 impl<T> BytesEncode for T
 where
     T: Encode,
-    <T as Encode>::Error: std::error::Error + Send + Sync + 'static,
 {
-    #[inline]
-    fn encode_bytes(&self, bytes: &mut bytes::BytesMut) -> Result<(), BoxedError> {
-        self.encode(bytes).map_err(From::from)
+    #[inline(always)]
+    fn encode_bytes(&self, bytes: &mut bytes::BytesMut) -> Result<(), io::Error> {
+        self.encode(bytes)
     }
 }
 
 /// Describes types that can be decoded from a packet buffer.
-pub trait Decode {
-    /// The resulting type.
-    type Output;
-
-    /// The error type.
-    type Error;
-
+pub trait Decode: Sized {
     /// Decode from a buffer.
     ///
     /// # Errors
     ///
     /// Returns an error if the decoding failed.
-    fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
+    fn decode<B>(buf: B) -> Result<Self, io::Error>
     where
         B: bytes::Buf;
 }
 
 /// Represents types that can be updated from a buffer.
-pub trait Update: Encode {
-    /// The error type.
-    type Error;
-
+pub trait Update {
     /// Update from a buffer.
     ///
     /// # Errors
     ///
     /// Returns an error if the decoding in place failed.
-    fn update<B>(&mut self, buf: B) -> Result<(), <Self as Update>::Error>
+    fn update<B>(&mut self, buf: B) -> Result<(), io::Error>
     where
         B: bytes::Buf;
 }
 
-impl<T, E> Update for T
+impl<T> Update for T
 where
-    T: Encode<Error = E> + Decode<Output = T, Error = E>,
+    T: Decode,
 {
-    type Error = E;
-
     #[inline]
-    fn update<B>(&mut self, buf: B) -> Result<(), <Self as Update>::Error>
+    fn update<B>(&mut self, buf: B) -> Result<(), io::Error>
     where
         B: bytes::Buf,
     {
@@ -107,13 +91,14 @@ pub struct Json<T>(pub T);
 
 /// Represents a variable integer.
 #[derive(Debug)]
+#[repr(transparent)]
 #[doc(alias = "VarInt")]
 pub struct VarI32(pub i32);
 
 impl VarI32 {
     /// Get the encoded bytes length of this integer.
     #[inline]
-    pub fn len(self) -> usize {
+    pub fn encoded_len(self) -> usize {
         (1..5).find(|i| self.0 & -1 << (i * 7) == 0).unwrap_or(5)
     }
 

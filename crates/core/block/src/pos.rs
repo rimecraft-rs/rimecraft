@@ -250,10 +250,8 @@ mod edcode {
     use super::*;
 
     impl Encode for BlockPos {
-        type Error = Infallible;
-
         #[inline]
-        fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
+        fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
         where
             B: rimecraft_edcode::bytes::BufMut,
         {
@@ -263,12 +261,8 @@ mod edcode {
     }
 
     impl Decode for BlockPos {
-        type Error = Infallible;
-
-        type Output = Self;
-
         #[inline]
-        fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
+        fn decode<B>(mut buf: B) -> Result<Self, std::io::Error>
         where
             B: rimecraft_edcode::bytes::Buf,
         {

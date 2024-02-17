@@ -621,50 +621,13 @@ mod serde {
 pub mod edcode {
     //! Helper module for `edcode` support.
 
-    use std::convert::Infallible;
-
-    use rimecraft_edcode::{error::VarI32TooBigError, Decode, Encode, VarI32};
+    use rimecraft_edcode::{Decode, Encode, VarI32};
 
     use crate::{ProvideRegistry, Reg};
 
-    /// Error type for `edcode` support.
-    #[derive(Debug)]
-    pub enum Error<K> {
-        /// Error for invalid key.
-        InvalidKey(K),
-        /// Error for invalid raw id.
-        InvalidRawId(usize),
-        /// Error for `VarI32`.
-        VarI32(VarI32TooBigError),
-    }
-
-    impl<K> std::fmt::Display for Error<K>
-    where
-        K: std::fmt::Debug,
-    {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Error::InvalidKey(id) => write!(f, "element not found for key {id:?}"),
-                Error::InvalidRawId(id) => write!(f, "element not found for raw id {id}"),
-                Error::VarI32(err) => write!(f, "{err}"),
-            }
-        }
-    }
-
-    impl<K> std::error::Error for Error<K> where K: std::fmt::Debug {}
-
-    impl<K> From<VarI32TooBigError> for Error<K> {
-        #[inline]
-        fn from(value: VarI32TooBigError) -> Self {
-            Self::VarI32(value)
-        }
-    }
-
     impl<K, T> Encode for Reg<'_, K, T> {
-        type Error = Infallible;
-
         #[inline]
-        fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+        fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
         where
             B: rimecraft_edcode::bytes::BufMut,
         {
@@ -678,19 +641,14 @@ pub mod edcode {
         K: 'r,
         T: ProvideRegistry<'r, K, T> + 'r,
     {
-        type Output = Self;
-
-        type Error = Error<K>;
-
-        fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
+        fn decode<B>(buf: B) -> Result<Self, std::io::Error>
         where
             B: rimecraft_edcode::bytes::Buf,
         {
-            let id = VarI32::decode(buf)? as usize;
+            let id = VarI32::decode(buf)?.0 as usize;
             T::registry()
                 .of_raw(id)
-                .map(From::from)
-                .ok_or_else(|| Error::InvalidRawId(id))
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid id"))
         }
     }
 }
@@ -708,7 +666,7 @@ pub const VANILLA_ROOT_KEY: rimecraft_identifier::vanilla::Identifier =
 
 #[cfg(feature = "vanilla-identifier")]
 impl crate::key::Root for rimecraft_identifier::vanilla::Identifier {
-    #[inline]
+    #[inline(always)]
     fn root() -> Self {
         VANILLA_ROOT_KEY
     }

@@ -165,9 +165,9 @@ mod edcode {
 
     use std::hash::Hash;
 
-    use rimecraft_edcode::{error::EitherError, Decode, Encode, VarI32};
+    use rimecraft_edcode::{Decode, Encode, VarI32};
 
-    use crate::{edcode::Error, ProvideRegistry, Reg};
+    use crate::{ProvideRegistry, Reg};
 
     use super::{Entry, RefEntry};
 
@@ -176,19 +176,14 @@ mod edcode {
         K: Hash + Eq + Clone + 'r,
         T: ProvideRegistry<'r, K, T> + 'r,
     {
-        type Error = Error<K>;
-
-        fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+        fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
         where
             B: rimecraft_edcode::bytes::BufMut,
         {
-            let id = Reg::raw_id(
-                T::registry()
-                    .get(self.key())
-                    .ok_or_else(|| Error::InvalidKey(self.key().value().clone()))?,
-            );
-            VarI32((id + 1) as i32).encode(buf).unwrap();
-            Ok(())
+            let id = Reg::raw_id(T::registry().get(self.key()).ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "unknown registry key")
+            })?);
+            VarI32((id + 1) as i32).encode(buf)
         }
     }
 
@@ -198,19 +193,14 @@ mod edcode {
         K: 'r,
         T: ProvideRegistry<'r, K, T> + 'r,
     {
-        type Output = Self;
-
-        type Error = Error<K>;
-
-        fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
+        fn decode<B>(buf: B) -> Result<Self, std::io::Error>
         where
             B: rimecraft_edcode::bytes::Buf,
         {
-            let id = (VarI32::decode(buf)? - 1) as usize;
-            T::registry()
-                .of_raw(id)
-                .map(From::from)
-                .ok_or_else(|| Error::InvalidRawId(id))
+            let id = (VarI32::decode(buf)?.0 - 1) as usize;
+            T::registry().of_raw(id).map(From::from).ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "unknown registry id")
+            })
         }
     }
 
@@ -219,18 +209,16 @@ mod edcode {
         K: Hash + Eq + Clone + 'r,
         T: ProvideRegistry<'r, K, T> + Encode + 'r,
     {
-        type Error = EitherError<Error<K>, <T as Encode>::Error>;
-
-        fn encode<B>(&self, mut buf: B) -> Result<(), Self::Error>
+        fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
         where
             B: rimecraft_edcode::bytes::BufMut,
         {
             match self {
                 Entry::Direct(value) => {
-                    VarI32(0).encode(&mut buf).unwrap();
-                    value.encode(buf).map_err(EitherError::B)
+                    VarI32(0).encode(&mut buf)?;
+                    value.encode(buf)
                 }
-                Entry::Ref(entry) => entry.encode(buf).map_err(EitherError::A),
+                Entry::Ref(entry) => entry.encode(buf),
             }
         }
     }
@@ -239,23 +227,21 @@ mod edcode {
     where
         'r: 'a,
         K: 'r,
-        T: ProvideRegistry<'r, K, T> + Decode<Output = T> + 'r,
+        T: ProvideRegistry<'r, K, T> + Decode + 'r,
     {
-        type Output = Self;
-
-        type Error = EitherError<Error<K>, <T as Decode>::Error>;
-
-        fn decode<B>(mut buf: B) -> Result<Self::Output, Self::Error>
+        fn decode<B>(mut buf: B) -> Result<Self, std::io::Error>
         where
             B: rimecraft_edcode::bytes::Buf,
         {
-            let id = VarI32::decode(&mut buf).map_err(|err| EitherError::A(err.into()))?;
+            let id = VarI32::decode(&mut buf)?.0;
             match id {
-                0 => T::decode(buf).map(Entry::Direct).map_err(EitherError::B),
+                0 => T::decode(buf).map(Entry::Direct),
                 id => T::registry()
                     .of_raw((id - 1) as usize)
                     .map(|r| Entry::Ref(r.into()))
-                    .ok_or_else(|| EitherError::A(Error::InvalidRawId((id - 1) as usize))),
+                    .ok_or_else(|| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, "unknown registry id")
+                    }),
             }
         }
     }

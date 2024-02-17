@@ -22,6 +22,7 @@ uuid = { version = "1.7", optional = true }
 glam = { version = "0.25", optional = true }
 
 [features]
+# default = ["serde", "nbt", "json", "uuid", "glam"]
 serde = ["dep:serde"]
 # custom formats
 nbt = ["serde", "dep:fastnbt"]

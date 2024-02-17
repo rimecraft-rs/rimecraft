@@ -1,0 +1,22 @@
+[package]
+name = "rimecraft-chunk-palette"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Minecraft chunk palettes"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+rimecraft-edcode = { path = "../../../util/edcode", optional = true }
+
+[features]
+default = ["edcode"]
+edcode = ["rimecraft-edcode"]
+
+[lints]
+workspace = true
