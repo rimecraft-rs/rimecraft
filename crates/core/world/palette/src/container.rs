@@ -1,0 +1,1 @@
+//! Paletted containers.
