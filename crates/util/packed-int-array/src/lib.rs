@@ -153,6 +153,24 @@ impl PackedIntArray {
             }
         }
     }
+
+    /// Gets `elements_per_long` value of this array.
+    #[inline]
+    pub fn elements_per_long(&self) -> usize {
+        self.elements_per_long
+    }
+
+    /// Gets `max` value of this array.
+    #[inline]
+    pub fn max(&self) -> u64 {
+        self.max
+    }
+
+    /// Gets `element_bits` value of this array.
+    #[inline]
+    pub fn element_bits(&self) -> usize {
+        self.element_bits
+    }
 }
 
 impl IntoIterator for PackedIntArray {
