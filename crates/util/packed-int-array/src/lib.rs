@@ -9,6 +9,8 @@ use crate::consts::INDEX_PARAMS;
 
 /// A packed container for storing small integers.
 #[derive(Debug, Clone)]
+#[doc(alias = "PackedIntegerArray")]
+#[doc(alias = "BitStorage")]
 pub struct PackedIntArray {
     data: Vec<u64>,
     element_bits: usize,
