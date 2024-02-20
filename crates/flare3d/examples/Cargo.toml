@@ -16,3 +16,6 @@ flare3d = { path = "../" }
 winit = "0.29"
 wgpu = "0.19"
 futures-executor = "0.3"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+display-link = { git = "https://github.com/BrainiumLLC/display-link" }

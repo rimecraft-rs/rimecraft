@@ -29,3 +29,6 @@ tracing = "0.1"
 bytemuck = { version = "1.4", features = ["derive"] }
 anyhow = "1.0"
 futures-executor = "0.3"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+display-link = { git = "https://github.com/BrainiumLLC/display-link" }
