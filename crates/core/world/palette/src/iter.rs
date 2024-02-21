@@ -25,6 +25,15 @@ where
             IterImpl::IntoIter(iter) => iter.next(),
         }
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match &self.internal {
+            IterImpl::MaybeNone(iter) => iter.size_hint(),
+            IterImpl::Vector(iter) => iter.size_hint(),
+            IterImpl::IntoIter(iter) => iter.size_hint(),
+        }
+    }
 }
 
 impl<'a, I, T> ExactSizeIterator for Iter<'a, I, T>

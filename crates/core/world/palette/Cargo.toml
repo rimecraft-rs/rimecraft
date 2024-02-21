@@ -12,6 +12,7 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+rimecraft-packed-int-array = { path = "../../../util/packed-int-array" }
 rimecraft-edcode = { path = "../../../util/edcode", optional = true }
 
 [features]

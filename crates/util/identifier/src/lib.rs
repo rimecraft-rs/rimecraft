@@ -149,9 +149,13 @@ mod serde {
 
 #[cfg(feature = "edcode")]
 mod edcode {
-    use std::{fmt::Display, str::FromStr};
+    use std::{
+        fmt::Display,
+        io::{self, ErrorKind},
+        str::FromStr,
+    };
 
-    use rimecraft_edcode::{error::EitherError, Encode};
+    use rimecraft_edcode::{Decode, Encode};
 
     use crate::{Identifier, Separate};
 
@@ -160,10 +164,8 @@ mod edcode {
         N: Display + Separate,
         P: Display,
     {
-        type Error = std::convert::Infallible;
-
         #[inline]
-        fn encode<B>(&self, buf: B) -> Result<(), Self::Error>
+        fn encode<B>(&self, buf: B) -> Result<(), io::Error>
         where
             B: rimecraft_edcode::bytes::BufMut,
         {
@@ -171,25 +173,23 @@ mod edcode {
         }
     }
 
-    impl<N, P> rimecraft_edcode::Decode for Identifier<N, P>
+    impl<N, P> Decode for Identifier<N, P>
     where
         N: FromStr + Separate,
         P: FromStr,
     {
-        type Output = Self;
-
-        type Error = EitherError<
-            rimecraft_edcode::error::ErrorWithVarI32Err<std::string::FromUtf8Error>,
-            crate::FromStrError<N::Err, P::Err>,
-        >;
-
         #[inline]
-        fn decode<B>(buf: B) -> Result<Self::Output, Self::Error>
+        fn decode<B>(buf: B) -> Result<Self, io::Error>
         where
             B: rimecraft_edcode::bytes::Buf,
         {
-            let str = <String>::decode(buf).map_err(EitherError::A)?;
-            Self::from_str(str.as_str()).map_err(rimecraft_edcode::error::EitherError::B)
+            let str = String::decode(buf)?;
+            Self::from_str(str.as_str()).map_err(|_| {
+                io::Error::new(
+                    ErrorKind::InvalidData,
+                    format!("unable to parse identifier {str}"),
+                )
+            })
         }
     }
 }

@@ -157,7 +157,7 @@ where
     ///
     /// Returns `Err` containing the expected `index_bits` if the palette is too small to
     /// include this object.
-    pub fn index_or_insert(&mut self, object: T) -> Result<usize, usize>
+    pub fn index_or_insert(&mut self, object: T) -> Result<usize, (usize, T)>
     where
         T: Clone,
     {
@@ -170,7 +170,7 @@ where
                             "illegal index bits for SingularPalette: {}",
                             self.index_bits
                         );
-                        return Err(1);
+                        return Err((1, object));
                     }
                 } else {
                     *value = Some(object);
@@ -185,7 +185,7 @@ where
                     array.push(object);
                     Ok(index)
                 } else {
-                    Err(self.index_bits + 1)
+                    Err((self.index_bits + 1, object))
                 }
             }
             PaletteImpl::BiMap { forward, reverse } => {
@@ -197,7 +197,7 @@ where
                     reverse.insert(object, index);
                     Ok(index)
                 } else {
-                    Err(self.index_bits + 1)
+                    Err((self.index_bits + 1, object))
                 }
             }
             PaletteImpl::Direct => self.index(&object).ok_or_else(|| unreachable!()),
@@ -248,6 +248,20 @@ impl<L, T> Palette<L, T> {
                 PaletteImpl::Direct => IterImpl::IntoIter((&self.list).into_iter()),
             },
         }
+    }
+
+    /// Returns the strategy and the bits size.
+    #[inline]
+    pub fn config(&self) -> (Strategy, usize) {
+        (
+            match self.internal {
+                PaletteImpl::Singular(_) => Strategy::Singular,
+                PaletteImpl::Array(_) => Strategy::Array,
+                PaletteImpl::BiMap { .. } => Strategy::BiMap,
+                PaletteImpl::Direct => Strategy::Direct,
+            },
+            self.index_bits,
+        )
     }
 }
 

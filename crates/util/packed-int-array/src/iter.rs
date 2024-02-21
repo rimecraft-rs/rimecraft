@@ -34,6 +34,19 @@ impl Iterator for Iter<'_> {
             self.next()
         }
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.array.len() - self.inner.times;
+        (len, Some(len))
+    }
+}
+
+impl ExactSizeIterator for Iter<'_> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.array.len() - self.inner.times
+    }
 }
 
 /// An iterator over a packed int array.
@@ -65,5 +78,18 @@ impl Iterator for IntoIter {
             self.inner.l = self.iter.next()?;
             self.next()
         }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len - self.inner.times;
+        (len, Some(len))
+    }
+}
+
+impl ExactSizeIterator for IntoIter {
+    #[inline]
+    fn len(&self) -> usize {
+        self.len - self.inner.times
     }
 }

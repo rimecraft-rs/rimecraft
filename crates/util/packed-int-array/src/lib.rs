@@ -8,7 +8,7 @@ pub use iter::{IntoIter, Iter};
 use crate::consts::INDEX_PARAMS;
 
 /// A packed container for storing small integers.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[doc(alias = "PackedIntegerArray")]
 #[doc(alias = "BitStorage")]
 pub struct PackedIntArray {
@@ -74,7 +74,7 @@ impl PackedIntArray {
     /// # Panics
     ///
     /// Panics if the given value is greater than the internal max value.
-    pub fn set(&mut self, index: usize, value: u32) -> Option<u32> {
+    pub fn swap(&mut self, index: usize, value: u32) -> Option<u32> {
         assert!(
             value as u64 <= self.max,
             "given value {} could not be greater than max value {}",
@@ -92,6 +92,28 @@ impl PackedIntArray {
         let j = (index - i * self.elements_per_long) * self.element_bits;
         *l = *l & !(self.max << j) | (value as u64 & self.max) << j;
         Some((lo >> j & self.max) as u32)
+    }
+
+    /// Sets the data at given `index` with given value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given value is greater than the internal max value.
+    pub fn set(&mut self, index: usize, value: u32) {
+        assert!(
+            value as u64 <= self.max,
+            "given value {} could not be greater than max value {}",
+            value,
+            self.max
+        );
+
+        if index >= self.len {
+            return;
+        }
+
+        let i = self.storage_index(index);
+        let j = (index - i * self.elements_per_long) * self.element_bits;
+        self.data[i] &= !(self.max << j) | (value as u64 & self.max) << j;
     }
 
     /// Gets the value at target index.

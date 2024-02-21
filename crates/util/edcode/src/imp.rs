@@ -223,12 +223,11 @@ impl<T> Encode for [T]
 where
     T: Encode,
 {
-    #[inline]
     fn encode<B>(&self, mut buf: B) -> Result<(), io::Error>
     where
         B: bytes::BufMut,
     {
-        VarI32(self.len() as i32).encode(&mut buf).unwrap();
+        VarI32(self.len() as i32).encode(&mut buf)?;
         for object in self.iter() {
             object.encode(&mut buf)?;
         }
@@ -453,5 +452,26 @@ impl Decode for () {
         B: bytes::Buf,
     {
         Ok(())
+    }
+}
+
+impl<T> Update for [T]
+where
+    T: Update,
+{
+    fn update<B>(&mut self, mut buf: B) -> Result<(), io::Error>
+    where
+        B: bytes::Buf,
+    {
+        let len = VarI32::decode(&mut buf)?.0 as usize;
+        if len > self.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Update length longer than array",
+            ));
+        }
+        self.iter_mut()
+            .take(len)
+            .try_for_each(|x| x.update(&mut buf))
     }
 }
