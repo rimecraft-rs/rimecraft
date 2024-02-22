@@ -12,7 +12,7 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-regex-lite = "0.1"
+regex = "1.10"
 serde = { version = "1.0", optional = true }
 
 [features]

@@ -341,7 +341,11 @@ pub struct State<'s> {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     diffuse_bind_group: wgpu::BindGroup,
+
+    // Disable warning, remove this attr later
+    #[allow(dead_code)]
     diffuse_texture: Texture,
+
     camera: Camera,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,

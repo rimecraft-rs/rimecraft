@@ -20,8 +20,8 @@ impl std::fmt::Display for Error {
             Error::FormattingWithoutColor(formatting) => {
                 write!(
                     f,
-                    "the given formatting does not contains a color: {:?}",
-                    formatting
+                    "the given formatting does not contains a color: {}",
+                    formatting.raw_name(),
                 )
             }
             Error::ColorValueOutOfRange(value) => {

@@ -12,7 +12,7 @@ use std::{
 };
 
 use property::{BiIndex, ErasedProperty, Property, Wrap};
-use regex_lite::Regex;
+use regex::Regex;
 
 use crate::property::ErasedWrap;
 
@@ -59,7 +59,7 @@ impl<T> State<'_, T> {
         let index = *self
             .entries
             .get(prop.name())
-            .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))?;
+            .ok_or_else(|| Error::PropertyNotFound(prop.name().to_owned()))?;
         let Some(next) = obtain_next(
             index,
             (&prop.wrap)
@@ -75,7 +75,7 @@ impl<T> State<'_, T> {
                 .get()
                 .expect("state not initialized")
                 .get(prop.name())
-                .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))
+                .ok_or_else(|| Error::PropertyNotFound(prop.name().to_owned()))
                 .and_then(|map| map.get(&next).ok_or(Error::ValueNotFound(index)))
                 .map(|weak| MaybeArc::Arc(weak.upgrade().expect("state was dropped")))
         }
@@ -99,7 +99,7 @@ impl<T> State<'_, T> {
         let index = *self
             .entries
             .get(prop.name())
-            .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))?;
+            .ok_or_else(|| Error::PropertyNotFound(prop.name().to_owned()))?;
         let value = prop.wrap.index_of(&value).ok_or(Error::InvalidValue)?;
         if value == index {
             Ok(MaybeArc::Borrowed(self))
@@ -108,7 +108,7 @@ impl<T> State<'_, T> {
                 .get()
                 .expect("state not initialized")
                 .get(prop.name())
-                .ok_or_else(|| Error::PropertyNotFound(prop.name().to_string()))
+                .ok_or_else(|| Error::PropertyNotFound(prop.name().to_owned()))
                 .and_then(|map| map.get(&value).ok_or(Error::ValueNotFound(index)))
                 .map(|weak| MaybeArc::Arc(weak.upgrade().expect("state was dropped")))
         }

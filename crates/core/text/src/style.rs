@@ -93,9 +93,9 @@ impl FromStr for Color {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some(hex) = s.strip_prefix('#') {
             let rgb =
-                u32::from_str_radix(hex, 16).map_err(|_| Error::InvalidColor(s.to_string()))?;
+                u32::from_str_radix(hex, 16).map_err(|_| Error::InvalidColor(s.to_owned()))?;
             if rgb > 0x00FF_FFFF {
-                return Err(Error::ColorValueOutOfRange(s.to_string()));
+                return Err(Error::ColorValueOutOfRange(s.to_owned()));
             }
             let [_, r, g, b] = rgb.to_be_bytes();
             Ok(Self {

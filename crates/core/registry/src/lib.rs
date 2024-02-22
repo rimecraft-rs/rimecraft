@@ -596,7 +596,7 @@ mod serde {
     where
         'r: 'a,
         T: ProvideRegistry<'r, K, T> + 'r,
-        K: serde::Deserialize<'de> + Hash + Eq + std::fmt::Debug + 'r,
+        K: serde::Deserialize<'de> + Hash + Eq + 'r,
     {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
@@ -606,7 +606,7 @@ mod serde {
                 let key = K::deserialize(deserializer)?;
                 T::registry()
                     .get(&key)
-                    .ok_or_else(|| serde::de::Error::custom(format!("key {key:?} not found")))
+                    .ok_or_else(|| serde::de::Error::custom(format!("key not found")))
             } else {
                 let raw = i32::deserialize(deserializer)? as usize;
                 T::registry()

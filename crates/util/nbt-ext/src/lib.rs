@@ -16,39 +16,39 @@ pub type Compound = HashMap<String, Value>;
 /// Provides additional methods for inserting and retrieving values from a compound tag.
 pub trait CompoundExt {
     /// Inserts an `i8` value into the compound with the specified key.
-    fn insert_i8(&mut self, key: &str, value: i8);
+    fn insert_i8(&mut self, key: String, value: i8);
 
     /// Inserts an `i16` value into the compound with the specified key.
-    fn insert_i16(&mut self, key: &str, value: i16);
+    fn insert_i16(&mut self, key: String, value: i16);
 
     /// Inserts an `i32` value into the compound with the specified key.
-    fn insert_i32(&mut self, key: &str, value: i32);
+    fn insert_i32(&mut self, key: String, value: i32);
 
     /// Inserts an `i64` value into the compound with the specified key.
-    fn insert_i64(&mut self, key: &str, value: i64);
+    fn insert_i64(&mut self, key: String, value: i64);
 
     /// Inserts an `f32` value into the compound with the specified key.
-    fn insert_f32(&mut self, key: &str, value: f32);
+    fn insert_f32(&mut self, key: String, value: f32);
 
     /// Inserts an `f64` value into the compound with the specified key.
-    fn insert_f64(&mut self, key: &str, value: f64);
+    fn insert_f64(&mut self, key: String, value: f64);
 
     /// Inserts a string value into the compound with the specified key.
-    fn insert_str(&mut self, key: &str, value: &str);
+    fn insert_string(&mut self, key: String, value: String);
 
     /// Inserts a slice of `i8` values into the compound with the specified key.
-    fn insert_i8_slice(&mut self, key: &str, value: &[i8]);
+    fn insert_i8_slice(&mut self, key: String, value: &[i8]);
 
     /// Inserts a slice of `i32` values into the compound with the specified key.
-    fn insert_i32_slice(&mut self, key: &str, value: &[i32]);
+    fn insert_i32_slice(&mut self, key: String, value: &[i32]);
 
     /// Inserts a slice of `i64` values into the compound with the specified key.
-    fn insert_i64_slice(&mut self, key: &str, value: &[i64]);
+    fn insert_i64_slice(&mut self, key: String, value: &[i64]);
 
     /// Inserts a boolean value into the compound with the specified key.
     /// The boolean value is internally stored as an `i8` (0 for false, 1 for true).
     #[inline]
-    fn insert_bool(&mut self, key: &str, value: bool) {
+    fn insert_bool(&mut self, key: String, value: bool) {
         self.insert_i8(key, if value { 1 } else { 0 })
     }
 
@@ -107,62 +107,53 @@ pub trait CompoundExt {
 
 impl CompoundExt for Compound {
     #[inline]
-    fn insert_i8(&mut self, key: &str, value: i8) {
-        self.insert(key.to_string(), Value::Byte(value));
+    fn insert_i8(&mut self, key: String, value: i8) {
+        self.insert(key, Value::Byte(value));
     }
 
     #[inline]
-    fn insert_i16(&mut self, key: &str, value: i16) {
-        self.insert(key.to_string(), Value::Short(value));
+    fn insert_i16(&mut self, key: String, value: i16) {
+        self.insert(key, Value::Short(value));
     }
 
     #[inline]
-    fn insert_i32(&mut self, key: &str, value: i32) {
-        self.insert(key.to_string(), Value::Int(value));
+    fn insert_i32(&mut self, key: String, value: i32) {
+        self.insert(key, Value::Int(value));
     }
 
     #[inline]
-    fn insert_i64(&mut self, key: &str, value: i64) {
-        self.insert(key.to_string(), Value::Long(value));
+    fn insert_i64(&mut self, key: String, value: i64) {
+        self.insert(key, Value::Long(value));
     }
 
     #[inline]
-    fn insert_f32(&mut self, key: &str, value: f32) {
-        self.insert(key.to_string(), Value::Float(value));
+    fn insert_f32(&mut self, key: String, value: f32) {
+        self.insert(key, Value::Float(value));
     }
 
     #[inline]
-    fn insert_f64(&mut self, key: &str, value: f64) {
-        self.insert(key.to_string(), Value::Double(value));
+    fn insert_f64(&mut self, key: String, value: f64) {
+        self.insert(key, Value::Double(value));
     }
 
     #[inline]
-    fn insert_str(&mut self, key: &str, value: &str) {
-        self.insert(key.to_string(), Value::String(value.to_string()));
+    fn insert_string(&mut self, key: String, value: String) {
+        self.insert(key, Value::String(value));
     }
 
     #[inline]
-    fn insert_i8_slice(&mut self, key: &str, value: &[i8]) {
-        self.insert(
-            key.to_string(),
-            Value::ByteArray(ByteArray::new(value.into())),
-        );
+    fn insert_i8_slice(&mut self, key: String, value: &[i8]) {
+        self.insert(key, Value::ByteArray(ByteArray::new(value.into())));
     }
 
     #[inline]
-    fn insert_i32_slice(&mut self, key: &str, value: &[i32]) {
-        self.insert(
-            key.to_string(),
-            Value::IntArray(IntArray::new(value.into())),
-        );
+    fn insert_i32_slice(&mut self, key: String, value: &[i32]) {
+        self.insert(key, Value::IntArray(IntArray::new(value.into())));
     }
 
     #[inline]
-    fn insert_i64_slice(&mut self, key: &str, value: &[i64]) {
-        self.insert(
-            key.to_string(),
-            Value::LongArray(LongArray::new(value.into())),
-        );
+    fn insert_i64_slice(&mut self, key: String, value: &[i64]) {
+        self.insert(key, Value::LongArray(LongArray::new(value.into())));
     }
 
     #[inline]

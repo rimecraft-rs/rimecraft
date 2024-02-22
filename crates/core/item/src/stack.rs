@@ -19,7 +19,7 @@ use crate::{Item, RawItem, ToItem};
         serialize = "K: serde::Serialize + std::hash::Hash + Eq",
         deserialize = r#"
             'r: 'de,
-            K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + std::hash::Hash + Eq + std::fmt::Debug + 'r,
+            K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + std::hash::Hash + Eq + 'r,
             P: InitAttachments<K> + rimecraft_registry::ProvideRegistry<'r, K, crate::RawItem<P>> + 'r"#
     ))
 )]
@@ -287,7 +287,7 @@ mod serde_helper {
         where
             'rr: 'd,
             D: serde::Deserializer<'d>,
-            K: Deserialize<'d> + Hash + Eq + std::fmt::Debug + 'rr,
+            K: Deserialize<'d> + Hash + Eq + 'rr,
             P: InitAttachments<K> + ProvideRegistry<'rr, K, RawItem<P>> + 'rr,
         {
             Item::deserialize(HumanReadableControlled::new(deserializer, true))

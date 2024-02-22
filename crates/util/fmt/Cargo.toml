@@ -14,7 +14,7 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 serde = { version = "1.0", features = ["derive"], optional = true }
 rgb = "0.8"
-regex-lite = "0.1"
+regex = "1.10"
 
 [features]
 serde = ["dep:serde"]

@@ -1,3 +1,5 @@
+#![allow(clippy::decimal_literal_representation)]
+
 pub const INDEX_PARAMS: [i32; 192] = [
     -1,
     -1,

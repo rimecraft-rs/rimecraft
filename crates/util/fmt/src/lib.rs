@@ -2,7 +2,7 @@
 
 use std::{fmt::Display, ops::Deref, sync::OnceLock};
 
-use regex_lite::Regex;
+use regex::Regex;
 use rgb::RGB8;
 
 /// Color index of a formatting.

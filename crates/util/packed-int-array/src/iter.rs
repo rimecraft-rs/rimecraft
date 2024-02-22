@@ -1,6 +1,6 @@
 use crate::PackedIntArray;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct IterInner {
     pub l: u64,
     pub j: usize,
@@ -8,7 +8,7 @@ pub(crate) struct IterInner {
 }
 
 /// An iterator over a packed int array.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Iter<'a> {
     pub(crate) array: &'a PackedIntArray,
     pub(crate) iter: std::slice::Iter<'a, u64>,
@@ -50,7 +50,7 @@ impl ExactSizeIterator for Iter<'_> {
 }
 
 /// An iterator over a packed int array.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IntoIter {
     pub(crate) element_bits: usize,
     pub(crate) elements_per_long: usize,
