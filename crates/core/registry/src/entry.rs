@@ -9,6 +9,7 @@ use crate::{key::Key, tag::TagKey};
 /// Type holds a value that can be registered
 /// in a registry.
 #[derive(Debug)]
+#[allow(clippy::exhaustive_enums)]
 pub enum Entry<'a, K, T> {
     /// Holds the value directly.
     Direct(T),

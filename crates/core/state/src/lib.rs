@@ -346,6 +346,7 @@ where
 
 /// Error type for state operations.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The property was not found in the state.
     PropertyNotFound(String),
@@ -394,6 +395,7 @@ impl std::error::Error for Error {}
 
 /// Cell that can be either an [`Arc`] or a borrowed reference.
 #[derive(Debug)]
+#[allow(clippy::exhaustive_enums)]
 pub enum MaybeArc<'a, T> {
     /// The reference-counted variant.
     Arc(Arc<T>),

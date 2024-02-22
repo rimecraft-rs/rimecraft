@@ -55,6 +55,7 @@ where
 
 /// Errors that may occur when parsing an identifier.
 #[derive(Debug)]
+#[allow(clippy::exhaustive_enums)]
 pub enum FromStrError<EN, EP> {
     /// An error occurred when parsing the namespace.
     Namespace(EN),

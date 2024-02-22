@@ -49,6 +49,7 @@ macro_rules! formattings {
             serde(rename_all = "snake_case")
         )]
         #[doc(alias = "ChatFormatting")]
+        #[non_exhaustive]
         pub enum Formatting {
             $(#[doc = "The formatting."] $i),*
         }
@@ -217,6 +218,7 @@ formattings! {
 /// An error returned when parsing a formatting.
 #[derive(Debug)]
 #[allow(variant_size_differences)]
+#[non_exhaustive]
 pub enum Error {
     /// No matching color index found.
     InvalidColorIndex(i32),

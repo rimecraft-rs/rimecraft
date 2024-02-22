@@ -2,6 +2,7 @@ use rimecraft_fmt::Formatting;
 
 /// An error type for the text module.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The given formatting does not contains a color.
     FormattingWithoutColor(Formatting),

@@ -112,6 +112,7 @@ pub use Settings as ItemSettings;
 
 /// Rarity of an item.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Default)]
+#[non_exhaustive]
 pub enum Rarity {
     /// Common rarity.
     #[default]

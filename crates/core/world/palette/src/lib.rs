@@ -21,6 +21,7 @@ pub struct Palette<L, T> {
 
 /// The strategy to use for the palette.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive] // New strategies may be added in the future.
 pub enum Strategy {
     /// A palette that only holds a unique entry.
     #[doc(alias = "SingleValue")]
@@ -418,6 +419,7 @@ where
 
 /// Error type for palette operations.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The palette is uninitialized.
     Uninitialized,
