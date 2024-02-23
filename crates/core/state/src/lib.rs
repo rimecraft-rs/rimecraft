@@ -26,14 +26,12 @@ pub mod property;
 type Table<'a, T> = HashMap<ErasedProperty<'a>, HashMap<isize, Weak<T>>>;
 
 /// State of an object.
-pub struct State<'a, T> {
+pub struct State<'a> {
     pub(crate) entries: HashMap<ErasedProperty<'a>, isize>,
     table: OnceLock<Table<'a, Self>>,
-
-    data: T,
 }
 
-impl<T> State<'_, T> {
+impl State<'_> {
     /// Gets the current value of given property in this state.
     #[inline]
     pub fn get<V, W>(&self, prop: &Property<'_, W>) -> Option<V>
@@ -123,12 +121,6 @@ impl<T> State<'_, T> {
     pub fn contains<W, V>(&self, prop: &Property<'_, W>) -> bool {
         self.entries.contains_key(prop.name())
     }
-
-    /// Gets external data of this state.
-    #[inline]
-    pub fn data(&self) -> &T {
-        &self.data
-    }
 }
 
 fn obtain_next(value: isize, mut iter: impl Iterator<Item = isize>) -> Option<isize> {
@@ -144,11 +136,10 @@ fn obtain_next(value: isize, mut iter: impl Iterator<Item = isize>) -> Option<is
     iter.next()
 }
 
-impl<T: Debug> Debug for State<'_, T> {
+impl Debug for State<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("State")
             .field("entries", &self.entries)
-            .field("data", &self.data)
             .finish()
     }
 }
@@ -159,18 +150,15 @@ impl<T: Debug> Debug for State<'_, T> {
 #[derive(Debug)]
 #[doc(alias = "StateManager")]
 #[doc(alias = "StateDefinition")]
-pub struct States<'a, T> {
-    states: Vec<Arc<State<'a, T>>>,
+pub struct States<'a> {
+    states: Vec<Arc<State<'a>>>,
     #[allow(unused)]
     props: BTreeMap<&'a str, ErasedProperty<'a>>,
-
-    data: T,
 }
 
-impl<'a, T> States<'a, T> {
-    fn new<I>(data: T, props: I) -> Self
+impl<'a> States<'a> {
+    fn new<I>(props: I) -> Self
     where
-        T: Clone,
         I: IntoIterator<Item = ErasedProperty<'a>>,
     {
         let props: BTreeMap<_, _> = props.into_iter().map(|prop| (prop.name, prop)).collect();
@@ -197,14 +185,13 @@ impl<'a, T> States<'a, T> {
                 Arc::new(State {
                     entries,
                     table: OnceLock::new(),
-                    data: data.clone(),
                 })
             })
             .collect::<Vec<_>>();
 
         // Initialize tables
         for state in list.iter() {
-            let mut table: Table<'a, State<'a, T>> = Table::new();
+            let mut table: Table<'a, State<'a>> = Table::new();
             for (prop, s_val) in state.entries.iter() {
                 let mut row = HashMap::new();
                 for val in prop.wrap.erased_iter().filter(|v| v != s_val) {
@@ -229,20 +216,13 @@ impl<'a, T> States<'a, T> {
         Self {
             states: list,
             props,
-            data,
         }
     }
 
     /// Gets all states of this state.
     #[inline]
-    pub fn states(&self) -> &[Arc<State<'a, T>>] {
+    pub fn states(&self) -> &[Arc<State<'a>>] {
         &self.states
-    }
-
-    /// Gets the external data.
-    #[inline]
-    pub fn data(&self) -> &T {
-        &self.data
     }
 
     /// Gets the default state.
@@ -251,7 +231,7 @@ impl<'a, T> States<'a, T> {
     ///
     /// Panics if no state is available.
     #[inline]
-    pub fn default_state(&self) -> &Arc<State<'a, T>> {
+    pub fn default_state(&self) -> &Arc<State<'a>> {
         self.states.first().expect("no state available")
     }
 
@@ -270,19 +250,15 @@ impl<'a, T> States<'a, T> {
 
 /// Mutable instance of [`States`].
 #[derive(Debug)]
-pub struct StatesMut<'a, T> {
-    data: T,
+pub struct StatesMut<'a> {
     props: Vec<ErasedProperty<'a>>,
 }
 
-impl<'a, T> StatesMut<'a, T> {
+impl<'a> StatesMut<'a> {
     /// Creates a new states with given data.
     #[inline]
-    pub const fn new(data: T) -> Self {
-        Self {
-            data,
-            props: Vec::new(),
-        }
+    pub const fn new() -> Self {
+        Self { props: Vec::new() }
     }
 
     /// Adds a property to the states.
@@ -327,23 +303,17 @@ impl<'a, T> StatesMut<'a, T> {
     }
 }
 
-impl<'a, T> StatesMut<'a, T>
-where
-    T: Clone,
-{
+impl<'a> StatesMut<'a> {
     /// Freezes the state.
     #[inline]
-    pub fn freeze(self) -> States<'a, T> {
-        States::new(self.data, self.props)
+    pub fn freeze(self) -> States<'a> {
+        States::new(self.props)
     }
 }
 
-impl<'a, T> From<StatesMut<'a, T>> for States<'a, T>
-where
-    T: Clone,
-{
+impl<'a> From<StatesMut<'a>> for States<'a> {
     #[inline]
-    fn from(value: StatesMut<'a, T>) -> Self {
+    fn from(value: StatesMut<'a>) -> Self {
         value.freeze()
     }
 }
@@ -466,9 +436,9 @@ impl<T> Deref for MaybeArc<'_, T> {
 }
 
 /// Trait for providing [`States`].
-pub trait ProvideStates<'a, 's, T> {
+pub trait ProvideStates<'a, 's> {
     /// Gets the states.
-    fn states() -> &'s States<'a, T>;
+    fn states() -> &'s States<'a>;
 }
 
 #[cfg(feature = "serde")]
@@ -481,7 +451,7 @@ pub mod serde {
 
     use super::*;
 
-    impl<T> Serialize for State<'_, T> {
+    impl Serialize for State<'_> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: ::serde::Serializer,
@@ -515,7 +485,7 @@ pub mod serde {
         }
     }
 
-    impl<T, P> Serialize for FromDefault<State<'_, T>, P> {
+    impl<P> Serialize for FromDefault<State<'_>, P> {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
@@ -525,21 +495,20 @@ pub mod serde {
         }
     }
 
-    impl<'de, 's, 'a, T, P> Deserialize<'de> for FromDefault<State<'a, T>, P>
+    impl<'de, 's, 'a, P> Deserialize<'de> for FromDefault<State<'a>, P>
     where
         'a: 's,
-        T: Clone + 's,
-        P: ProvideStates<'a, 's, T> + 's,
+        P: ProvideStates<'a, 's> + 's,
     {
         #[inline]
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
         {
-            struct Visitor<'a, T>(Arc<State<'a, T>>);
+            struct Visitor<'a>(Arc<State<'a>>);
 
-            impl<'de, 'a, T> ::serde::de::Visitor<'de> for Visitor<'a, T> {
-                type Value = Arc<State<'a, T>>;
+            impl<'de, 'a> ::serde::de::Visitor<'de> for Visitor<'a> {
+                type Value = Arc<State<'a>>;
 
                 fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     formatter.write_str("a map")

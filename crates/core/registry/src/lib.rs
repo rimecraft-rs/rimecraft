@@ -6,6 +6,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Display,
     hash::Hash,
     ops::{Deref, Index},
     sync::OnceLock,
@@ -277,6 +278,16 @@ where
         T::registry()
             .default_entry()
             .expect("default entry not found in registry")
+    }
+}
+
+impl<K, T> Display for Reg<'_, K, T>
+where
+    K: Display,
+{
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <&RefEntry<K, T>>::from(*self).key.value().fmt(f)
     }
 }
 

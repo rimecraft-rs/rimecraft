@@ -16,6 +16,7 @@ regex = { version = "1.10", optional = true }
 serde = { version = "1.0", optional = true }
 
 [features]
+# default = ["serde"]
 serde = ["dep:serde"]
 # use `regex` crate instead of `regex-lite`.
 regex = ["dep:regex"]

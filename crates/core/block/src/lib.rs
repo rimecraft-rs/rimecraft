@@ -1,6 +1,7 @@
 //! Minecraft Block primitives.
 
 use rimecraft_registry::Reg;
+use rimecraft_state::StatesMut;
 
 use std::marker::PhantomData;
 
@@ -8,19 +9,26 @@ mod pos;
 
 pub use pos::BlockPos;
 
-/// Block containing settings.
+/// Block containing settings and the state manager.
 #[derive(Debug)]
-pub struct RawBlock<P> {
+pub struct RawBlock<'a, P> {
     settings: Settings,
+    states: rimecraft_state::States<'a>,
     _marker: PhantomData<P>,
 }
 
-impl<P> RawBlock<P> {
-    /// Creates a new `Block` with the given settings.
+impl<'a, P> RawBlock<'a, P> {
+    /// Creates a new block with the given settings.
     #[inline]
-    pub const fn new(settings: Settings) -> Self {
+    pub fn new<B>(settings: Settings, p: B) -> Self
+    where
+        B: AppendProperties<'a>,
+    {
+        let mut states = StatesMut::new();
+        p.append_properties(&mut states);
         Self {
             settings,
+            states: states.freeze(),
             _marker: PhantomData,
         }
     }
@@ -30,17 +38,23 @@ impl<P> RawBlock<P> {
     pub fn settings(&self) -> &Settings {
         &self.settings
     }
+
+    /// Returns the state manager of the block.
+    #[inline]
+    pub fn states(&self) -> &rimecraft_state::States<'a> {
+        &self.states
+    }
 }
 
-impl<P> From<Settings> for RawBlock<P> {
+impl<P> From<Settings> for RawBlock<'_, P> {
     #[inline]
     fn from(settings: Settings) -> Self {
-        Self::new(settings)
+        Self::new(settings, ())
     }
 }
 
 /// A voxel in a `World`.
-pub type Block<'r, K, P> = Reg<'r, K, RawBlock<P>>;
+pub type Block<'a, K, P> = Reg<'a, K, RawBlock<'a, P>>;
 
 /// Settings of a block.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -62,6 +76,23 @@ pub struct Settings {
 #[doc(alias = "BlockProperties")]
 pub use Settings as BlockSettings;
 
-/// Represents a block state.
-#[cfg(feature = "state")]
-pub type BlockState<'s, 'r, K, P> = rimecraft_state::State<'s, Reg<'r, K, RawBlock<P>>>;
+/// Types that can appends properties to the block.
+pub trait AppendProperties<'a> {
+    /// Appends properties to the block.
+    fn append_properties(self, settings: &mut StatesMut<'a>);
+}
+
+impl AppendProperties<'_> for () {
+    #[inline(always)]
+    fn append_properties(self, _: &mut StatesMut<'_>) {}
+}
+
+impl<'a, F> AppendProperties<'a> for F
+where
+    F: for<'s> FnOnce(&'s mut StatesMut<'a>),
+{
+    #[inline]
+    fn append_properties(self, settings: &mut StatesMut<'a>) {
+        self(settings)
+    }
+}
