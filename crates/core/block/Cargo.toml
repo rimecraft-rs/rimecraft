@@ -14,14 +14,12 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 rimecraft-registry = { path = "../registry" }
 glam = "0.25"
-rimecraft-state = { path = "../state", optional = true }
+rimecraft-state = { path = "../state" }
 rimecraft-edcode = { path = "../../util/edcode", optional = true }
 serde = { version = "1.0", optional = true }
 
 [features]
-default = ["state"]
 serde = ["dep:serde"]
-state = ["dep:rimecraft-state"]
 edcode = ["dep:rimecraft-edcode"]
 
 [lints]

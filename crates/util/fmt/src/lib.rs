@@ -2,8 +2,12 @@
 
 use std::{fmt::Display, ops::Deref, sync::OnceLock};
 
-use regex::Regex;
 use rgb::RGB8;
+
+#[cfg(feature = "regex")]
+use regex::Regex;
+#[cfg(not(feature = "regex"))]
+use regex_lite::Regex;
 
 /// Color index of a formatting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -12,7 +12,11 @@ use std::{
 };
 
 use property::{BiIndex, ErasedProperty, Property, Wrap};
+
+#[cfg(feature = "regex")]
 use regex::Regex;
+#[cfg(not(feature = "regex"))]
+use regex_lite::Regex;
 
 use crate::property::ErasedWrap;
 
