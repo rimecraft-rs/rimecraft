@@ -1,7 +1,7 @@
 //! Minecraft Block primitives.
 
 use rimecraft_registry::Reg;
-use rimecraft_state::StatesMut;
+use rimecraft_state::{States, StatesMut};
 
 use std::marker::PhantomData;
 
@@ -9,26 +9,23 @@ mod pos;
 
 pub use pos::BlockPos;
 
+pub use rimecraft_state as state;
+
 /// Block containing settings and the state manager.
 #[derive(Debug)]
 pub struct RawBlock<'a, P> {
     settings: Settings,
-    states: rimecraft_state::States<'a>,
+    states: States<'a>,
     _marker: PhantomData<P>,
 }
 
 impl<'a, P> RawBlock<'a, P> {
     /// Creates a new block with the given settings.
     #[inline]
-    pub fn new<B>(settings: Settings, p: B) -> Self
-    where
-        B: AppendProperties<'a>,
-    {
-        let mut states = StatesMut::new();
-        p.append_properties(&mut states);
+    pub const fn new(settings: Settings, states: States<'a>) -> Self {
         Self {
             settings,
-            states: states.freeze(),
+            states,
             _marker: PhantomData,
         }
     }
@@ -41,7 +38,7 @@ impl<'a, P> RawBlock<'a, P> {
 
     /// Returns the state manager of the block.
     #[inline]
-    pub fn states(&self) -> &rimecraft_state::States<'a> {
+    pub fn states(&self) -> &States<'a> {
         &self.states
     }
 }
@@ -49,7 +46,7 @@ impl<'a, P> RawBlock<'a, P> {
 impl<P> From<Settings> for RawBlock<'_, P> {
     #[inline]
     fn from(settings: Settings) -> Self {
-        Self::new(settings, ())
+        Self::new(settings, StatesMut::new().freeze())
     }
 }
 
@@ -75,24 +72,3 @@ pub struct Settings {
 
 #[doc(alias = "BlockProperties")]
 pub use Settings as BlockSettings;
-
-/// Types that can appends properties to the block.
-pub trait AppendProperties<'a> {
-    /// Appends properties to the block.
-    fn append_properties(self, settings: &mut StatesMut<'a>);
-}
-
-impl AppendProperties<'_> for () {
-    #[inline(always)]
-    fn append_properties(self, _: &mut StatesMut<'_>) {}
-}
-
-impl<'a, F> AppendProperties<'a> for F
-where
-    F: for<'s> FnOnce(&'s mut StatesMut<'a>),
-{
-    #[inline]
-    fn append_properties(self, settings: &mut StatesMut<'a>) {
-        self(settings)
-    }
-}

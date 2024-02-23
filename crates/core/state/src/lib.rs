@@ -435,33 +435,28 @@ impl<T> Deref for MaybeArc<'_, T> {
     }
 }
 
-/// Trait for providing [`States`].
-pub trait ProvideStates<'a, 's> {
-    /// Gets the states.
-    fn states() -> &'s States<'a>;
-}
-
 #[cfg(feature = "serde")]
 pub mod serde {
     //! Serde support for state.
 
-    use std::marker::PhantomData;
+    use std::sync::Arc;
 
-    use ::serde::{ser::SerializeMap, Deserialize, Serialize};
+    use rimecraft_serde_update::Update;
+    use serde::{ser::SerializeMap, Serialize};
 
-    use super::*;
+    use crate::State;
 
     impl Serialize for State<'_> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
-            S: ::serde::Serializer,
+            S: serde::Serializer,
         {
             let mut map = serializer.serialize_map(Some(self.entries.len()))?;
             for (prop, val) in &self.entries {
                 map.serialize_entry(
                     prop.name,
                     &prop.wrap.erased_to_name(*val).ok_or_else(|| {
-                        ::serde::ser::Error::custom(format!(
+                        serde::ser::Error::custom(format!(
                             "invalid value {val} in property {}",
                             prop.name
                         ))
@@ -472,42 +467,32 @@ pub mod serde {
         }
     }
 
-    /// A wrapper type for deserializing a state based on a default value
-    /// and updates it.
-    #[derive(Debug, Clone)]
-    pub struct FromDefault<T, P>(pub Arc<T>, PhantomData<P>);
+    /// Updatable state newtype wrapper.
+    #[derive(Debug)]
+    pub struct Upd<'a>(pub Arc<State<'a>>);
 
-    impl<T, P> FromDefault<T, P> {
-        /// Creates a new instance with given default value.
-        #[inline]
-        pub const fn new(value: Arc<T>) -> Self {
-            Self(value, PhantomData)
-        }
-    }
-
-    impl<P> Serialize for FromDefault<State<'_>, P> {
+    impl Serialize for Upd<'_> {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
-            S: ::serde::Serializer,
+            S: serde::Serializer,
         {
             self.0.serialize(serializer)
         }
     }
 
-    impl<'de, 's, 'a, P> Deserialize<'de> for FromDefault<State<'a>, P>
-    where
-        'a: 's,
-        P: ProvideStates<'a, 's> + 's,
-    {
+    impl<'de> Update<'de> for Upd<'_> {
         #[inline]
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        fn update<D>(
+            &mut self,
+            deserializer: D,
+        ) -> Result<(), <D as serde::Deserializer<'de>>::Error>
         where
-            D: ::serde::Deserializer<'de>,
+            D: serde::Deserializer<'de>,
         {
             struct Visitor<'a>(Arc<State<'a>>);
 
-            impl<'de, 'a> ::serde::de::Visitor<'de> for Visitor<'a> {
+            impl<'de, 'a> serde::de::Visitor<'de> for Visitor<'a> {
                 type Value = Arc<State<'a>>;
 
                 fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -516,7 +501,7 @@ pub mod serde {
 
                 fn visit_map<A>(mut self, mut map: A) -> Result<Self::Value, A::Error>
                 where
-                    A: ::serde::de::MapAccess<'de>,
+                    A: serde::de::MapAccess<'de>,
                 {
                     while let Some((prop, val)) = map.next_entry::<String, isize>()? {
                         self.0 = self
@@ -526,11 +511,11 @@ pub mod serde {
                             .expect("state not initialized")
                             .get(prop.as_str())
                             .ok_or_else(|| {
-                                ::serde::de::Error::custom(format!("property {prop} not found"))
+                                serde::de::Error::custom(format!("property {prop} not found"))
                             })?
                             .get(&val)
                             .ok_or_else(|| {
-                                ::serde::de::Error::custom(format!(
+                                serde::de::Error::custom(format!(
                                     "value {val} not found in property {prop}"
                                 ))
                             })?
@@ -542,8 +527,8 @@ pub mod serde {
             }
 
             deserializer
-                .deserialize_map(Visitor(P::states().default_state().clone()))
-                .map(Self::new)
+                .deserialize_map(Visitor(self.0.clone()))
+                .map(|state| self.0 = state)
         }
     }
 }
