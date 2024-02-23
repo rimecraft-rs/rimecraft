@@ -354,13 +354,7 @@ pub struct State<'s> {
     instances: Vec<Instance>,
     instance_buffer: wgpu::Buffer,
     depth_texture: Texture,
-    /// # FIXME
-    /// There is a memory leak when the window is occluded on the `Apple M1`
-    /// platform. This field will stop `request_render()` when the window is
-    /// occluded or not focused. It decreases the speed of memory leak, but
-    /// the problem still exists. Find more in the issue section of the
-    /// __gfx-rs/wgpu__ repository.
-    should_render: bool,
+    
 }
 
 impl<'s> State<'s> {
@@ -598,7 +592,6 @@ impl<'s> State<'s> {
             instances,
             instance_buffer,
             depth_texture,
-            should_render: false,
         }
     }
 }
@@ -680,21 +673,9 @@ impl<'s> State<'s> {
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
-        match event {
-            WindowEvent::Occluded(val) => {
-                self.should_render = *val;
-                true
-            }
-            WindowEvent::Focused(val) => {
-                self.should_render = !*val;
-                true
-            }
-            _ => self.camera_controller.process_events(event),
-        }
+        self.camera_controller.process_events(event)
+        
     }
 
-    #[inline]
-    pub fn do_render(&self) -> bool {
-        !self.should_render
-    }
+    
 }
