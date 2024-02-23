@@ -2,7 +2,7 @@ use crate::PackedIntArray;
 
 #[test]
 fn swap() {
-    let mut array = PackedIntArray::from_packed(8, 16, None);
+    let mut array = PackedIntArray::from_packed(8, 16, None).expect("failed to create array");
     assert_eq!(array.len(), 16);
     assert_eq!(array.max, u8::MAX as u64);
 
@@ -19,7 +19,7 @@ fn swap() {
 #[test]
 fn iter() {
     const ARRAY: [u32; 4] = [1, 2, 3, 4];
-    let mut array = PackedIntArray::from_packed(8, 4, None);
+    let mut array = PackedIntArray::from_packed(8, 4, None).expect("failed to create array");
     for (i, j) in ARRAY.into_iter().enumerate() {
         array.swap(i, j);
     }

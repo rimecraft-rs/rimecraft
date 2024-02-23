@@ -15,7 +15,7 @@ use iter::IterImpl;
 #[derive(Debug, Clone)]
 pub struct Palette<L, T> {
     list: L,
-    index_bits: usize,
+    index_bits: u32,
     internal: PaletteImpl<T>,
 }
 
@@ -71,7 +71,7 @@ where
     /// ## Array and BiMap
     ///
     /// Panics if the `entries` length is greater than `2 ** bits_size`.
-    pub fn new(strategy: Strategy, bits_size: usize, list: L, entries: Vec<T>) -> Self {
+    pub fn new(strategy: Strategy, bits_size: u32, list: L, entries: Vec<T>) -> Self {
         match strategy {
             Strategy::Singular => {
                 debug_assert_eq!(
@@ -158,7 +158,7 @@ where
     ///
     /// Returns `Err` containing the expected `index_bits` if the palette is too small to
     /// include this object.
-    pub fn index_or_insert(&mut self, object: T) -> Result<usize, (usize, T)>
+    pub fn index_or_insert(&mut self, object: T) -> Result<usize, (u32, T)>
     where
         T: Clone,
     {
@@ -253,7 +253,7 @@ impl<L, T> Palette<L, T> {
 
     /// Returns the strategy and the bits size.
     #[inline]
-    pub fn config(&self) -> (Strategy, usize) {
+    pub fn config(&self) -> (Strategy, u32) {
         (
             match self.internal {
                 PaletteImpl::Singular(_) => Strategy::Singular,

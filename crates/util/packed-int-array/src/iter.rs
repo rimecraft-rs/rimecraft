@@ -52,7 +52,7 @@ impl ExactSizeIterator for Iter<'_> {
 /// An iterator over a packed int array.
 #[derive(Debug, Clone)]
 pub struct IntoIter {
-    pub(crate) element_bits: usize,
+    pub(crate) element_bits: u32,
     pub(crate) elements_per_long: usize,
     pub(crate) max: u64,
     pub(crate) iter: std::vec::IntoIter<u64>,

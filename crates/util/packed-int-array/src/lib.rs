@@ -13,7 +13,7 @@ use crate::consts::INDEX_PARAMS;
 #[doc(alias = "BitStorage")]
 pub struct PackedIntArray {
     data: Vec<u64>,
-    element_bits: usize,
+    element_bits: u32,
     max: u64,
     len: usize,
     elements_per_long: usize,
@@ -24,33 +24,79 @@ pub struct PackedIntArray {
 }
 
 impl PackedIntArray {
+    /// Creates a new `PackedIntArray` with given `element_bits`, `len` and indices.
+    ///
+    /// # Panics
+    ///
+    /// See [`Self::from_packed`].
+    ///
+    /// # Errors
+    ///
+    /// See [`Self::from_packed`].
+    pub fn new(element_bits: u32, len: usize, data: &[u32]) -> Result<Self, Error> {
+        let mut this = Self::from_packed(element_bits, len, None)?;
+
+        let mut i = 0;
+        let mut jj = 0;
+        for j in (0..len).step_by(this.elements_per_long) {
+            let mut l = 0;
+
+            for ii in data[j..j + this.elements_per_long].iter().copied().rev() {
+                l <<= this.element_bits;
+                l |= ii as u64 & this.max;
+            }
+
+            i += 1;
+            this.data[i] = l;
+            jj = j;
+        }
+
+        if len > jj {
+            let m = len - jj;
+            let mut n = 0;
+            for o in data[jj..jj + m].iter().copied().rev() {
+                n <<= this.element_bits;
+                n |= o as u64 & this.max;
+            }
+            this.data[i] = n;
+        }
+
+        Ok(this)
+    }
+
     /// Creates a new `PackedIntArray` with given `element_bits`, `len` and `raw`
     /// packed data.
     ///
     /// # Panics
     ///
-    /// - Panics if the given `element_bits` is not in range `(0, 32]`.
-    /// - Panics if length of the given raw data slice is not equal to
-    ///   `(len + 64 / element_bits - 1) / (64 / element_bits)`.
-    pub fn from_packed(element_bits: usize, len: usize, raw: Option<&[u64]>) -> Self {
+    /// Panics if the given `element_bits` is not in range `(0, 32]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if length of the given raw data slice is not equal to
+    /// `(len + 64 / element_bits - 1) / (64 / element_bits)`.
+    pub fn from_packed(element_bits: u32, len: usize, raw: Option<&[u64]>) -> Result<Self, Error> {
         assert!(
             0 < element_bits && element_bits <= 32,
             "element bits should in range (0, 32]"
         );
 
         let max = (1u64 << element_bits) - 1;
-        let elements_per_long = 64 / element_bits;
+        let elements_per_long = 64 / element_bits as usize;
         let i = 3 * (elements_per_long - 1);
         let index_scale = INDEX_PARAMS[i] as isize;
         let index_offset = INDEX_PARAMS[i + 1] as isize;
         let index_shift = INDEX_PARAMS[i + 2] as isize;
         let j = (len + elements_per_long - 1) / elements_per_long;
 
-        if let Some(data) = raw {
-            assert_eq!(data.len(), j, "invalid length given for storage");
+        if raw.is_some_and(|d| d.len() != j) {
+            return Err(Error::InvalidLength {
+                expected: j,
+                actual: raw.map_or(0, <[u64]>::len),
+            });
         }
 
-        Self {
+        Ok(Self {
             data: raw.map(Vec::from).unwrap_or_else(|| vec![0; j]),
             element_bits,
             max,
@@ -59,7 +105,7 @@ impl PackedIntArray {
             index_scale,
             index_offset,
             index_shift,
-        }
+        })
     }
 
     #[inline]
@@ -89,7 +135,7 @@ impl PackedIntArray {
         let i = self.storage_index(index);
         let l = &mut self.data[i];
         let lo = *l;
-        let j = (index - i * self.elements_per_long) * self.element_bits;
+        let j = (index - i * self.elements_per_long) * self.element_bits as usize;
         *l = *l & !(self.max << j) | (value as u64 & self.max) << j;
         Some((lo >> j & self.max) as u32)
     }
@@ -112,7 +158,7 @@ impl PackedIntArray {
         }
 
         let i = self.storage_index(index);
-        let j = (index - i * self.elements_per_long) * self.element_bits;
+        let j = (index - i * self.elements_per_long) * self.element_bits as usize;
         self.data[i] &= !(self.max << j) | (value as u64 & self.max) << j;
     }
 
@@ -123,7 +169,7 @@ impl PackedIntArray {
         }
         let i = self.storage_index(index);
         let l = self.data[i];
-        let j = (index - i * self.elements_per_long) * self.element_bits;
+        let j = (index - i * self.elements_per_long) * self.element_bits as usize;
         Some((l >> j & self.max) as u32)
     }
 
@@ -190,7 +236,7 @@ impl PackedIntArray {
 
     /// Gets `element_bits` value of this array.
     #[inline]
-    pub fn element_bits(&self) -> usize {
+    pub fn element_bits(&self) -> u32 {
         self.element_bits
     }
 }
@@ -243,6 +289,35 @@ impl<'a> IntoIterator for &'a PackedIntArray {
         self.iter()
     }
 }
+
+/// Error type for `PackedIntArray`.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum Error {
+    /// Invalid length given for storage.
+    InvalidLength {
+        /// Expected length.
+        expected: usize,
+        /// Actual length.
+        actual: usize,
+    },
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidLength { expected, actual } => {
+                write!(
+                    f,
+                    "invalid length given for storage, expected: {}, actual: {}",
+                    expected, actual
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests;
