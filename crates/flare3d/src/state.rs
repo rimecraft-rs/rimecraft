@@ -354,7 +354,6 @@ pub struct State<'s> {
     instances: Vec<Instance>,
     instance_buffer: wgpu::Buffer,
     depth_texture: Texture,
-    
 }
 
 impl<'s> State<'s> {
@@ -674,8 +673,5 @@ impl<'s> State<'s> {
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
         self.camera_controller.process_events(event)
-        
     }
-
-    
 }

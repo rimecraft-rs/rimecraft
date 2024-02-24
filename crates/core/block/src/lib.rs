@@ -5,10 +5,6 @@ use rimecraft_state::{States, StatesMut};
 
 use std::marker::PhantomData;
 
-mod pos;
-
-pub use pos::BlockPos;
-
 pub use rimecraft_state as state;
 
 /// Block containing settings and the state manager.

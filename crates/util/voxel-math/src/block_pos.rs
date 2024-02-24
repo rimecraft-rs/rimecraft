@@ -1,3 +1,5 @@
+//! Position types.
+
 use glam::IVec3;
 
 /// A position of a block in a three-dimensional volume.
@@ -12,25 +14,25 @@ impl BlockPos {
 
     /// Creates a new block position.
     #[inline]
-    pub fn new(x: i32, y: i32, z: i32) -> Self {
+    pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self(IVec3::new(x, y, z))
     }
 
     /// Returns the x-coordinate of the position.
     #[inline]
-    pub fn x(&self) -> i32 {
+    pub const fn x(&self) -> i32 {
         self.0.x
     }
 
     /// Returns the y-coordinate of the position.
     #[inline]
-    pub fn y(&self) -> i32 {
+    pub const fn y(&self) -> i32 {
         self.0.y
     }
 
     /// Returns the z-coordinate of the position.
     #[inline]
-    pub fn z(&self) -> i32 {
+    pub const fn z(&self) -> i32 {
         self.0.z
     }
 }
@@ -95,38 +97,6 @@ impl std::ops::SubAssign<IVec3> for BlockPos {
     }
 }
 
-impl std::ops::Add<BlockPos> for BlockPos {
-    type Output = BlockPos;
-
-    #[inline]
-    fn add(self, rhs: BlockPos) -> BlockPos {
-        BlockPos(self.0 + rhs.0)
-    }
-}
-
-impl std::ops::AddAssign<BlockPos> for BlockPos {
-    #[inline]
-    fn add_assign(&mut self, rhs: BlockPos) {
-        self.0 += rhs.0;
-    }
-}
-
-impl std::ops::Sub<BlockPos> for BlockPos {
-    type Output = BlockPos;
-
-    #[inline]
-    fn sub(self, rhs: BlockPos) -> BlockPos {
-        BlockPos(self.0 - rhs.0)
-    }
-}
-
-impl std::ops::SubAssign<BlockPos> for BlockPos {
-    #[inline]
-    fn sub_assign(&mut self, rhs: BlockPos) {
-        self.0 -= rhs.0;
-    }
-}
-
 const LEN_BITS_X: i32 = 1 + (1i32 << (32 - (30000000i32 - 1).leading_zeros())).ilog2() as i32;
 const LEN_BITS_Y: i32 = 64 - LEN_BITS_X - LEN_BITS_Z;
 const LEN_BITS_Z: i32 = LEN_BITS_X;
@@ -160,7 +130,7 @@ impl From<i64> for BlockPos {
 }
 
 #[cfg(feature = "serde")]
-mod serde {
+mod _serde {
     use ::serde::{Deserialize, Serialize};
 
     use super::*;
@@ -243,8 +213,6 @@ mod serde {
 
 #[cfg(feature = "edcode")]
 mod edcode {
-    use std::convert::Infallible;
-
     use rimecraft_edcode::{Decode, Encode};
 
     use super::*;

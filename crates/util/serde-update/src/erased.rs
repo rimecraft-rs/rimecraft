@@ -12,11 +12,11 @@ macro_rules! __internal_update_from_erased {
         fn update<D>(
             &mut self,
             deserializer: D,
-        ) -> Result<(), <D as serde::Deserializer<'de>>::Error>
+        ) -> Result<(), <D as ::serde::Deserializer<'de>>::Error>
         where
-            D: serde::Deserializer<'de>,
+            D: ::serde::Deserializer<'de>,
         {
-            use serde::de::Error;
+            use ::serde::de::Error;
             self.erased_update(&mut <dyn erased_serde::Deserializer<'de>>::erase(
                 deserializer,
             ))
@@ -49,7 +49,7 @@ macro_rules! update_trait_object {
 }
 
 /// [`Update`] but type erased.
-pub trait ErasedUpdate<'de>: erased_serde::Serialize {
+pub trait ErasedUpdate<'de> {
     /// Update this type from an erased deserializer.
     ///
     /// # Errors
@@ -61,8 +61,6 @@ pub trait ErasedUpdate<'de>: erased_serde::Serialize {
         deserializer: &mut dyn erased_serde::Deserializer<'de>,
     ) -> Result<(), erased_serde::Error>;
 }
-
-erased_serde::serialize_trait_object!(<'de> ErasedUpdate<'de>);
 
 crate::update_trait_object!(ErasedUpdate<'de>);
 
@@ -80,16 +78,6 @@ where
 }
 
 struct ErasedWrapper<'a, 'de>(pub &'a mut dyn ErasedUpdate<'de>);
-
-impl serde::Serialize for ErasedWrapper<'_, '_> {
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.0.serialize(serializer)
-    }
-}
 
 impl<'de> Update<'de> for ErasedWrapper<'_, 'de> {
     #[inline]
