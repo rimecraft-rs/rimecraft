@@ -89,3 +89,52 @@ impl std::ops::SubAssign<IVec3> for ChunkSectionPos {
         self.0 -= rhs;
     }
 }
+
+impl From<u64> for ChunkSectionPos {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self(IVec3 {
+            x: (value >> 42) as i32,
+            y: (value << 44 >> 44) as i32,
+            z: (value << 22 >> 42) as i32,
+        })
+    }
+}
+
+impl From<ChunkSectionPos> for u64 {
+    #[inline]
+    fn from(ChunkSectionPos(IVec3 { x, y, z }): ChunkSectionPos) -> Self {
+        let mut l = 0u64;
+        l |= (x as u64 & 0x003F_FFFF) << 42;
+        l |= y as u64 & 0x000F_FFFF;
+        l | (z as u64 & 0x003F_FFFF) << 20
+    }
+}
+
+#[cfg(feature = "edcode")]
+mod _edcode {
+    use rimecraft_edcode::{Decode, Encode};
+
+    use super::*;
+
+    impl Encode for ChunkSectionPos {
+        #[inline]
+        fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
+        where
+            B: rimecraft_edcode::bytes::BufMut,
+        {
+            buf.put_u64((*self).into());
+            Ok(())
+        }
+    }
+
+    impl Decode for ChunkSectionPos {
+        #[inline]
+        fn decode<B>(mut buf: B) -> Result<Self, std::io::Error>
+        where
+            B: rimecraft_edcode::bytes::Buf,
+        {
+            Ok(buf.get_u64().into())
+        }
+    }
+}
