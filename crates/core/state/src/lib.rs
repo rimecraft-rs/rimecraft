@@ -26,12 +26,13 @@ pub mod property;
 type Table<'a, T> = HashMap<ErasedProperty<'a>, HashMap<isize, Weak<T>>>;
 
 /// State of an object.
-pub struct State<'a> {
+pub struct State<'a, T> {
     pub(crate) entries: HashMap<ErasedProperty<'a>, isize>,
     table: OnceLock<Table<'a, Self>>,
+    data: T,
 }
 
-impl State<'_> {
+impl<T> State<'_, T> {
     /// Gets the current value of given property in this state.
     #[inline]
     pub fn get<V, W>(&self, prop: &Property<'_, W>) -> Option<V>
@@ -121,6 +122,12 @@ impl State<'_> {
     pub fn contains<W, V>(&self, prop: &Property<'_, W>) -> bool {
         self.entries.contains_key(prop.name())
     }
+
+    /// Gets the data of this state.
+    #[inline]
+    pub fn data(&self) -> &T {
+        &self.data
+    }
 }
 
 fn obtain_next(value: isize, mut iter: impl Iterator<Item = isize>) -> Option<isize> {
@@ -136,10 +143,11 @@ fn obtain_next(value: isize, mut iter: impl Iterator<Item = isize>) -> Option<is
     iter.next()
 }
 
-impl Debug for State<'_> {
+impl<T: Debug> Debug for State<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("State")
             .field("entries", &self.entries)
+            .field("data", &self.data)
             .finish()
     }
 }
@@ -150,14 +158,17 @@ impl Debug for State<'_> {
 #[derive(Debug)]
 #[doc(alias = "StateManager")]
 #[doc(alias = "StateDefinition")]
-pub struct States<'a> {
-    states: Vec<Arc<State<'a>>>,
+pub struct States<'a, T> {
+    states: Vec<Arc<State<'a, T>>>,
     #[allow(unused)]
     props: BTreeMap<&'a str, ErasedProperty<'a>>,
 }
 
-impl<'a> States<'a> {
-    fn new<I>(props: I) -> Self
+impl<'a, T> States<'a, T>
+where
+    T: Clone,
+{
+    fn new<I>(props: I, data: T) -> Self
     where
         I: IntoIterator<Item = ErasedProperty<'a>>,
     {
@@ -185,13 +196,14 @@ impl<'a> States<'a> {
                 Arc::new(State {
                     entries,
                     table: OnceLock::new(),
+                    data: data.clone(),
                 })
             })
             .collect::<Vec<_>>();
 
         // Initialize tables
         for state in list.iter() {
-            let mut table: Table<'a, State<'a>> = Table::new();
+            let mut table: Table<'a, State<'a, T>> = Table::new();
             for (prop, s_val) in state.entries.iter() {
                 let mut row = HashMap::new();
                 for val in prop.wrap.erased_iter().filter(|v| v != s_val) {
@@ -218,10 +230,12 @@ impl<'a> States<'a> {
             props,
         }
     }
+}
 
+impl<'a, T> States<'a, T> {
     /// Gets all states of this state.
     #[inline]
-    pub fn states(&self) -> &[Arc<State<'a>>] {
+    pub fn states(&self) -> &[Arc<State<'a, T>>] {
         &self.states
     }
 
@@ -231,7 +245,7 @@ impl<'a> States<'a> {
     ///
     /// Panics if no state is available.
     #[inline]
-    pub fn default_state(&self) -> &Arc<State<'a>> {
+    pub fn default_state(&self) -> &Arc<State<'a, T>> {
         self.states.first().expect("no state available")
     }
 
@@ -250,15 +264,19 @@ impl<'a> States<'a> {
 
 /// Mutable instance of [`States`].
 #[derive(Debug)]
-pub struct StatesMut<'a> {
+pub struct StatesMut<'a, T> {
     props: Vec<ErasedProperty<'a>>,
+    data: T,
 }
 
-impl<'a> StatesMut<'a> {
+impl<'a, T> StatesMut<'a, T> {
     /// Creates a new states with given data.
     #[inline]
-    pub const fn new() -> Self {
-        Self { props: Vec::new() }
+    pub const fn new(data: T) -> Self {
+        Self {
+            props: Vec::new(),
+            data,
+        }
     }
 
     /// Adds a property to the states.
@@ -303,17 +321,23 @@ impl<'a> StatesMut<'a> {
     }
 }
 
-impl<'a> StatesMut<'a> {
+impl<'a, T> StatesMut<'a, T>
+where
+    T: Clone,
+{
     /// Freezes the state.
     #[inline]
-    pub fn freeze(self) -> States<'a> {
-        States::new(self.props)
+    pub fn freeze(self) -> States<'a, T> {
+        States::new(self.props, self.data)
     }
 }
 
-impl<'a> From<StatesMut<'a>> for States<'a> {
+impl<'a, T> From<StatesMut<'a, T>> for States<'a, T>
+where
+    T: Clone,
+{
     #[inline]
-    fn from(value: StatesMut<'a>) -> Self {
+    fn from(value: StatesMut<'a, T>) -> Self {
         value.freeze()
     }
 }
@@ -446,7 +470,7 @@ pub mod serde {
 
     use crate::State;
 
-    impl Serialize for State<'_> {
+    impl<T> Serialize for State<'_, T> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
@@ -469,9 +493,9 @@ pub mod serde {
 
     /// Updatable state newtype wrapper.
     #[derive(Debug)]
-    pub struct Upd<'a>(pub Arc<State<'a>>);
+    pub struct Upd<'a, T>(pub Arc<State<'a, T>>);
 
-    impl Serialize for Upd<'_> {
+    impl<T> Serialize for Upd<'_, T> {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
@@ -481,7 +505,7 @@ pub mod serde {
         }
     }
 
-    impl<'de> Update<'de> for Upd<'_> {
+    impl<'de, T> Update<'de> for Upd<'_, T> {
         #[inline]
         fn update<D>(
             &mut self,
@@ -490,10 +514,10 @@ pub mod serde {
         where
             D: serde::Deserializer<'de>,
         {
-            struct Visitor<'a>(Arc<State<'a>>);
+            struct Visitor<'a, T>(Arc<State<'a, T>>);
 
-            impl<'de, 'a> serde::de::Visitor<'de> for Visitor<'a> {
-                type Value = Arc<State<'a>>;
+            impl<'de, 'a, T> serde::de::Visitor<'de> for Visitor<'a, T> {
+                type Value = Arc<State<'a, T>>;
 
                 fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     formatter.write_str("a map")

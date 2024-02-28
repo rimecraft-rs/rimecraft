@@ -14,6 +14,7 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 rimecraft-registry = { path = "../registry" }
 rimecraft-state = { path = "../state" }
+rimecraft-voxel-math = { path = "../../util/voxel-math" }
 
 [features]
 

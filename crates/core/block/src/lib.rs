@@ -2,6 +2,7 @@
 
 use rimecraft_registry::Reg;
 use rimecraft_state::{States, StatesMut};
+use state::State;
 
 use std::marker::PhantomData;
 
@@ -9,13 +10,13 @@ pub use rimecraft_state as state;
 
 /// Block containing settings and the state manager.
 #[derive(Debug)]
-pub struct RawBlock<'a, P> {
+pub struct RawBlock<'a, Cx> {
     settings: Settings,
     states: States<'a>,
-    _marker: PhantomData<P>,
+    _marker: PhantomData<Cx>,
 }
 
-impl<'a, P> RawBlock<'a, P> {
+impl<'a, Cx> RawBlock<'a, Cx> {
     /// Creates a new block with the given settings.
     #[inline]
     pub const fn new(settings: Settings, states: States<'a>) -> Self {
@@ -39,7 +40,7 @@ impl<'a, P> RawBlock<'a, P> {
     }
 }
 
-impl<P> From<Settings> for RawBlock<'_, P> {
+impl<Cx> From<Settings> for RawBlock<'_, Cx> {
     #[inline]
     fn from(settings: Settings) -> Self {
         Self::new(settings, StatesMut::new().freeze())
@@ -47,7 +48,7 @@ impl<P> From<Settings> for RawBlock<'_, P> {
 }
 
 /// A voxel in a `World`.
-pub type Block<'a, K, P> = Reg<'a, K, RawBlock<'a, P>>;
+pub type Block<'a, K, Cx> = Reg<'a, K, RawBlock<'a, Cx>>;
 
 /// Settings of a block.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -68,3 +69,5 @@ pub struct Settings {
 
 #[doc(alias = "BlockProperties")]
 pub use Settings as BlockSettings;
+
+struct ShapeCache {}
