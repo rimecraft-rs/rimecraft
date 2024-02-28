@@ -12,14 +12,14 @@ pub use rimecraft_state as state;
 #[derive(Debug)]
 pub struct RawBlock<'a, Cx> {
     settings: Settings,
-    states: States<'a>,
+    states: States<'a, ()>,
     _marker: PhantomData<Cx>,
 }
 
 impl<'a, Cx> RawBlock<'a, Cx> {
     /// Creates a new block with the given settings.
     #[inline]
-    pub const fn new(settings: Settings, states: States<'a>) -> Self {
+    pub const fn new(settings: Settings, states: States<'a, ()>) -> Self {
         Self {
             settings,
             states,
@@ -35,7 +35,7 @@ impl<'a, Cx> RawBlock<'a, Cx> {
 
     /// Returns the state manager of the block.
     #[inline]
-    pub fn states(&self) -> &States<'a> {
+    pub fn states(&self) -> &States<'a, ()> {
         &self.states
     }
 }
@@ -43,7 +43,7 @@ impl<'a, Cx> RawBlock<'a, Cx> {
 impl<Cx> From<Settings> for RawBlock<'_, Cx> {
     #[inline]
     fn from(settings: Settings) -> Self {
-        Self::new(settings, StatesMut::new().freeze())
+        Self::new(settings, StatesMut::new(()).freeze())
     }
 }
 
