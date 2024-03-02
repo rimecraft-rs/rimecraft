@@ -7,7 +7,7 @@ members = [
     "crates/core/world/palette",
 
     "crates/flare3d",
-    "crates/flare3d/examples",
+    "crates/flare3d/example",
 ]
 
 [workspace.lints.rust]
