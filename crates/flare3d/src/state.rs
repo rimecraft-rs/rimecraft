@@ -2,6 +2,8 @@ pub mod camera;
 pub mod instance;
 pub mod vertex;
 
+use std::sync::Arc;
+
 use glam::{Quat, Vec3};
 use wgpu::util::DeviceExt;
 use winit::{event::WindowEvent, event_loop::EventLoop, window::Window};
@@ -44,7 +46,7 @@ const INSTANCE_DISPLACEMENT: Vec3 = Vec3::new(
 );
 
 pub struct State<'s> {
-	pub window: Window,
+	pub window: Arc<Window>,
     pub size: winit::dpi::PhysicalSize<u32>,
 
     surface: wgpu::Surface<'s>,
@@ -68,7 +70,7 @@ pub struct State<'s> {
 
 impl<'s> State<'s> {
     pub async fn new(event_loop: &EventLoop<()>) -> State<'s> {
-		let window = Window::new(event_loop).unwrap();
+		let window = Arc::new(Window::new(event_loop).unwrap());
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -76,7 +78,7 @@ impl<'s> State<'s> {
             ..Default::default()
         });
 
-        let surface = instance.create_surface(&window).unwrap();
+        let surface = instance.create_surface(window.clone()).unwrap();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),

@@ -84,7 +84,7 @@ impl<'w> Window<'w> {
             })
             .unwrap();
 
-        Window {
+        Self {
             state
         }
     }
