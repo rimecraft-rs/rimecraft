@@ -6,8 +6,6 @@ use winit::{
 
 #[allow(unused_variables)]
 fn main() {
-    let event_loop = EventLoop::new().unwrap();
-    let winit_window = WindowBuilder::new().build(&event_loop).unwrap();
 
-	let window = Window::new(event_loop, &winit_window);
+	let window = Window::new(&winit_window);
 }

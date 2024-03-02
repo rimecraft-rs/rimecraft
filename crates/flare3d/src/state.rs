@@ -44,7 +44,9 @@ const INSTANCE_DISPLACEMENT: Vec3 = Vec3::new(
 );
 
 pub struct State<'s> {
+	pub window: Window,
     pub size: winit::dpi::PhysicalSize<u32>,
+
     surface: wgpu::Surface<'s>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -65,7 +67,7 @@ pub struct State<'s> {
 }
 
 impl<'s> State<'s> {
-    pub async fn new(window: &'s Window) -> State<'s> {
+    pub async fn new(window: Window) -> State<'s> {
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -73,7 +75,7 @@ impl<'s> State<'s> {
             ..Default::default()
         });
 
-        let surface = instance.create_surface(window).unwrap();
+        let surface = instance.create_surface(&window).unwrap();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
@@ -280,6 +282,7 @@ impl<'s> State<'s> {
         });
 
         Self {
+			window,
             size,
             surface,
             device,

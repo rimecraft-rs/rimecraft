@@ -1,8 +1,7 @@
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    keyboard::{KeyCode, PhysicalKey},
-    window::Window as WinitWindow,
+    window::WindowBuilder,
 };
 
 use crate::state::State;
@@ -12,7 +11,10 @@ pub struct Window<'w> {
 }
 
 impl<'w> Window<'w> {
-    pub fn new(event_loop: EventLoop<()>, winit_window: &'w WinitWindow) -> Window<'w> {
+    pub fn new() -> Window<'w> {
+        let event_loop = EventLoop::new().unwrap();
+        let winit_window = WindowBuilder::new().build(&event_loop).unwrap();
+
         let mut f3d_window = Window {
             state: futures_executor::block_on(State::new(&winit_window)),
         };
