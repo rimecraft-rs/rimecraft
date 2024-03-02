@@ -13,11 +13,7 @@ pub struct Window<'w> {
 impl<'w> Window<'w> {
     pub fn new() -> Window<'w> {
         let event_loop = EventLoop::new().unwrap();
-        let winit_window = WindowBuilder::new().build(&event_loop).unwrap();
-
-        let mut f3d_window = Window {
-            state: futures_executor::block_on(State::new(&winit_window)),
-        };
+		let mut state = futures_executor::block_on(State::new(&event_loop));
 
         #[cfg(target_os = "macos")]
         let (_dl, semaphore) = {
@@ -45,19 +41,19 @@ impl<'w> Window<'w> {
                 target.set_control_flow(ControlFlow::Wait);
 
                 match event {
-                    Event::WindowEvent { window_id, event } if window_id == winit_window.id() => {
-                        if !f3d_window.state.input(&event) {
+                    Event::WindowEvent { window_id, event } if window_id == state.window.id() => {
+                        if !state.input(&event) {
                             match event {
                                 WindowEvent::CloseRequested => target.exit(),
                                 WindowEvent::Resized(physical_size) => {
-                                    f3d_window.state.resize(physical_size);
+                                    state.resize(physical_size);
                                 }
                                 WindowEvent::RedrawRequested => {
-                                    f3d_window.state.update();
-                                    match f3d_window.state.render() {
+                                    state.update();
+                                    match state.render() {
                                         Ok(_) => {}
                                         Err(wgpu::SurfaceError::Lost) => {
-                                            f3d_window.state.resize(f3d_window.state.size)
+                                            state.resize(state.size)
                                         }
                                         Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
                                         Err(e) => eprintln!("{:?}", e),
@@ -81,13 +77,15 @@ impl<'w> Window<'w> {
                             *do_redraw = false;
                         }
 
-                        winit_window.request_redraw();
+                        state.window.request_redraw();
                     }
                     _ => (),
                 }
             })
             .unwrap();
 
-        f3d_window
+        Window {
+            state
+        }
     }
 }

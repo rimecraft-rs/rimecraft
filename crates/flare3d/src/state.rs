@@ -4,7 +4,7 @@ pub mod vertex;
 
 use glam::{Quat, Vec3};
 use wgpu::util::DeviceExt;
-use winit::{event::WindowEvent, window::Window};
+use winit::{event::WindowEvent, event_loop::EventLoop, window::Window};
 
 use crate::texture::Texture;
 
@@ -67,7 +67,8 @@ pub struct State<'s> {
 }
 
 impl<'s> State<'s> {
-    pub async fn new(window: Window) -> State<'s> {
+    pub async fn new(event_loop: &EventLoop<()>) -> State<'s> {
+		let window = Window::new(event_loop).unwrap();
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
