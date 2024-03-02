@@ -162,11 +162,11 @@ pub enum Axis {
 impl Axis {
     /// Chooses a value from a position based on the axis.
     #[inline]
-    pub fn choose<T>(self, pos: (T, T, T)) -> T {
+    pub fn choose<T>(self, x: T, y: T, z: T) -> T {
         match self {
-            Axis::X => pos.0,
-            Axis::Y => pos.1,
-            Axis::Z => pos.2,
+            Axis::X => x,
+            Axis::Y => y,
+            Axis::Z => z,
         }
     }
 }

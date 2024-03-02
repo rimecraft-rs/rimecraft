@@ -1,0 +1,26 @@
+[package]
+name = "rimecraft-voxel-shape"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Voxel shapes"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["game-development"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+rimecraft-voxel-math = { path = "../voxel-math" }
+rimecraft-edcode = { path = "../../util/edcode", optional = true }
+serde = { version = "1.0", optional = true, features = ["derive"] }
+bitvec = "1.0"
+
+[features]
+default = ["serde", "edcode"]
+serde = ["dep:serde"]
+edcode = ["dep:rimecraft-edcode"]
+
+[lints]
+workspace = true
