@@ -1,0 +1,18 @@
+[package]
+name = "rimecraft-input"
+version = "0.1.0"
+edition = "2021"
+authors = ["KrLite"]
+description = "Minecraft Input"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+glam = "0.25.0"
+
+[lints]
+workspace = true
