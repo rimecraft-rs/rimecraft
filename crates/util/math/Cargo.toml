@@ -1,19 +1,18 @@
 [package]
-name = "rimecraft-option"
+name = "rimecraft-math"
 version = "0.1.0"
 edition = "2021"
 authors = ["KrLite"]
-description = "Minecraft option"
+description = "Math library for Rimecraft"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
-categories = []
+categories = ["game-development"]
 
 [badges]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-text = { path = "../text" }
-rimecraft-math = { path = "../../util/math" }
+glam = "0.25"
 
 [lints]
 workspace = true
