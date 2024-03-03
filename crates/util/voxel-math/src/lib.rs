@@ -8,6 +8,9 @@ pub use block_pos::BlockPos;
 pub use chunk_pos::ChunkPos;
 pub use chunk_section_pos::ChunkSectionPos;
 
+mod bbox;
 pub mod direction;
 
-pub use glam::IVec3;
+pub use bbox::BBox;
+
+pub use glam::{DVec3, IVec3};

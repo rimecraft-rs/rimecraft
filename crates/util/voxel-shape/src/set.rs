@@ -55,15 +55,19 @@ impl<'s> VoxelSetSlice<'s> {
         self.inner.set_ext(x, y, z);
     }
 
-    /// Gets the length properties of this set.
-    #[inline]
-    pub fn props(&self) -> Props {
-        self.inner.props()
+    /// Gets the length of given axis.
+    pub fn len_of(&self, axis: Axis) -> u32 {
+        let Props {
+            len_x,
+            len_y,
+            len_z,
+        } = self.inner.props();
+        axis.choose(len_x, len_y, len_z)
     }
 
-    /// Gets the length bounds of the given axis.
+    /// Gets the bounds of give axis.
     #[inline]
-    pub fn bounds(&self, axis: Axis) -> RangeInclusive<u32> {
+    pub fn bounds_of(&self, axis: Axis) -> RangeInclusive<u32> {
         self.inner.bounds(axis)
     }
 
