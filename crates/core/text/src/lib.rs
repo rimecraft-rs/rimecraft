@@ -33,6 +33,11 @@ pub struct Text<T, StyleExt> {
     sibs: Vec<Self>,
 }
 
+pub trait Texts {
+	type T;
+	type StyleExt;
+}
+
 impl<T, StyleExt> Text<T, StyleExt> {
     /// Creates a new text with the given content and style.
     ///
