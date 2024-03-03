@@ -103,11 +103,22 @@ impl Path {
     where
         T: Into<Arc<str>>,
     {
-        let value = value.into();
-        validate_path(&value).unwrap();
-        Self(ArcCowStr::Arc(value))
+        Self::try_new(value).unwrap()
     }
 
+    /// Creates a new [`Path`] from the given value.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the given path is invalid.
+    pub fn try_new<T>(value: T) -> Result<Self, Error>
+    where
+        T: Into<Arc<str>>,
+    {
+        let value = value.into();
+        validate_path(&value)?;
+        Ok(Self(ArcCowStr::Arc(value)))
+    }
     /// Creates a new [`Path`] from the given value
     /// at compile time.
     ///
@@ -143,8 +154,9 @@ impl FromStr for Path {
 
 impl PathWord {
     #[inline]
-    pub fn new<T>(value: Vec<T>) -> Self
+    pub fn new<I, T>(value: I) -> Self
     where
+        I: IntoIterator<Item = T>,
         T: Into<Arc<str>>,
     {
         Self(
@@ -155,7 +167,7 @@ impl PathWord {
                     validate_path(&s);
                     s
                 })
-                .map(|s| ArcCowStr::Arc(s))
+                .map(ArcCowStr::Arc)
                 .collect(),
         )
     }
@@ -187,6 +199,8 @@ impl FromStr for PathWord {
         Ok(Self(ArcCowStr::Arc(s.into())))
     }
 }
+
+impl PathLocation {}
 
 #[derive(Debug, Clone)]
 enum ArcCowStr<'a> {
