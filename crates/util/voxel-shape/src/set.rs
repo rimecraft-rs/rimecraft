@@ -72,8 +72,8 @@ impl<'s> VoxelSetSlice<'s> {
     }
 
     /// Crops this set into a cropped slice.
-    pub fn crop<'a>(&'a self, bounds: Bounds) -> Crop<'a, 's> {
-        Crop {
+    pub fn crop<'a>(&'a self, bounds: Bounds) -> Cropped<'a, 's> {
+        Cropped {
             props: Props {
                 len_x: *bounds.x.end() - *bounds.x.start(),
                 len_y: *bounds.y.end() - *bounds.y.start(),
@@ -85,8 +85,8 @@ impl<'s> VoxelSetSlice<'s> {
     }
 
     /// Crops this set into a mutable cropped slice.
-    pub fn crop_mut<'a>(&'a mut self, bounds: Bounds) -> CropMut<'a, 's> {
-        CropMut {
+    pub fn crop_mut<'a>(&'a mut self, bounds: Bounds) -> CroppedMut<'a, 's> {
+        CroppedMut {
             props: Props {
                 len_x: *bounds.x.end() - *bounds.x.start(),
                 len_y: *bounds.y.end() - *bounds.y.start(),
@@ -101,18 +101,12 @@ impl<'s> VoxelSetSlice<'s> {
 #[allow(unsafe_code)] // SAFETY: safe because the type is marked as `repr(transparent)`
 impl<'a> VoxelSetSlice<'a> {
     #[inline]
-    fn from_ref<'s>(this: &'s (dyn AbstVoxelSet + Send + Sync + 'a)) -> &'s Self
-    where
-        'a: 's,
-    {
+    fn from_ref<'s>(this: &'s (dyn AbstVoxelSet + Send + Sync + 'a)) -> &'s Self {
         unsafe { std::mem::transmute(this) }
     }
 
     #[inline]
-    fn from_mut<'s>(this: &'s mut (dyn AbstVoxelSet + Send + Sync + 'a)) -> &'s mut Self
-    where
-        'a: 's,
-    {
+    fn from_mut<'s>(this: &'s mut (dyn AbstVoxelSet + Send + Sync + 'a)) -> &'s mut Self {
         unsafe { std::mem::transmute(this) }
     }
 
@@ -146,7 +140,7 @@ pub struct Bounds {
 }
 
 /// A voxel set implemented using a bit set.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VoxelSet {
     props: Props,
     bounds: Bounds,
@@ -250,14 +244,14 @@ impl DerefMut for VoxelSet {
 }
 
 /// A cropped voxel set.
-#[derive(Debug)]
-pub struct Crop<'a, 's> {
+#[derive(Debug, Clone)]
+pub struct Cropped<'a, 's> {
     props: Props,
     bounds: Bounds,
     parent: &'a VoxelSetSlice<'s>,
 }
 
-impl<'a> Crop<'a, 'a> {
+impl<'a> Cropped<'a, 'a> {
     /// Converts this set into a boxed slice.
     #[inline]
     pub fn into_boxed_slice(self) -> Box<VoxelSetSlice<'a>> {
@@ -265,7 +259,7 @@ impl<'a> Crop<'a, 'a> {
     }
 }
 
-impl AbstVoxelSet for Crop<'_, '_> {
+impl AbstVoxelSet for Cropped<'_, '_> {
     #[inline]
     fn props(&self) -> Props {
         self.props
@@ -310,13 +304,13 @@ impl AbstVoxelSet for Crop<'_, '_> {
 
 /// A mutable cropped voxel set.
 #[derive(Debug)]
-pub struct CropMut<'a, 's> {
+pub struct CroppedMut<'a, 's> {
     props: Props,
     bounds: Bounds,
     parent: &'a mut VoxelSetSlice<'s>,
 }
 
-impl<'a> CropMut<'a, 'a> {
+impl<'a> CroppedMut<'a, 'a> {
     /// Converts this set into a boxed slice.
     #[inline]
     pub fn into_boxed_slice(self) -> Box<VoxelSetSlice<'a>> {
@@ -324,7 +318,7 @@ impl<'a> CropMut<'a, 'a> {
     }
 }
 
-impl AbstVoxelSet for CropMut<'_, '_> {
+impl AbstVoxelSet for CroppedMut<'_, '_> {
     #[inline]
     fn props(&self) -> Props {
         self.props
@@ -371,7 +365,7 @@ impl AbstVoxelSet for CropMut<'_, '_> {
     }
 }
 
-impl<'a> Deref for Crop<'a, '_> {
+impl<'a> Deref for Cropped<'a, '_> {
     type Target = VoxelSetSlice<'a>;
 
     #[inline]
@@ -380,7 +374,7 @@ impl<'a> Deref for Crop<'a, '_> {
     }
 }
 
-impl<'a> Deref for CropMut<'a, '_> {
+impl<'a> Deref for CroppedMut<'a, '_> {
     type Target = VoxelSetSlice<'a>;
 
     #[inline]
@@ -389,7 +383,7 @@ impl<'a> Deref for CropMut<'a, '_> {
     }
 }
 
-impl DerefMut for CropMut<'_, '_> {
+impl DerefMut for CroppedMut<'_, '_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         VoxelSetSlice::from_mut(self)
