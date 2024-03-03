@@ -1,4 +1,4 @@
-//! Minecraft Text API.
+//! Minecraft text API.
 
 mod error;
 mod iter;
@@ -36,7 +36,9 @@ pub struct Text<T, StyleExt> {
 /// A generics wrapper for [`Text`].
 /// The associated types [`Texts::T`] and [`Texts::StyleExt`] should be applied to [`Text`] when used.
 pub trait Texts {
+	/// Generic `T` that should be applied to [`Text`].
 	type T;
+	/// Generic `StyleExt` that should be applied to [`Text`].
 	type StyleExt;
 }
 
