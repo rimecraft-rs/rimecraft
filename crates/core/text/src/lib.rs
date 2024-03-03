@@ -34,7 +34,7 @@ pub struct Text<T, StyleExt> {
 }
 
 /// A generics wrapper for [`Text`].
-/// [`Texts::T`]
+/// The associated types [`Texts::T`] and [`Texts::StyleExt`] should be applied to [`Text`] when used.
 pub trait Texts {
 	type T;
 	type StyleExt;
