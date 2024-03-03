@@ -14,6 +14,7 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 rimecraft-text = { path = "../../core/text" }
 rimecraft-math = { path = "../../util/math" }
+enum-iterator = "2.0.0"
 
 [lints]
 workspace = true

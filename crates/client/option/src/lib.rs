@@ -2,6 +2,7 @@
 
 pub(crate) mod callbacks;
 pub mod tooltip_factory;
+pub mod enums;
 
 use rimecraft_text::{Text, Texts};
 
