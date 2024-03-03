@@ -12,7 +12,7 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-text = { path = "../text" }
+rimecraft-text = { path = "../../core/text" }
 rimecraft-math = { path = "../../util/math" }
 
 [lints]
