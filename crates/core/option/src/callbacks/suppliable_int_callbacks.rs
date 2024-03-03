@@ -64,26 +64,6 @@ impl<Txt> Callbacks<i32, Txt> for SuppliableIntCallbacks
 where
     Txt: Texts,
 {
-    fn get_widget_creator(
-        &self,
-        tooltip_factory: &dyn TooltipFactory<i32>,
-        game_options: (),
-        x: f32,
-        y: f32,
-        width: f32,
-        change_callback: &ChangeCallback<i32>,
-    ) -> WidgetCreator<i32, Txt> {
-        <SuppliableIntCallbacks as SliderCallbacks<i32, Txt>>::get_widget_creator(
-            self,
-            tooltip_factory,
-            game_options,
-            x,
-            y,
-            width,
-            change_callback,
-        )
-    }
-
     fn validate(&self, value: Option<i32>) -> Option<i32> {
         <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::i32_validate(self, value)
     }

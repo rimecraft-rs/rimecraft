@@ -4,34 +4,16 @@ pub mod validating_int_slider_callbacks;
 
 use rimecraft_text::Texts;
 
-use crate::{tooltip_factory::TooltipFactory, SimpleOption};
+use crate::SimpleOption;
 
 type ChangeCallback<T> = dyn Fn(Option<T>);
 
-type ValueSetter<T, Txt>
-where
-    Txt: Texts,
-= fn(&mut SimpleOption<T, Txt>, value: Option<T>);
-
-type WidgetCreator<T, Txt>
-where
-    Txt: Texts,
-= fn(&SimpleOption<T, Txt>) -> (); // ClickableWidget
+type ValueSetter<T, Txt> = fn(&mut SimpleOption<T, Txt>, value: Option<T>);
 
 trait Callbacks<T, Txt>
 where
     Txt: Texts,
 {
-    fn get_widget_creator(
-        &self,
-        tooltip_factory: &dyn TooltipFactory<T>,
-        game_options: (),
-        x: f32,
-        y: f32,
-        width: f32,
-        change_callback: &ChangeCallback<T>,
-    ) -> WidgetCreator<T, Txt>;
-
     fn validate(&self, value: Option<T>) -> Option<T>;
 }
 
@@ -44,18 +26,6 @@ where
     fn value_setter(&self) -> ValueSetter<T, Txt> {
         |option, value| option.set_value(value)
     }
-
-    fn get_widget_creator(
-        &self,
-        tooltip_factory: &dyn TooltipFactory<T>,
-        game_options: (),
-        x: f32,
-        y: f32,
-        width: f32,
-        change_callback: &ChangeCallback<T>,
-    ) -> WidgetCreator<T, Txt> {
-        todo!()
-    }
 }
 
 trait SliderCallbacks<T, Txt>: Callbacks<T, Txt>
@@ -65,18 +35,6 @@ where
     fn to_slider_progress(&self, value: T) -> f32;
 
     fn to_value(&self, slider_progress: f32) -> T;
-
-    fn get_widget_creator(
-        &self,
-        tooltip_factory: &dyn TooltipFactory<T>,
-        game_options: (),
-        x: f32,
-        y: f32,
-        width: f32,
-        change_callback: &ChangeCallback<T>,
-    ) -> WidgetCreator<T, Txt> {
-        todo!()
-    }
 }
 
 trait TypeChangeableCallbacks<T, Txt>: CyclingCallbacks<T, Txt> + SliderCallbacks<T, Txt>
@@ -84,18 +42,6 @@ where
     Txt: Texts,
 {
     fn is_cycling(&self) -> bool;
-
-    fn get_widget_creator(
-        &self,
-        tooltip_factory: &dyn TooltipFactory<T>,
-        game_options: (),
-        x: f32,
-        y: f32,
-        width: f32,
-        change_callback: &ChangeCallback<T>,
-    ) -> WidgetCreator<T, Txt> {
-        todo!()
-    }
 }
 
 trait IntSliderCallbacks<Txt>: SliderCallbacks<i32, Txt>
@@ -182,26 +128,6 @@ where
                 let i = (self.value_to_progress)(value);
                 let invalidated = (self.i32_validate)(i);
                 (self.progress_to_value)(invalidated)
-            }
-
-            fn get_widget_creator(
-                &self,
-                tooltip_factory: &dyn TooltipFactory<R>,
-                game_options: (),
-                x: f32,
-                y: f32,
-                width: f32,
-                change_callback: &ChangeCallback<R>,
-            ) -> WidgetCreator<R, Txt> {
-                SliderCallbacks::get_widget_creator(
-                    self,
-                    tooltip_factory,
-                    game_options,
-                    x,
-                    y,
-                    width,
-                    change_callback,
-                )
             }
         }
 
