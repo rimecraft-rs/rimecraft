@@ -108,6 +108,7 @@ pub trait Wrap<T> {
 }
 
 pub(crate) trait ErasedWrap {
+    #[allow(dead_code)]
     fn erased_parse_name(&self, name: &str) -> Option<isize>;
     fn erased_to_name(&self, index: isize) -> Option<Cow<'_, str>>;
     fn erased_iter<'a>(&'a self) -> Box<dyn Iterator<Item = isize> + 'a>;

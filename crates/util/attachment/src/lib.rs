@@ -1,7 +1,5 @@
-//! Attachments are a way to attach arbitrary data to
-//! an object. This is useful for storing data that
-//! is not directly related to the object, but is
-//! still useful to store.
+//! Attachments are a way to attach arbitrary data to  an object. This is useful for storing data that
+//! is not directly related to the object, but is still useful to store.
 
 use std::{
     any::Any,
@@ -113,7 +111,7 @@ impl<K: Hash + Eq> Attachments<K> {
     where
         <T as Attach<K>>::Attached: Any + Send + Sync + 'static,
         Q: ToOwned,
-        K: From<<Q as ToOwned>::Owned>,
+        <Q as ToOwned>::Owned: Into<K>,
     {
         let key = ty.key.to_owned().into();
         val.attach(self, &key)?;

@@ -8,7 +8,7 @@ use std::{
 use bitvec::{bitbox, boxed::BitBox, slice::BitSlice};
 use rimecraft_voxel_math::direction::Axis;
 
-trait AsVoxelSet {
+trait AbstVoxelSet {
     fn props(&self) -> Props;
 
     fn bitslice(&self) -> &BitSlice;
@@ -23,7 +23,7 @@ trait AsVoxelSet {
 /// Slice of a voxel set.
 #[repr(transparent)]
 pub struct VoxelSetSlice<'s> {
-    inner: dyn AsVoxelSet + Send + Sync + 's,
+    inner: dyn AbstVoxelSet + Send + Sync + 's,
 }
 
 impl Debug for VoxelSetSlice<'_> {
@@ -97,7 +97,7 @@ impl<'s> VoxelSetSlice<'s> {
 #[allow(unsafe_code)] // SAFETY: safe because the type is marked as `repr(transparent)`
 impl<'a> VoxelSetSlice<'a> {
     #[inline]
-    fn from_ref<'s>(this: &'s (dyn AsVoxelSet + Send + Sync + 'a)) -> &'s Self
+    fn from_ref<'s>(this: &'s (dyn AbstVoxelSet + Send + Sync + 'a)) -> &'s Self
     where
         'a: 's,
     {
@@ -105,10 +105,15 @@ impl<'a> VoxelSetSlice<'a> {
     }
 
     #[inline]
-    fn from_mut<'s>(this: &'s mut (dyn AsVoxelSet + Send + Sync + 'a)) -> &'s mut Self
+    fn from_mut<'s>(this: &'s mut (dyn AbstVoxelSet + Send + Sync + 'a)) -> &'s mut Self
     where
         'a: 's,
     {
+        unsafe { std::mem::transmute(this) }
+    }
+
+    #[inline]
+    fn from_boxed(this: Box<dyn AbstVoxelSet + Send + Sync + 'a>) -> Box<Self> {
         unsafe { std::mem::transmute(this) }
     }
 }
@@ -138,14 +143,14 @@ pub struct Bounds {
 
 /// A voxel set implemented using a bit set.
 #[derive(Debug)]
-pub struct BoxedVoxelSet {
+pub struct VoxelSet {
     props: Props,
     bounds: Bounds,
     data: BitBox,
 }
 
-impl BoxedVoxelSet {
-    /// Creates a new `BitSetImpl`.
+impl VoxelSet {
+    /// Creates a new voxel set.
     #[inline]
     pub fn new(props: Props) -> Self {
         let Props {
@@ -171,9 +176,15 @@ impl BoxedVoxelSet {
         this.bounds = bounds;
         this
     }
+
+    /// Converts this set into a boxed slice.
+    #[inline]
+    pub fn into_boxed_slice(self) -> Box<VoxelSetSlice<'static>> {
+        VoxelSetSlice::from_boxed(Box::new(self))
+    }
 }
 
-impl AsVoxelSet for BoxedVoxelSet {
+impl AbstVoxelSet for VoxelSet {
     #[inline]
     fn props(&self) -> Props {
         self.props
@@ -218,7 +229,7 @@ impl AsVoxelSet for BoxedVoxelSet {
     }
 }
 
-impl Deref for BoxedVoxelSet {
+impl Deref for VoxelSet {
     type Target = VoxelSetSlice<'static>;
 
     #[inline]
@@ -227,7 +238,7 @@ impl Deref for BoxedVoxelSet {
     }
 }
 
-impl DerefMut for BoxedVoxelSet {
+impl DerefMut for VoxelSet {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         VoxelSetSlice::from_mut(self)
@@ -242,7 +253,15 @@ pub struct Crop<'a, 's> {
     parent: &'a VoxelSetSlice<'s>,
 }
 
-impl AsVoxelSet for Crop<'_, '_> {
+impl<'a> Crop<'a, 'a> {
+    /// Converts this set into a boxed slice.
+    #[inline]
+    pub fn into_boxed_slice(self) -> Box<VoxelSetSlice<'a>> {
+        VoxelSetSlice::from_boxed(Box::new(self))
+    }
+}
+
+impl AbstVoxelSet for Crop<'_, '_> {
     #[inline]
     fn props(&self) -> Props {
         self.props
@@ -293,7 +312,15 @@ pub struct CropMut<'a, 's> {
     parent: &'a mut VoxelSetSlice<'s>,
 }
 
-impl AsVoxelSet for CropMut<'_, '_> {
+impl<'a> CropMut<'a, 'a> {
+    /// Converts this set into a boxed slice.
+    #[inline]
+    pub fn into_boxed_slice(self) -> Box<VoxelSetSlice<'a>> {
+        VoxelSetSlice::from_boxed(Box::new(self))
+    }
+}
+
+impl AbstVoxelSet for CropMut<'_, '_> {
     #[inline]
     fn props(&self) -> Props {
         self.props
@@ -371,7 +398,7 @@ mod tests {
 
     #[test]
     fn boxed() {
-        let mut set = BoxedVoxelSet::new(Props {
+        let mut set = VoxelSet::new(Props {
             len_x: 16,
             len_y: 16,
             len_z: 16,
@@ -384,7 +411,7 @@ mod tests {
 
     #[test]
     fn crop() {
-        let mut set = BoxedVoxelSet::new(Props {
+        let mut set = VoxelSet::new(Props {
             len_x: 16,
             len_y: 16,
             len_z: 16,
