@@ -1,9 +1,9 @@
 [package]
-name = "rimecraft-block"
+name = "rimecraft-option"
 version = "0.1.0"
 edition = "2021"
-authors = ["JieningYu <jiening.yu@outlook.com>"]
-description = "Minecraft block primitives"
+authors = ["KrLite"]
+description = "Minecraft option"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
@@ -12,10 +12,6 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-registry = { path = "../registry" }
-rimecraft-state = { path = "../state" }
-
-[features]
 
 [lints]
 workspace = true
