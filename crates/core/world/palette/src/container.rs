@@ -1,6 +1,6 @@
 //! Paletted containers.
 
-use std::{hash::Hash, marker::PhantomData};
+use std::{collections::HashMap, hash::Hash, marker::PhantomData};
 
 use rimecraft_packed_int_array::PackedIntArray;
 
@@ -51,7 +51,7 @@ where
 {
     /// Creates a new paletted container that contains the given object.
     #[allow(clippy::missing_panics_doc)] // The panic point should be unreachable.
-    pub fn from_single(list: L, object: T) -> Self {
+    pub fn of_single(list: L, object: T) -> Self {
         let data = compatible_data::<L, T, P>(list.clone(), None, 0)
             .expect("should return Some when prev is None");
         let mut this = Self {
@@ -86,6 +86,24 @@ where
             array.set(index, i as u32)
         }
     }
+
+    /// Slices this container to a container of the first entry of the palette.
+    ///
+    /// See [`Self::of_single`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the palette is empty.
+    pub fn to_slice(&self) -> Self {
+        Self::of_single(
+            self.list.clone(),
+            self.data
+                .palette
+                .get(0)
+                .expect("Palette should not be empty")
+                .clone(),
+        )
+    }
 }
 
 impl<L, T, P> PalettedContainer<L, T, P>
@@ -100,6 +118,41 @@ where
             .as_array()
             .and_then(|array| array.get(index))
             .and_then(|i| self.data.palette.get(i as usize))
+    }
+
+    /// Counts the number of occurrences of each object in the container
+    /// to the given counter function.
+    pub fn count<'a, F>(&'a self, mut counter: F)
+    where
+        F: FnMut(&T, usize),
+        &'a L: IntoIterator,
+        <&'a L as IntoIterator>::IntoIter: ExactSizeIterator,
+    {
+        if let Some(val) = (self.data.palette.len() == 1)
+            .then(|| self.data.palette.get(0))
+            .flatten()
+        {
+            counter(val, self.data.storage.len());
+        } else {
+            let mut map = HashMap::new();
+            if let Some(array) = self.data.storage.as_array() {
+                array.iter().for_each(|i| {
+                    if let Some(val) = map.get_mut(&i) {
+                        *val += 1;
+                    } else {
+                        map.insert(i, 1);
+                    }
+                });
+            } else {
+                map.insert(0, self.data.storage.len());
+            }
+            for (obj, c) in map
+                .into_iter()
+                .filter_map(|(i, c)| self.data.palette.get(i as usize).map(|i| (i, c)))
+            {
+                counter(obj, c);
+            }
+        }
     }
 }
 

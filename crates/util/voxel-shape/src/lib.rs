@@ -78,7 +78,7 @@ impl<'a> VoxelShapeSlice<'a> {
 #[derive(Debug, Clone)]
 struct RawVoxelShape {
     voxels: VoxelSet,
-    shape_cache: Vec<Arc<VoxelShapeSlice<'static>>>,
+    shape_cache: Vec<Arc<VoxelShapeSlice<'static>>>, //TODO: done these
 }
 
 /// A simple voxel shape.
