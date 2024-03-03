@@ -33,6 +33,8 @@ pub struct Text<T, StyleExt> {
     sibs: Vec<Self>,
 }
 
+/// A generics wrapper for [`Text`].
+/// [`Texts::T`]
 pub trait Texts {
 	type T;
 	type StyleExt;
