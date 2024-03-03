@@ -1,5 +1,6 @@
 //! Rust implementation of Minecraft resource location.
 
+use core::str;
 use std::{fmt::Display, str::FromStr};
 
 #[cfg(feature = "vanilla")]
@@ -33,8 +34,7 @@ impl<N, P> Identifier<N, P> {
     }
 }
 
-/// Namespace types that is able to separate
-/// with paths using a separator.
+/// Namespace types that are able to separate with paths, or path types that are able to split by itself.
 pub trait Separate {
     //TODO: use `Pattern` when it's stable
 
