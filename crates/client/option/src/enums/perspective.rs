@@ -2,6 +2,8 @@
 
 use enum_iterator::Sequence;
 
+use super::ByIntId;
+
 /// Represents the perspective.
 ///
 /// # MCJE Reference
@@ -17,6 +19,8 @@ pub enum Perspective {
 	ThirdPersonFront
 }
 
+impl ByIntId for Perspective {}
+
 impl Perspective {
 	fn is_first_person(&self) -> bool {
 		match self {
@@ -30,9 +34,5 @@ impl Perspective {
 			Perspective::ThirdPersonBack => false,
 			_ => true
 		}
-	}
-
-	fn next(&self) -> Perspective {
-		enum_iterator::next::<Perspective>(self).unwrap()
 	}
 }

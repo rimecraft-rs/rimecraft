@@ -51,7 +51,7 @@ pub fn _lerp(factor: f32, start: f32, end: f32) -> f32 {
     start + (end - start) * factor
 }
 
-/// Linear interpolates an [`f32`] between two values by a factor, with parameter `clamp` available to clamp the result.
+/// Linear interpolates an [`f32`] between two values by a factor, with argument `clamp` available to clamp the result.
 pub fn lerp(factor: f32, start: f32, end: f32, clamps: bool) -> f32 {
     let lerp = _lerp(factor, start, end);
     if clamps {
@@ -66,7 +66,7 @@ pub fn _get_lerp_factor(value: f32, start: f32, end: f32) -> f32 {
     (value - start) / (end - start)
 }
 
-/// Gets the factor of a [`f32`] in a linear interpolation progress, with parameter `clamp` available to clamp the result.
+/// Gets the factor of a [`f32`] in a linear interpolation progress, with argument `clamp` available to clamp the result.
 pub fn get_lerp_factor(value: f32, start: f32, end: f32, clamps: bool) -> f32 {
     let factor = _get_lerp_factor(value, start, end);
     if clamps {
@@ -85,7 +85,7 @@ pub fn _map(value: f32, old_start: f32, old_end: f32, new_start: f32, new_end: f
     )
 }
 
-/// Linearly maps a [`f32`] from an old range to a newer one, with parameter `clamps` available to clamp the result.
+/// Linearly maps a [`f32`] from an old range to a newer one, with argument `clamps` available to clamp the result.
 pub fn map(
     value: f32,
     old_start: f32,

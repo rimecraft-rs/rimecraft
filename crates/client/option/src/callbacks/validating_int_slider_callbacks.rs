@@ -20,7 +20,7 @@ where
     fn i32_validate(&self, value: Option<i32>) -> Option<i32> {
         match value {
             Some(value) => {
-                if rimecraft_math::in_range(value as f32, self.min as f32, self.max as f32) {
+                if value >= self.min && value <= self.max {
                     Some(value)
                 } else {
                     None
