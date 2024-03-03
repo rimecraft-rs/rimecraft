@@ -2,14 +2,14 @@
 
 use enum_iterator::Sequence;
 
-use super::ByIntId;
+use super::ByUIntId;
 
 /// Represents the perspective.
 ///
 /// # MCJE Reference
 ///
 /// This type represents `net.minecraft.client.option.Perspective` (yarn).
-#[derive(Debug, Sequence)]
+#[derive(Debug, Sequence, PartialEq)]
 pub enum Perspective {
 	/// 1st person perspective.
 	FirstPerson,
@@ -19,7 +19,7 @@ pub enum Perspective {
 	ThirdPersonFront
 }
 
-impl ByIntId for Perspective {}
+impl ByUIntId for Perspective {}
 
 impl Perspective {
 	fn is_first_person(&self) -> bool {
