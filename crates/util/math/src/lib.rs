@@ -36,6 +36,11 @@ pub fn min_f32(a: f32, b: f32) -> f32 {
     }
 }
 
+/// Returns if a [`f32`] is in the specified range.
+pub fn in_range(value: f32, min: f32, max: f32) -> bool {
+	value >= min && value <= max
+}
+
 /// Clamps a [`f32`] to an inclusive range.
 pub fn clamp(value: f32, min: f32, max: f32) -> f32 {
     max_f32(min, min_f32(max, value))
