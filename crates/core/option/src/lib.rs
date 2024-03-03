@@ -1,3 +1,5 @@
+//! Minecraft game options
+
 pub(crate) mod callbacks;
 pub mod tooltip_factory;
 
