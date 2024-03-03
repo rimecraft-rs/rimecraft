@@ -1,25 +1,29 @@
 use super::{Input, SlowDown};
 
+/// Represents keyboard input.
+#[derive(Debug)]
 pub struct KeyboardInput;
 
 impl KeyboardInput {
-    pub fn new_input() -> Input<KeyboardInput> {
-        Input::new(Self {})
-    }
+	/// Creates a new instance of `KeyboardInput`.
+	pub fn new_input() -> Input<KeyboardInput> {
+		Input::new(Self {})
+	}
 }
 
 impl Input<KeyboardInput> {
-    pub fn get_movement_modifier(positive: bool, negative: bool) -> f32 {
-        if positive == negative {
-            0.0
-        } else {
-            if positive {
-                1.0
-            } else {
-                -1.0
-            }
-        }
-    }
+	/// Returns the movement modifier based on the positive and negative flags.
+	pub fn get_movement_modifier(positive: bool, negative: bool) -> f32 {
+		if positive == negative {
+			0.0
+		} else {
+			if positive {
+				1.0
+			} else {
+				-1.0
+			}
+		}
+	}
 }
 
 impl Input<KeyboardInput> {
