@@ -9,17 +9,17 @@ pub use internal_types::*;
 pub use section::ChunkSection;
 
 /// Types associated with a [`ChunkSection`].
-pub trait ChunkSectionTy<'bs, 'bi> {
+pub trait ChunkSectionTy<'w> {
     /// The type of block state extensions.
-    type BlockStateExt: 'bs;
+    type BlockStateExt: 'w;
     /// The type of block state id list.
     type BlockStateList;
 
     /// The type of fluid state extensions.
-    type FluidStateExt: 'bs;
+    type FluidStateExt: 'w;
 
     /// The type of biomes.
-    type Biome: 'bi;
+    type Biome: 'w;
     /// The type of biome id list.
     type BiomeList;
 }

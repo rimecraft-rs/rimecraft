@@ -7,33 +7,33 @@ use rimecraft_chunk_palette::{
 use super::*;
 
 /// Section on a `Chunk`.
-pub struct ChunkSection<'bs, 'bi, K, Cx>
+pub struct ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'bs, 'bi>,
+    Cx: ChunkSectionTy<'w>,
 {
-    bsc: PalettedContainer<Cx::BlockStateList, IBlockState<'bs, 'bi, K, Cx>, Cx>,
-    bic: PalettedContainer<Cx::BiomeList, IBiome<'bs, 'bi, K, Cx>, Cx>,
+    bsc: PalettedContainer<Cx::BlockStateList, IBlockState<'w, K, Cx>, Cx>,
+    bic: PalettedContainer<Cx::BiomeList, IBiome<'w, K, Cx>, Cx>,
 
     ne_block_c: u16,
     rt_block_c: u16,
     ne_fluid_c: u16,
 }
 
-impl<'bs, 'bi, K, Cx> ChunkSection<'bs, 'bi, K, Cx>
+impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'bs, 'bi>,
-    Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, &'s IBlockState<'bs, 'bi, K, Cx>>,
+    Cx: ChunkSectionTy<'w>,
+    Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, K, Cx>>,
 
     for<'a> &'a Cx::BlockStateList: IntoIterator,
     for<'a> <&'a Cx::BlockStateList as IntoIterator>::IntoIter: ExactSizeIterator,
 
-    for<'a> &'a Cx::BlockStateExt: Into<IFluidStateRef<'a, 'bs, 'bi, K, Cx>>,
+    for<'a> &'a Cx::BlockStateExt: Into<IFluidStateRef<'a, 'w, K, Cx>>,
 {
     /// Creates a new chunk section with the given containers.
     #[inline]
     pub fn new(
-        bs_container: PalettedContainer<Cx::BlockStateList, IBlockState<'bs, 'bi, K, Cx>, Cx>,
-        bi_container: PalettedContainer<Cx::BiomeList, IBiome<'bs, 'bi, K, Cx>, Cx>,
+        bs_container: PalettedContainer<Cx::BlockStateList, IBlockState<'w, K, Cx>, Cx>,
+        bi_container: PalettedContainer<Cx::BiomeList, IBiome<'w, K, Cx>, Cx>,
     ) -> Self {
         let mut this = Self {
             bsc: bs_container,
@@ -53,7 +53,7 @@ where
         let mut ne_fluid_c = 0;
 
         self.bsc.count(|IBlockState { block, state }, count| {
-            let fs: IFluidStateRef<'_, '_, '_, _, _> = state.data().into();
+            let fs: IFluidStateRef<'_, '_, _, _> = state.data().into();
             if !block.settings().is_empty {
                 ne_block_c += count;
             }
@@ -74,15 +74,15 @@ where
     }
 }
 
-impl<'bs, 'bi, K, Cx> ChunkSection<'bs, 'bi, K, Cx>
+impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'bs, 'bi>,
+    Cx: ChunkSectionTy<'w>,
 {
     /// Returns the block state container of the chunk section.
     #[inline]
     pub fn bs_container(
         &self,
-    ) -> &PalettedContainer<Cx::BlockStateList, IBlockState<'bs, 'bi, K, Cx>, Cx> {
+    ) -> &PalettedContainer<Cx::BlockStateList, IBlockState<'w, K, Cx>, Cx> {
         &self.bsc
     }
 
@@ -90,13 +90,13 @@ where
     #[inline]
     pub fn bs_container_mut(
         &mut self,
-    ) -> &mut PalettedContainer<Cx::BlockStateList, IBlockState<'bs, 'bi, K, Cx>, Cx> {
+    ) -> &mut PalettedContainer<Cx::BlockStateList, IBlockState<'w, K, Cx>, Cx> {
         &mut self.bsc
     }
 
     /// Returns the biome container of the chunk section.
     #[inline]
-    pub fn bi_container(&self) -> &PalettedContainer<Cx::BiomeList, IBiome<'bs, 'bi, K, Cx>, Cx> {
+    pub fn bi_container(&self) -> &PalettedContainer<Cx::BiomeList, IBiome<'w, K, Cx>, Cx> {
         &self.bic
     }
 
@@ -104,7 +104,7 @@ where
     #[inline]
     pub fn bi_container_mut(
         &mut self,
-    ) -> &mut PalettedContainer<Cx::BiomeList, IBiome<'bs, 'bi, K, Cx>, Cx> {
+    ) -> &mut PalettedContainer<Cx::BiomeList, IBiome<'w, K, Cx>, Cx> {
         &mut self.bic
     }
 
@@ -133,52 +133,47 @@ where
     }
 }
 
-impl<'bs, 'bi, K, Cx> ChunkSection<'bs, 'bi, K, Cx>
+impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'bs, 'bi> + ComputeIndex<Cx::BlockStateList, IBlockState<'bs, 'bi, K, Cx>>,
-    Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, &'s IBlockState<'bs, 'bi, K, Cx>>,
+    Cx: ChunkSectionTy<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, K, Cx>>,
+    Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, K, Cx>>,
 {
     /// Returns the block state at the given position.
     #[inline]
-    pub fn block_state(
-        &self,
-        x: u32,
-        y: u32,
-        z: u32,
-    ) -> Option<IBlockStateRef<'_, 'bs, 'bi, K, Cx>> {
+    pub fn block_state(&self, x: u32, y: u32, z: u32) -> Option<IBlockStateRef<'_, 'w, K, Cx>> {
         self.bsc.get(Cx::compute_index(x, y, z)).map(From::from)
     }
 
     /// Returns the fluid state at the given position.
     #[inline]
-    pub fn fluid_state(&self, x: u32, y: u32, z: u32) -> Option<IFluidStateRef<'_, 'bs, 'bi, K, Cx>>
+    pub fn fluid_state(&self, x: u32, y: u32, z: u32) -> Option<IFluidStateRef<'_, 'w, K, Cx>>
     where
-        for<'a> &'a Cx::BlockStateExt: Into<IFluidStateRef<'a, 'bs, 'bi, K, Cx>>,
+        for<'a> &'a Cx::BlockStateExt: Into<IFluidStateRef<'a, 'w, K, Cx>>,
     {
         self.block_state(x, y, z)
             .map(|IBlockStateRef { state, .. }| state.data().into())
     }
 }
 
-impl<'bs, 'bi, K, Cx> ChunkSection<'bs, 'bi, K, Cx>
+impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'bs, 'bi> + ComputeIndex<Cx::Biome, IBiome<'bs, 'bi, K, Cx>>,
-    Cx::BiomeList: for<'s> PalIndexFromRaw<'s, &'s IBiome<'bs, 'bi, K, Cx>>,
+    Cx: ChunkSectionTy<'w> + ComputeIndex<Cx::Biome, IBiome<'w, K, Cx>>,
+    Cx::BiomeList: for<'s> PalIndexFromRaw<'s, &'s IBiome<'w, K, Cx>>,
 {
     /// Returns the biome at the given position.
     #[inline]
-    pub fn biome(&self, x: u32, y: u32, z: u32) -> Option<IBiome<'bs, 'bi, K, Cx>> {
+    pub fn biome(&self, x: u32, y: u32, z: u32) -> Option<IBiome<'w, K, Cx>> {
         self.bic.get(Cx::compute_index(x, y, z)).copied()
     }
 }
 
-impl<'bs, 'bi, K, Cx> ChunkSection<'bs, 'bi, K, Cx>
+impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'bs, 'bi> + ComputeIndex<Cx::BlockStateList, IBlockState<'bs, 'bi, K, Cx>>,
-    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'bs, 'bi, K, Cx>>
-        + for<'s> PalIndexFromRaw<'s, &'s IBlockState<'bs, 'bi, K, Cx>>
+    Cx: ChunkSectionTy<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, K, Cx>>,
+    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, K, Cx>>
+        + for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, K, Cx>>
         + Clone,
-    for<'a> &'a Cx::BlockStateExt: Into<IFluidStateRef<'a, 'bs, 'bi, K, Cx>>,
+    for<'a> &'a Cx::BlockStateExt: Into<IFluidStateRef<'a, 'w, K, Cx>>,
 {
     /// Sets the block state at the given position and returns the
     /// old one if present.
@@ -188,8 +183,8 @@ where
         x: u32,
         y: u32,
         z: u32,
-        state: IBlockState<'bs, 'bi, K, Cx>,
-    ) -> Option<IBlockStateRef<'_, 'bs, 'bi, K, Cx>> {
+        state: IBlockState<'w, K, Cx>,
+    ) -> Option<IBlockStateRef<'_, 'w, K, Cx>> {
         let bs_old = self.bsc.swap(Cx::compute_index(x, y, z), state.clone());
 
         if let Some(state_old) = bs_old {
@@ -199,7 +194,7 @@ where
                     self.rt_block_c -= 1;
                 }
             }
-            let fs: IFluidStateRef<'_, '_, '_, _, _> = state_old.state.data().into();
+            let fs: IFluidStateRef<'_, '_, _, _> = state_old.state.data().into();
             if !fs.fluid.settings().is_empty {
                 self.ne_fluid_c -= 1;
             }
@@ -211,7 +206,7 @@ where
                 }
             }
 
-            let fs: IFluidStateRef<'_, '_, '_, _, _> = state.state.data().into();
+            let fs: IFluidStateRef<'_, '_, _, _> = state.state.data().into();
             if !fs.fluid.settings().is_empty {
                 self.ne_fluid_c += 1;
             }
@@ -221,10 +216,10 @@ where
     }
 }
 
-impl<'bs, 'bi, K, Cx> Debug for ChunkSection<'bs, 'bi, K, Cx>
+impl<'w, K, Cx> Debug for ChunkSection<'w, K, Cx>
 where
     K: Debug,
-    Cx: ChunkSectionTy<'bs, 'bi> + Debug,
+    Cx: ChunkSectionTy<'w> + Debug,
     Cx::BlockStateExt: Debug,
     Cx::BlockStateList: Debug,
     Cx::Biome: Debug,
@@ -247,11 +242,11 @@ mod _edcode {
 
     use super::*;
 
-    impl<'bs, 'bi, K, Cx> Encode for ChunkSection<'bs, 'bi, K, Cx>
+    impl<'w, K, Cx> Encode for ChunkSection<'w, K, Cx>
     where
-        Cx: ChunkSectionTy<'bs, 'bi>,
-        Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'bs, 'bi, K, Cx>>,
-        Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'bs, 'bi, K, Cx>>,
+        Cx: ChunkSectionTy<'w>,
+        Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, K, Cx>>,
+        Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, K, Cx>>,
     {
         fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
         where
@@ -263,18 +258,18 @@ mod _edcode {
         }
     }
 
-    impl<'bs, 'bi, K, Cx> Update for ChunkSection<'bs, 'bi, K, Cx>
+    impl<'w, K, Cx> Update for ChunkSection<'w, K, Cx>
     where
-        Cx: ChunkSectionTy<'bs, 'bi>,
+        Cx: ChunkSectionTy<'w>,
 
-        Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, IBlockState<'bs, 'bi, K, Cx>> + Clone,
-        Cx::BiomeList: for<'s> PalIndexFromRaw<'s, &'s IBiome<'bs, 'bi, K, Cx>>
-            + for<'s> PalIndexFromRaw<'s, IBiome<'bs, 'bi, K, Cx>>
-            + for<'a> PalIndexToRaw<&'a IBiome<'bs, 'bi, K, Cx>>
+        Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, IBlockState<'w, K, Cx>> + Clone,
+        Cx::BiomeList: for<'s> PalIndexFromRaw<'s, &'s IBiome<'w, K, Cx>>
+            + for<'s> PalIndexFromRaw<'s, IBiome<'w, K, Cx>>
+            + for<'a> PalIndexToRaw<&'a IBiome<'w, K, Cx>>
             + Clone,
 
-        Cx: ProvidePalette<Cx::BlockStateList, IBlockState<'bs, 'bi, K, Cx>>,
-        Cx: ProvidePalette<Cx::BiomeList, IBiome<'bs, 'bi, K, Cx>>,
+        Cx: ProvidePalette<Cx::BlockStateList, IBlockState<'w, K, Cx>>,
+        Cx: ProvidePalette<Cx::BiomeList, IBiome<'w, K, Cx>>,
     {
         fn update<B>(&mut self, mut buf: B) -> Result<(), std::io::Error>
         where
