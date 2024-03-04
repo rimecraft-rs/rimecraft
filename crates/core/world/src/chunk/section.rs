@@ -283,4 +283,38 @@ mod _edcode {
             Ok(())
         }
     }
+
+    impl<'w, K, Cx> ChunkSection<'w, K, Cx>
+    where
+        Cx: ChunkSectionTy<'w>,
+        Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, K, Cx>>,
+        Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, K, Cx>>,
+    {
+        /// Returns the encoded length of the chunk section.
+        pub fn encoded_len(&self) -> usize {
+            2 + self.bsc.encoded_len() + self.bic.encoded_len()
+        }
+    }
+
+    impl<'w, K, Cx> ChunkSection<'w, K, Cx>
+    where
+        Cx: ChunkSectionTy<'w>,
+        Cx::BiomeList: for<'s> PalIndexFromRaw<'s, &'s IBiome<'w, K, Cx>>
+            + for<'s> PalIndexFromRaw<'s, IBiome<'w, K, Cx>>
+            + for<'a> PalIndexToRaw<&'a IBiome<'w, K, Cx>>
+            + Clone,
+        Cx: ProvidePalette<Cx::BiomeList, IBiome<'w, K, Cx>>,
+    {
+        /// Updates the chunk section from the given biome packet buffer.
+        #[allow(clippy::missing_errors_doc)]
+        pub fn update_from_biome_buf<B>(&mut self, mut buf: B) -> Result<(), std::io::Error>
+        where
+            B: rimecraft_edcode::bytes::Buf,
+        {
+            let mut sliced = self.bic.to_slice();
+            sliced.update(&mut buf)?;
+            self.bic = sliced;
+            Ok(())
+        }
+    }
 }
