@@ -5,29 +5,29 @@ use rimecraft_fluid::Fluid;
 use rimecraft_registry::Reg;
 use rimecraft_state::State;
 
-use super::ChunkSectionTy;
+use super::ChunkTy;
 
 /// The internal-used `Biome` type.
-pub type IBiome<'w, K, Cx> = Reg<'w, K, <Cx as ChunkSectionTy<'w>>::Biome>;
+pub type IBiome<'w, K, Cx> = Reg<'w, K, <Cx as ChunkTy<'w>>::Biome>;
 
 /// The internal-used `BlockState` type.
 ///
 /// This contains the block registration and the [`State`].
 pub struct IBlockState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     /// The block.
-    pub block: Block<'w, K, <Cx as ChunkSectionTy<'w>>::BlockStateExt, Cx>,
+    pub block: Block<'w, K, <Cx as ChunkTy<'w>>::BlockStateExt, Cx>,
     /// The state.
-    pub state: Arc<State<'w, <Cx as ChunkSectionTy<'w>>::BlockStateExt>>,
+    pub state: Arc<State<'w, <Cx as ChunkTy<'w>>::BlockStateExt>>,
 }
 
 impl<'w, K, Cx> Debug for IBlockState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w> + Debug,
+    Cx: ChunkTy<'w> + Debug,
     K: Debug,
-    <Cx as ChunkSectionTy<'w>>::BlockStateExt: Debug,
+    <Cx as ChunkTy<'w>>::BlockStateExt: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IBlockState")
@@ -39,7 +39,7 @@ where
 
 impl<'w, K, Cx> Clone for IBlockState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -52,7 +52,7 @@ where
 
 impl<'w, K, Cx> PartialEq for IBlockState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -60,11 +60,11 @@ where
     }
 }
 
-impl<'w, K, Cx> Eq for IBlockState<'w, K, Cx> where Cx: ChunkSectionTy<'w> {}
+impl<'w, K, Cx> Eq for IBlockState<'w, K, Cx> where Cx: ChunkTy<'w> {}
 
 impl<'w, K, Cx> Hash for IBlockState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -76,19 +76,19 @@ where
 /// The internal-used [`IBlockState`] reference type.
 pub struct IBlockStateRef<'a, 'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     /// The block.
-    pub block: Block<'w, K, <Cx as ChunkSectionTy<'w>>::BlockStateExt, Cx>,
+    pub block: Block<'w, K, <Cx as ChunkTy<'w>>::BlockStateExt, Cx>,
     /// The state.
-    pub state: &'a Arc<State<'w, <Cx as ChunkSectionTy<'w>>::BlockStateExt>>,
+    pub state: &'a Arc<State<'w, <Cx as ChunkTy<'w>>::BlockStateExt>>,
 }
 
 impl<'w, K, Cx> Debug for IBlockStateRef<'_, 'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w> + Debug,
+    Cx: ChunkTy<'w> + Debug,
     K: Debug,
-    <Cx as ChunkSectionTy<'w>>::BlockStateExt: Debug,
+    <Cx as ChunkTy<'w>>::BlockStateExt: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IBlockStateRef")
@@ -100,7 +100,7 @@ where
 
 impl<'w, K, Cx> Clone for IBlockStateRef<'_, 'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -108,11 +108,11 @@ where
     }
 }
 
-impl<'w, K, Cx> Copy for IBlockStateRef<'_, 'w, K, Cx> where Cx: ChunkSectionTy<'w> {}
+impl<'w, K, Cx> Copy for IBlockStateRef<'_, 'w, K, Cx> where Cx: ChunkTy<'w> {}
 
 impl<'w, K, Cx> PartialEq for IBlockStateRef<'_, 'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -120,11 +120,11 @@ where
     }
 }
 
-impl<'w, K, Cx> Eq for IBlockStateRef<'_, 'w, K, Cx> where Cx: ChunkSectionTy<'w> {}
+impl<'w, K, Cx> Eq for IBlockStateRef<'_, 'w, K, Cx> where Cx: ChunkTy<'w> {}
 
 impl<'a, 'w, K, Cx> From<IBlockStateRef<'a, 'w, K, Cx>> for IBlockState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn from(value: IBlockStateRef<'a, 'w, K, Cx>) -> Self {
@@ -137,7 +137,7 @@ where
 
 impl<'a, 'w, K, Cx> From<&'a IBlockState<'w, K, Cx>> for IBlockStateRef<'a, 'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn from(value: &'a IBlockState<'w, K, Cx>) -> Self {
@@ -153,19 +153,19 @@ where
 /// This contains the fluid registration and the [`State`].
 pub struct IFluidState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     /// The fluid.
-    pub fluid: Fluid<'w, K, <Cx as ChunkSectionTy<'w>>::FluidStateExt, Cx>,
+    pub fluid: Fluid<'w, K, <Cx as ChunkTy<'w>>::FluidStateExt, Cx>,
     /// The state.
-    pub state: Arc<State<'w, <Cx as ChunkSectionTy<'w>>::FluidStateExt>>,
+    pub state: Arc<State<'w, <Cx as ChunkTy<'w>>::FluidStateExt>>,
 }
 
 impl<'w, K, Cx> Debug for IFluidState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w> + Debug,
+    Cx: ChunkTy<'w> + Debug,
     K: Debug,
-    <Cx as ChunkSectionTy<'w>>::FluidStateExt: Debug,
+    <Cx as ChunkTy<'w>>::FluidStateExt: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IFluidState")
@@ -177,7 +177,7 @@ where
 
 impl<'w, K, Cx> Clone for IFluidState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -190,7 +190,7 @@ where
 
 impl<'w, K, Cx> PartialEq for IFluidState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -198,11 +198,11 @@ where
     }
 }
 
-impl<'w, K, Cx> Eq for IFluidState<'w, K, Cx> where Cx: ChunkSectionTy<'w> {}
+impl<'w, K, Cx> Eq for IFluidState<'w, K, Cx> where Cx: ChunkTy<'w> {}
 
 impl<'w, K, Cx> Hash for IFluidState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -214,19 +214,19 @@ where
 /// The internal-used [`IFluidState`] reference type.
 pub struct IFluidStateRef<'a, 'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     /// The fluid.
-    pub fluid: Fluid<'w, K, <Cx as ChunkSectionTy<'w>>::FluidStateExt, Cx>,
+    pub fluid: Fluid<'w, K, <Cx as ChunkTy<'w>>::FluidStateExt, Cx>,
     /// The state.
-    pub state: &'a Arc<State<'w, <Cx as ChunkSectionTy<'w>>::FluidStateExt>>,
+    pub state: &'a Arc<State<'w, <Cx as ChunkTy<'w>>::FluidStateExt>>,
 }
 
 impl<'w, K, Cx> Debug for IFluidStateRef<'_, 'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w> + Debug,
+    Cx: ChunkTy<'w> + Debug,
     K: Debug,
-    <Cx as ChunkSectionTy<'w>>::FluidStateExt: Debug,
+    <Cx as ChunkTy<'w>>::FluidStateExt: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IFluidStateRef")
@@ -238,7 +238,7 @@ where
 
 impl<'w, K, Cx> Clone for IFluidStateRef<'_, 'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -246,11 +246,11 @@ where
     }
 }
 
-impl<'w, K, Cx> Copy for IFluidStateRef<'_, 'w, K, Cx> where Cx: ChunkSectionTy<'w> {}
+impl<'w, K, Cx> Copy for IFluidStateRef<'_, 'w, K, Cx> where Cx: ChunkTy<'w> {}
 
 impl<'w, K, Cx> PartialEq for IFluidStateRef<'_, 'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -258,11 +258,11 @@ where
     }
 }
 
-impl<'w, K, Cx> Eq for IFluidStateRef<'_, 'w, K, Cx> where Cx: ChunkSectionTy<'w> {}
+impl<'w, K, Cx> Eq for IFluidStateRef<'_, 'w, K, Cx> where Cx: ChunkTy<'w> {}
 
 impl<'a, 'w, K, Cx> From<IFluidStateRef<'a, 'w, K, Cx>> for IFluidState<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn from(value: IFluidStateRef<'a, 'w, K, Cx>) -> Self {
@@ -275,7 +275,7 @@ where
 
 impl<'a, 'w, K, Cx> From<&'a IFluidState<'w, K, Cx>> for IFluidStateRef<'a, 'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     #[inline]
     fn from(value: &'a IFluidState<'w, K, Cx>) -> Self {

@@ -1,15 +1,24 @@
 //! Types and traits for working with chunks of blocks in a world.
 
-use rimecraft_chunk_palette::container::ProvidePalette;
-
 mod internal_types;
 mod section;
+mod upgrade;
+
+use std::fmt::Debug;
 
 pub use internal_types::*;
+pub use rimecraft_voxel_math::ChunkPos;
 pub use section::ChunkSection;
+pub use upgrade::UpgradeData;
 
-/// Types associated with a [`ChunkSection`].
-pub trait ChunkSectionTy<'w> {
+use crate::view::HeightLimit;
+
+/// Types associated with a `Chunk`.
+///
+/// # Generics
+///
+/// - `'w`: The world lifetime. See the crate document for more information.
+pub trait ChunkTy<'w> {
     /// The type of block state extensions.
     type BlockStateExt: 'w;
     /// The type of block state id list.
@@ -24,13 +33,63 @@ pub trait ChunkSectionTy<'w> {
     type BiomeList;
 }
 
-/// Trait for computing the index of a position in a chunk section for [`PalettedContainer`].
-pub trait ComputeIndex<L, T>: ProvidePalette<L, T> {
-    /// Computes the index of the given position.
-    ///
-    /// The number type is unsigned because the index will overflow if it's negative.
-    #[inline]
-    fn compute_index(x: u32, y: u32, z: u32) -> usize {
-        ((y << Self::EDGE_BITS | z) << Self::EDGE_BITS | x) as usize
+/// A scoped, mutable view of biomes, block states, fluid states and
+/// block entities.
+///
+/// # Generics
+///
+/// - `'w`: The world lifetime. See the crate document for more information.
+/// - `T`: The chunk implementation data type. It provides functionalities like `WorldChunk` and `ProtoChunk`.
+/// - `K`: The `Identifier` type.
+/// - `Cx`: The global context type, providing access to the static fields and logics of the game.
+pub struct Chunk<'w, T, K, Cx>
+where
+    Cx: ChunkTy<'w>,
+{
+    pos: ChunkPos,
+
+    hlimit: HeightLimit,
+    section_array: Option<Vec<ChunkSection<'w, K, Cx>>>,
+
+    vdata: T,
+}
+
+impl<'w, T, K, Cx> Chunk<'w, T, K, Cx>
+where
+    Cx: ChunkTy<'w>,
+{
+    /// Creates a new chunk from scratch.
+    pub fn new(
+        pos: ChunkPos,
+        height_limit: HeightLimit,
+        section_array: Option<Vec<ChunkSection<'w, K, Cx>>>,
+        vdata: T,
+    ) -> Self {
+        Self {
+            pos,
+            hlimit: height_limit,
+            section_array,
+            vdata,
+        }
+    }
+}
+
+impl<'w, T, K, Cx> Debug for Chunk<'w, T, K, Cx>
+where
+    T: Debug,
+    K: Debug,
+    Cx: ChunkTy<'w> + Debug,
+    Cx::BlockStateExt: Debug,
+    Cx::BlockStateList: Debug,
+    Cx::Biome: Debug,
+    Cx::BiomeList: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Chunk")
+            .field("pos", &self.pos)
+            .field("hlimit", &self.hlimit)
+            .field("section_array", &self.section_array)
+            .field("vdata", &self.vdata)
+            .finish()
     }
 }

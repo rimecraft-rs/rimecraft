@@ -1,15 +1,16 @@
 use std::fmt::Debug;
 
 use rimecraft_chunk_palette::{
-    container::PalettedContainer, IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw,
+    container::{PalettedContainer, ProvidePalette},
+    IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw,
 };
 
-use super::*;
+use super::{internal_types::*, ChunkTy};
 
 /// Section on a `Chunk`.
 pub struct ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     bsc: PalettedContainer<Cx::BlockStateList, IBlockState<'w, K, Cx>, Cx>,
     bic: PalettedContainer<Cx::BiomeList, IBiome<'w, K, Cx>, Cx>,
@@ -21,7 +22,7 @@ where
 
 impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
     Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, K, Cx>>,
 
     for<'a> &'a Cx::BlockStateList: IntoIterator,
@@ -76,7 +77,7 @@ where
 
 impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w>,
+    Cx: ChunkTy<'w>,
 {
     /// Returns the block state container of the chunk section.
     #[inline]
@@ -135,7 +136,7 @@ where
 
 impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, K, Cx>>,
+    Cx: ChunkTy<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, K, Cx>>,
     Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, K, Cx>>,
 {
     /// Returns the block state at the given position.
@@ -157,7 +158,7 @@ where
 
 impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w> + ComputeIndex<Cx::Biome, IBiome<'w, K, Cx>>,
+    Cx: ChunkTy<'w> + ComputeIndex<Cx::Biome, IBiome<'w, K, Cx>>,
     Cx::BiomeList: for<'s> PalIndexFromRaw<'s, &'s IBiome<'w, K, Cx>>,
 {
     /// Returns the biome at the given position.
@@ -169,7 +170,7 @@ where
 
 impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
-    Cx: ChunkSectionTy<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, K, Cx>>,
+    Cx: ChunkTy<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, K, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, K, Cx>>
         + for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, K, Cx>>
         + Clone,
@@ -219,7 +220,7 @@ where
 impl<'w, K, Cx> Debug for ChunkSection<'w, K, Cx>
 where
     K: Debug,
-    Cx: ChunkSectionTy<'w> + Debug,
+    Cx: ChunkTy<'w> + Debug,
     Cx::BlockStateExt: Debug,
     Cx::BlockStateList: Debug,
     Cx::Biome: Debug,
@@ -236,6 +237,17 @@ where
     }
 }
 
+/// Trait for computing the index of a position in a chunk section for [`PalettedContainer`].
+pub trait ComputeIndex<L, T>: ProvidePalette<L, T> {
+    /// Computes the index of the given position.
+    ///
+    /// The number type is unsigned because the index will overflow if it's negative.
+    #[inline]
+    fn compute_index(x: u32, y: u32, z: u32) -> usize {
+        ((y << Self::EDGE_BITS | z) << Self::EDGE_BITS | x) as usize
+    }
+}
+
 #[cfg(feature = "edcode")]
 mod _edcode {
     use rimecraft_edcode::{Encode, Update};
@@ -244,7 +256,7 @@ mod _edcode {
 
     impl<'w, K, Cx> Encode for ChunkSection<'w, K, Cx>
     where
-        Cx: ChunkSectionTy<'w>,
+        Cx: ChunkTy<'w>,
         Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, K, Cx>>,
         Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, K, Cx>>,
     {
@@ -260,7 +272,7 @@ mod _edcode {
 
     impl<'w, K, Cx> Update for ChunkSection<'w, K, Cx>
     where
-        Cx: ChunkSectionTy<'w>,
+        Cx: ChunkTy<'w>,
 
         Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, IBlockState<'w, K, Cx>> + Clone,
         Cx::BiomeList: for<'s> PalIndexFromRaw<'s, &'s IBiome<'w, K, Cx>>
@@ -286,7 +298,7 @@ mod _edcode {
 
     impl<'w, K, Cx> ChunkSection<'w, K, Cx>
     where
-        Cx: ChunkSectionTy<'w>,
+        Cx: ChunkTy<'w>,
         Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, K, Cx>>,
         Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, K, Cx>>,
     {
@@ -298,7 +310,7 @@ mod _edcode {
 
     impl<'w, K, Cx> ChunkSection<'w, K, Cx>
     where
-        Cx: ChunkSectionTy<'w>,
+        Cx: ChunkTy<'w>,
         Cx::BiomeList: for<'s> PalIndexFromRaw<'s, &'s IBiome<'w, K, Cx>>
             + for<'s> PalIndexFromRaw<'s, IBiome<'w, K, Cx>>
             + for<'a> PalIndexToRaw<&'a IBiome<'w, K, Cx>>
