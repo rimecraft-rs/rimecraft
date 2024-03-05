@@ -106,13 +106,51 @@ impl Path {
         Ok(Self(ArcCowStr::Arc(value)))
     }
 
+
     /// Creates a new [`Path`] from the given value.
     ///
     /// This function accepts a 2-dimension [`Vec`] which stands for words wrapped in locations.
     ///
     /// # Examples
     ///
+    /// ```
+    /// let path = Path::new_formatted(vec![
+    /// 		vec!["tags"],
+    /// 		vec![],
+    /// 		vec!["piglin", "", "likes"],
+    /// 	]);
+    /// let identifier = Identifier::new(MINECRAFT, path);
     ///
+    /// assert_eq!("minecraft:tags/piglin_likes", identifier.to_string());
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of the given words is invalid.
+    #[inline]
+    pub fn new_formatted<T>(values: Vec<Vec<T>>) -> Self
+    where
+        T: Into<Arc<str>>,
+    {
+		Self::try_new_formatted(values).unwrap()
+	}
+
+    /// Creates a new [`Path`] from the given value.
+    ///
+    /// This function accepts a 2-dimension [`Vec`] which stands for words wrapped in locations.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let path = Path::try_new_formatted(vec![
+    /// 		vec!["tags"],
+    /// 		vec![],
+    /// 		vec!["piglin", "", "likes"],
+    /// 	]).unwrap();
+    /// let identifier = Identifier::new(MINECRAFT, path);
+    ///
+    /// assert_eq!("minecraft:tags/piglin_likes", identifier.to_string());
+    /// ```
     ///
     /// # Errors
     ///
