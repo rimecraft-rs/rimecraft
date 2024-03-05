@@ -12,6 +12,8 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+rimecraft-text = { path = "../text" }
+rimecraft-identifier = { path = "../../util/identifier" ,features = ["vanilla"]}
 
 [lints]
 workspace = true
