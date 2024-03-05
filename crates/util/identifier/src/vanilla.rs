@@ -1,6 +1,6 @@
 //! Vanilla implementation of namespace and path.
 
-use std::{f64::consts::E, hash::Hash, str::FromStr, sync::Arc};
+use std::{hash::Hash, str::FromStr, sync::Arc};
 
 use crate::Separate;
 
@@ -145,11 +145,10 @@ impl Path {
     /// let path = Path::try_new_formatted(vec![
     /// 		vec!["tags"],
     /// 		vec![],
-    /// 		vec!["piglin", "", "likes"],
+    /// 		vec!["piglin", "", "repellents"],
     /// 	]).unwrap();
     /// let identifier = Identifier::new(MINECRAFT, path);
-    ///
-    /// assert_eq!("minecraft:tags/piglin_likes", identifier.to_string());
+    /// assert_eq!("minecraft:tags/piglin_repellents", identifier.to_string());
     /// ```
     ///
     /// # Errors

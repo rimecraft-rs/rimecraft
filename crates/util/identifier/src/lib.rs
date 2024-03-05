@@ -18,7 +18,7 @@ pub struct Identifier<N, P> {
 }
 
 impl<N, P> Identifier<N, P> {
-    /// Creates a new identifier.
+    /// Creates a new [`Identifier`].
     #[inline]
     pub const fn new(namespace: N, path: P) -> Self {
         Self { namespace, path }
