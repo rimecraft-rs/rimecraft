@@ -78,20 +78,6 @@ impl Default for Namespace {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Path(ArcCowStr<'static>);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PathWord(Vec<ArcCowStr<'static>>);
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PathLocation(Vec<ArcCowStr<'static>>);
-
-impl Separate for PathWord {
-    const SEPARATOR: char = '_';
-}
-
-impl Separate for PathLocation {
-    const SEPARATOR: char = '/';
-}
-
 impl Path {
     /// Creates a new [`Path`] from the given value.
     ///
@@ -151,56 +137,6 @@ impl FromStr for Path {
         Ok(Self(ArcCowStr::Arc(s.into())))
     }
 }
-
-impl PathWord {
-    #[inline]
-    pub fn new<I, T>(value: I) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Arc<str>>,
-    {
-        Self(
-            value
-                .into_iter()
-                .map(|s| {
-                    let s = s.into();
-                    validate_path(&s);
-                    s
-                })
-                .map(ArcCowStr::Arc)
-                .collect(),
-        )
-    }
-
-    #[inline]
-    pub fn new_unchecked(value: Vec<&'static str>) -> Self {
-        Self(value.into_iter().map(|s| ArcCowStr::Ref(s)).collect())
-    }
-
-    #[inline]
-    pub fn as_str(&self) -> &str {
-        self.0.join(Self::SEPARATOR)
-    }
-}
-
-impl std::fmt::Display for PathWord {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl FromStr for PathWord {
-    type Err = Error;
-
-    #[inline]
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        validate_path(s)?;
-        Ok(Self(ArcCowStr::Arc(s.into())))
-    }
-}
-
-impl PathLocation {}
 
 #[derive(Debug, Clone)]
 enum ArcCowStr<'a> {
