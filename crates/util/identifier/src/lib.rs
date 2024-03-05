@@ -194,3 +194,6 @@ mod edcode {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

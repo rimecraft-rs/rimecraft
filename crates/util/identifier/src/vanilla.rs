@@ -1,6 +1,6 @@
 //! Vanilla implementation of namespace and path.
 
-use std::{hash::Hash, str::FromStr, sync::Arc};
+use std::{f64::consts::E, hash::Hash, str::FromStr, sync::Arc};
 
 use crate::Separate;
 
@@ -105,6 +105,80 @@ impl Path {
         validate_path(&value)?;
         Ok(Self(ArcCowStr::Arc(value)))
     }
+
+    /// Creates a new [`Path`] from the given value.
+    ///
+    /// This function accepts a 2-dimension [`Vec`] which stands for words wrapped in locations.
+    ///
+    /// # Examples
+    ///
+    ///
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the given path is invalid.
+    #[inline]
+    pub fn try_new_formatted<T>(values: Vec<Vec<T>>) -> Result<Self, Error>
+    where
+        T: Into<Arc<str>>,
+    {
+        let values: Vec<Vec<Result<Arc<str>, Error>>> = values
+            .into_iter()
+            .map(|v| {
+                v.into_iter()
+                    .map(|s| {
+                        let s = s.into();
+                        match validate_path(&s) {
+                            Ok(_) => Ok(s),
+                            Err(error) => Err(error),
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+
+        match values.iter().flat_map(|v| v.iter()).find_map(|r| match r {
+            Ok(_) => None,
+            Err(error) => Some(error),
+        }) {
+            Some(error) => return Err((*error).clone()),
+            None => (),
+        };
+
+        let values: Vec<Vec<Arc<str>>> = values
+            .into_iter()
+            .filter_map(|v| {
+                let v: Vec<Arc<str>> = v
+                    .into_iter()
+                    .filter_map(|r| match r {
+                        Ok(s) => {
+                            if s.len() > 0 {
+                                Some(s)
+                            } else {
+                                None
+                            }
+                        }
+                        Err(_) => None,
+                    })
+                    .collect();
+
+                if v.len() > 0 {
+                    Some(v)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Join words
+        let values: Vec<Arc<str>> = values.into_iter().map(|v| v.join("_").into()).collect();
+
+        // Join locations
+        let arc: Arc<str> = values.join("/").into();
+
+        Ok(Self(ArcCowStr::Arc(arc)))
+    }
+
     /// Creates a new [`Path`] from the given value
     /// at compile time.
     ///
@@ -227,7 +301,7 @@ fn validate_path(value: &str) -> Result<(), Error> {
 }
 
 /// Error type for `Namespace` and `Path`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Error {
     /// The given namespace is invalid.
     InvalidNamespace(String),
