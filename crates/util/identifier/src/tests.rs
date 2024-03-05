@@ -11,4 +11,8 @@ fn create_identifiers() {
     let path = Path::try_new_formatted(vec![vec!["a", "b", ""], vec![], vec!["42"]]).unwrap();
     let identifier = Identifier::new(Namespace::new("n"), path);
     assert_eq!("n:a_b/42", identifier.to_string());
+
+    let identifier =
+        format_identifier!(Namespace::from_str("namespace").unwrap(); "a", "b"; "c"; "42");
+    assert_eq!("namespace:a_b/c/42", identifier.to_string());
 }
