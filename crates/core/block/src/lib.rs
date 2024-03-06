@@ -1,6 +1,6 @@
 //! Minecraft Block primitives.
 
-use rimecraft_registry::Reg;
+use rimecraft_registry::{ProvideRegistry, Reg};
 use rimecraft_state::{States, StatesMut};
 
 use std::marker::PhantomData;
@@ -46,6 +46,16 @@ where
     #[inline]
     fn from(settings: Settings) -> Self {
         Self::new(settings, StatesMut::new(Default::default()).freeze())
+    }
+}
+
+impl<'r, SExt, K, Cx> ProvideRegistry<'r, K, Self> for RawBlock<'r, SExt, Cx>
+where
+    Cx: ProvideRegistry<'r, K, Self>,
+{
+    #[inline(always)]
+    fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
+        Cx::registry()
     }
 }
 

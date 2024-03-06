@@ -1,3 +1,5 @@
+//! Ticks and their priorities.
+
 use std::hash::Hash;
 
 use rimecraft_voxel_math::BlockPos;
@@ -8,7 +10,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 pub struct Tick<T> {
     ty: T,
     pos: BlockPos,
-    delay: u32,
+    delay: i32,
     priority: Priority,
 }
 
@@ -38,7 +40,7 @@ impl<T> Tick<T> {
 
     /// Returns the delay of the tick.
     #[inline]
-    pub fn delay(&self) -> u32 {
+    pub fn delay(&self) -> i32 {
         self.delay
     }
 
@@ -67,6 +69,131 @@ where
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.ty.hash(state);
         self.pos.hash(state);
+    }
+}
+
+/// [`Tick`] but ordered.
+#[derive(Debug, Clone, Copy)]
+pub struct OrderedTick<T> {
+    ty: T,
+    pos: BlockPos,
+    trigger_tick: i64,
+    priority: Priority,
+    sub_tick_order: i16,
+}
+
+impl<T> OrderedTick<T> {
+    /// Creates a new ordered tick.
+    #[inline]
+    pub fn new(
+        ty: T,
+        pos: BlockPos,
+        trigger_tick: i64,
+        priority: Priority,
+        sub_tick_order: i16,
+    ) -> Self {
+        Self {
+            ty,
+            pos,
+            trigger_tick,
+            priority,
+            sub_tick_order,
+        }
+    }
+
+    /// Returns the type of the tick.
+    #[inline]
+    pub fn ty(&self) -> &T {
+        &self.ty
+    }
+
+    /// Returns the position of the tick.
+    #[inline]
+    pub fn pos(&self) -> BlockPos {
+        self.pos
+    }
+
+    /// Returns the trigger tick of the tick.
+    #[inline]
+    pub fn trigger_tick(&self) -> i64 {
+        self.trigger_tick
+    }
+
+    /// Returns the priority of the tick.
+    #[inline]
+    pub fn priority(&self) -> Priority {
+        self.priority
+    }
+
+    /// Returns the sub-tick order of the tick.
+    #[inline]
+    pub fn sub_tick_order(&self) -> i16 {
+        self.sub_tick_order
+    }
+}
+
+impl<T> OrderedTick<T>
+where
+    T: Eq,
+{
+    /// Compares ordered ticks by their trigger ticks, or else by [`Ord`].
+    pub fn trigger_tick_cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let cmp = self.trigger_tick.cmp(&other.trigger_tick);
+        if cmp.is_eq() {
+            self.cmp(other)
+        } else {
+            cmp
+        }
+    }
+}
+
+impl<T> PartialEq for OrderedTick<T>
+where
+    T: PartialEq,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.ty == other.ty && self.pos == other.pos
+    }
+}
+
+impl<T> Eq for OrderedTick<T> where T: Eq {}
+
+impl<T> Hash for OrderedTick<T>
+where
+    T: Hash,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.ty.hash(state);
+        self.pos.hash(state);
+    }
+}
+
+impl<T> PartialOrd for OrderedTick<T>
+where
+    T: PartialEq,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let cmp = self.priority.cmp(&other.priority);
+        if cmp.is_eq() {
+            Some(self.sub_tick_order.cmp(&other.sub_tick_order))
+        } else {
+            Some(cmp)
+        }
+    }
+}
+
+impl<T> Ord for OrderedTick<T>
+where
+    T: Eq,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let cmp = self.priority.cmp(&other.priority);
+        if cmp.is_eq() {
+            self.sub_tick_order.cmp(&other.sub_tick_order)
+        } else {
+            cmp
+        }
     }
 }
 
@@ -137,7 +264,7 @@ mod _serde {
                 x: i32,
                 y: i32,
                 z: i32,
-                t: u32,
+                t: i32,
                 p: Priority,
             }
 
@@ -167,7 +294,7 @@ mod _serde {
                 x: i32,
                 y: i32,
                 z: i32,
-                t: u32,
+                t: i32,
                 p: Priority,
             }
 

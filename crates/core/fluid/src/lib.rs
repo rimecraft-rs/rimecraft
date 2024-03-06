@@ -1,6 +1,6 @@
 //! Minecraft Block primitives.
 
-use rimecraft_registry::Reg;
+use rimecraft_registry::{ProvideRegistry, Reg};
 use rimecraft_state::States;
 
 use std::marker::PhantomData;
@@ -36,6 +36,16 @@ impl<'a, SExt, Cx> RawFluid<'a, SExt, Cx> {
     #[inline]
     pub fn settings(&self) -> &Settings {
         &self.settings
+    }
+}
+
+impl<'r, SExt, K, Cx> ProvideRegistry<'r, K, Self> for RawFluid<'r, SExt, Cx>
+where
+    Cx: ProvideRegistry<'r, K, Self>,
+{
+    #[inline(always)]
+    fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
+        Cx::registry()
     }
 }
 

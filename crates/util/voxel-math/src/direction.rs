@@ -202,6 +202,79 @@ impl AxisDirection {
     }
 }
 
+/// An enum representing 4 cardinal directions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(clippy::exhaustive_enums)]
+#[repr(u8)]
+pub enum EightWayDirection {
+    /// Represents [`Direction::North`].
+    North,
+    /// Represents [`Direction::South`] and [`Direction::East`].
+    NorthEast,
+    /// Represents [`Direction::East`].
+    East,
+    /// Represents [`Direction::South`] and [`Direction::West`].
+    SouthEast,
+    /// Represents [`Direction::South`].
+    South,
+    /// Represents [`Direction::South`] and [`Direction::West`].
+    SouthWest,
+    /// Represents [`Direction::West`].
+    West,
+    /// Represents [`Direction::North`] and [`Direction::West`].
+    NorthWest,
+}
+
+impl EightWayDirection {
+    /// The amount of directions.
+    pub const COUNT: usize = 8;
+
+    /// All directions.
+    pub const ALL: [Self; Self::COUNT] = [
+        Self::North,
+        Self::NorthEast,
+        Self::East,
+        Self::SouthEast,
+        Self::South,
+        Self::SouthWest,
+        Self::West,
+        Self::NorthWest,
+    ];
+
+    /// Gets the [`Direction`]s of this direction.
+    pub const fn directions(self) -> &'static [Direction] {
+        match self {
+            Self::North => &[Direction::North],
+            Self::NorthEast => &[Direction::North, Direction::East],
+            Self::East => &[Direction::East],
+            Self::SouthEast => &[Direction::South, Direction::East],
+            Self::South => &[Direction::South],
+            Self::SouthWest => &[Direction::South, Direction::West],
+            Self::West => &[Direction::West],
+            Self::NorthWest => &[Direction::North, Direction::West],
+        }
+    }
+}
+
+impl From<Direction> for EightWayDirection {
+    fn from(dir: Direction) -> Self {
+        match dir {
+            Direction::North => Self::North,
+            Direction::East => Self::East,
+            Direction::South => Self::South,
+            Direction::West => Self::West,
+            Direction::Up => Self::North,
+            Direction::Down => Self::South,
+        }
+    }
+}
+
+impl From<EightWayDirection> for IVec3 {
+    fn from(value: EightWayDirection) -> Self {
+        value.directions().iter().copied().map(IVec3::from).sum()
+    }
+}
+
 /// An error that can occur when converting a direction.
 #[derive(Debug)]
 #[non_exhaustive]
