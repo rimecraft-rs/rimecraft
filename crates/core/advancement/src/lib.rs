@@ -2,6 +2,7 @@ use rimecraft_identifier::{
     vanilla::{Namespace, Path},
     Identifier,
 };
+use rimecraft_item::ItemStack;
 use rimecraft_text::{Text, Texts};
 
 pub struct Advancement<T, Id>
@@ -15,14 +16,14 @@ where
 /// # MCJE Reference
 ///
 /// `net.minecraft.advancement.AdvancementDisplay` in yarn.
-pub struct DisplayInfo<T, Id>
+pub struct DisplayInfo<'r, T, Id, Cx>
 where
     T: Texts,
 {
     title: T,
     description: T,
     /// @TODO: ItemStack
-    icon: (),
+    icon: ItemStack<'r, Id, Cx>,
     background: Option<Id>,
     frame: Frame<(), ()>,
     show_toast: bool,
@@ -31,14 +32,14 @@ where
     pos: (f32, f32),
 }
 
-impl<T, Id> DisplayInfo<T, Id>
+impl<'r,T, Id,Cx> DisplayInfo<'r,T, Id,Cx>
 where
     T: Texts,
 {
     pub fn new(
         title: T,
         description: T,
-        icon: (),
+        icon: ItemStack,
         background: Option<Id>,
         frame: Frame<(), ()>,
         show_toast: bool,
