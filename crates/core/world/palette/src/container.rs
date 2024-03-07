@@ -1,7 +1,8 @@
 //! Paletted containers.
 
-use std::{hash::Hash, marker::PhantomData};
+use std::{collections::HashMap, hash::Hash, marker::PhantomData};
 
+use rimecraft_maybe::Maybe;
 use rimecraft_packed_int_array::PackedIntArray;
 
 use crate::{IndexFromRaw, IndexToRaw, Palette, Strategy};
@@ -9,13 +10,13 @@ use crate::{IndexFromRaw, IndexToRaw, Palette, Strategy};
 /// A paletted container stores objects as small integer indices,
 /// governed by palettes that map between these objects and indices.
 #[derive(Debug)]
-pub struct PalettedContainer<L, T, P> {
+pub struct PalettedContainer<L, T, Cx> {
     list: L,
     data: Data<L, T>,
-    _marker: PhantomData<P>,
+    _marker: PhantomData<Cx>,
 }
 
-impl<L, T, P> PalettedContainer<L, T, P>
+impl<L, T, Cx> PalettedContainer<L, T, Cx>
 where
     L: Clone,
     T: Clone + Hash + Eq,
@@ -43,16 +44,16 @@ macro_rules! resize {
     };
 }
 
-impl<L, T, P> PalettedContainer<L, T, P>
+impl<L, T, Cx> PalettedContainer<L, T, Cx>
 where
-    L: for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, &'s T> + Clone,
+    L: for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>> + Clone,
     T: Hash + Eq + Clone,
-    P: ProvidePalette<L, T>,
+    Cx: ProvidePalette<L, T>,
 {
     /// Creates a new paletted container that contains the given object.
     #[allow(clippy::missing_panics_doc)] // The panic point should be unreachable.
-    pub fn from_single(list: L, object: T) -> Self {
-        let data = compatible_data::<L, T, P>(list.clone(), None, 0)
+    pub fn of_single(list: L, object: T) -> Self {
+        let data = compatible_data::<L, T, Cx>(list.clone(), None, 0)
             .expect("should return Some when prev is None");
         let mut this = Self {
             list,
@@ -64,7 +65,7 @@ where
     }
 
     /// Sets the value at the given index and returns the old one.
-    pub fn swap(&mut self, index: usize, value: T) -> Option<&T> {
+    pub fn swap(&mut self, index: usize, value: T) -> Option<Maybe<'_, T>> {
         resize!(self, self.data.palette.index_or_insert(value))
             .and_then(|i| {
                 if let Some(array) = self.data.storage.as_array_mut() {
@@ -86,44 +87,98 @@ where
             array.set(index, i as u32)
         }
     }
+
+    /// Slices this container to a container of the first entry of the palette.
+    ///
+    /// See [`Self::of_single`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the palette is empty.
+    pub fn to_slice(&self) -> Self {
+        Self::of_single(
+            self.list.clone(),
+            self.data
+                .palette
+                .get(0)
+                .expect("Palette should not be empty")
+                .clone(),
+        )
+    }
 }
 
-impl<L, T, P> PalettedContainer<L, T, P>
+impl<L, T, Cx> PalettedContainer<L, T, Cx>
 where
-    L: for<'s> IndexFromRaw<'s, &'s T>,
+    L: for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
 {
     /// Returns the value at the given index.
     #[inline]
-    pub fn get(&self, index: usize) -> Option<&T> {
+    pub fn get(&self, index: usize) -> Option<Maybe<'_, T>> {
         self.data
             .storage
             .as_array()
             .and_then(|array| array.get(index))
             .and_then(|i| self.data.palette.get(i as usize))
     }
-}
 
-fn compatible_data<L, T, P>(list: L, prev: Option<&Data<L, T>>, bits: u32) -> Option<Data<L, T>>
-where
-    T: Clone + Hash + Eq,
-    P: ProvidePalette<L, T>,
-{
-    let config = P::provide_palette_config(&list, bits);
-    if prev.is_some_and(|prev| prev.palette.config() == config) {
-        None
-    } else {
-        Some(create_data(config, list, P::container_len()))
+    /// Counts the number of occurrences of each object in the container
+    /// to the given counter function.
+    pub fn count<'a, F>(&'a self, mut counter: F)
+    where
+        F: FnMut(&T, usize),
+        &'a L: IntoIterator,
+        <&'a L as IntoIterator>::IntoIter: ExactSizeIterator,
+    {
+        if let Some(val) = (self.data.palette.len() == 1)
+            .then(|| self.data.palette.get(0))
+            .flatten()
+        {
+            counter(&val, self.data.storage.len());
+        } else {
+            let mut map = HashMap::new();
+            if let Some(array) = self.data.storage.as_array() {
+                array.iter().for_each(|i| {
+                    if let Some(val) = map.get_mut(&i) {
+                        *val += 1;
+                    } else {
+                        map.insert(i, 1);
+                    }
+                });
+            } else {
+                map.insert(0, self.data.storage.len());
+            }
+            for (obj, c) in map
+                .into_iter()
+                .filter_map(|(i, c)| self.data.palette.get(i as usize).map(|i| (i, c)))
+            {
+                counter(&obj, c);
+            }
+        }
     }
 }
 
-impl<L, T, P> PalettedContainer<L, T, P>
+fn compatible_data<L, T, Cx>(list: L, prev: Option<&Data<L, T>>, bits: u32) -> Option<Data<L, T>>
 where
-    L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, &'s T>,
     T: Clone + Hash + Eq,
-    P: ProvidePalette<L, T>,
+    Cx: ProvidePalette<L, T>,
+{
+    let config = Cx::provide_palette_config(&list, bits);
+    if prev.is_some_and(|prev| prev.palette.config() == config) {
+        None
+    } else {
+        Some(create_data(config, list, Cx::container_len()))
+    }
+}
+
+impl<L, T, Cx> PalettedContainer<L, T, Cx>
+where
+    L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
+    T: Clone + Hash + Eq,
+    Cx: ProvidePalette<L, T>,
 {
     fn on_resize(&mut self, (i, object): (u32, T)) -> Option<usize> {
-        if let Some(mut data) = compatible_data::<L, T, P>(self.list.clone(), Some(&self.data), i) {
+        if let Some(mut data) = compatible_data::<L, T, Cx>(self.list.clone(), Some(&self.data), i)
+        {
             data.import_from(&self.data.palette, &self.data.storage);
             self.data = data;
             self.data.palette.index(&object)
@@ -223,14 +278,14 @@ where
     #[allow(clippy::missing_panics_doc)]
     pub fn import_from<L1>(&mut self, palette: &Palette<L1, T>, storage: &Storage)
     where
-        L1: for<'s> IndexFromRaw<'s, &'s T>,
+        L1: for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
     {
         for i in 0..storage.len() {
             if let Some(raw) = storage
                 .as_array()
                 .and_then(|array| array.get(i))
                 .and_then(|i| palette.get(i as usize))
-                .and_then(|obj| self.palette.index(obj))
+                .and_then(|obj| self.palette.index(&obj))
             {
                 self.storage.as_array_mut().unwrap().swap(i, raw as u32);
             }
@@ -259,8 +314,6 @@ where
 #[cfg(feature = "edcode")]
 mod _edcode {
     use rimecraft_edcode::{Encode, Update, VarI32};
-
-    use crate::IndexToRaw;
 
     use super::*;
 
@@ -311,7 +364,7 @@ mod _edcode {
         }
     }
 
-    impl<L, T, P> Encode for PalettedContainer<L, T, P>
+    impl<L, T, Cx> Encode for PalettedContainer<L, T, Cx>
     where
         L: for<'a> IndexToRaw<&'a T>,
     {
@@ -324,17 +377,17 @@ mod _edcode {
         }
     }
 
-    impl<L, T, P> Update for PalettedContainer<L, T, P>
+    impl<L, T, Cx> Update for PalettedContainer<L, T, Cx>
     where
         L: for<'s> IndexFromRaw<'s, T> + Clone,
         T: Clone + Hash + Eq,
-        P: ProvidePalette<L, T>,
+        Cx: ProvidePalette<L, T>,
     {
         fn update<B>(&mut self, mut buf: B) -> Result<(), std::io::Error>
         where
             B: rimecraft_edcode::bytes::Buf,
         {
-            let data = compatible_data::<L, T, P>(
+            let data = compatible_data::<L, T, Cx>(
                 self.list.clone(),
                 Some(&self.data),
                 buf.get_u8() as u32,
@@ -352,7 +405,7 @@ mod _edcode {
         }
     }
 
-    impl<L, T, P> PalettedContainer<L, T, P>
+    impl<L, T, Cx> PalettedContainer<L, T, Cx>
     where
         L: for<'a> IndexToRaw<&'a T>,
     {
@@ -374,6 +427,7 @@ mod _serde {
 
     use super::*;
 
+    use rimecraft_maybe::SimpleOwned;
     use rimecraft_serde_update::Update;
     use serde::{Deserialize, Serialize};
 
@@ -414,13 +468,13 @@ mod _serde {
         }
     }
 
-    impl<L, T, P> Serialize for PalettedContainer<L, T, P>
+    impl<L, T, Cx> Serialize for PalettedContainer<L, T, Cx>
     where
-        L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, &'s T>,
+        L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
         for<'a> &'a L: IntoIterator,
         for<'a> <&'a L as IntoIterator>::IntoIter: ExactSizeIterator,
         T: Clone + Hash + Eq + Serialize,
-        P: ProvidePalette<L, T>,
+        Cx: ProvidePalette<L, T>,
     {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
@@ -437,7 +491,7 @@ mod _serde {
                 vec![],
             );
 
-            let i = P::container_len();
+            let i = Cx::container_len();
             let mut is = vec![0; i];
             if let Some(array) = self.data.storage.as_array() {
                 write_palette_indices(array, &mut is);
@@ -445,14 +499,17 @@ mod _serde {
             }
             apply_each(&mut is, |id| {
                 pal.get(id as usize)
-                    .cloned()
+                    .map(|obj| match obj {
+                        Maybe::Borrowed(obj) => obj.clone(),
+                        Maybe::Owned(SimpleOwned(obj)) => obj,
+                    })
                     .and_then(|obj| pal.index_or_insert(obj).ok())
                     .map_or(-1i32 as u32, |n| n as u32)
             });
             let pal = pal;
             let is = is;
 
-            let j = P::bits(&self.list, pal.len());
+            let j = Cx::bits(&self.list, pal.len());
             #[derive(Serialize)]
             struct Serialized<'a, T> {
                 palette: &'a [T], // forward field in BiMapPalette
@@ -481,11 +538,11 @@ mod _serde {
         }
     }
 
-    impl<'de, L, T, P> Update<'de> for PalettedContainer<L, T, P>
+    impl<'de, L, T, Cx> Update<'de> for PalettedContainer<L, T, Cx>
     where
-        L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, &'s T>,
+        L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
         T: Deserialize<'de> + Clone + Hash + Eq,
-        P: ProvidePalette<L, T>,
+        Cx: ProvidePalette<L, T>,
     {
         fn update<D>(&mut self, deserializer: D) -> Result<(), D::Error>
         where
@@ -497,9 +554,9 @@ mod _serde {
                 data: Option<Vec<u64>>,
             }
             let Serialized { palette, data } = Serialized::<T>::deserialize(deserializer)?;
-            let i = P::container_len();
-            let j = P::bits(&self.list, palette.len());
-            let config = P::provide_palette_config(&self.list, j);
+            let i = Cx::container_len();
+            let j = Cx::bits(&self.list, palette.len());
+            let config = Cx::provide_palette_config(&self.list, j);
             let storage = if j != 0 {
                 let ls = data.as_ref().ok_or_else(|| {
                     serde::de::Error::custom("missing values for non-zero storage")
@@ -514,7 +571,7 @@ mod _serde {
                         write_palette_indices(&array, &mut is);
                         apply_each(&mut is, |id| {
                             pal.get(id as usize)
-                                .and_then(|obj| self.list.raw_id(obj))
+                                .and_then(|obj| self.list.raw_id(&obj))
                                 .map_or(-1i32 as u32, |n| n as u32)
                         });
 

@@ -14,15 +14,13 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 serde = { version = "1.0", features = ["derive"], optional = true }
 rgb = "0.8"
+regex-lite = "0.1"
 regex = { version = "1.10", optional = true }
 
 [features]
 serde = ["dep:serde"]
 # use `regex` crate instead of `regex-lite`.
 regex = ["dep:regex"]
-
-[target.'cfg(not(feature = "regex"))'.dependencies]
-regex-lite = "0.1"
 
 [lints]
 workspace = true

@@ -20,17 +20,17 @@ use crate::{Item, RawItem, ToItem};
         deserialize = r#"
             'r: 'de,
             K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + std::hash::Hash + Eq + 'r,
-            P: InitAttachments<K> + rimecraft_registry::ProvideRegistry<'r, K, crate::RawItem<P>> + 'r"#
+            Cx: InitAttachments<K> + rimecraft_registry::ProvideRegistry<'r, K, crate::RawItem<Cx>> + 'r"#
     ))
 )]
-pub struct ItemStack<'r, K, P> {
+pub struct ItemStack<'r, K, Cx> {
     #[cfg_attr(
         feature = "serde",
         serde(default),
         serde(rename = "id"),
         serde(with = "serde_helper::item_serde")
     )]
-    item: Item<'r, K, P>,
+    item: Item<'r, K, Cx>,
 
     #[cfg_attr(feature = "serde", serde(rename = "Count"))]
     count: u32,
@@ -46,18 +46,18 @@ pub struct ItemStack<'r, K, P> {
         serde(serialize_with = "serde_helper::ser_attachments"),
         serde(deserialize_with = "serde_helper::deser_attachments")
     )]
-    attachments: (Attachments<K>, PhantomData<P>),
+    attachments: (Attachments<K>, PhantomData<Cx>),
 }
 
-impl<'r, K, P> ItemStack<'r, K, P>
+impl<'r, K, Cx> ItemStack<'r, K, Cx>
 where
-    P: InitAttachments<K>,
+    Cx: InitAttachments<K>,
 {
     /// Creates a new item stack with the given item and count.
     #[inline]
     pub fn new<I>(item: I, count: u32) -> Self
     where
-        I: for<'a> ToItem<'a, 'r, K, P>,
+        I: for<'a> ToItem<'a, 'r, K, Cx>,
     {
         Self::with_nbt(item, count, None)
     }
@@ -65,10 +65,10 @@ where
     /// Creates a new item stack with the given item, count, and custom NBT tag.
     pub fn with_nbt<I>(item: I, count: u32, nbt: Option<Compound>) -> Self
     where
-        I: for<'a> ToItem<'a, 'r, K, P>,
+        I: for<'a> ToItem<'a, 'r, K, Cx>,
     {
         let mut attachments = Attachments::new();
-        P::init_attachments(&mut attachments);
+        Cx::init_attachments(&mut attachments);
 
         Self {
             item: item.to_item(),
@@ -79,9 +79,9 @@ where
     }
 }
 
-impl<'r, K, P> ItemStack<'r, K, P>
+impl<'r, K, Cx> ItemStack<'r, K, Cx>
 where
-    P: InitAttachments<K> + ProvideRegistry<'r, K, RawItem<P>> + 'r,
+    Cx: InitAttachments<K> + ProvideRegistry<'r, K, RawItem<Cx>> + 'r,
 {
     /// Creates an empty item stack.
     #[inline]
@@ -96,10 +96,10 @@ where
     }
 }
 
-impl<'r, K, P> ItemStack<'r, K, P> {
+impl<'r, K, Cx> ItemStack<'r, K, Cx> {
     /// Returns the item of the stack.
     #[inline]
-    pub fn item(&self) -> Item<'r, K, P> {
+    pub fn item(&self) -> Item<'r, K, Cx> {
         self.item
     }
 
@@ -152,9 +152,9 @@ impl<'r, K, P> ItemStack<'r, K, P> {
     }
 }
 
-impl<'r, K, P> Default for ItemStack<'r, K, P>
+impl<'r, K, Cx> Default for ItemStack<'r, K, Cx>
 where
-    P: InitAttachments<K> + ProvideRegistry<'r, K, RawItem<P>> + 'r,
+    Cx: InitAttachments<K> + ProvideRegistry<'r, K, RawItem<Cx>> + 'r,
 {
     #[inline]
     fn default() -> Self {
@@ -162,42 +162,42 @@ where
     }
 }
 
-impl<'r, K, P> From<Item<'r, K, P>> for ItemStack<'r, K, P>
+impl<'r, K, Cx> From<Item<'r, K, Cx>> for ItemStack<'r, K, Cx>
 where
-    P: InitAttachments<K>,
+    Cx: InitAttachments<K>,
 {
     #[inline]
-    fn from(value: Item<'r, K, P>) -> Self {
+    fn from(value: Item<'r, K, Cx>) -> Self {
         Self::new(value, 1)
     }
 }
 
-impl<'r, K, P> From<ItemStack<'r, K, P>> for Item<'r, K, P> {
+impl<'r, K, Cx> From<ItemStack<'r, K, Cx>> for Item<'r, K, Cx> {
     #[inline]
-    fn from(value: ItemStack<'r, K, P>) -> Self {
+    fn from(value: ItemStack<'r, K, Cx>) -> Self {
         value.item
     }
 }
 
-impl<'s, 'r, K, P> ToItem<'s, 'r, K, P> for ItemStack<'r, K, P> {
+impl<'s, 'r, K, Cx> ToItem<'s, 'r, K, Cx> for ItemStack<'r, K, Cx> {
     #[inline]
-    fn to_item(&'s self) -> Item<'r, K, P> {
+    fn to_item(&'s self) -> Item<'r, K, Cx> {
         self.item
     }
 }
 
-impl<K, P> PartialEq for ItemStack<'_, K, P> {
+impl<K, Cx> PartialEq for ItemStack<'_, K, Cx> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.item == other.item && self.count == other.count && self.nbt == other.nbt
     }
 }
 
-impl<K, P> Eq for ItemStack<'_, K, P> {}
+impl<K, Cx> Eq for ItemStack<'_, K, Cx> {}
 
-impl<K, P> Clone for ItemStack<'_, K, P>
+impl<K, Cx> Clone for ItemStack<'_, K, Cx>
 where
-    P: InitAttachments<K>,
+    Cx: InitAttachments<K>,
 {
     /// Clones the item stack.
     ///
@@ -221,25 +221,25 @@ mod serde_helper {
     use std::hash::Hash;
 
     #[inline]
-    pub fn default_attachments<K, P>() -> (Attachments<K>, PhantomData<P>)
+    pub fn default_attachments<K, Cx>() -> (Attachments<K>, PhantomData<Cx>)
     where
-        P: InitAttachments<K>,
+        Cx: InitAttachments<K>,
     {
         let mut att = Attachments::new();
-        P::init_attachments(&mut att);
+        Cx::init_attachments(&mut att);
         (att, PhantomData)
     }
 
     #[inline]
-    pub fn should_skip_attachment_ser<K, P>(
-        attachments: &(Attachments<K>, PhantomData<P>),
+    pub fn should_skip_attachment_ser<K, Cx>(
+        attachments: &(Attachments<K>, PhantomData<Cx>),
     ) -> bool {
         attachments.0.is_persistent_data_empty()
     }
 
     #[inline]
-    pub fn ser_attachments<K, P, S>(
-        attachments: &(Attachments<K>, PhantomData<P>),
+    pub fn ser_attachments<K, Cx, S>(
+        attachments: &(Attachments<K>, PhantomData<Cx>),
         serializer: S,
     ) -> Result<S::Ok, S::Error>
     where
@@ -249,17 +249,17 @@ mod serde_helper {
         serde::Serialize::serialize(&attachments.0, serializer)
     }
 
-    pub fn deser_attachments<'de, K, P, D>(
+    pub fn deser_attachments<'de, K, Cx, D>(
         deserializer: D,
-    ) -> Result<(Attachments<K>, PhantomData<P>), <D as serde::Deserializer<'de>>::Error>
+    ) -> Result<(Attachments<K>, PhantomData<Cx>), <D as serde::Deserializer<'de>>::Error>
     where
         D: serde::Deserializer<'de>,
-        P: InitAttachments<K>,
+        Cx: InitAttachments<K>,
         K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + Hash + Eq,
     {
         use rimecraft_serde_update::Update;
         let mut attachments = Attachments::new();
-        P::init_attachments(&mut attachments);
+        Cx::init_attachments(&mut attachments);
         attachments.update(deserializer)?;
         Ok((attachments, PhantomData))
     }
@@ -274,7 +274,7 @@ mod serde_helper {
         use super::*;
 
         #[inline]
-        pub fn serialize<K, P, S>(item: &Item<'_, K, P>, serializer: S) -> Result<S::Ok, S::Error>
+        pub fn serialize<K, Cx, S>(item: &Item<'_, K, Cx>, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
             K: Serialize + Hash + Eq,
@@ -283,12 +283,12 @@ mod serde_helper {
         }
 
         #[inline]
-        pub fn deserialize<'rr, 'd, K, P, D>(deserializer: D) -> Result<Item<'rr, K, P>, D::Error>
+        pub fn deserialize<'rr, 'd, K, Cx, D>(deserializer: D) -> Result<Item<'rr, K, Cx>, D::Error>
         where
             'rr: 'd,
             D: serde::Deserializer<'d>,
             K: Deserialize<'d> + Hash + Eq + 'rr,
-            P: InitAttachments<K> + ProvideRegistry<'rr, K, RawItem<P>> + 'rr,
+            Cx: InitAttachments<K> + ProvideRegistry<'rr, K, RawItem<Cx>> + 'rr,
         {
             Item::deserialize(HumanReadableControlled::new(deserializer, true))
         }

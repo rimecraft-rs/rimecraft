@@ -8,6 +8,8 @@ mod iter;
 pub use iter::Iter;
 use iter::IterImpl;
 
+pub use rimecraft_maybe::Maybe;
+
 /// A palette maps object from and to small integer IDs that uses less number of bits
 /// to make storage smaller.
 ///
@@ -208,13 +210,18 @@ where
 
 impl<L, T> Palette<L, T>
 where
-    L: for<'s> IndexFromRaw<'s, &'s T>,
+    L: for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
 {
     /// Returns the object associated with the given ID.
-    pub fn get(&self, id: usize) -> Option<&T> {
+    pub fn get(&self, id: usize) -> Option<Maybe<'_, T>> {
         match &self.internal {
-            PaletteImpl::Singular(value) => (id == 0).then_some(value.as_ref()).flatten(),
-            PaletteImpl::Array(forward) | PaletteImpl::BiMap { forward, .. } => forward.get(id),
+            PaletteImpl::Singular(value) => (id == 0)
+                .then_some(value.as_ref())
+                .flatten()
+                .map(Maybe::Borrowed),
+            PaletteImpl::Array(forward) | PaletteImpl::BiMap { forward, .. } => {
+                forward.get(id).map(Maybe::Borrowed)
+            }
             PaletteImpl::Direct => self.list.of_raw(id),
         }
     }

@@ -8,13 +8,14 @@ use crate::*; // Used in docs
 /// # Examples
 ///
 /// ```
+/// # use rimecraft_identifier::{*, vanilla::*};
 /// let identifier = format_identifier!("namespace".parse().unwrap() =>
-/// 	"a", "b"; "c"; "42"
+///     "a", "b"; "c"; "42"
 /// );
 /// assert_eq!("namespace:a_b/c/42", identifier.to_string());
 ///
 /// let identifier = format_identifier!(MINECRAFT =>
-/// 	"tags"; "piglin", "repellents"
+///     "tags"; "piglin", "repellents"
 /// );
 /// assert_eq!("minecraft:tags/piglin_repellents", identifier.to_string());
 /// ```
@@ -23,21 +24,13 @@ use crate::*; // Used in docs
 macro_rules! format_identifier {
 	($namespace:expr => $($($word:expr),*);*) => {
 		{
-			let mut locations = Vec::new();
-
-			$(
-				{
-					let mut words = Vec::new();
-
-					$(
-						words.push($word);
-					)*
-
-					locations.push(words);
-				}
-			)*
-
-			Identifier::<Namespace, Path>::new($namespace, Path::new_formatted(locations))
+			$crate::Identifier::<$crate::vanilla::Namespace, $crate::vanilla::Path>::new(
+				$namespace,
+				$crate::vanilla::Path::new_formatted(
+					::std::vec![
+						$(::std::vec![$($word),*]),*
+					])
+			)
 		}
 	};
 }
