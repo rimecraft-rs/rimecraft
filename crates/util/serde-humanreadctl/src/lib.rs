@@ -84,9 +84,10 @@ where
     }
 
     #[inline]
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
+    fn serialize_some<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
         T: serde::Serialize,
+        T: ?Sized,
     {
         self.inner.serialize_some(value)
     }
@@ -113,19 +114,19 @@ where
     }
 
     #[inline]
-    fn serialize_newtype_struct<T: ?Sized>(
+    fn serialize_newtype_struct<T>(
         self,
         name: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: serde::Serialize,
+        T: serde::Serialize + ?Sized,
     {
         self.inner.serialize_newtype_struct(name, value)
     }
 
     #[inline]
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
         name: &'static str,
         variant_index: u32,
@@ -133,7 +134,7 @@ where
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: serde::Serialize,
+        T: serde::Serialize + ?Sized,
     {
         self.inner
             .serialize_newtype_variant(name, variant_index, variant, value)
@@ -216,9 +217,9 @@ where
     }
 
     #[inline]
-    fn collect_str<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
+    fn collect_str<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: std::fmt::Display,
+        T: std::fmt::Display + ?Sized,
     {
         self.inner.collect_str(value)
     }

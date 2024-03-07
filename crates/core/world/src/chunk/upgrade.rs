@@ -133,7 +133,7 @@ where
 
 mod _serde {
     use rimecraft_registry::entry::RefEntry;
-    use serde::{Deserialize, Serialize};
+    use serde::Serialize;
 
     use super::*;
 

@@ -17,6 +17,7 @@ rimecraft-maybe = { path = "../../../util/maybe" }
 rimecraft-edcode = { path = "../../../util/edcode", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 rimecraft-serde-update = { path = "../../../util/serde-update", optional = true }
+ahash = "0.8"
 
 [features]
 edcode = ["dep:rimecraft-edcode"]

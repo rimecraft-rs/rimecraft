@@ -131,7 +131,7 @@ impl From<i64> for BlockPos {
 
 #[cfg(feature = "serde")]
 mod _serde {
-    use ::serde::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
 
     use super::*;
 
@@ -140,7 +140,7 @@ mod _serde {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
-            S: ::serde::Serializer,
+            S: serde::Serializer,
         {
             [self.0.x, self.0.y, self.0.z].serialize(serializer)
         }
@@ -152,11 +152,11 @@ mod _serde {
         #[inline]
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
-            D: ::serde::Deserializer<'de>,
+            D: serde::Deserializer<'de>,
         {
             struct Visitor;
 
-            impl<'de> ::serde::de::Visitor<'de> for Visitor {
+            impl<'de> serde::de::Visitor<'de> for Visitor {
                 fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     formatter
                         .write_str("a sequence of three integers, or a struct of three dimensions")
@@ -166,23 +166,23 @@ mod _serde {
 
                 fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
                 where
-                    A: ::serde::de::SeqAccess<'de>,
+                    A: serde::de::SeqAccess<'de>,
                 {
                     let x = seq.next_element()?.ok_or_else(|| {
-                        ::serde::de::Error::invalid_length(0, &"a sequence of three integers")
+                        serde::de::Error::invalid_length(0, &"a sequence of three integers")
                     })?;
                     let y = seq.next_element()?.ok_or_else(|| {
-                        ::serde::de::Error::invalid_length(1, &"a sequence of three integers")
+                        serde::de::Error::invalid_length(1, &"a sequence of three integers")
                     })?;
                     let z = seq.next_element()?.ok_or_else(|| {
-                        ::serde::de::Error::invalid_length(2, &"a sequence of three integers")
+                        serde::de::Error::invalid_length(2, &"a sequence of three integers")
                     })?;
                     Ok(BlockPos::new(x, y, z))
                 }
 
                 fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
                 where
-                    A: ::serde::de::MapAccess<'de>,
+                    A: serde::de::MapAccess<'de>,
                 {
                     use ::serde::de::Error;
                     let mut x = None;
