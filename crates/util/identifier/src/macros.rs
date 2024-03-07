@@ -23,6 +23,8 @@ use crate::*; // Used in docs
 macro_rules! format_identifier {
 	($namespace:expr => $($($word:expr),*);*) => {
 		{
+			use crate::*;
+
 			let mut locations = Vec::new();
 
 			$(
