@@ -1,48 +1,55 @@
 //! Advancement related types.
 
-use rimecraft_item::{ItemStack, stack::InitAttachments};
-use rimecraft_text::{Text, Texts};
+use rimecraft_fmt::Formatting;
+use rimecraft_item::{stack::InitAttachments, ItemStack};
+use rimecraft_text::Texts;
 
-pub struct Advancement<'r,T, Id,Cx>
+/// All information about an advancement.\
+/// `'r` is registry lifetime.\
+/// Generic type `T` is text type, `Id` is identifier
+/// type, `Cx` is content type.
+///
+/// # MCJE Reference
+/// `net.minecraft.advancement.Advancement` in yarn.
+pub struct Advancement<'r, T, Id, Cx>
 where
     T: Texts,
-    Cx:InitAttachments<Id>
+    Cx: InitAttachments<Id>,
 {
     pub parent: Option<Id>,
-    pub display: Option<DisplayInfo<'r,T, Id,Cx>>,
+    pub display: Option<DisplayInfo<'r, T, Id, Cx>>,
 }
 
 /// # MCJE Reference
-///
 /// `net.minecraft.advancement.AdvancementDisplay` in yarn.
 pub struct DisplayInfo<'r, T, Id, Cx>
 where
     T: Texts,
-    Cx:InitAttachments<Id>,
+    Cx: InitAttachments<Id>,
 {
     title: T,
     description: T,
-    /// @TODO: ItemStack
     icon: ItemStack<'r, Id, Cx>,
     background: Option<Id>,
-    frame: Frame<(), ()>,
+    frame: Frame<Id>,
     show_toast: bool,
     announce_to_chat: bool,
     hidden: bool,
     pos: (f32, f32),
 }
 
-impl<'r,T, Id,Cx> DisplayInfo<'r,T, Id,Cx>
+impl<'r, T, Id, Cx> DisplayInfo<'r, T, Id, Cx>
 where
     T: Texts,
-    Cx:InitAttachments<Id>,
+    Cx: InitAttachments<Id>,
 {
+    /// Create a new [`DisplayInfo`].
     pub fn new(
         title: T,
         description: T,
-        icon: ItemStack<'r,Id,Cx>,
+        icon: ItemStack<'r, Id, Cx>,
         background: Option<Id>,
-        frame: Frame<(), ()>,
+        frame: Frame<Id>,
         show_toast: bool,
         announce_to_chat: bool,
         hidden: bool,
@@ -64,12 +71,19 @@ where
         self.pos = (x, y);
     }
 
+    /// Get the title of this advancement.
     pub fn title(&self) -> &T {
         &self.title
     }
 }
 
-pub struct Frame<Id, F> {
+/// Describes how an advancement will be announced in the chat.\
+/// Generic type `Id` represents an identifier type.
+///
+/// # MCJE Reference
+/// `net.minecraft.advancement.AdvancementFrame` in yarn.
+#[derive(Debug)]
+pub struct Frame<Id> {
     id: Id,
-    format: F,
+    format: Formatting,
 }

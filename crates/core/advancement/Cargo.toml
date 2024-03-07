@@ -13,10 +13,9 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 rimecraft-text = { path = "../text" }
-rimecraft-identifier = { path = "../../util/identifier", features = [
-    "vanilla",
-] }
+rimecraft-identifier = { path = "../../util/identifier" }
 rimecraft-item = { path = "../item" }
+rimecraft-fmt = { path = "../../util/fmt" }
 
 [lints]
 workspace = true
