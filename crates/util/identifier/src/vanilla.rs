@@ -79,7 +79,7 @@ impl Default for Namespace {
 pub struct Path(ArcCowStr<'static>);
 
 impl Path {
-    /// Creates a new `Path` from the given value.
+    /// Creates a new [`Path`] from the given value.
     ///
     /// # Panics
     ///
@@ -89,12 +89,134 @@ impl Path {
     where
         T: Into<Arc<str>>,
     {
-        let value = value.into();
-        validate_path(&value).unwrap();
-        Self(ArcCowStr::Arc(value))
+        Self::try_new(value).unwrap()
     }
 
-    /// Creates a new `Path` from the given value
+    /// Creates a new [`Path`] from the given value.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the given path is invalid.
+    pub fn try_new<T>(value: T) -> Result<Self, Error>
+    where
+        T: Into<Arc<str>>,
+    {
+        let value = value.into();
+        validate_path(&value)?;
+        Ok(Self(ArcCowStr::Arc(value)))
+    }
+
+
+    /// Creates a new [`Path`] from the given value.
+    ///
+    /// This function accepts a 2-dimension [`Vec`] which stands for words wrapped in locations.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let path = Path::new_formatted(vec![
+    /// 		vec!["tags"],
+    /// 		vec![],
+    /// 		vec!["piglin", "", "likes"],
+    /// 	]);
+    /// let identifier = Identifier::new(MINECRAFT, path);
+    ///
+    /// assert_eq!("minecraft:tags/piglin_likes", identifier.to_string());
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of the given words is invalid.
+    #[inline]
+    pub fn new_formatted<T>(values: Vec<Vec<T>>) -> Self
+    where
+        T: Into<Arc<str>>,
+    {
+		Self::try_new_formatted(values).unwrap()
+	}
+
+    /// Creates a new [`Path`] from the given value.
+    ///
+    /// This function accepts a 2-dimension [`Vec`] which stands for words wrapped in locations.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let path = Path::try_new_formatted(vec![
+    /// 		vec!["tags"],
+    /// 		vec![],
+    /// 		vec!["piglin", "", "repellents"],
+    /// 	]).unwrap();
+    /// let identifier = Identifier::new(MINECRAFT, path);
+    /// assert_eq!("minecraft:tags/piglin_repellents", identifier.to_string());
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the given path is invalid.
+    #[inline]
+    pub fn try_new_formatted<T>(values: Vec<Vec<T>>) -> Result<Self, Error>
+    where
+        T: Into<Arc<str>>,
+    {
+        let values: Vec<Vec<Result<Arc<str>, Error>>> = values
+            .into_iter()
+            .map(|v| {
+                v.into_iter()
+                    .map(|s| {
+                        let s = s.into();
+                        match validate_path(&s) {
+                            Ok(_) => Ok(s),
+                            Err(error) => Err(error),
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+
+        match values.iter().flat_map(|v| v.iter()).find_map(|r| match r {
+            Ok(_) => None,
+            Err(error) => Some(error),
+        }) {
+            Some(error) => return Err((*error).clone()),
+            None => (),
+        };
+
+        let values: Vec<Vec<Arc<str>>> = values
+            .into_iter()
+            .filter_map(|v| {
+                let v: Vec<Arc<str>> = v
+                    .into_iter()
+                    .filter_map(|r| match r {
+                        Ok(s) => {
+                            if s.len() > 0 {
+                                Some(s)
+                            } else {
+                                None
+                            }
+                        }
+                        Err(_) => None,
+                    })
+                    .collect();
+
+                if v.len() > 0 {
+                    Some(v)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Join words
+        let values: Vec<Arc<str>> = values.into_iter().map(|v| v.join("_").into()).collect();
+
+        // Join locations
+        let arc: Arc<str> = values.join("/").into();
+
+        Ok(Self(ArcCowStr::Arc(arc)))
+    }
+
+    /// Creates a new [`Path`] from the given value
     /// at compile time.
     ///
     /// The given path shoule be all [a-z0-9/_.-] character.
@@ -103,7 +225,7 @@ impl Path {
         Self(ArcCowStr::Ref(value))
     }
 
-    /// Returns the inner value of the `Path`.
+    /// Returns the inner value of the [`Path`].
     #[inline]
     pub fn as_str(&self) -> &str {
         self.0.as_ref()
@@ -216,7 +338,7 @@ fn validate_path(value: &str) -> Result<(), Error> {
 }
 
 /// Error type for `Namespace` and `Path`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Error {
     /// The given namespace is invalid.
     InvalidNamespace(String),

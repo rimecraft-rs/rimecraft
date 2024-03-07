@@ -1,4 +1,4 @@
-//! Minecraft Item primitives.
+//! Minecraft item primitives.
 
 use std::{marker::PhantomData, num::NonZeroU32};
 

@@ -3,7 +3,7 @@ name = "rimecraft-option"
 version = "0.1.0"
 edition = "2021"
 authors = ["KrLite"]
-description = "Minecraft option"
+description = "Minecraft game options"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
@@ -12,8 +12,9 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-text = { path = "../text" }
+rimecraft-text = { path = "../../core/text" }
 rimecraft-math = { path = "../../util/math" }
+enum-iterator = "2.0.0"
 
 [lints]
 workspace = true

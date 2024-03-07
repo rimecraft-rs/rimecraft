@@ -1,4 +1,4 @@
-///! Minecraft Input primitives.
+//! Minecraft input.
 
 use glam::Vec2;
 
@@ -32,16 +32,16 @@ pub struct Input<T> {
 
 /// Represents the tickable component.
 pub trait SlowDownTickable {
-    /// Performs a tick operation with the specified SlowDown.
+    /// Performs a tick operation with the specified [`SlowDown`].
     fn tick(&mut self, slow_down: SlowDown);
 }
 
-/// Represents the slowdown state.
+/// Represents a slow down state.
 #[derive(Debug)]
 pub enum SlowDown {
-    /// Slowdown with a factor.
+    /// Slows down with a factor.
     Yes(f32),
-    /// No slowdown.
+    /// No slow down available.
     No,
 }
 
@@ -52,7 +52,7 @@ impl<T> SlowDownTickable for Input<T> {
 }
 
 impl<T> Input<T> {
-    /// Creates a new `Input` instance with the specified child.
+    /// Creates a new [`Input`] instance with the specified child.
     pub fn new(child: T) -> Input<T> {
         Self {
             movement_sideways: 0.0,
@@ -67,7 +67,7 @@ impl<T> Input<T> {
         }
     }
 
-    /// Returns the movement input as a `Vec2`.
+    /// Returns the movement input as a [`Vec2`].
     pub fn get_movement_input(&self) -> Vec2 {
         Vec2 {
             x: self.movement_sideways,
@@ -75,7 +75,7 @@ impl<T> Input<T> {
         }
     }
 
-    /// Checks if there is movement forward.
+    /// Checks if movement forward exists.
     pub fn has_movement_forward(&self) -> bool {
         self.movement_forward > 1.0e-5
     }

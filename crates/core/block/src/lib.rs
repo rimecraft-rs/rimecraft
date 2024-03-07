@@ -1,4 +1,4 @@
-//! Minecraft Block primitives.
+//! Minecraft block primitives.
 
 use rimecraft_registry::Reg;
 use rimecraft_state::{States, StatesMut};

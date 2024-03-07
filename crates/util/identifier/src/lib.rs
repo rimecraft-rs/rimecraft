@@ -1,9 +1,13 @@
 //! Rust implementation of Minecraft resource location.
 
+use core::str;
 use std::{fmt::Display, str::FromStr};
 
 #[cfg(feature = "vanilla")]
 pub mod vanilla;
+
+#[cfg(feature = "macros")]
+pub mod macros;
 
 /// An identifier used to identify things.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -14,7 +18,7 @@ pub struct Identifier<N, P> {
 }
 
 impl<N, P> Identifier<N, P> {
-    /// Creates a new identifier.
+    /// Creates a new [`Identifier`].
     #[inline]
     pub const fn new(namespace: N, path: P) -> Self {
         Self { namespace, path }
@@ -33,8 +37,7 @@ impl<N, P> Identifier<N, P> {
     }
 }
 
-/// Namespace types that is able to separate
-/// with paths using a separator.
+/// Namespace types that are able to separate with paths, or path types that are able to split by itself.
 pub trait Separate {
     //TODO: use `Pattern` when it's stable
 
@@ -194,3 +197,6 @@ mod edcode {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
