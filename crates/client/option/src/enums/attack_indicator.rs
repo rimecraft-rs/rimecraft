@@ -3,7 +3,7 @@
 use std::fmt::Display;
 
 use enum_iterator::Sequence;
-use rimecraft_identifier::format_localization_key;
+use rimecraft_text::{format_localization_key, Localizable};
 
 use super::ByUSizeId;
 
@@ -34,8 +34,8 @@ impl Display for AttackIndicator {
 	}
 }
 
-impl AttackIndicator {
-	pub fn localization_key(&self) -> String {
+impl Localizable for AttackIndicator {
+	fn localization_key(&self) -> String {
 		format_localization_key!("options", "attack", format!("{}", self))
 	}
 }
