@@ -188,5 +188,10 @@ where
     }
 }
 
+
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(feature = "macros")]
+mod macros;
