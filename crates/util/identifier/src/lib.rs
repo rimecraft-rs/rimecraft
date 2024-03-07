@@ -17,6 +17,15 @@ pub struct Identifier<N, P> {
     path: P,
 }
 
+/// A generics wrapper for [`Identifier`].
+/// The associated types [`Identifiers::N`] and [`Identifiers::P`] should be applied to [`Identifier`] when used.
+pub trait Identifiers {
+	/// Generic `N` that should be applied to [`Identifier`].
+	type N;
+	/// Generic `P` that should be applied to [`Identifier`].
+	type P;
+}
+
 impl<N, P> Identifier<N, P> {
     /// Creates a new [`Identifier`].
     #[inline]
