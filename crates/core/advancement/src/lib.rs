@@ -1,16 +1,15 @@
-use rimecraft_identifier::{
-    vanilla::{Namespace, Path},
-    Identifier,
-};
-use rimecraft_item::ItemStack;
+//! Advancement related types.
+
+use rimecraft_item::{ItemStack, stack::InitAttachments};
 use rimecraft_text::{Text, Texts};
 
-pub struct Advancement<T, Id>
+pub struct Advancement<'r,T, Id,Cx>
 where
     T: Texts,
+    Cx:InitAttachments<Id>
 {
     pub parent: Option<Id>,
-    pub display: Option<DisplayInfo<T, Id>>,
+    pub display: Option<DisplayInfo<'r,T, Id,Cx>>,
 }
 
 /// # MCJE Reference
@@ -19,6 +18,7 @@ where
 pub struct DisplayInfo<'r, T, Id, Cx>
 where
     T: Texts,
+    Cx:InitAttachments<Id>,
 {
     title: T,
     description: T,
@@ -35,11 +35,12 @@ where
 impl<'r,T, Id,Cx> DisplayInfo<'r,T, Id,Cx>
 where
     T: Texts,
+    Cx:InitAttachments<Id>,
 {
     pub fn new(
         title: T,
         description: T,
-        icon: ItemStack,
+        icon: ItemStack<'r,Id,Cx>,
         background: Option<Id>,
         frame: Frame<(), ()>,
         show_toast: bool,
@@ -68,7 +69,7 @@ where
     }
 }
 
-pub struct Frame<I, F> {
-    id: I,
+pub struct Frame<Id, F> {
+    id: Id,
     format: F,
 }
