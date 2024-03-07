@@ -10,13 +10,13 @@ use crate::{IndexFromRaw, IndexToRaw, Palette, Strategy};
 /// A paletted container stores objects as small integer indices,
 /// governed by palettes that map between these objects and indices.
 #[derive(Debug)]
-pub struct PalettedContainer<L, T, P> {
+pub struct PalettedContainer<L, T, Cx> {
     list: L,
     data: Data<L, T>,
-    _marker: PhantomData<P>,
+    _marker: PhantomData<Cx>,
 }
 
-impl<L, T, P> PalettedContainer<L, T, P>
+impl<L, T, Cx> PalettedContainer<L, T, Cx>
 where
     L: Clone,
     T: Clone + Hash + Eq,
@@ -44,16 +44,16 @@ macro_rules! resize {
     };
 }
 
-impl<L, T, P> PalettedContainer<L, T, P>
+impl<L, T, Cx> PalettedContainer<L, T, Cx>
 where
     L: for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>> + Clone,
     T: Hash + Eq + Clone,
-    P: ProvidePalette<L, T>,
+    Cx: ProvidePalette<L, T>,
 {
     /// Creates a new paletted container that contains the given object.
     #[allow(clippy::missing_panics_doc)] // The panic point should be unreachable.
     pub fn of_single(list: L, object: T) -> Self {
-        let data = compatible_data::<L, T, P>(list.clone(), None, 0)
+        let data = compatible_data::<L, T, Cx>(list.clone(), None, 0)
             .expect("should return Some when prev is None");
         let mut this = Self {
             list,
@@ -107,7 +107,7 @@ where
     }
 }
 
-impl<L, T, P> PalettedContainer<L, T, P>
+impl<L, T, Cx> PalettedContainer<L, T, Cx>
 where
     L: for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
 {
@@ -157,27 +157,28 @@ where
     }
 }
 
-fn compatible_data<L, T, P>(list: L, prev: Option<&Data<L, T>>, bits: u32) -> Option<Data<L, T>>
+fn compatible_data<L, T, Cx>(list: L, prev: Option<&Data<L, T>>, bits: u32) -> Option<Data<L, T>>
 where
     T: Clone + Hash + Eq,
-    P: ProvidePalette<L, T>,
+    Cx: ProvidePalette<L, T>,
 {
-    let config = P::provide_palette_config(&list, bits);
+    let config = Cx::provide_palette_config(&list, bits);
     if prev.is_some_and(|prev| prev.palette.config() == config) {
         None
     } else {
-        Some(create_data(config, list, P::container_len()))
+        Some(create_data(config, list, Cx::container_len()))
     }
 }
 
-impl<L, T, P> PalettedContainer<L, T, P>
+impl<L, T, Cx> PalettedContainer<L, T, Cx>
 where
     L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
     T: Clone + Hash + Eq,
-    P: ProvidePalette<L, T>,
+    Cx: ProvidePalette<L, T>,
 {
     fn on_resize(&mut self, (i, object): (u32, T)) -> Option<usize> {
-        if let Some(mut data) = compatible_data::<L, T, P>(self.list.clone(), Some(&self.data), i) {
+        if let Some(mut data) = compatible_data::<L, T, Cx>(self.list.clone(), Some(&self.data), i)
+        {
             data.import_from(&self.data.palette, &self.data.storage);
             self.data = data;
             self.data.palette.index(&object)
@@ -363,7 +364,7 @@ mod _edcode {
         }
     }
 
-    impl<L, T, P> Encode for PalettedContainer<L, T, P>
+    impl<L, T, Cx> Encode for PalettedContainer<L, T, Cx>
     where
         L: for<'a> IndexToRaw<&'a T>,
     {
@@ -376,17 +377,17 @@ mod _edcode {
         }
     }
 
-    impl<L, T, P> Update for PalettedContainer<L, T, P>
+    impl<L, T, Cx> Update for PalettedContainer<L, T, Cx>
     where
         L: for<'s> IndexFromRaw<'s, T> + Clone,
         T: Clone + Hash + Eq,
-        P: ProvidePalette<L, T>,
+        Cx: ProvidePalette<L, T>,
     {
         fn update<B>(&mut self, mut buf: B) -> Result<(), std::io::Error>
         where
             B: rimecraft_edcode::bytes::Buf,
         {
-            let data = compatible_data::<L, T, P>(
+            let data = compatible_data::<L, T, Cx>(
                 self.list.clone(),
                 Some(&self.data),
                 buf.get_u8() as u32,
@@ -404,7 +405,7 @@ mod _edcode {
         }
     }
 
-    impl<L, T, P> PalettedContainer<L, T, P>
+    impl<L, T, Cx> PalettedContainer<L, T, Cx>
     where
         L: for<'a> IndexToRaw<&'a T>,
     {
@@ -467,13 +468,13 @@ mod _serde {
         }
     }
 
-    impl<L, T, P> Serialize for PalettedContainer<L, T, P>
+    impl<L, T, Cx> Serialize for PalettedContainer<L, T, Cx>
     where
         L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
         for<'a> &'a L: IntoIterator,
         for<'a> <&'a L as IntoIterator>::IntoIter: ExactSizeIterator,
         T: Clone + Hash + Eq + Serialize,
-        P: ProvidePalette<L, T>,
+        Cx: ProvidePalette<L, T>,
     {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
@@ -490,7 +491,7 @@ mod _serde {
                 vec![],
             );
 
-            let i = P::container_len();
+            let i = Cx::container_len();
             let mut is = vec![0; i];
             if let Some(array) = self.data.storage.as_array() {
                 write_palette_indices(array, &mut is);
@@ -508,7 +509,7 @@ mod _serde {
             let pal = pal;
             let is = is;
 
-            let j = P::bits(&self.list, pal.len());
+            let j = Cx::bits(&self.list, pal.len());
             #[derive(Serialize)]
             struct Serialized<'a, T> {
                 palette: &'a [T], // forward field in BiMapPalette
@@ -537,11 +538,11 @@ mod _serde {
         }
     }
 
-    impl<'de, L, T, P> Update<'de> for PalettedContainer<L, T, P>
+    impl<'de, L, T, Cx> Update<'de> for PalettedContainer<L, T, Cx>
     where
         L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
         T: Deserialize<'de> + Clone + Hash + Eq,
-        P: ProvidePalette<L, T>,
+        Cx: ProvidePalette<L, T>,
     {
         fn update<D>(&mut self, deserializer: D) -> Result<(), D::Error>
         where
@@ -553,9 +554,9 @@ mod _serde {
                 data: Option<Vec<u64>>,
             }
             let Serialized { palette, data } = Serialized::<T>::deserialize(deserializer)?;
-            let i = P::container_len();
-            let j = P::bits(&self.list, palette.len());
-            let config = P::provide_palette_config(&self.list, j);
+            let i = Cx::container_len();
+            let j = Cx::bits(&self.list, palette.len());
+            let config = Cx::provide_palette_config(&self.list, j);
             let storage = if j != 0 {
                 let ls = data.as_ref().ok_or_else(|| {
                     serde::de::Error::custom("missing values for non-zero storage")

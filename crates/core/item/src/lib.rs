@@ -11,12 +11,12 @@ pub use stack::ItemStack;
 
 /// Item containing settings.
 #[derive(Debug)]
-pub struct RawItem<P> {
+pub struct RawItem<Cx> {
     settings: Settings,
-    _marker: PhantomData<P>,
+    _marker: PhantomData<Cx>,
 }
 
-impl<P> RawItem<P> {
+impl<Cx> RawItem<Cx> {
     /// Creates a new `Item` with the given settings.
     #[inline]
     pub const fn new(settings: Settings) -> Self {
@@ -33,47 +33,47 @@ impl<P> RawItem<P> {
     }
 }
 
-impl<P> From<Settings> for RawItem<P> {
+impl<Cx> From<Settings> for RawItem<Cx> {
     #[inline]
     fn from(settings: Settings) -> Self {
         Self::new(settings)
     }
 }
 
-impl<'r, K, P> ProvideRegistry<'r, K, Self> for RawItem<P>
+impl<'r, K, Cx> ProvideRegistry<'r, K, Self> for RawItem<Cx>
 where
-    P: ProvideRegistry<'r, K, Self>,
+    Cx: ProvideRegistry<'r, K, Self>,
 {
     #[inline]
     fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
-        P::registry()
+        Cx::registry()
     }
 }
 
 /// An item usable by players and other entities.
-pub type Item<'r, K, P> = Reg<'r, K, RawItem<P>>;
+pub type Item<'r, K, Cx> = Reg<'r, K, RawItem<Cx>>;
 
 /// A trait for converting a value to an [`Item`].
 #[doc(alias = "ItemConvertible")]
 #[doc(alias = "ItemLike")]
-pub trait ToItem<'s, 'r, K, P> {
+pub trait ToItem<'s, 'r, K, Cx> {
     /// Converts the value to an [`Item`].
-    fn to_item(&'s self) -> Item<'r, K, P>;
+    fn to_item(&'s self) -> Item<'r, K, Cx>;
 }
 
-impl<'ss, 's, 'r, K, P, T> ToItem<'ss, 'r, K, P> for &'s T
+impl<'ss, 's, 'r, K, Cx, T> ToItem<'ss, 'r, K, Cx> for &'s T
 where
-    T: ToItem<'s, 'r, K, P>,
+    T: ToItem<'s, 'r, K, Cx>,
 {
     #[inline]
-    fn to_item(&'ss self) -> Item<'r, K, P> {
+    fn to_item(&'ss self) -> Item<'r, K, Cx> {
         (*self).to_item()
     }
 }
 
-impl<'r, K, P> ToItem<'_, 'r, K, P> for Item<'r, K, P> {
+impl<'r, K, Cx> ToItem<'_, 'r, K, Cx> for Item<'r, K, Cx> {
     #[inline]
-    fn to_item(&'_ self) -> Item<'r, K, P> {
+    fn to_item(&'_ self) -> Item<'r, K, Cx> {
         *self
     }
 }

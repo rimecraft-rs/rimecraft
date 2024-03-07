@@ -216,9 +216,9 @@ pub trait ProvideProperty<'p> {
 
 /// A value with property provider.
 #[derive(Debug)]
-pub struct Value<T, P>(pub T, PhantomData<P>);
+pub struct Value<T, Cx>(pub T, PhantomData<Cx>);
 
-impl<T, P> Value<T, P> {
+impl<T, Cx> Value<T, Cx> {
     /// Creates a new value.
     #[inline]
     pub const fn new(value: T) -> Self {
@@ -232,16 +232,16 @@ mod serde {
 
     use super::*;
 
-    impl<'p, T, P> Serialize for Value<T, P>
+    impl<'p, T, Cx> Serialize for Value<T, Cx>
     where
-        P: ProvideProperty<'p> + 'p,
-        <P as ProvideProperty<'p>>::Property: Wrap<T>,
+        Cx: ProvideProperty<'p> + 'p,
+        <Cx as ProvideProperty<'p>>::Property: Wrap<T>,
     {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: ::serde::Serializer,
         {
-            let prop = P::provide_property();
+            let prop = Cx::provide_property();
             let name = prop
                 .to_name(&self.0)
                 .ok_or_else(|| ::serde::ser::Error::custom("value is not in the property"))?;
@@ -249,16 +249,16 @@ mod serde {
         }
     }
 
-    impl<'p, 'de, T, P> Deserialize<'de> for Value<T, P>
+    impl<'p, 'de, T, Cx> Deserialize<'de> for Value<T, Cx>
     where
-        P: ProvideProperty<'p> + 'p,
-        <P as ProvideProperty<'p>>::Property: Wrap<T>,
+        Cx: ProvideProperty<'p> + 'p,
+        <Cx as ProvideProperty<'p>>::Property: Wrap<T>,
     {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
         {
-            let prop = P::provide_property();
+            let prop = Cx::provide_property();
             let name = <Cow<'_, str>>::deserialize(deserializer)?;
             let value = prop
                 .parse_name(&name)
