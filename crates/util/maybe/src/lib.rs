@@ -3,7 +3,11 @@
 
 #![no_std]
 
+extern crate alloc;
+
 use core::ops::Deref;
+
+use alloc::borrow::ToOwned;
 
 /// Cells that stores a type of data with a reference
 /// variant or an owned variant.
@@ -14,6 +18,19 @@ pub enum Maybe<'a, T: ?Sized, Owned = SimpleOwned<T>> {
     Borrowed(&'a T),
     /// The variant that contains an owned value.
     Owned(Owned),
+}
+
+impl<T: ?Sized, Owned> Maybe<'_, T, Owned>
+where
+    T: ToOwned<Owned = Owned>,
+{
+    /// Converts the cell into an owned value.
+    pub fn into_owned(self) -> Owned {
+        match self {
+            Maybe::Borrowed(val) => val.to_owned(),
+            Maybe::Owned(owned) => owned,
+        }
+    }
 }
 
 impl<T: ?Sized, Owned> Deref for Maybe<'_, T, Owned>

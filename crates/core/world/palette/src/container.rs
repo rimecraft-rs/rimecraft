@@ -426,6 +426,7 @@ mod _serde {
 
     use super::*;
 
+    use rimecraft_maybe::SimpleOwned;
     use rimecraft_serde_update::Update;
     use serde::{Deserialize, Serialize};
 
@@ -468,7 +469,7 @@ mod _serde {
 
     impl<L, T, P> Serialize for PalettedContainer<L, T, P>
     where
-        L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, &'s T>,
+        L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
         for<'a> &'a L: IntoIterator,
         for<'a> <&'a L as IntoIterator>::IntoIter: ExactSizeIterator,
         T: Clone + Hash + Eq + Serialize,
@@ -497,7 +498,10 @@ mod _serde {
             }
             apply_each(&mut is, |id| {
                 pal.get(id as usize)
-                    .cloned()
+                    .map(|obj| match obj {
+                        Maybe::Borrowed(obj) => obj.clone(),
+                        Maybe::Owned(SimpleOwned(obj)) => obj,
+                    })
                     .and_then(|obj| pal.index_or_insert(obj).ok())
                     .map_or(-1i32 as u32, |n| n as u32)
             });
@@ -535,7 +539,7 @@ mod _serde {
 
     impl<'de, L, T, P> Update<'de> for PalettedContainer<L, T, P>
     where
-        L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, &'s T>,
+        L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
         T: Deserialize<'de> + Clone + Hash + Eq,
         P: ProvidePalette<L, T>,
     {
@@ -566,7 +570,7 @@ mod _serde {
                         write_palette_indices(&array, &mut is);
                         apply_each(&mut is, |id| {
                             pal.get(id as usize)
-                                .and_then(|obj| self.list.raw_id(obj))
+                                .and_then(|obj| self.list.raw_id(&obj))
                                 .map_or(-1i32 as u32, |n| n as u32)
                         });
 

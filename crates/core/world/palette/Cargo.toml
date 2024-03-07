@@ -19,7 +19,6 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 rimecraft-serde-update = { path = "../../../util/serde-update", optional = true }
 
 [features]
-# default = ["edcode", "serde"]
 edcode = ["dep:rimecraft-edcode"]
 serde = ["dep:serde", "dep:rimecraft-serde-update"]
 
