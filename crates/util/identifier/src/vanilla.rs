@@ -4,6 +4,8 @@ use std::{hash::Hash, str::FromStr, sync::Arc};
 
 use crate::Separate;
 
+mod macros;
+
 /// Namespace of an vanilla Minecraft `Identifier`.
 ///
 /// This is the default value of a [`Namespace`].
@@ -106,7 +108,6 @@ impl Path {
         Ok(Self(ArcCowStr::Arc(value)))
     }
 
-
     /// Creates a new [`Path`] from the given value.
     ///
     /// This function accepts a 2-dimension [`Vec`] which stands for words wrapped in locations.
@@ -114,11 +115,12 @@ impl Path {
     /// # Examples
     ///
     /// ```
+    /// # use rimecraft_identifier::vanilla::Path;
     /// let path = Path::new_formatted(vec![
-    /// 		vec!["tags"],
-    /// 		vec![],
-    /// 		vec!["piglin", "", "likes"],
-    /// 	]);
+    ///         vec!["tags"],
+    ///         vec![],
+    ///         vec!["piglin", "", "likes"],
+    ///     ]);
     /// let identifier = Identifier::new(MINECRAFT, path);
     ///
     /// assert_eq!("minecraft:tags/piglin_likes", identifier.to_string());
@@ -132,8 +134,8 @@ impl Path {
     where
         T: Into<Arc<str>>,
     {
-		Self::try_new_formatted(values).unwrap()
-	}
+        Self::try_new_formatted(values).unwrap()
+    }
 
     /// Creates a new [`Path`] from the given value.
     ///
@@ -142,11 +144,12 @@ impl Path {
     /// # Examples
     ///
     /// ```
+    /// # use rimecraft_identifier::vanilla::Path;
     /// let path = Path::try_new_formatted(vec![
-    /// 		vec!["tags"],
-    /// 		vec![],
-    /// 		vec!["piglin", "", "repellents"],
-    /// 	]).unwrap();
+    ///         vec!["tags"],
+    ///         vec![],
+    ///         vec!["piglin", "", "repellents"],
+    ///     ]).unwrap();
     /// let identifier = Identifier::new(MINECRAFT, path);
     /// assert_eq!("minecraft:tags/piglin_repellents", identifier.to_string());
     /// ```
@@ -174,36 +177,24 @@ impl Path {
             })
             .collect();
 
-        match values.iter().flat_map(|v| v.iter()).find_map(|r| match r {
-            Ok(_) => None,
-            Err(error) => Some(error),
-        }) {
-            Some(error) => return Err((*error).clone()),
-            None => (),
-        };
+        if let Some(err) = values
+            .iter()
+            .flat_map(|v| v.iter())
+            .find_map(|r| r.as_ref().err())
+            .cloned()
+        {
+            return Err(err);
+        }
 
         let values: Vec<Vec<Arc<str>>> = values
             .into_iter()
             .filter_map(|v| {
                 let v: Vec<Arc<str>> = v
                     .into_iter()
-                    .filter_map(|r| match r {
-                        Ok(s) => {
-                            if s.len() > 0 {
-                                Some(s)
-                            } else {
-                                None
-                            }
-                        }
-                        Err(_) => None,
-                    })
+                    .filter_map(|r| r.ok().and_then(|s| (!s.is_empty()).then_some(s)))
                     .collect();
 
-                if v.len() > 0 {
-                    Some(v)
-                } else {
-                    None
-                }
+                (!v.is_empty()).then_some(v)
             })
             .collect();
 
@@ -219,7 +210,7 @@ impl Path {
     /// Creates a new [`Path`] from the given value
     /// at compile time.
     ///
-    /// The given path shoule be all [a-z0-9/_.-] character.
+    /// The given path should be all [a-z0-9/_.-] character.
     #[inline]
     pub const fn new_unchecked(value: &'static str) -> Self {
         Self(ArcCowStr::Ref(value))
@@ -339,6 +330,7 @@ fn validate_path(value: &str) -> Result<(), Error> {
 
 /// Error type for `Namespace` and `Path`.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Error {
     /// The given namespace is invalid.
     InvalidNamespace(String),

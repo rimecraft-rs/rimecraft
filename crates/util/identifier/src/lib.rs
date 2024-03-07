@@ -6,9 +6,6 @@ use std::{fmt::Display, str::FromStr};
 #[cfg(feature = "vanilla")]
 pub mod vanilla;
 
-#[cfg(feature = "macros")]
-pub mod macros;
-
 /// An identifier used to identify things.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[doc(alias = "ResourceLocation")]
