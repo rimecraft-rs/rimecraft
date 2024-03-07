@@ -13,6 +13,7 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 rimecraft-packed-int-array = { path = "../../../util/packed-int-array" }
+rimecraft-maybe = { path = "../../../util/maybe" }
 rimecraft-edcode = { path = "../../../util/edcode", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 rimecraft-serde-update = { path = "../../../util/serde-update", optional = true }

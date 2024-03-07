@@ -140,11 +140,10 @@ mod serde {
         }
     }
 
-    impl<'a, 'r, 'de, K, T> serde::Deserialize<'de> for &'a RefEntry<K, T>
+    impl<'a, 'de, K, T> serde::Deserialize<'de> for &'a RefEntry<K, T>
     where
-        'r: 'a,
-        K: serde::Deserialize<'de> + Hash + Eq + 'r,
-        T: ProvideRegistry<'r, K, T> + 'r,
+        K: serde::Deserialize<'de> + Hash + Eq + 'a,
+        T: ProvideRegistry<'a, K, T> + 'a,
     {
         /// Deserializes the registry entry using the ID.
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -155,7 +154,7 @@ mod serde {
             T::registry()
                 .get(&id)
                 .map(From::from)
-                .ok_or_else(|| serde::de::Error::custom(format!("unknown registry key")))
+                .ok_or_else(|| serde::de::Error::custom("unknown registry key"))
         }
     }
 }

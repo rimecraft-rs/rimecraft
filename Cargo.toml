@@ -13,9 +13,8 @@ members = [
 ]
 
 [workspace.lints.rust]
-unsafe_code = "deny"
 missing-docs = "warn"
-missing-debug-implementations = "deny"
+missing-debug-implementations = "warn"
 let-underscore-drop = "warn"
 single-use-lifetimes = "warn"
 trivial-numeric-casts = "warn"
@@ -23,7 +22,6 @@ elided-lifetimes-in-paths = "deny"
 unused-lifetimes = "forbid"
 unused-macro-rules = "warn"
 unused-qualifications = "warn"
-unused-tuple-struct-fields = "warn"
 variant-size-differences = "warn"
 dyn-drop = "forbid"
 ellipsis-inclusive-range-patterns = "forbid"

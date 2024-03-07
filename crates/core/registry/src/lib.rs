@@ -520,26 +520,10 @@ where
     }
 }
 
-/// Trait for providing a registry from reference.
-pub trait ProvideRegistryRef<'r, K, T> {
-    /// Gets the registry from reference.
-    fn registry_ref(&self) -> &'r Registry<K, T>;
-}
-
 /// Trait for providing a registry.
 pub trait ProvideRegistry<'r, K, T> {
     /// Gets the registry.
     fn registry() -> &'r Registry<K, T>;
-}
-
-impl<'r, K, T, S> ProvideRegistryRef<'r, K, T> for S
-where
-    S: ProvideRegistry<'r, K, T>,
-{
-    #[inline]
-    fn registry_ref(&self) -> &'r Registry<K, T> {
-        Self::registry()
-    }
 }
 
 impl<K, T> Registry<K, T>
@@ -603,11 +587,10 @@ mod serde {
         }
     }
 
-    impl<'a, 'r, 'de, K, T> serde::Deserialize<'de> for Reg<'a, K, T>
+    impl<'a, 'de, K, T> serde::Deserialize<'de> for Reg<'a, K, T>
     where
-        'r: 'a,
-        T: ProvideRegistry<'r, K, T> + 'r,
-        K: serde::Deserialize<'de> + Hash + Eq + 'r,
+        T: ProvideRegistry<'a, K, T> + 'a,
+        K: serde::Deserialize<'de> + Hash + Eq + 'a,
     {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
@@ -617,7 +600,7 @@ mod serde {
                 let key = K::deserialize(deserializer)?;
                 T::registry()
                     .get(&key)
-                    .ok_or_else(|| serde::de::Error::custom(format!("key not found")))
+                    .ok_or_else(|| serde::de::Error::custom("key not found"))
             } else {
                 let raw = i32::deserialize(deserializer)? as usize;
                 T::registry()
