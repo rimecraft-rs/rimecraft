@@ -3,11 +3,8 @@
 //! This corresponds to `net.minecraft.state` in `yarn`.
 
 use std::{
-    borrow::Borrow,
     collections::{BTreeMap, HashMap},
     fmt::{Debug, Display},
-    hash::Hash,
-    ops::Deref,
     sync::{Arc, OnceLock, Weak},
 };
 
@@ -17,6 +14,7 @@ use property::{BiIndex, ErasedProperty, Property, Wrap};
 use regex::Regex;
 #[cfg(not(feature = "regex"))]
 use regex_lite::Regex;
+use rimecraft_maybe::Maybe;
 
 use crate::property::ErasedWrap;
 
@@ -24,6 +22,8 @@ pub mod property;
 
 // <property> -> <<value> -> <state>>
 type Table<'a, T> = HashMap<ErasedProperty<'a>, HashMap<isize, Weak<T>>>;
+
+type MaybeArc<'a, T> = Maybe<'a, T, Arc<T>>;
 
 /// State of an object.
 pub struct State<'a, T> {
@@ -80,7 +80,7 @@ impl<T> State<'_, T> {
                 .get(prop.name())
                 .ok_or_else(|| Error::PropertyNotFound(prop.name().to_owned()))
                 .and_then(|map| map.get(&next).ok_or(Error::ValueNotFound(index)))
-                .map(|weak| MaybeArc::Arc(weak.upgrade().expect("state was dropped")))
+                .map(|weak| MaybeArc::Owned(weak.upgrade().expect("state was dropped")))
         }
     }
 
@@ -113,7 +113,7 @@ impl<T> State<'_, T> {
                 .get(prop.name())
                 .ok_or_else(|| Error::PropertyNotFound(prop.name().to_owned()))
                 .and_then(|map| map.get(&value).ok_or(Error::ValueNotFound(index)))
-                .map(|weak| MaybeArc::Arc(weak.upgrade().expect("state was dropped")))
+                .map(|weak| MaybeArc::Owned(weak.upgrade().expect("state was dropped")))
         }
     }
 
@@ -390,74 +390,6 @@ impl Display for Error {
 }
 
 impl std::error::Error for Error {}
-
-/// Cell that can be either an [`Arc`] or a borrowed reference.
-#[derive(Debug)]
-#[allow(clippy::exhaustive_enums)]
-pub enum MaybeArc<'a, T> {
-    /// The reference-counted variant.
-    Arc(Arc<T>),
-    /// The borrowed variant.
-    Borrowed(&'a T),
-}
-
-impl<T> Hash for MaybeArc<'_, T>
-where
-    T: Hash,
-{
-    #[inline]
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Borrow::<T>::borrow(self).hash(state)
-    }
-}
-
-impl<T> Borrow<T> for MaybeArc<'_, T> {
-    #[inline]
-    fn borrow(&self) -> &T {
-        match self {
-            MaybeArc::Arc(arc) => arc.as_ref(),
-            MaybeArc::Borrowed(val) => val,
-        }
-    }
-}
-
-impl<T> Clone for MaybeArc<'_, T> {
-    #[inline]
-    fn clone(&self) -> Self {
-        match self {
-            MaybeArc::Arc(arc) => MaybeArc::Arc(Arc::clone(arc)),
-            MaybeArc::Borrowed(val) => MaybeArc::Borrowed(val),
-        }
-    }
-}
-
-impl<T> PartialEq for MaybeArc<'_, T>
-where
-    T: PartialEq,
-{
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        Borrow::<T>::borrow(self).eq(Borrow::<T>::borrow(other))
-    }
-}
-
-impl<T> Eq for MaybeArc<'_, T> where T: Eq {}
-
-impl<T> AsRef<T> for MaybeArc<'_, T> {
-    #[inline]
-    fn as_ref(&self) -> &T {
-        Borrow::<T>::borrow(self)
-    }
-}
-
-impl<T> Deref for MaybeArc<'_, T> {
-    type Target = T;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        Borrow::<T>::borrow(self)
-    }
-}
 
 #[cfg(feature = "serde")]
 pub mod serde {

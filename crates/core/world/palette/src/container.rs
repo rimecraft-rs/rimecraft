@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, hash::Hash, marker::PhantomData};
 
+use rimecraft_maybe::Maybe;
 use rimecraft_packed_int_array::PackedIntArray;
 
 use crate::{IndexFromRaw, IndexToRaw, Palette, Strategy};
@@ -45,7 +46,7 @@ macro_rules! resize {
 
 impl<L, T, P> PalettedContainer<L, T, P>
 where
-    L: for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, &'s T> + Clone,
+    L: for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>> + Clone,
     T: Hash + Eq + Clone,
     P: ProvidePalette<L, T>,
 {
@@ -64,7 +65,7 @@ where
     }
 
     /// Sets the value at the given index and returns the old one.
-    pub fn swap(&mut self, index: usize, value: T) -> Option<&T> {
+    pub fn swap(&mut self, index: usize, value: T) -> Option<Maybe<'_, T>> {
         resize!(self, self.data.palette.index_or_insert(value))
             .and_then(|i| {
                 if let Some(array) = self.data.storage.as_array_mut() {
@@ -108,11 +109,11 @@ where
 
 impl<L, T, P> PalettedContainer<L, T, P>
 where
-    L: for<'s> IndexFromRaw<'s, &'s T>,
+    L: for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
 {
     /// Returns the value at the given index.
     #[inline]
-    pub fn get(&self, index: usize) -> Option<&T> {
+    pub fn get(&self, index: usize) -> Option<Maybe<'_, T>> {
         self.data
             .storage
             .as_array()
@@ -132,7 +133,7 @@ where
             .then(|| self.data.palette.get(0))
             .flatten()
         {
-            counter(val, self.data.storage.len());
+            counter(&val, self.data.storage.len());
         } else {
             let mut map = HashMap::new();
             if let Some(array) = self.data.storage.as_array() {
@@ -150,7 +151,7 @@ where
                 .into_iter()
                 .filter_map(|(i, c)| self.data.palette.get(i as usize).map(|i| (i, c)))
             {
-                counter(obj, c);
+                counter(&obj, c);
             }
         }
     }
@@ -171,7 +172,7 @@ where
 
 impl<L, T, P> PalettedContainer<L, T, P>
 where
-    L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, &'s T>,
+    L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
     T: Clone + Hash + Eq,
     P: ProvidePalette<L, T>,
 {
@@ -276,14 +277,14 @@ where
     #[allow(clippy::missing_panics_doc)]
     pub fn import_from<L1>(&mut self, palette: &Palette<L1, T>, storage: &Storage)
     where
-        L1: for<'s> IndexFromRaw<'s, &'s T>,
+        L1: for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
     {
         for i in 0..storage.len() {
             if let Some(raw) = storage
                 .as_array()
                 .and_then(|array| array.get(i))
                 .and_then(|i| palette.get(i as usize))
-                .and_then(|obj| self.palette.index(obj))
+                .and_then(|obj| self.palette.index(&obj))
             {
                 self.storage.as_array_mut().unwrap().swap(i, raw as u32);
             }
@@ -312,8 +313,6 @@ where
 #[cfg(feature = "edcode")]
 mod _edcode {
     use rimecraft_edcode::{Encode, Update, VarI32};
-
-    use crate::IndexToRaw;
 
     use super::*;
 

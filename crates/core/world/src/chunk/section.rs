@@ -1,9 +1,11 @@
 use std::fmt::Debug;
 
+use rimecraft_block::ProvideStateIds;
 use rimecraft_chunk_palette::{
     container::{PalettedContainer, ProvidePalette},
-    IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw,
+    IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
 };
+use rimecraft_registry::Registry;
 
 use super::{internal_types::*, ChunkTy};
 
@@ -23,12 +25,12 @@ where
 impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
     Cx: ChunkTy<'w>,
-    Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, K, Cx>>,
+    Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, K, Cx>>>,
 
     for<'a> &'a Cx::BlockStateList: IntoIterator,
     for<'a> <&'a Cx::BlockStateList as IntoIterator>::IntoIter: ExactSizeIterator,
 
-    for<'a> &'a Cx::BlockStateExt: Into<IFluidStateRef<'a, 'w, K, Cx>>,
+    for<'a> &'a Cx::BlockStateExt: Into<Maybe<'a, IFluidState<'w, K, Cx>>>,
 {
     /// Creates a new chunk section with the given containers.
     #[inline]
@@ -54,7 +56,7 @@ where
         let mut ne_fluid_c = 0;
 
         self.bsc.count(|IBlockState { block, state }, count| {
-            let fs: IFluidStateRef<'_, '_, _, _> = state.data().into();
+            let fs: Maybe<'_, _> = state.data().into();
             if !block.settings().is_empty {
                 ne_block_c += count;
             }
@@ -137,34 +139,24 @@ where
 impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
     Cx: ChunkTy<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, K, Cx>>,
-    Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, K, Cx>>,
+    Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, K, Cx>>>,
 {
     /// Returns the block state at the given position.
     #[inline]
-    pub fn block_state(&self, x: u32, y: u32, z: u32) -> Option<IBlockStateRef<'_, 'w, K, Cx>> {
+    pub fn block_state(&self, x: u32, y: u32, z: u32) -> Option<Maybe<'_, IBlockState<'w, K, Cx>>> {
         self.bsc.get(Cx::compute_index(x, y, z)).map(From::from)
-    }
-
-    /// Returns the fluid state at the given position.
-    #[inline]
-    pub fn fluid_state(&self, x: u32, y: u32, z: u32) -> Option<IFluidStateRef<'_, 'w, K, Cx>>
-    where
-        for<'a> &'a Cx::BlockStateExt: Into<IFluidStateRef<'a, 'w, K, Cx>>,
-    {
-        self.block_state(x, y, z)
-            .map(|IBlockStateRef { state, .. }| state.data().into())
     }
 }
 
 impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
     Cx: ChunkTy<'w> + ComputeIndex<Cx::Biome, IBiome<'w, K, Cx>>,
-    Cx::BiomeList: for<'s> PalIndexFromRaw<'s, &'s IBiome<'w, K, Cx>>,
+    Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, K, Cx>>>,
 {
     /// Returns the biome at the given position.
     #[inline]
-    pub fn biome(&self, x: u32, y: u32, z: u32) -> Option<IBiome<'w, K, Cx>> {
-        self.bic.get(Cx::compute_index(x, y, z)).copied()
+    pub fn biome(&self, x: u32, y: u32, z: u32) -> Option<Maybe<'_, IBiome<'w, K, Cx>>> {
+        self.bic.get(Cx::compute_index(x, y, z))
     }
 }
 
@@ -172,7 +164,7 @@ impl<'w, K, Cx> ChunkSection<'w, K, Cx>
 where
     Cx: ChunkTy<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, K, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, K, Cx>>
-        + for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, K, Cx>>
+        + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, K, Cx>>>
         + Clone,
     for<'a> &'a Cx::BlockStateExt: Into<IFluidStateRef<'a, 'w, K, Cx>>,
 {
@@ -185,10 +177,10 @@ where
         y: u32,
         z: u32,
         state: IBlockState<'w, K, Cx>,
-    ) -> Option<IBlockStateRef<'_, 'w, K, Cx>> {
+    ) -> Option<Maybe<'_, IBlockState<'w, K, Cx>>> {
         let bs_old = self.bsc.swap(Cx::compute_index(x, y, z), state.clone());
 
-        if let Some(state_old) = bs_old {
+        if let Some(ref state_old) = bs_old {
             if !state_old.block.settings().is_empty {
                 self.ne_block_c -= 1;
                 if state_old.block.settings().random_ticks {
@@ -213,7 +205,22 @@ where
             }
         }
 
-        bs_old.map(From::from)
+        bs_old
+    }
+}
+
+impl<'w, K, Cx> From<&'w Registry<K, Cx::Biome>> for ChunkSection<'w, K, Cx>
+where
+    Cx: ChunkTy<'w>
+        + ProvideStateIds
+        + ProvidePalette<Cx::BlockStateList, IBlockState<'w, K, Cx>>
+        + ProvidePalette<Cx::BlockStateList, IBlockState<'w, K, Cx>>,
+    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, K, Cx>>
+        + for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, K, Cx>>
+        + Clone,
+{
+    fn from(value: &'w Registry<K, Cx::Biome>) -> Self {
+        unimplemented!()
     }
 }
 
@@ -275,7 +282,7 @@ mod _edcode {
         Cx: ChunkTy<'w>,
 
         Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, IBlockState<'w, K, Cx>> + Clone,
-        Cx::BiomeList: for<'s> PalIndexFromRaw<'s, &'s IBiome<'w, K, Cx>>
+        Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, K, Cx>>>
             + for<'s> PalIndexFromRaw<'s, IBiome<'w, K, Cx>>
             + for<'a> PalIndexToRaw<&'a IBiome<'w, K, Cx>>
             + Clone,
@@ -311,7 +318,7 @@ mod _edcode {
     impl<'w, K, Cx> ChunkSection<'w, K, Cx>
     where
         Cx: ChunkTy<'w>,
-        Cx::BiomeList: for<'s> PalIndexFromRaw<'s, &'s IBiome<'w, K, Cx>>
+        Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, K, Cx>>>
             + for<'s> PalIndexFromRaw<'s, IBiome<'w, K, Cx>>
             + for<'a> PalIndexToRaw<&'a IBiome<'w, K, Cx>>
             + Clone,

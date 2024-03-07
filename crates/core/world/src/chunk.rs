@@ -47,7 +47,7 @@ where
     Cx: ChunkTy<'w>,
 {
     pos: ChunkPos,
-
+    udata: UpgradeData<'w, K, Cx>,
     hlimit: HeightLimit,
     section_array: Option<Vec<ChunkSection<'w, K, Cx>>>,
 
@@ -59,14 +59,29 @@ where
     Cx: ChunkTy<'w>,
 {
     /// Creates a new chunk from scratch.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the length of the section array does not match the
+    /// vertical section count of the height limit. See [`HeightLimit::count_vertical_sections`].
     pub fn new(
         pos: ChunkPos,
+        upgrade_data: UpgradeData<'w, K, Cx>,
         height_limit: HeightLimit,
         section_array: Option<Vec<ChunkSection<'w, K, Cx>>>,
         vdata: T,
     ) -> Self {
+        if let Some(ref array) = section_array {
+            assert_eq! {
+                array.len() as i32,
+                height_limit.count_vertical_sections(),
+                "the section array must have the same length as the vertical section count of the height limit"
+            }
+        }
+
         Self {
             pos,
+            udata: upgrade_data,
             hlimit: height_limit,
             section_array,
             vdata,
@@ -81,12 +96,14 @@ where
     Cx: ChunkTy<'w> + Debug,
     Cx::BlockStateExt: Debug,
     Cx::BlockStateList: Debug,
+    Cx::FluidStateExt: Debug,
     Cx::Biome: Debug,
     Cx::BiomeList: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Chunk")
             .field("pos", &self.pos)
+            .field("udata", &self.udata)
             .field("hlimit", &self.hlimit)
             .field("section_array", &self.section_array)
             .field("vdata", &self.vdata)

@@ -82,3 +82,16 @@ pub struct Settings {
 
 #[doc(alias = "BlockProperties")]
 pub use Settings as BlockSettings;
+
+/// Global contexts providing global `BlockState` IDs.
+///
+/// # MCJE Reference
+///
+/// This is the equivalent of `net.minecraft.block.Block.STATE_IDS` in MCJE.
+pub trait ProvideStateIds {
+    /// The type of the state IDs.
+    type List;
+
+    /// Returns the state IDs.
+    fn state_ids() -> Self::List;
+}
