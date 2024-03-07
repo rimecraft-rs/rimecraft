@@ -115,7 +115,7 @@ impl Path {
     /// # Examples
     ///
     /// ```
-    /// # use rimecraft_identifier::vanilla::Path;
+    /// # use rimecraft_identifier::{Identifier, vanilla::*};
     /// let path = Path::new_formatted(vec![
     ///         vec!["tags"],
     ///         vec![],
@@ -144,7 +144,7 @@ impl Path {
     /// # Examples
     ///
     /// ```
-    /// # use rimecraft_identifier::vanilla::Path;
+    /// # use rimecraft_identifier::{Identifier, vanilla::*};
     /// let path = Path::try_new_formatted(vec![
     ///         vec!["tags"],
     ///         vec![],
@@ -368,13 +368,5 @@ mod tests {
     fn parse() {
         let id: Identifier = "foo:bar".parse().unwrap();
         assert_eq!(id, Identifier::new(Namespace::new("foo"), Path::new("bar")));
-    }
-}
-
-#[cfg(feature = "vanilla-registry")]
-impl ::rimecraft_registry::key::Root for Identifier {
-    #[inline]
-    fn root() -> Self {
-        Self::new(Default::default(), Path::new("root"))
     }
 }
