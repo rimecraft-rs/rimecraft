@@ -238,7 +238,7 @@ mod serde_helper {
     }
 
     #[inline]
-    pub fn ser_attachments<K, P, S>(
+    pub fn ser_attachments<K, Cx, S>(
         attachments: &(Attachments<K>, PhantomData<Cx>),
         serializer: S,
     ) -> Result<S::Ok, S::Error>
@@ -249,7 +249,7 @@ mod serde_helper {
         serde::Serialize::serialize(&attachments.0, serializer)
     }
 
-    pub fn deser_attachments<'de, K, P, D>(
+    pub fn deser_attachments<'de, K, Cx, D>(
         deserializer: D,
     ) -> Result<(Attachments<K>, PhantomData<Cx>), <D as serde::Deserializer<'de>>::Error>
     where
@@ -274,7 +274,7 @@ mod serde_helper {
         use super::*;
 
         #[inline]
-        pub fn serialize<K, P, S>(item: &Item<'_, K, Cx>, serializer: S) -> Result<S::Ok, S::Error>
+        pub fn serialize<K, Cx, S>(item: &Item<'_, K, Cx>, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
             K: Serialize + Hash + Eq,
@@ -283,7 +283,7 @@ mod serde_helper {
         }
 
         #[inline]
-        pub fn deserialize<'rr, 'd, K, P, D>(deserializer: D) -> Result<Item<'rr, K, Cx>, D::Error>
+        pub fn deserialize<'rr, 'd, K, Cx, D>(deserializer: D) -> Result<Item<'rr, K, Cx>, D::Error>
         where
             'rr: 'd,
             D: serde::Deserializer<'d>,
