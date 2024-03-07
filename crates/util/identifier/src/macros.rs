@@ -8,6 +8,8 @@ use crate::*; // Used in docs
 /// # Examples
 ///
 /// ```
+/// use rimecraft_identifier::{format_identifier, Identifier, vanilla::{Namespace, Path, MINECRAFT}};
+///
 /// let identifier = format_identifier!("namespace".parse().unwrap() =>
 /// 	"a", "b"; "c"; "42"
 /// );
@@ -23,8 +25,6 @@ use crate::*; // Used in docs
 macro_rules! format_identifier {
 	($namespace:expr => $($($word:expr),*);*) => {
 		{
-			use crate::*;
-
 			let mut locations = Vec::new();
 
 			$(
@@ -40,6 +40,33 @@ macro_rules! format_identifier {
 			)*
 
 			Identifier::<Namespace, Path>::new($namespace, Path::new_formatted(locations))
+		}
+	};
+}
+
+/// Creates a new localization key with literals.
+///
+/// # Examples
+///
+/// ```
+/// use rimecraft_identifier::format_localization_key;
+///
+/// let key = format_localization_key!(
+/// 	"category", "id", "path"
+/// );
+/// assert_eq!("category.id.path", key);
+/// ```
+#[macro_export]
+macro_rules! format_localization_key {
+	($($word:expr),*) => {
+		{
+			let mut words: Vec<String> = Vec::new();
+
+			$(
+				words.push($word.to_string());
+			)*
+
+			words.into_iter().filter(|s| s.len() > 0).collect::<Vec<String>>().join(".")
 		}
 	};
 }

@@ -1,8 +1,11 @@
 //! Enum for particles mode.
 
-use enum_iterator::Sequence;
+use std::fmt::Display;
 
-use super::ByUIntId;
+use enum_iterator::Sequence;
+use rimecraft_identifier::format_localization_key;
+
+use super::ByUSizeId;
 
 /// Represents the rendering mode of particles.
 ///
@@ -19,14 +22,20 @@ pub enum ParticlesMode {
 	Minimal
 }
 
-impl ByUIntId for ParticlesMode {}
+impl ByUSizeId for ParticlesMode {}
 
-impl ParticlesMode {
-	fn translation_key(&self) -> String {
-		String::from("options.particles.") + match self {
+impl Display for ParticlesMode {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", match self {
 			ParticlesMode::All => "all",
 			ParticlesMode::Decreased => "decreased",
 			ParticlesMode::Minimal => "minimal",
-		}
+		})
+	}
+}
+
+impl ParticlesMode {
+	pub fn translation_key(&self) -> String {
+		format_localization_key!("options", "particles", format!("{}", self))
 	}
 }
