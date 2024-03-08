@@ -1,6 +1,10 @@
+//! Callbacks used in option types.
+
 pub mod potential_values_based_callbacks;
 pub mod suppliable_int_callbacks;
 pub mod validating_int_slider_callbacks;
+
+use std::fmt::Debug;
 
 use crate::SimpleOption;
 
@@ -8,29 +12,36 @@ type ChangeCallback<T> = dyn Fn(Option<T>);
 
 type ValueSetter<T, Txt, TxtStyle> = fn(&mut SimpleOption<T, Txt, TxtStyle>, value: Option<T>);
 
-trait Callbacks<T, Txt, TxtStyle> {
+pub trait Callbacks<T, Txt, TxtStyle> {
     fn validate(&self, value: Option<T>) -> Option<T>;
 }
 
-trait CyclingCallbacks<T, Txt, TxtStyle>: Callbacks<T, Txt, TxtStyle> {
+pub trait CyclingCallbacks<T, Txt, TxtStyle>: Callbacks<T, Txt, TxtStyle> {
     fn get_values(&self) -> (); // CyclingButtonWidget.Values<T>
+}
 
+impl<T, Txt, TxtStyle> dyn CyclingCallbacks<T, Txt, TxtStyle>
+where
+    T: Clone + PartialEq,
+{
     fn value_setter(&self) -> ValueSetter<T, Txt, TxtStyle> {
         |option, value| option.set_value(value)
     }
 }
 
-trait SliderCallbacks<T, Txt, TxtStyle>: Callbacks<T, Txt, TxtStyle> {
+pub trait SliderCallbacks<T, Txt, TxtStyle>: Callbacks<T, Txt, TxtStyle> {
     fn to_slider_progress(&self, value: T) -> f32;
 
     fn to_value(&self, slider_progress: f32) -> T;
 }
 
-trait TypeChangeableCallbacks<T, Txt, TxtStyle>: CyclingCallbacks<T, Txt, TxtStyle> + SliderCallbacks<T, Txt, TxtStyle> {
+pub trait TypeChangeableCallbacks<T, Txt, TxtStyle>:
+    CyclingCallbacks<T, Txt, TxtStyle> + SliderCallbacks<T, Txt, TxtStyle>
+{
     fn is_cycling(&self) -> bool;
 }
 
-trait IntSliderCallbacks<Txt, TxtStyle>: SliderCallbacks<i32, Txt, TxtStyle> {
+pub trait IntSliderCallbacks<Txt, TxtStyle>: SliderCallbacks<i32, Txt, TxtStyle> {
     fn min_inclusive(&self) -> i32;
 
     fn max_inclusive(&self) -> i32;
@@ -78,7 +89,14 @@ trait IntSliderCallbacks<Txt, TxtStyle>: SliderCallbacks<i32, Txt, TxtStyle> {
             to_value: ToV,
         }
 
-        impl<R, IR, RI, F, ToP, ToV, Txt, TxtStyle> SliderCallbacks<R, Txt, TxtStyle> for Impl<IR, RI, F, ToP, ToV>
+        impl<IR, RI, F, ToP, ToV> Debug for Impl<IR, RI, F, ToP, ToV> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_struct("Impl").finish()
+            }
+        }
+
+        impl<R, IR, RI, F, ToP, ToV, Txt, TxtStyle> SliderCallbacks<R, Txt, TxtStyle>
+            for Impl<IR, RI, F, ToP, ToV>
         where
             IR: Fn(Option<i32>) -> Option<R>,
             RI: Fn(Option<R>) -> Option<i32>,
@@ -97,7 +115,8 @@ trait IntSliderCallbacks<Txt, TxtStyle>: SliderCallbacks<i32, Txt, TxtStyle> {
             }
         }
 
-        impl<R, IR, RI, F, ToP, ToV, Txt, TxtStyle> Callbacks<R, Txt, TxtStyle> for Impl<IR, RI, F, ToP, ToV>
+        impl<R, IR, RI, F, ToP, ToV, Txt, TxtStyle> Callbacks<R, Txt, TxtStyle>
+            for Impl<IR, RI, F, ToP, ToV>
         where
             IR: Fn(Option<i32>) -> Option<R>,
             RI: Fn(Option<R>) -> Option<i32>,

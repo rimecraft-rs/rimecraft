@@ -1,6 +1,6 @@
 use super::*;
 
-struct ValidatingIntSliderCallbacks {
+pub struct ValidatingIntSliderCallbacks {
     min: i32,
     max: i32,
 }

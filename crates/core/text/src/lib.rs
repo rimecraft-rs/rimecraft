@@ -179,9 +179,12 @@ where
     }
 }
 
+/// Indicates that a struct or enum has its own localization key.
 pub trait Localizable {
+	/// Gets the localization key.
 	fn localization_key(&self) -> String;
 
+	/// Gets the localized name using the localization key.
 	fn localized_name(&self) -> Text<(), ()> {
 		todo!()
 	}

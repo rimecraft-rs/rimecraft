@@ -30,8 +30,8 @@ impl<Txt, TxtStyle> IntSliderCallbacks<Txt, TxtStyle> for SuppliableIntCallbacks
         match value {
             Some(value) => Some(rimecraft_math::clamp(
                 value as f32,
-                <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::min_inclusive(self) as f32,
-                <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::max_inclusive(self) as f32,
+                <SuppliableIntCallbacks as IntSliderCallbacks<Txt, TxtStyle>>::min_inclusive(self) as f32,
+                <SuppliableIntCallbacks as IntSliderCallbacks<Txt, TxtStyle>>::max_inclusive(self) as f32,
             ) as i32),
             None => None,
         }
@@ -40,16 +40,16 @@ impl<Txt, TxtStyle> IntSliderCallbacks<Txt, TxtStyle> for SuppliableIntCallbacks
 
 impl<Txt, TxtStyle> SliderCallbacks<i32, Txt, TxtStyle> for SuppliableIntCallbacks {
     fn to_slider_progress(&self, value: i32) -> f32 {
-        <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::to_slider_progress(self, value)
+        <SuppliableIntCallbacks as IntSliderCallbacks<Txt, TxtStyle>>::to_slider_progress(self, value)
     }
 
     fn to_value(&self, slider_progress: f32) -> i32 {
-        <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::to_value(self, slider_progress)
+        <SuppliableIntCallbacks as IntSliderCallbacks<Txt, TxtStyle>>::to_value(self, slider_progress)
     }
 }
 
 impl<Txt, TxtStyle> Callbacks<i32, Txt, TxtStyle> for SuppliableIntCallbacks {
     fn validate(&self, value: Option<i32>) -> Option<i32> {
-        <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::i32_validate(self, value)
+        <SuppliableIntCallbacks as IntSliderCallbacks<Txt, TxtStyle>>::i32_validate(self, value)
     }
 }

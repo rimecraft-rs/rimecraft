@@ -1,3 +1,5 @@
+//! Enums for game option types.
+
 use enum_iterator::Sequence;
 
 pub mod attack_indicator;
