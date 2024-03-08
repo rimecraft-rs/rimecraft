@@ -7,6 +7,9 @@ mod upgrade;
 use std::fmt::Debug;
 
 pub use internal_types::*;
+use rimecraft_block::ProvideBlockStateExtTy;
+use rimecraft_fluid::ProvideFluidStateExtTy;
+use rimecraft_global_cx::ProvideIdTy;
 pub use rimecraft_voxel_math::ChunkPos;
 pub use section::ChunkSection;
 pub use upgrade::UpgradeData;
@@ -18,14 +21,9 @@ use crate::view::HeightLimit;
 /// # Generics
 ///
 /// - `'w`: The world lifetime. See the crate document for more information.
-pub trait ChunkTy<'w> {
-    /// The type of block state extensions.
-    type BlockStateExt: 'w;
+pub trait ChunkTy<'w>: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideIdTy {
     /// The type of block state id list.
     type BlockStateList;
-
-    /// The type of fluid state extensions.
-    type FluidStateExt: 'w;
 
     /// The type of biomes.
     type Biome: 'w;
@@ -42,19 +40,19 @@ pub trait ChunkTy<'w> {
 /// - `T`: The chunk implementation data type. It provides functionalities like `WorldChunk` and `ProtoChunk`.
 /// - `K`: The `Identifier` type.
 /// - `Cx`: The global context type, providing access to the static fields and logics of the game.
-pub struct Chunk<'w, T, K, Cx>
+pub struct Chunk<'w, T, Cx>
 where
     Cx: ChunkTy<'w>,
 {
     pos: ChunkPos,
-    udata: UpgradeData<'w, K, Cx>,
+    udata: UpgradeData<'w, Cx>,
     hlimit: HeightLimit,
-    section_array: Option<Vec<ChunkSection<'w, K, Cx>>>,
+    section_array: Option<Vec<ChunkSection<'w, Cx>>>,
 
     vdata: T,
 }
 
-impl<'w, T, K, Cx> Chunk<'w, T, K, Cx>
+impl<'w, T, Cx> Chunk<'w, T, Cx>
 where
     Cx: ChunkTy<'w>,
 {
@@ -66,9 +64,9 @@ where
     /// vertical section count of the height limit. See [`HeightLimit::count_vertical_sections`].
     pub fn new(
         pos: ChunkPos,
-        upgrade_data: UpgradeData<'w, K, Cx>,
+        upgrade_data: UpgradeData<'w, Cx>,
         height_limit: HeightLimit,
-        section_array: Option<Vec<ChunkSection<'w, K, Cx>>>,
+        section_array: Option<Vec<ChunkSection<'w, Cx>>>,
         vdata: T,
     ) -> Self {
         if let Some(ref array) = section_array {
@@ -89,11 +87,11 @@ where
     }
 }
 
-impl<'w, T, K, Cx> Debug for Chunk<'w, T, K, Cx>
+impl<'w, T, Cx> Debug for Chunk<'w, T, Cx>
 where
     T: Debug,
-    K: Debug,
     Cx: ChunkTy<'w> + Debug,
+    Cx::Identifier: Debug,
     Cx::BlockStateExt: Debug,
     Cx::BlockStateList: Debug,
     Cx::FluidStateExt: Debug,

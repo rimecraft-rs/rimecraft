@@ -1,5 +1,6 @@
 //! Minecraft block primitives.
 
+use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
 use rimecraft_registry::{ProvideRegistry, Reg};
 use rimecraft_state::{States, StatesMut};
 
@@ -9,16 +10,22 @@ pub use rimecraft_state as state;
 
 /// Block containing settings and the state manager.
 #[derive(Debug)]
-pub struct RawBlock<'a, SExt, Cx> {
+pub struct RawBlock<'a, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+{
     settings: Settings,
-    states: States<'a, SExt>,
+    states: States<'a, Cx::BlockStateExt>,
     _marker: PhantomData<Cx>,
 }
 
-impl<'a, SExt, Cx> RawBlock<'a, SExt, Cx> {
+impl<'a, Cx> RawBlock<'a, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+{
     /// Creates a new block with the given settings.
     #[inline]
-    pub const fn new(settings: Settings, states: States<'a, SExt>) -> Self {
+    pub const fn new(settings: Settings, states: States<'a, Cx::BlockStateExt>) -> Self {
         Self {
             settings,
             states,
@@ -34,24 +41,24 @@ impl<'a, SExt, Cx> RawBlock<'a, SExt, Cx> {
 
     /// Returns the state manager of the block.
     #[inline]
-    pub fn states(&self) -> &States<'a, SExt> {
+    pub fn states(&self) -> &States<'a, Cx::BlockStateExt> {
         &self.states
     }
 }
 
-impl<SExt, Cx> From<Settings> for RawBlock<'_, SExt, Cx>
+impl<Cx> From<Settings> for RawBlock<'_, Cx>
 where
-    SExt: Default + Clone,
+    Cx: ProvideBlockStateExtTy,
+    Cx::BlockStateExt: Default + Clone,
 {
-    #[inline]
     fn from(settings: Settings) -> Self {
         Self::new(settings, StatesMut::new(Default::default()).freeze())
     }
 }
 
-impl<'r, SExt, K, Cx> ProvideRegistry<'r, K, Self> for RawBlock<'r, SExt, Cx>
+impl<'r, K, Cx> ProvideRegistry<'r, K, Self> for RawBlock<'r, Cx>
 where
-    Cx: ProvideRegistry<'r, K, Self>,
+    Cx: ProvideBlockStateExtTy + ProvideRegistry<'r, K, Self>,
 {
     #[inline(always)]
     fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
@@ -60,7 +67,7 @@ where
 }
 
 /// A voxel in a `World`.
-pub type Block<'a, K, SExt, Cx> = Reg<'a, K, RawBlock<'a, SExt, Cx>>;
+pub type Block<'a, Cx> = Reg<'a, <Cx as ProvideIdTy>::Identifier, RawBlock<'a, Cx>>;
 
 /// Settings of a block.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -88,10 +95,16 @@ pub use Settings as BlockSettings;
 /// # MCJE Reference
 ///
 /// This is the equivalent of `net.minecraft.block.Block.STATE_IDS` in MCJE.
-pub trait ProvideStateIds {
+pub trait ProvideStateIds: GlobalContext {
     /// The type of the state IDs.
     type List;
 
     /// Returns the state IDs.
     fn state_ids() -> Self::List;
+}
+
+/// Global contexts providing block state extensions.
+pub trait ProvideBlockStateExtTy: GlobalContext {
+    /// The type of the block state extension.
+    type BlockStateExt;
 }

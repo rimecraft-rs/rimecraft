@@ -1,36 +1,40 @@
 //! Item stack related types and traits.
 
 use rimecraft_attachment::Attachments;
+use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_nbt_ext::Compound;
 use rimecraft_registry::ProvideRegistry;
 
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
-use crate::{Item, RawItem, ToItem};
+use crate::{Item, RawItem};
 
 /// A stack of items.
 ///
 /// This is a data container that holds the item count and the stack's NBT.
-#[derive(Debug)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
     serde(bound(
-        serialize = "K: serde::Serialize + std::hash::Hash + Eq",
+        serialize = "Cx: ProvideIdTy, Cx::Identifier: serde::Serialize + std::hash::Hash + Eq",
         deserialize = r#"
             'r: 'de,
-            K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + std::hash::Hash + Eq + 'r,
-            Cx: InitAttachments<K> + rimecraft_registry::ProvideRegistry<'r, K, crate::RawItem<Cx>> + 'r"#
+            Cx: ProvideIdTy,
+            Cx::Identifier: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + std::hash::Hash + Eq + 'r,
+            Cx: InitAttachments + rimecraft_registry::ProvideRegistry<'r, Cx::Identifier, crate::RawItem<Cx>> + 'r"#
     ))
 )]
-pub struct ItemStack<'r, K, Cx> {
+pub struct ItemStack<'r, Cx>
+where
+    Cx: ProvideIdTy,
+{
     #[cfg_attr(
         feature = "serde",
         serde(default),
         serde(rename = "id"),
         serde(with = "serde_helper::item_serde")
     )]
-    item: Item<'r, K, Cx>,
+    item: Item<'r, Cx>,
 
     #[cfg_attr(feature = "serde", serde(rename = "Count"))]
     count: u32,
@@ -46,32 +50,26 @@ pub struct ItemStack<'r, K, Cx> {
         serde(serialize_with = "serde_helper::ser_attachments"),
         serde(deserialize_with = "serde_helper::deser_attachments")
     )]
-    attachments: (Attachments<K>, PhantomData<Cx>),
+    attachments: (Attachments<Cx::Identifier>, PhantomData<Cx>),
 }
 
-impl<'r, K, Cx> ItemStack<'r, K, Cx>
+impl<'r, Cx> ItemStack<'r, Cx>
 where
-    Cx: InitAttachments<K>,
+    Cx: InitAttachments,
 {
     /// Creates a new item stack with the given item and count.
     #[inline]
-    pub fn new<I>(item: I, count: u32) -> Self
-    where
-        I: for<'a> ToItem<'a, 'r, K, Cx>,
-    {
+    pub fn new(item: Item<'r, Cx>, count: u32) -> Self {
         Self::with_nbt(item, count, None)
     }
 
     /// Creates a new item stack with the given item, count, and custom NBT tag.
-    pub fn with_nbt<I>(item: I, count: u32, nbt: Option<Compound>) -> Self
-    where
-        I: for<'a> ToItem<'a, 'r, K, Cx>,
-    {
+    pub fn with_nbt(item: Item<'r, Cx>, count: u32, nbt: Option<Compound>) -> Self {
         let mut attachments = Attachments::new();
         Cx::init_attachments(&mut attachments);
 
         Self {
-            item: item.to_item(),
+            item,
             count,
             nbt,
             attachments: (attachments, PhantomData),
@@ -79,16 +77,21 @@ where
     }
 }
 
-impl<'r, K, Cx> ItemStack<'r, K, Cx>
+impl<'r, Cx> ItemStack<'r, Cx>
 where
-    Cx: InitAttachments<K> + ProvideRegistry<'r, K, RawItem<Cx>> + 'r,
+    Cx: InitAttachments + ProvideRegistry<'r, Cx::Identifier, RawItem<Cx>> + 'r,
 {
     /// Creates an empty item stack.
     #[inline]
     pub fn empty() -> Self {
         Self::new(Item::default(), 0)
     }
+}
 
+impl<'r, Cx> ItemStack<'r, Cx>
+where
+    Cx: ProvideIdTy + ProvideRegistry<'r, Cx::Identifier, RawItem<Cx>> + 'r,
+{
     /// Returns whether the stack is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -96,10 +99,13 @@ where
     }
 }
 
-impl<'r, K, Cx> ItemStack<'r, K, Cx> {
+impl<'r, Cx> ItemStack<'r, Cx>
+where
+    Cx: ProvideIdTy,
+{
     /// Returns the item of the stack.
     #[inline]
-    pub fn item(&self) -> Item<'r, K, Cx> {
+    pub fn item(&self) -> Item<'r, Cx> {
         self.item
     }
 
@@ -141,20 +147,20 @@ impl<'r, K, Cx> ItemStack<'r, K, Cx> {
 
     /// Returns the attachments of the stack.
     #[inline]
-    pub fn attachments(&self) -> &Attachments<K> {
+    pub fn attachments(&self) -> &Attachments<Cx::Identifier> {
         &self.attachments.0
     }
 
     /// Returns the mutable view of attachments of the stack.
     #[inline]
-    pub fn attachments_mut(&mut self) -> &mut Attachments<K> {
+    pub fn attachments_mut(&mut self) -> &mut Attachments<Cx::Identifier> {
         &mut self.attachments.0
     }
 }
 
-impl<'r, K, Cx> Default for ItemStack<'r, K, Cx>
+impl<'r, Cx> Default for ItemStack<'r, Cx>
 where
-    Cx: InitAttachments<K> + ProvideRegistry<'r, K, RawItem<Cx>> + 'r,
+    Cx: InitAttachments + ProvideRegistry<'r, Cx::Identifier, RawItem<Cx>> + 'r,
 {
     #[inline]
     fn default() -> Self {
@@ -162,42 +168,41 @@ where
     }
 }
 
-impl<'r, K, Cx> From<Item<'r, K, Cx>> for ItemStack<'r, K, Cx>
+impl<'r, Cx> From<Item<'r, Cx>> for ItemStack<'r, Cx>
 where
-    Cx: InitAttachments<K>,
+    Cx: InitAttachments,
 {
     #[inline]
-    fn from(value: Item<'r, K, Cx>) -> Self {
+    fn from(value: Item<'r, Cx>) -> Self {
         Self::new(value, 1)
     }
 }
 
-impl<'r, K, Cx> From<ItemStack<'r, K, Cx>> for Item<'r, K, Cx> {
+impl<'r, Cx> From<ItemStack<'r, Cx>> for Item<'r, Cx>
+where
+    Cx: ProvideIdTy,
+{
     #[inline]
-    fn from(value: ItemStack<'r, K, Cx>) -> Self {
+    fn from(value: ItemStack<'r, Cx>) -> Self {
         value.item
     }
 }
 
-impl<'s, 'r, K, Cx> ToItem<'s, 'r, K, Cx> for ItemStack<'r, K, Cx> {
-    #[inline]
-    fn to_item(&'s self) -> Item<'r, K, Cx> {
-        self.item
-    }
-}
-
-impl<K, Cx> PartialEq for ItemStack<'_, K, Cx> {
+impl<Cx> PartialEq for ItemStack<'_, Cx>
+where
+    Cx: ProvideIdTy,
+{
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.item == other.item && self.count == other.count && self.nbt == other.nbt
     }
 }
 
-impl<K, Cx> Eq for ItemStack<'_, K, Cx> {}
+impl<Cx> Eq for ItemStack<'_, Cx> where Cx: ProvideIdTy {}
 
-impl<K, Cx> Clone for ItemStack<'_, K, Cx>
+impl<Cx> Clone for ItemStack<'_, Cx>
 where
-    Cx: InitAttachments<K>,
+    Cx: InitAttachments,
 {
     /// Clones the item stack.
     ///
@@ -208,10 +213,25 @@ where
     }
 }
 
+impl<Cx> Debug for ItemStack<'_, Cx>
+where
+    Cx: ProvideIdTy + Debug,
+    Cx::Identifier: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ItemStack")
+            .field("item", &self.item)
+            .field("count", &self.count)
+            .field("nbt", &self.nbt)
+            .field("attachments", &self.attachments)
+            .finish()
+    }
+}
+
 /// A trait for initializing attachments of an item stack.
-pub trait InitAttachments<K> {
+pub trait InitAttachments: ProvideIdTy {
     /// Initializes the attachments of the item stack.
-    fn init_attachments(attachments: &mut Attachments<K>);
+    fn init_attachments(attachments: &mut Attachments<Self::Identifier>);
 }
 
 #[cfg(feature = "serde")]
@@ -221,9 +241,9 @@ mod serde_helper {
     use std::hash::Hash;
 
     #[inline]
-    pub fn default_attachments<K, Cx>() -> (Attachments<K>, PhantomData<Cx>)
+    pub fn default_attachments<Cx>() -> (Attachments<Cx::Identifier>, PhantomData<Cx>)
     where
-        Cx: InitAttachments<K>,
+        Cx: InitAttachments,
     {
         let mut att = Attachments::new();
         Cx::init_attachments(&mut att);
@@ -249,13 +269,16 @@ mod serde_helper {
         serde::Serialize::serialize(&attachments.0, serializer)
     }
 
-    pub fn deser_attachments<'de, K, Cx, D>(
+    pub fn deser_attachments<'de, Cx, D>(
         deserializer: D,
-    ) -> Result<(Attachments<K>, PhantomData<Cx>), <D as serde::Deserializer<'de>>::Error>
+    ) -> Result<
+        (Attachments<Cx::Identifier>, PhantomData<Cx>),
+        <D as serde::Deserializer<'de>>::Error,
+    >
     where
         D: serde::Deserializer<'de>,
-        Cx: InitAttachments<K>,
-        K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + Hash + Eq,
+        Cx: InitAttachments,
+        Cx::Identifier: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + Hash + Eq,
     {
         use rimecraft_serde_update::Update;
         let mut attachments = Attachments::new();
@@ -265,30 +288,28 @@ mod serde_helper {
     }
 
     pub mod item_serde {
-        use rimecraft_registry::ProvideRegistry;
         use rimecraft_serde_humanreadctl::HumanReadableControlled;
         use serde::{Deserialize, Serialize};
-
-        use crate::RawItem;
 
         use super::*;
 
         #[inline]
-        pub fn serialize<K, Cx, S>(item: &Item<'_, K, Cx>, serializer: S) -> Result<S::Ok, S::Error>
+        pub fn serialize<K, Cx, S>(item: &Item<'_, Cx>, serializer: S) -> Result<S::Ok, S::Error>
         where
+            Cx: ProvideIdTy,
             S: serde::Serializer,
-            K: Serialize + Hash + Eq,
+            Cx::Identifier: Serialize + Hash + Eq,
         {
             item.serialize(HumanReadableControlled::new(serializer, true))
         }
 
         #[inline]
-        pub fn deserialize<'rr, 'd, K, Cx, D>(deserializer: D) -> Result<Item<'rr, K, Cx>, D::Error>
+        pub fn deserialize<'rr, 'd, Cx, D>(deserializer: D) -> Result<Item<'rr, Cx>, D::Error>
         where
             'rr: 'd,
             D: serde::Deserializer<'d>,
-            K: Deserialize<'d> + Hash + Eq + 'rr,
-            Cx: InitAttachments<K> + ProvideRegistry<'rr, K, RawItem<Cx>> + 'rr,
+            Cx: InitAttachments + ProvideRegistry<'rr, Cx::Identifier, RawItem<Cx>> + 'rr,
+            Cx::Identifier: Deserialize<'d> + Hash + Eq + 'rr,
         {
             Item::deserialize(HumanReadableControlled::new(deserializer, true))
         }
