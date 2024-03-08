@@ -2,52 +2,35 @@ pub mod potential_values_based_callbacks;
 pub mod suppliable_int_callbacks;
 pub mod validating_int_slider_callbacks;
 
-use rimecraft_text::Texts;
-
 use crate::SimpleOption;
 
 type ChangeCallback<T> = dyn Fn(Option<T>);
 
-type ValueSetter<T, Txt> = fn(&mut SimpleOption<T, Txt>, value: Option<T>);
+type ValueSetter<T, Txt, TxtStyle> = fn(&mut SimpleOption<T, Txt, TxtStyle>, value: Option<T>);
 
-trait Callbacks<T, Txt>
-where
-    Txt: Texts,
-{
+trait Callbacks<T, Txt, TxtStyle> {
     fn validate(&self, value: Option<T>) -> Option<T>;
 }
 
-trait CyclingCallbacks<T, Txt>: Callbacks<T, Txt>
-where
-    Txt: Texts,
-{
+trait CyclingCallbacks<T, Txt, TxtStyle>: Callbacks<T, Txt, TxtStyle> {
     fn get_values(&self) -> (); // CyclingButtonWidget.Values<T>
 
-    fn value_setter(&self) -> ValueSetter<T, Txt> {
+    fn value_setter(&self) -> ValueSetter<T, Txt, TxtStyle> {
         |option, value| option.set_value(value)
     }
 }
 
-trait SliderCallbacks<T, Txt>: Callbacks<T, Txt>
-where
-    Txt: Texts,
-{
+trait SliderCallbacks<T, Txt, TxtStyle>: Callbacks<T, Txt, TxtStyle> {
     fn to_slider_progress(&self, value: T) -> f32;
 
     fn to_value(&self, slider_progress: f32) -> T;
 }
 
-trait TypeChangeableCallbacks<T, Txt>: CyclingCallbacks<T, Txt> + SliderCallbacks<T, Txt>
-where
-    Txt: Texts,
-{
+trait TypeChangeableCallbacks<T, Txt, TxtStyle>: CyclingCallbacks<T, Txt, TxtStyle> + SliderCallbacks<T, Txt, TxtStyle> {
     fn is_cycling(&self) -> bool;
 }
 
-trait IntSliderCallbacks<Txt>: SliderCallbacks<i32, Txt>
-where
-    Txt: Texts,
-{
+trait IntSliderCallbacks<Txt, TxtStyle>: SliderCallbacks<i32, Txt, TxtStyle> {
     fn min_inclusive(&self) -> i32;
 
     fn max_inclusive(&self) -> i32;
@@ -79,7 +62,7 @@ where
         &self,
         progress_to_value: IR,
         value_to_progress: RI,
-    ) -> impl SliderCallbacks<R, Txt>
+    ) -> impl SliderCallbacks<R, Txt, TxtStyle>
     where
         IR: Fn(Option<i32>) -> Option<R>,
         RI: Fn(Option<R>) -> Option<i32>,
@@ -95,9 +78,8 @@ where
             to_value: ToV,
         }
 
-        impl<R, IR, RI, F, ToP, ToV, Txt> SliderCallbacks<R, Txt> for Impl<IR, RI, F, ToP, ToV>
+        impl<R, IR, RI, F, ToP, ToV, Txt, TxtStyle> SliderCallbacks<R, Txt, TxtStyle> for Impl<IR, RI, F, ToP, ToV>
         where
-            Txt: Texts,
             IR: Fn(Option<i32>) -> Option<R>,
             RI: Fn(Option<R>) -> Option<i32>,
             F: Fn(Option<i32>) -> Option<i32>,
@@ -115,9 +97,8 @@ where
             }
         }
 
-        impl<R, IR, RI, F, ToP, ToV, Txt> Callbacks<R, Txt> for Impl<IR, RI, F, ToP, ToV>
+        impl<R, IR, RI, F, ToP, ToV, Txt, TxtStyle> Callbacks<R, Txt, TxtStyle> for Impl<IR, RI, F, ToP, ToV>
         where
-            Txt: Texts,
             IR: Fn(Option<i32>) -> Option<R>,
             RI: Fn(Option<R>) -> Option<i32>,
             F: Fn(Option<i32>) -> Option<i32>,
