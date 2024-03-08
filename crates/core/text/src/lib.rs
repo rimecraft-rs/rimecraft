@@ -188,5 +188,16 @@ where
     }
 }
 
+pub trait Localizable {
+	fn localization_key(&self) -> String;
+
+	fn localized_name(&self) -> Text<(), ()> {
+		todo!()
+	}
+}
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(feature = "macros")]
+mod macros;

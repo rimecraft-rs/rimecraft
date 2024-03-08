@@ -1,8 +1,10 @@
 //! Enum for perspective.
 
+use std::fmt::Display;
+
 use enum_iterator::Sequence;
 
-use super::ByUIntId;
+use super::ByUSizeId;
 
 /// Represents the perspective.
 ///
@@ -19,17 +21,27 @@ pub enum Perspective {
 	ThirdPersonFront
 }
 
-impl ByUIntId for Perspective {}
+impl ByUSizeId for Perspective {}
+
+impl Display for Perspective {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", match self {
+			Perspective::FirstPerson => "first_person",
+			Perspective::ThirdPersonBack => "third_person_back",
+			Perspective::ThirdPersonFront => "third_person_front",
+		})
+	}
+}
 
 impl Perspective {
-	fn is_first_person(&self) -> bool {
+	pub fn is_first_person(&self) -> bool {
 		match self {
 			Perspective::FirstPerson => true,
 			_ => false
 		}
 	}
 
-	fn is_front_view(&self) -> bool {
+	pub fn is_front_view(&self) -> bool {
 		match self {
 			Perspective::ThirdPersonBack => false,
 			_ => true
