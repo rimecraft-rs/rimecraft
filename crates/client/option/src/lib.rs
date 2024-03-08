@@ -1,16 +1,16 @@
 //! Minecraft game options
 
 pub(crate) mod callbacks;
-pub mod tooltip_factory;
 pub mod enums;
+pub mod tooltip_factory;
 
-use rimecraft_text::{Text, Texts};
+use rimecraft_text::{ProvideTextTy, Text};
 
-struct SimpleOption<T, Txt>
+struct SimpleOption<T, Cx>
 where
-    Txt: Texts,
+    Cx: ProvideTextTy,
 {
-    pub(crate) text: Text<Txt::T, Txt::StyleExt>,
+    pub(crate) text: Text<Cx>,
     pub(crate) value: Option<T>,
     default: T,
     change_callback: fn(T),
@@ -18,7 +18,7 @@ where
 
 impl<T, Txt> SimpleOption<T, Txt>
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn set_value(&mut self, value: Option<T>) {
         todo!()

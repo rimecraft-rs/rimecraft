@@ -67,7 +67,7 @@ where
 }
 
 /// A voxel in a `World`.
-pub type Block<'a, Cx> = Reg<'a, <Cx as ProvideIdTy>::Identifier, RawBlock<'a, Cx>>;
+pub type Block<'a, Cx> = Reg<'a, <Cx as ProvideIdTy>::Id, RawBlock<'a, Cx>>;
 
 /// Settings of a block.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

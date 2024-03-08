@@ -24,8 +24,8 @@ where
     fluid_ticks: Vec<TickedFluid<'w, Cx>>,
 }
 
-type TickedBlock<'w, Cx> = TickedReg<'w, RawBlock<'w, Cx>, <Cx as ProvideIdTy>::Identifier>;
-type TickedFluid<'w, Cx> = TickedReg<'w, RawFluid<'w, Cx>, <Cx as ProvideIdTy>::Identifier>;
+type TickedBlock<'w, Cx> = TickedReg<'w, RawBlock<'w, Cx>, <Cx as ProvideIdTy>::Id>;
+type TickedFluid<'w, Cx> = TickedReg<'w, RawFluid<'w, Cx>, <Cx as ProvideIdTy>::Id>;
 
 #[derive(Debug)]
 struct TickedReg<'r, T, K>(Reg<'r, K, T>);
@@ -33,9 +33,9 @@ struct TickedReg<'r, T, K>(Reg<'r, K, T>);
 impl<'w, Cx> UpgradeData<'w, Cx>
 where
     Cx: ChunkTy<'w>
-        + ProvideRegistry<'w, Cx::Identifier, RawBlock<'w, Cx>>
-        + ProvideRegistry<'w, Cx::Identifier, RawFluid<'w, Cx>>,
-    Cx::Identifier: Hash + Eq,
+        + ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>
+        + ProvideRegistry<'w, Cx::Id, RawFluid<'w, Cx>>,
+    Cx::Id: Hash + Eq,
 {
     /// Creates a new upgrade data from given *serialized NBT data* and the height limit.
     ///
@@ -50,13 +50,13 @@ where
     ) -> Result<Self, <D as serde::Deserializer<'de>>::Error>
     where
         D: serde::Deserializer<'de>,
-        Cx::Identifier: Deserialize<'de>,
+        Cx::Id: Deserialize<'de>,
     {
         #[derive(Deserialize)]
         #[serde(bound(deserialize = r#"
-                Cx::Identifier: Deserialize<'de> + Hash + Eq,
-                Cx: ProvideRegistry<'w, Cx::Identifier, RawBlock<'w, Cx>>
-                    + ProvideRegistry<'w, Cx::Identifier, RawFluid<'w, Cx>>
+                Cx::Id: Deserialize<'de> + Hash + Eq,
+                Cx: ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>
+                    + ProvideRegistry<'w, Cx::Id, RawFluid<'w, Cx>>
                     + ChunkTy<'w>
                 "#))]
         struct Serialized<'w, Cx>
@@ -115,7 +115,7 @@ where
 impl<'w, Cx> Debug for UpgradeData<'w, Cx>
 where
     Cx: ChunkTy<'w> + Debug,
-    Cx::Identifier: Debug,
+    Cx::Id: Debug,
     Cx::BlockStateExt: Debug,
     Cx::BlockStateList: Debug,
     Cx::FluidStateExt: Debug,

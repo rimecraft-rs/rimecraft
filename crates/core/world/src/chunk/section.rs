@@ -207,7 +207,7 @@ where
     }
 }
 
-impl<'w, Cx> From<&'w Registry<Cx::Identifier, Cx::Biome>> for ChunkSection<'w, Cx>
+impl<'w, Cx> From<&'w Registry<Cx::Id, Cx::Biome>> for ChunkSection<'w, Cx>
 where
     Cx: ChunkTy<'w>
         + ProvideStateIds
@@ -217,14 +217,14 @@ where
         + for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, Cx>>
         + Clone,
 {
-    fn from(_value: &'w Registry<Cx::Identifier, Cx::Biome>) -> Self {
+    fn from(_value: &'w Registry<Cx::Id, Cx::Biome>) -> Self {
         unimplemented!()
     }
 }
 
 impl<'w, Cx> Debug for ChunkSection<'w, Cx>
 where
-    Cx::Identifier: Debug,
+    Cx::Id: Debug,
     Cx: ChunkTy<'w> + Debug,
     Cx::BlockStateExt: Debug,
     Cx::BlockStateList: Debug,

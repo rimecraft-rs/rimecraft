@@ -18,5 +18,5 @@ pub trait ProvideIdTy: GlobalContext {
     /// Identifier type.
     ///
     /// [`Display`] is required for error handling purposes.
-    type Identifier: Display;
+    type Id: Display;
 }

@@ -9,7 +9,7 @@ use rimecraft_state::State;
 use super::ChunkTy;
 
 /// The internal-used `Biome` type.
-pub type IBiome<'w, Cx> = Reg<'w, <Cx as ProvideIdTy>::Identifier, <Cx as ChunkTy<'w>>::Biome>;
+pub type IBiome<'w, Cx> = Reg<'w, <Cx as ProvideIdTy>::Id, <Cx as ChunkTy<'w>>::Biome>;
 
 /// The internal-used `BlockState` type.
 ///
@@ -27,7 +27,7 @@ where
 impl<'w, Cx> Debug for IBlockState<'w, Cx>
 where
     Cx: ChunkTy<'w> + Debug,
-    Cx::Identifier: Debug,
+    Cx::Id: Debug,
     Cx::BlockStateExt: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -90,7 +90,7 @@ where
 impl<'w, Cx> Debug for IFluidState<'w, Cx>
 where
     Cx: ChunkTy<'w> + Debug,
-    Cx::Identifier: Debug,
+    Cx::Id: Debug,
     Cx::FluidStateExt: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

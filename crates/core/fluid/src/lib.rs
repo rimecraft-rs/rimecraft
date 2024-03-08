@@ -66,7 +66,7 @@ pub struct Settings {
 }
 
 /// A fluid in a `World`.
-pub type Fluid<'a, Cx> = Reg<'a, <Cx as ProvideIdTy>::Identifier, RawFluid<'a, Cx>>;
+pub type Fluid<'a, Cx> = Reg<'a, <Cx as ProvideIdTy>::Id, RawFluid<'a, Cx>>;
 
 /// Global contexts providing fluid state extensions.
 pub trait ProvideFluidStateExtTy: GlobalContext {

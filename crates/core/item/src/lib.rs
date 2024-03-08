@@ -52,7 +52,7 @@ where
 }
 
 /// An item usable by players and other entities.
-pub type Item<'r, Cx> = Reg<'r, <Cx as ProvideIdTy>::Identifier, RawItem<Cx>>;
+pub type Item<'r, Cx> = Reg<'r, <Cx as ProvideIdTy>::Id, RawItem<Cx>>;
 
 /// The max item count of an `ItemStack`.
 pub const MAX_STACK_COUNT: u32 = 64;

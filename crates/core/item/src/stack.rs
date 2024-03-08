@@ -50,7 +50,7 @@ where
         serde(serialize_with = "serde_helper::ser_attachments"),
         serde(deserialize_with = "serde_helper::deser_attachments")
     )]
-    attachments: (Attachments<Cx::Identifier>, PhantomData<Cx>),
+    attachments: (Attachments<Cx::Id>, PhantomData<Cx>),
 }
 
 impl<'r, Cx> ItemStack<'r, Cx>
@@ -79,7 +79,7 @@ where
 
 impl<'r, Cx> ItemStack<'r, Cx>
 where
-    Cx: InitAttachments + ProvideRegistry<'r, Cx::Identifier, RawItem<Cx>> + 'r,
+    Cx: InitAttachments + ProvideRegistry<'r, Cx::Id, RawItem<Cx>> + 'r,
 {
     /// Creates an empty item stack.
     #[inline]
@@ -90,7 +90,7 @@ where
 
 impl<'r, Cx> ItemStack<'r, Cx>
 where
-    Cx: ProvideIdTy + ProvideRegistry<'r, Cx::Identifier, RawItem<Cx>> + 'r,
+    Cx: ProvideIdTy + ProvideRegistry<'r, Cx::Id, RawItem<Cx>> + 'r,
 {
     /// Returns whether the stack is empty.
     #[inline]
@@ -147,20 +147,20 @@ where
 
     /// Returns the attachments of the stack.
     #[inline]
-    pub fn attachments(&self) -> &Attachments<Cx::Identifier> {
+    pub fn attachments(&self) -> &Attachments<Cx::Id> {
         &self.attachments.0
     }
 
     /// Returns the mutable view of attachments of the stack.
     #[inline]
-    pub fn attachments_mut(&mut self) -> &mut Attachments<Cx::Identifier> {
+    pub fn attachments_mut(&mut self) -> &mut Attachments<Cx::Id> {
         &mut self.attachments.0
     }
 }
 
 impl<'r, Cx> Default for ItemStack<'r, Cx>
 where
-    Cx: InitAttachments + ProvideRegistry<'r, Cx::Identifier, RawItem<Cx>> + 'r,
+    Cx: InitAttachments + ProvideRegistry<'r, Cx::Id, RawItem<Cx>> + 'r,
 {
     #[inline]
     fn default() -> Self {
@@ -216,7 +216,7 @@ where
 impl<Cx> Debug for ItemStack<'_, Cx>
 where
     Cx: ProvideIdTy + Debug,
-    Cx::Identifier: Debug,
+    Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ItemStack")
@@ -231,7 +231,7 @@ where
 /// A trait for initializing attachments of an item stack.
 pub trait InitAttachments: ProvideIdTy {
     /// Initializes the attachments of the item stack.
-    fn init_attachments(attachments: &mut Attachments<Self::Identifier>);
+    fn init_attachments(attachments: &mut Attachments<Self::Id>);
 }
 
 #[cfg(feature = "serde")]

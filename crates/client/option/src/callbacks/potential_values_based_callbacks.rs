@@ -6,7 +6,7 @@ pub struct PotentialValuesBasedCallbacks<T> {
 
 impl<T, Txt> CyclingCallbacks<T, Txt> for PotentialValuesBasedCallbacks<T>
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn get_values(&self) -> () {
         todo!()
@@ -15,7 +15,7 @@ where
 
 impl<T, Txt> Callbacks<T, Txt> for PotentialValuesBasedCallbacks<T>
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn validate(&self, value: Option<T>) -> Option<T> {
         todo!()

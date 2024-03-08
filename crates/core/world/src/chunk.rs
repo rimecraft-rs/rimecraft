@@ -91,7 +91,7 @@ impl<'w, T, Cx> Debug for Chunk<'w, T, Cx>
 where
     T: Debug,
     Cx: ChunkTy<'w> + Debug,
-    Cx::Identifier: Debug,
+    Cx::Id: Debug,
     Cx::BlockStateExt: Debug,
     Cx::BlockStateList: Debug,
     Cx::FluidStateExt: Debug,
