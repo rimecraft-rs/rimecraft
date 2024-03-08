@@ -23,7 +23,7 @@ rimecraft-nbt-ext = { path = "../../util/nbt-ext" }
 serde = { version = "1.0", optional = true, features = ["derive"] }
 
 [features]
-# default = ["serde"]
+default = ["serde"]
 serde = [
     "dep:serde",
     "rimecraft-registry/serde",

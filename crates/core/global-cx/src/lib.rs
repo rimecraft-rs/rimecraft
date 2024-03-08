@@ -8,15 +8,11 @@
 
 #![no_std]
 
-use core::fmt::Display;
-
 /// Marker trait for global contexts.
-pub trait GlobalContext: 'static {}
+pub trait GlobalContext: Sized + 'static {}
 
 /// Marker trait for global contexts that provide an identifier type.
 pub trait ProvideIdTy: GlobalContext {
     /// Identifier type.
-    ///
-    /// [`Display`] is required for error handling purposes.
-    type Id: Display;
+    type Id;
 }

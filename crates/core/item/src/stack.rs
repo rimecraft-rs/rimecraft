@@ -12,44 +12,15 @@ use crate::{Item, RawItem};
 /// A stack of items.
 ///
 /// This is a data container that holds the item count and the stack's NBT.
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(bound(
-        serialize = "Cx: ProvideIdTy, Cx::Identifier: serde::Serialize + std::hash::Hash + Eq",
-        deserialize = r#"
-            'r: 'de,
-            Cx: ProvideIdTy,
-            Cx::Identifier: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + std::hash::Hash + Eq + 'r,
-            Cx: InitAttachments + rimecraft_registry::ProvideRegistry<'r, Cx::Identifier, crate::RawItem<Cx>> + 'r"#
-    ))
-)]
 pub struct ItemStack<'r, Cx>
 where
     Cx: ProvideIdTy,
 {
-    #[cfg_attr(
-        feature = "serde",
-        serde(default),
-        serde(rename = "id"),
-        serde(with = "serde_helper::item_serde")
-    )]
     item: Item<'r, Cx>,
-
-    #[cfg_attr(feature = "serde", serde(rename = "Count"))]
     count: u32,
 
     /// Item stack's custom NBT.
-    #[cfg_attr(feature = "serde", serde(rename = "tag"), serde(default))]
     nbt: Option<Compound>,
-
-    #[cfg_attr(
-        feature = "serde",
-        serde(skip_serializing_if = "serde_helper::should_skip_attachment_ser"),
-        serde(default = "serde_helper::default_attachments"),
-        serde(serialize_with = "serde_helper::ser_attachments"),
-        serde(deserialize_with = "serde_helper::deser_attachments")
-    )]
     attachments: (Attachments<Cx::Id>, PhantomData<Cx>),
 }
 
@@ -235,83 +206,55 @@ pub trait InitAttachments: ProvideIdTy {
 }
 
 #[cfg(feature = "serde")]
-mod serde_helper {
+pub use _serde::{DeserItemStack, SerItemStack};
+
+#[cfg(feature = "serde")]
+mod _serde {
+    use serde::{Deserialize, Serialize};
+
     use super::*;
 
-    use std::hash::Hash;
-
-    #[inline]
-    pub fn default_attachments<Cx>() -> (Attachments<Cx::Identifier>, PhantomData<Cx>)
-    where
-        Cx: InitAttachments,
-    {
-        let mut att = Attachments::new();
-        Cx::init_attachments(&mut att);
-        (att, PhantomData)
-    }
-
-    #[inline]
-    pub fn should_skip_attachment_ser<K, Cx>(
-        attachments: &(Attachments<K>, PhantomData<Cx>),
-    ) -> bool {
-        attachments.0.is_persistent_data_empty()
-    }
-
-    #[inline]
-    pub fn ser_attachments<K, Cx, S>(
-        attachments: &(Attachments<K>, PhantomData<Cx>),
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-        K: serde::Serialize + Hash + Eq,
-    {
-        serde::Serialize::serialize(&attachments.0, serializer)
-    }
-
-    pub fn deser_attachments<'de, Cx, D>(
-        deserializer: D,
-    ) -> Result<
-        (Attachments<Cx::Identifier>, PhantomData<Cx>),
-        <D as serde::Deserializer<'de>>::Error,
-    >
-    where
-        D: serde::Deserializer<'de>,
-        Cx: InitAttachments,
-        Cx::Identifier: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + Hash + Eq,
-    {
-        use rimecraft_serde_update::Update;
-        let mut attachments = Attachments::new();
-        Cx::init_attachments(&mut attachments);
-        attachments.update(deserializer)?;
-        Ok((attachments, PhantomData))
-    }
-
-    pub mod item_serde {
-        use rimecraft_serde_humanreadctl::HumanReadableControlled;
-        use serde::{Deserialize, Serialize};
-
-        use super::*;
-
-        #[inline]
-        pub fn serialize<K, Cx, S>(item: &Item<'_, Cx>, serializer: S) -> Result<S::Ok, S::Error>
+    /// Global context behavior for serializing item stacks.
+    pub trait SerItemStack<'r>: ProvideIdTy {
+        /// Serializes the item stack.
+        #[allow(clippy::missing_errors_doc)]
+        fn serialize<S>(serializer: S, stack: &ItemStack<'r, Self>) -> Result<S::Ok, S::Error>
         where
-            Cx: ProvideIdTy,
+            S: serde::Serializer;
+    }
+
+    /// Global context behavior for deserializing item stacks.
+    pub trait DeserItemStack<'r, 'de>: ProvideIdTy {
+        /// Deserializes the item stack.
+        #[allow(clippy::missing_errors_doc)]
+        fn deserialize<D>(deserializer: D) -> Result<ItemStack<'r, Self>, D::Error>
+        where
+            D: serde::Deserializer<'de>;
+    }
+
+    impl<'r, Cx> Serialize for ItemStack<'r, Cx>
+    where
+        Cx: SerItemStack<'r>,
+    {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
             S: serde::Serializer,
-            Cx::Identifier: Serialize + Hash + Eq,
         {
-            item.serialize(HumanReadableControlled::new(serializer, true))
+            Cx::serialize(serializer, self)
         }
+    }
 
+    impl<'r, 'de, Cx> Deserialize<'de> for ItemStack<'r, Cx>
+    where
+        Cx: DeserItemStack<'r, 'de>,
+    {
         #[inline]
-        pub fn deserialize<'rr, 'd, Cx, D>(deserializer: D) -> Result<Item<'rr, Cx>, D::Error>
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
-            'rr: 'd,
-            D: serde::Deserializer<'d>,
-            Cx: InitAttachments + ProvideRegistry<'rr, Cx::Identifier, RawItem<Cx>> + 'rr,
-            Cx::Identifier: Deserialize<'d> + Hash + Eq + 'rr,
+            D: serde::Deserializer<'de>,
         {
-            Item::deserialize(HumanReadableControlled::new(deserializer, true))
+            Cx::deserialize(deserializer)
         }
     }
 }
