@@ -80,7 +80,7 @@ where
 }
 
 /// Layer for encoding and decoding in nbt binary format for packets.
-#[cfg(feature = "nbt")]
+#[cfg(feature = "fastnbt")]
 #[derive(Debug)]
 pub struct Nbt<T>(pub T);
 

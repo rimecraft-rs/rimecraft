@@ -16,3 +16,14 @@ pub trait ProvideIdTy: GlobalContext {
     /// Identifier type.
     type Id;
 }
+
+/// Marker trait for global contexts that provide a `NbtCompound` type and friends.
+pub trait ProvideNbtTy: GlobalContext {
+    /// NBT compound type.
+    type Compound;
+
+    /// [`i32`] array type.
+    type IntArray;
+    /// [`i64`] array type.
+    type LongArray;
+}
