@@ -510,11 +510,13 @@ mod _serde {
             let is = is;
 
             let j = Cx::bits(&self.list, pal.len());
+
             #[derive(Serialize)]
             struct Serialized<'a, T> {
                 palette: &'a [T], // forward field in BiMapPalette
                 data: Option<&'a [u64]>,
             }
+
             let entries = {
                 let PaletteImpl::BiMap { forward, .. } = &pal.internal else {
                     unreachable!()

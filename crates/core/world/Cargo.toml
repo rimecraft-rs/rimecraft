@@ -13,7 +13,7 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 rimecraft-global-cx = { path = "../global-cx" }
-rimecraft-chunk-palette = { path = "./palette" }
+rimecraft-chunk-palette = { path = "../palette" }
 rimecraft-registry = { path = "../../util/registry", features = ["serde"] }
 rimecraft-state = { path = "../state" }
 rimecraft-block = { path = "../block" }
