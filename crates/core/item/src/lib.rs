@@ -3,6 +3,7 @@
 use std::{marker::PhantomData, num::NonZeroU32};
 
 use rimecraft_fmt::Formatting;
+use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{ProvideRegistry, Reg};
 
 pub mod stack;
@@ -51,32 +52,7 @@ where
 }
 
 /// An item usable by players and other entities.
-pub type Item<'r, K, Cx> = Reg<'r, K, RawItem<Cx>>;
-
-/// A trait for converting a value to an [`Item`].
-#[doc(alias = "ItemConvertible")]
-#[doc(alias = "ItemLike")]
-pub trait ToItem<'s, 'r, K, Cx> {
-    /// Converts the value to an [`Item`].
-    fn to_item(&'s self) -> Item<'r, K, Cx>;
-}
-
-impl<'ss, 's, 'r, K, Cx, T> ToItem<'ss, 'r, K, Cx> for &'s T
-where
-    T: ToItem<'s, 'r, K, Cx>,
-{
-    #[inline]
-    fn to_item(&'ss self) -> Item<'r, K, Cx> {
-        (*self).to_item()
-    }
-}
-
-impl<'r, K, Cx> ToItem<'_, 'r, K, Cx> for Item<'r, K, Cx> {
-    #[inline]
-    fn to_item(&'_ self) -> Item<'r, K, Cx> {
-        *self
-    }
-}
+pub type Item<'r, Cx> = Reg<'r, <Cx as ProvideIdTy>::Id, RawItem<Cx>>;
 
 /// The max item count of an `ItemStack`.
 pub const MAX_STACK_COUNT: u32 = 64;

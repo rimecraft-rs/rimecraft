@@ -11,9 +11,10 @@ use std::{fmt::Display, ops::Add};
 
 pub use error::Error;
 pub use iter::{Iter, StyledIter};
+use rimecraft_global_cx::GlobalContext;
 pub use style::Style;
 
-/// A text component.
+/// A raw text component.
 ///
 /// Each text has a tree structure, embodying all its siblings.
 /// See [`Self::sibs`].
@@ -27,22 +28,13 @@ pub use style::Style;
 /// and the variant type (the `type` field) should be an optional field, as the same as the
 /// format in Java Edition._
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Text<T, StyleExt> {
+pub struct RawText<T, StyleExt> {
     content: T,
     style: Style<StyleExt>,
     sibs: Vec<Self>,
 }
 
-/// A generics wrapper for [`Text`].
-/// The associated types [`Texts::T`] and [`Texts::StyleExt`] should be applied to [`Text`] when used.
-pub trait Texts {
-    /// Generic `T` that should be applied to [`Text`].
-    type T;
-    /// Generic `StyleExt` that should be applied to [`Text`].
-    type StyleExt;
-}
-
-impl<T, StyleExt> Text<T, StyleExt> {
+impl<T, StyleExt> RawText<T, StyleExt> {
     /// Creates a new text with the given content and style.
     ///
     /// See [`Self::with_sibs`] for creating a text with siblings.
@@ -118,7 +110,7 @@ impl<T, StyleExt> Text<T, StyleExt> {
     }
 }
 
-impl<T, StyleExt> Text<T, StyleExt>
+impl<T, StyleExt> RawText<T, StyleExt>
 where
     StyleExt: Add<Output = StyleExt> + Clone,
 {
@@ -135,7 +127,7 @@ where
     }
 }
 
-impl<'a, T, StyleExt> IntoIterator for &'a Text<T, StyleExt> {
+impl<'a, T, StyleExt> IntoIterator for &'a RawText<T, StyleExt> {
     type Item = &'a T;
     type IntoIter = Iter<'a, T>;
 
@@ -145,7 +137,7 @@ impl<'a, T, StyleExt> IntoIterator for &'a Text<T, StyleExt> {
     }
 }
 
-impl<T, StyleExt> From<T> for Text<T, StyleExt>
+impl<T, StyleExt> From<T> for RawText<T, StyleExt>
 where
     StyleExt: Default,
 {
@@ -159,7 +151,7 @@ where
     }
 }
 
-impl<T, StyleExt> Display for Text<T, StyleExt>
+impl<T, StyleExt> Display for RawText<T, StyleExt>
 where
     T: Display,
 {
@@ -188,10 +180,23 @@ where
     }
 }
 
+/// Global context for text.
+///
+/// The associated types [`Texts::T`] and [`Texts::StyleExt`] should be applied to [`Text`] when used.
+pub trait ProvideTextTy: GlobalContext {
+    /// Generic `T` that should be applied to [`Text`].
+    type Content;
+    /// Generic `StyleExt` that should be applied to [`Text`].
+    type StyleExt;
+}
+
+/// Context type decorated [`RawText`].
+pub type Text<Cx> = RawText<<Cx as ProvideTextTy>::Content, <Cx as ProvideTextTy>::StyleExt>;
+
 pub trait Localizable {
 	fn localization_key(&self) -> String;
 
-	fn localized_name(&self) -> Text<(), ()> {
+	fn localized_name(&self) -> () {
 		todo!()
 	}
 }

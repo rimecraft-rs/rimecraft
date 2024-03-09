@@ -3,6 +3,7 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash};
 use fastnbt::IntArray;
 use rimecraft_block::RawBlock;
 use rimecraft_fluid::RawFluid;
+use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{ProvideRegistry, Reg};
 use rimecraft_voxel_math::direction::EightWayDirection;
 use serde::Deserialize;
@@ -12,31 +13,29 @@ use crate::view::HeightLimit;
 use super::ChunkTy;
 
 /// Upgrade data for a chunk.
-pub struct UpgradeData<'w, K, Cx>
+pub struct UpgradeData<'w, Cx>
 where
     Cx: ChunkTy<'w>,
 {
     sides_to_upgrade: Vec<EightWayDirection>,
     center_indices_upgrade: Box<[Box<[i32]>]>,
 
-    block_ticks: Vec<TickedBlock<'w, K, Cx>>,
-    fluid_ticks: Vec<TickedFluid<'w, K, Cx>>,
+    block_ticks: Vec<TickedBlock<'w, Cx>>,
+    fluid_ticks: Vec<TickedFluid<'w, Cx>>,
 }
 
-type TickedBlock<'w, K, Cx> =
-    TickedReg<'w, RawBlock<'w, <Cx as ChunkTy<'w>>::BlockStateExt, Cx>, K>;
-type TickedFluid<'w, K, Cx> =
-    TickedReg<'w, RawFluid<'w, <Cx as ChunkTy<'w>>::FluidStateExt, Cx>, K>;
+type TickedBlock<'w, Cx> = TickedReg<'w, RawBlock<'w, Cx>, <Cx as ProvideIdTy>::Id>;
+type TickedFluid<'w, Cx> = TickedReg<'w, RawFluid<'w, Cx>, <Cx as ProvideIdTy>::Id>;
 
 #[derive(Debug)]
 struct TickedReg<'r, T, K>(Reg<'r, K, T>);
 
-impl<'w, K, Cx> UpgradeData<'w, K, Cx>
+impl<'w, Cx> UpgradeData<'w, Cx>
 where
     Cx: ChunkTy<'w>
-        + ProvideRegistry<'w, K, RawBlock<'w, Cx::BlockStateExt, Cx>>
-        + ProvideRegistry<'w, K, RawFluid<'w, Cx::FluidStateExt, Cx>>,
-    K: Hash + Eq,
+        + ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>
+        + ProvideRegistry<'w, Cx::Id, RawFluid<'w, Cx>>,
+    Cx::Id: Hash + Eq,
 {
     /// Creates a new upgrade data from given *serialized NBT data* and the height limit.
     ///
@@ -51,16 +50,16 @@ where
     ) -> Result<Self, <D as serde::Deserializer<'de>>::Error>
     where
         D: serde::Deserializer<'de>,
-        K: Deserialize<'de>,
+        Cx::Id: Deserialize<'de>,
     {
         #[derive(Deserialize)]
         #[serde(bound(deserialize = r#"
-                K: Deserialize<'de> + Hash + Eq,
-                Cx: ProvideRegistry<'w, K, RawBlock<'w, Cx::BlockStateExt, Cx>>
-                    + ProvideRegistry<'w, K, RawFluid<'w, Cx::FluidStateExt, Cx>>
+                Cx::Id: Deserialize<'de> + Hash + Eq,
+                Cx: ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>
+                    + ProvideRegistry<'w, Cx::Id, RawFluid<'w, Cx>>
                     + ChunkTy<'w>
                 "#))]
-        struct Serialized<'w, K, Cx>
+        struct Serialized<'w, Cx>
         where
             Cx: ChunkTy<'w>,
         {
@@ -72,8 +71,8 @@ where
             #[serde(default)]
             sides: i32,
 
-            neighbor_block_ticks: Vec<TickedBlock<'w, K, Cx>>,
-            neighbor_fluid_ticks: Vec<TickedFluid<'w, K, Cx>>,
+            neighbor_block_ticks: Vec<TickedBlock<'w, Cx>>,
+            neighbor_fluid_ticks: Vec<TickedFluid<'w, Cx>>,
         }
 
         let Serialized {
@@ -81,7 +80,7 @@ where
             sides,
             neighbor_block_ticks: block_ticks,
             neighbor_fluid_ticks: fluid_ticks,
-        } = Serialized::<'w, K, Cx>::deserialize(nbt)?;
+        } = Serialized::<'w, Cx>::deserialize(nbt)?;
 
         Ok(Self {
             sides_to_upgrade: {
@@ -113,10 +112,10 @@ where
     }
 }
 
-impl<'w, K, Cx> Debug for UpgradeData<'w, K, Cx>
+impl<'w, Cx> Debug for UpgradeData<'w, Cx>
 where
     Cx: ChunkTy<'w> + Debug,
-    K: Debug,
+    Cx::Id: Debug,
     Cx::BlockStateExt: Debug,
     Cx::BlockStateList: Debug,
     Cx::FluidStateExt: Debug,

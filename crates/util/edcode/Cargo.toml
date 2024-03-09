@@ -25,7 +25,7 @@ glam = { version = "0.25", optional = true }
 # default = ["serde", "nbt", "json", "uuid", "glam"]
 serde = ["dep:serde"]
 # custom formats
-nbt = ["serde", "dep:fastnbt"]
+fastnbt = ["serde", "dep:fastnbt"]
 json = ["serde", "dep:serde_json"]
 # integrations
 uuid = ["dep:uuid"]

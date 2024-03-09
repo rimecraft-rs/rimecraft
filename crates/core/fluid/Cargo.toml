@@ -12,7 +12,8 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-registry = { path = "../registry" }
+rimecraft-global-cx = { path = "../global-cx" }
+rimecraft-registry = { path = "../../util/registry" }
 rimecraft-state = { path = "../state" }
 
 [features]

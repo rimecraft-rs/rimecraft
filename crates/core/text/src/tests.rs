@@ -23,8 +23,8 @@ impl Display for Content {
 #[test]
 fn display() {
     let content: Content = "Hello, world! ".into();
-    let mut text: Text<_, ()> = content.into();
-    let mut sib: Text<_, ()> = Content::from("Genshin Impact, ").into();
+    let mut text: RawText<_, ()> = content.into();
+    let mut sib: RawText<_, ()> = Content::from("Genshin Impact, ").into();
     sib.push(Content::from("a game by miHoYo, ").into());
     sib.push(Content::from("boot! ").into());
     text.push(sib);

@@ -2,7 +2,7 @@ pub mod potential_values_based_callbacks;
 pub mod suppliable_int_callbacks;
 pub mod validating_int_slider_callbacks;
 
-use rimecraft_text::Texts;
+use rimecraft_text::ProvideTextTy;
 
 use crate::SimpleOption;
 
@@ -12,14 +12,14 @@ type ValueSetter<T, Txt> = fn(&mut SimpleOption<T, Txt>, value: Option<T>);
 
 trait Callbacks<T, Txt>
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn validate(&self, value: Option<T>) -> Option<T>;
 }
 
 trait CyclingCallbacks<T, Txt>: Callbacks<T, Txt>
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn get_values(&self) -> (); // CyclingButtonWidget.Values<T>
 
@@ -30,7 +30,7 @@ where
 
 trait SliderCallbacks<T, Txt>: Callbacks<T, Txt>
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn to_slider_progress(&self, value: T) -> f32;
 
@@ -39,14 +39,14 @@ where
 
 trait TypeChangeableCallbacks<T, Txt>: CyclingCallbacks<T, Txt> + SliderCallbacks<T, Txt>
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn is_cycling(&self) -> bool;
 }
 
 trait IntSliderCallbacks<Txt>: SliderCallbacks<i32, Txt>
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn min_inclusive(&self) -> i32;
 
@@ -97,7 +97,7 @@ where
 
         impl<R, IR, RI, F, ToP, ToV, Txt> SliderCallbacks<R, Txt> for Impl<IR, RI, F, ToP, ToV>
         where
-            Txt: Texts,
+            Txt: ProvideTextTy,
             IR: Fn(Option<i32>) -> Option<R>,
             RI: Fn(Option<R>) -> Option<i32>,
             F: Fn(Option<i32>) -> Option<i32>,
@@ -117,7 +117,7 @@ where
 
         impl<R, IR, RI, F, ToP, ToV, Txt> Callbacks<R, Txt> for Impl<IR, RI, F, ToP, ToV>
         where
-            Txt: Texts,
+            Txt: ProvideTextTy,
             IR: Fn(Option<i32>) -> Option<R>,
             RI: Fn(Option<R>) -> Option<i32>,
             F: Fn(Option<i32>) -> Option<i32>,

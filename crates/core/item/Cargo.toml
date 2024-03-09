@@ -12,24 +12,14 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-registry = { path = "../registry" }
+rimecraft-global-cx = { path = "../global-cx" }
+rimecraft-registry = { path = "../../util/registry" }
 rimecraft-fmt = { path = "../../util/fmt" }
-rimecraft-attachment = { path = "../../util/attachment" }
-rimecraft-serde-update = { path = "../../util/serde-update", optional = true }
-rimecraft-serde-humanreadctl = { path = "../../util/serde-humanreadctl", optional = true }
-fastnbt = "2.4"
-rimecraft-nbt-ext = { path = "../../util/nbt-ext" }
-serde = { version = "1.0", optional = true, features = ["derive"] }
+serde = { version = "1.0", optional = true }
 
 [features]
-# default = ["serde"]
-serde = [
-    "dep:serde",
-    "rimecraft-registry/serde",
-    "rimecraft-attachment/serde",
-    "dep:rimecraft-serde-update",
-    "dep:rimecraft-serde-humanreadctl",
-]
+default = ["serde"]
+serde = ["dep:serde", "rimecraft-registry/serde"]
 
 [lints]
 workspace = true

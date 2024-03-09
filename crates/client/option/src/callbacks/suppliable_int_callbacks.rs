@@ -7,7 +7,7 @@ pub struct SuppliableIntCallbacks {
 
 impl<Txt> TypeChangeableCallbacks<i32, Txt> for SuppliableIntCallbacks
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn is_cycling(&self) -> bool {
         true
@@ -16,7 +16,7 @@ where
 
 impl<Txt> CyclingCallbacks<i32, Txt> for SuppliableIntCallbacks
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn get_values(&self) -> () {
         todo!()
@@ -25,7 +25,7 @@ where
 
 impl<Txt> IntSliderCallbacks<Txt> for SuppliableIntCallbacks
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn min_inclusive(&self) -> i32 {
         (self.min_boundary)()
@@ -49,7 +49,7 @@ where
 
 impl<Txt> SliderCallbacks<i32, Txt> for SuppliableIntCallbacks
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn to_slider_progress(&self, value: i32) -> f32 {
         <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::to_slider_progress(self, value)
@@ -62,7 +62,7 @@ where
 
 impl<Txt> Callbacks<i32, Txt> for SuppliableIntCallbacks
 where
-    Txt: Texts,
+    Txt: ProvideTextTy,
 {
     fn validate(&self, value: Option<i32>) -> Option<i32> {
         <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::i32_validate(self, value)
