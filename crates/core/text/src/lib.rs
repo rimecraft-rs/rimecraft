@@ -194,11 +194,11 @@ pub trait ProvideTextTy: GlobalContext {
 pub type Text<Cx> = RawText<<Cx as ProvideTextTy>::Content, <Cx as ProvideTextTy>::StyleExt>;
 
 pub trait Localizable {
-	fn localization_key(&self) -> String;
+    fn localization_key(&self) -> String;
 
-	fn localized_name(&self) -> () {
-		todo!()
-	}
+    fn localized_name(&self) -> () {
+        todo!()
+    }
 }
 
 #[cfg(test)]

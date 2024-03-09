@@ -14,28 +14,32 @@ use super::ByUSizeId;
 /// This type represents `net.minecraft.client.option.AttackIndicator` (yarn).
 #[derive(Debug, Sequence)]
 pub enum AttackIndicator {
-	/// Attack indicator off.
-	Off,
-	/// Below crosshair.
-	Crosshair,
-	/// Next to hotbar.
-	Hotbar
+    /// Attack indicator off.
+    Off,
+    /// Below crosshair.
+    Crosshair,
+    /// Next to hotbar.
+    Hotbar,
 }
 
 impl ByUSizeId for AttackIndicator {}
 
 impl Display for AttackIndicator {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", match self {
-			AttackIndicator::Off => "off",
-			AttackIndicator::Crosshair => "crosshair",
-			AttackIndicator::Hotbar => "hotbar",
-		})
-	}
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                AttackIndicator::Off => "off",
+                AttackIndicator::Crosshair => "crosshair",
+                AttackIndicator::Hotbar => "hotbar",
+            }
+        )
+    }
 }
 
 impl Localizable for AttackIndicator {
-	fn localization_key(&self) -> String {
-		format_localization_key!("options", "attack", format!("{}", self))
-	}
+    fn localization_key(&self) -> String {
+        format_localization_key!("options", "attack", &format!("{}", self))
+    }
 }
