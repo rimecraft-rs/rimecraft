@@ -7,7 +7,7 @@ pub mod style;
 #[cfg(feature = "serde")]
 mod _serde;
 
-use std::{fmt::Display, ops::Add};
+use std::{borrow::Cow, fmt::Display, ops::Add};
 
 pub use error::Error;
 pub use iter::{Iter, StyledIter};
@@ -193,12 +193,10 @@ pub trait ProvideTextTy: GlobalContext {
 /// Context type decorated [`RawText`].
 pub type Text<Cx> = RawText<<Cx as ProvideTextTy>::Content, <Cx as ProvideTextTy>::StyleExt>;
 
+/// A localizable value.
 pub trait Localizable {
-    fn localization_key(&self) -> String;
-
-    fn localized_name(&self) -> () {
-        todo!()
-    }
+    /// Returns the localization key of this value.
+    fn localization_key(&self) -> Cow<'_, str>;
 }
 
 #[cfg(test)]

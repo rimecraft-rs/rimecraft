@@ -1,6 +1,6 @@
 //! Enum for graphics mode.
 
-use std::fmt::Display;
+use std::{borrow::Cow, fmt::Display};
 
 use enum_iterator::Sequence;
 use rimecraft_text::{format_localization_key, Localizable};
@@ -39,7 +39,11 @@ impl Display for GraphicsMode {
 }
 
 impl Localizable for GraphicsMode {
-    fn localization_key(&self) -> String {
-        format_localization_key!("options", "graphics", &format!("{}", self))
+    fn localization_key(&self) -> Cow<'_, str> {
+        Cow::Owned(format_localization_key!(
+            "options",
+            "graphics",
+            &format!("{}", self)
+        ))
     }
 }

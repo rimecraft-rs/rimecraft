@@ -1,6 +1,6 @@
 //! Enum for narrator mode.
 
-use std::fmt::Display;
+use std::{borrow::Cow, fmt::Display};
 
 use enum_iterator::Sequence;
 use rimecraft_text::{format_localization_key, Localizable};
@@ -58,7 +58,11 @@ impl NarratorMode {
 }
 
 impl Localizable for NarratorMode {
-    fn localization_key(&self) -> String {
-        format_localization_key!("options", "narrator", &format!("{}", self))
+    fn localization_key(&self) -> Cow<'_, str> {
+        Cow::Owned(format_localization_key!(
+            "options",
+            "narrator",
+            &format!("{}", self)
+        ))
     }
 }
