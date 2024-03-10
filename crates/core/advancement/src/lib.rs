@@ -1,27 +1,28 @@
 //! Advancement related types.
 
-use rimecraft_fmt::Formatting;
 use rimecraft_item::{stack::InitAttachments, ItemStack};
 use rimecraft_text::Texts;
 
 /// All information about an advancement.\
 /// `'r` is registry lifetime.\
-/// Generic type `T` is text type, `Id` is identifier
-/// type, `Cx` is content type.
+/// Generic type `T` is text type, `Id` is identifier type, `Cx` is context type.
 ///
 /// # MCJE Reference
 /// `net.minecraft.advancement.Advancement` in yarn.
+#[derive(Debug)]
 pub struct Advancement<'r, T, Id, Cx>
 where
     T: Texts,
     Cx: InitAttachments<Id>,
 {
+    /// Parent advancement.
     pub parent: Option<Id>,
     pub display: Option<DisplayInfo<'r, T, Id, Cx>>,
 }
 
 /// # MCJE Reference
 /// `net.minecraft.advancement.AdvancementDisplay` in yarn.
+#[derive(Debug)]
 pub struct DisplayInfo<'r, T, Id, Cx>
 where
     T: Texts,
@@ -31,7 +32,7 @@ where
     description: T,
     icon: ItemStack<'r, Id, Cx>,
     background: Option<Id>,
-    frame: Frame<Id>,
+    frame: Frame,
     show_toast: bool,
     announce_to_chat: bool,
     hidden: bool,
@@ -49,7 +50,7 @@ where
         description: T,
         icon: ItemStack<'r, Id, Cx>,
         background: Option<Id>,
-        frame: Frame<Id>,
+        frame: Frame,
         show_toast: bool,
         announce_to_chat: bool,
         hidden: bool,
@@ -83,7 +84,11 @@ where
 /// # MCJE Reference
 /// `net.minecraft.advancement.AdvancementFrame` in yarn.
 #[derive(Debug)]
-pub struct Frame<Id> {
-    id: Id,
-    format: Formatting,
+pub enum Frame {
+    /// Regular advancement.
+    Task,
+    /// A hard advancement, sometimes hidden.
+    Challenge,
+    /// Regular advancement.
+    Goal,
 }
