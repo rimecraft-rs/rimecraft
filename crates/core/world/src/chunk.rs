@@ -4,12 +4,17 @@ mod internal_types;
 mod section;
 mod upgrade;
 
+use core::panic;
 use std::fmt::Debug;
 
 pub use internal_types::*;
-use rimecraft_block::ProvideBlockStateExtTy;
+use rimecraft_block::{ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
+use rimecraft_chunk_palette::{
+    container::ProvidePalette, IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
+};
 use rimecraft_fluid::ProvideFluidStateExtTy;
 use rimecraft_global_cx::ProvideIdTy;
+use rimecraft_registry::{ProvideRegistry, Registry};
 pub use rimecraft_voxel_math::ChunkPos;
 pub use section::ChunkSection;
 pub use upgrade::UpgradeData;
@@ -47,41 +52,63 @@ where
     pos: ChunkPos,
     udata: UpgradeData<'w, Cx>,
     hlimit: HeightLimit,
-    section_array: Option<Vec<ChunkSection<'w, Cx>>>,
+    section_array: Vec<ChunkSection<'w, Cx>>,
 
     vdata: T,
 }
 
 impl<'w, T, Cx> Chunk<'w, T, Cx>
 where
-    Cx: ChunkTy<'w>,
+    Cx: ChunkTy<'w>
+        + ProvideStateIds<List = Cx::BlockStateList>
+        + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
+        + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>
+        + ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>,
+
+    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
+        + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>
+        + Clone,
+
+    &'w Registry<Cx::Id, Cx::Biome>: Into<Cx::BiomeList>,
+    Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>
+        + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
+        + Clone,
 {
     /// Creates a new chunk from scratch.
     ///
     /// # Panics
     ///
-    /// This method panics if the length of the section array does not match the
-    /// vertical section count of the height limit. See [`HeightLimit::count_vertical_sections`].
+    /// Panics if the given section array length is not the vertical count of
+    /// chunk sections of given `height_limit`.
+    ///
+    /// See [`HeightLimit::count_vertical_sections`].
     pub fn new(
         pos: ChunkPos,
         upgrade_data: UpgradeData<'w, Cx>,
         height_limit: HeightLimit,
-        section_array: Option<Vec<ChunkSection<'w, Cx>>>,
+        biome_registry: &'w Registry<Cx::Id, Cx::Biome>,
+        section_array: Option<Vec<Option<ChunkSection<'w, Cx>>>>,
         vdata: T,
     ) -> Self {
-        if let Some(ref array) = section_array {
-            assert_eq! {
-                array.len() as i32,
-                height_limit.count_vertical_sections(),
-                "the section array must have the same length as the vertical section count of the height limit"
-            }
-        }
-
         Self {
             pos,
             udata: upgrade_data,
             hlimit: height_limit,
-            section_array,
+            section_array: {
+                let len = height_limit.count_vertical_sections() as usize;
+                if let Some(section_array) = section_array {
+                    assert_eq!(section_array.len(), len, "length of given section array should be the count of vertical sections of the chunk");
+
+                    section_array
+                        .into_iter()
+                        .map(|opt| opt.unwrap_or_else(|| ChunkSection::from(biome_registry)))
+                        .collect()
+                } else {
+                    (0..len)
+                        .map(|_| ChunkSection::from(biome_registry))
+                        .collect()
+                }
+            },
             vdata,
         }
     }
@@ -108,4 +135,3 @@ where
             .finish()
     }
 }
-
