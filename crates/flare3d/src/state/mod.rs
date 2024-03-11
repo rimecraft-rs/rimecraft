@@ -46,7 +46,7 @@ const INSTANCE_DISPLACEMENT: Vec3 = Vec3::new(
 );
 
 pub struct State<'s> {
-	pub window: Arc<Window>,
+    pub window: Arc<Window>,
     pub size: winit::dpi::PhysicalSize<u32>,
 
     surface: wgpu::Surface<'s>,
@@ -70,7 +70,7 @@ pub struct State<'s> {
 
 impl<'s> State<'s> {
     pub async fn new(event_loop: &EventLoop<()>) -> State<'s> {
-		let window = Arc::new(Window::new(event_loop).unwrap());
+        let window = Arc::new(Window::new(event_loop).unwrap());
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -285,7 +285,7 @@ impl<'s> State<'s> {
         });
 
         Self {
-			window,
+            window,
             size,
             surface,
             device,

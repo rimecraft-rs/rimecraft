@@ -1,8 +1,11 @@
 //! Enum for particles mode.
 
-use enum_iterator::Sequence;
+use std::{borrow::Cow, fmt::Display};
 
-use super::ByUIntId;
+use enum_iterator::Sequence;
+use rimecraft_text::{format_localization_key, Localizable};
+
+use super::ByUSizeId;
 
 /// Represents the rendering mode of particles.
 ///
@@ -10,23 +13,38 @@ use super::ByUIntId;
 ///
 /// This type represents `net.minecraft.client.option.ParticlesMode` (yarn).
 #[derive(Debug, Sequence, PartialEq)]
+#[allow(clippy::exhaustive_enums)]
 pub enum ParticlesMode {
-	/// Renders all particles.
-	All,
-	/// Renders decreased particles.
-	Decreased,
-	/// Renders as less particles as possible.
-	Minimal
+    /// Renders all particles.
+    All,
+    /// Renders decreased particles.
+    Decreased,
+    /// Renders as less particles as possible.
+    Minimal,
 }
 
-impl ByUIntId for ParticlesMode {}
+impl ByUSizeId for ParticlesMode {}
 
-impl ParticlesMode {
-	fn translation_key(&self) -> String {
-		String::from("options.particles.") + match self {
-			ParticlesMode::All => "all",
-			ParticlesMode::Decreased => "decreased",
-			ParticlesMode::Minimal => "minimal",
-		}
-	}
+impl Display for ParticlesMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ParticlesMode::All => "all",
+                ParticlesMode::Decreased => "decreased",
+                ParticlesMode::Minimal => "minimal",
+            }
+        )
+    }
+}
+
+impl Localizable for ParticlesMode {
+    fn localization_key(&self) -> Cow<'_, str> {
+        Cow::Owned(format_localization_key!(
+            "options",
+            "particles",
+            &format!("{}", self)
+        ))
+    }
 }

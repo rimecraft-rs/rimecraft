@@ -13,7 +13,7 @@ pub struct Window<'w> {
 impl<'w> Window<'w> {
     pub fn new() -> Window<'w> {
         let event_loop = EventLoop::new().unwrap();
-		let mut state = futures_executor::block_on(State::new(&event_loop));
+        let mut state = futures_executor::block_on(State::new(&event_loop));
 
         #[cfg(target_os = "macos")]
         let (_dl, semaphore) = {
@@ -52,9 +52,7 @@ impl<'w> Window<'w> {
                                     state.update();
                                     match state.render() {
                                         Ok(_) => {}
-                                        Err(wgpu::SurfaceError::Lost) => {
-                                            state.resize(state.size)
-                                        }
+                                        Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
                                         Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
                                         Err(e) => eprintln!("{:?}", e),
                                     }
@@ -84,8 +82,6 @@ impl<'w> Window<'w> {
             })
             .unwrap();
 
-        Self {
-            state
-        }
+        Self { state }
     }
 }

@@ -2,11 +2,8 @@
 resolver = "2"
 members = [
     "crates/util/*",
-
-	"crates/client/*",
-
+    "crates/client/*",
     "crates/core/*",
-    "crates/core/world/palette",
 
     "crates/flare3d",
     "crates/flare3d/example",

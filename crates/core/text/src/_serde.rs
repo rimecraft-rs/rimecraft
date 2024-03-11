@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{style::Style, Plain, Text};
+use crate::{style::Style, Plain, RawText};
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
@@ -9,7 +9,7 @@ use crate::{style::Style, Plain, Text};
     StyleExt: Deserialize<'de> + Default"#))]
 enum Component<'a, T, StyleExt> {
     DirectLiteral(&'a str),
-    List(Vec<Text<T, StyleExt>>),
+    List(Vec<RawText<T, StyleExt>>),
     Bool(bool),
     Integer(i64),
     Float(f64),
@@ -18,11 +18,11 @@ enum Component<'a, T, StyleExt> {
         content: T,
         #[serde(flatten)]
         style: Style<StyleExt>,
-        extra: Vec<Text<T, StyleExt>>,
+        extra: Vec<RawText<T, StyleExt>>,
     },
 }
 
-impl<T, StyleExt> Serialize for Text<T, StyleExt>
+impl<T, StyleExt> Serialize for RawText<T, StyleExt>
 where
     T: Serialize,
     StyleExt: Serialize,
@@ -38,7 +38,7 @@ where
             content: &'a T,
             #[serde(flatten)]
             style: &'a Style<StyleExt>,
-            sibs: &'a [Text<T, StyleExt>],
+            sibs: &'a [RawText<T, StyleExt>],
         }
 
         Component {
@@ -50,7 +50,7 @@ where
     }
 }
 
-impl<'de, T, StyleExt> Deserialize<'de> for Text<T, StyleExt>
+impl<'de, T, StyleExt> Deserialize<'de> for RawText<T, StyleExt>
 where
     T: Deserialize<'de> + Plain,
     StyleExt: Deserialize<'de> + Default,
@@ -76,7 +76,7 @@ where
                 content,
                 style,
                 extra,
-            } => Ok(Text {
+            } => Ok(RawText {
                 content,
                 style,
                 sibs: extra,

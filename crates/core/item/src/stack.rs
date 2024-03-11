@@ -1,94 +1,62 @@
 //! Item stack related types and traits.
 
-use rimecraft_attachment::Attachments;
-use rimecraft_nbt_ext::Compound;
+use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
 use rimecraft_registry::ProvideRegistry;
 
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
-use crate::{Item, RawItem, ToItem};
+use crate::{Item, RawItem};
+
+/// Global context used for item stacks.
+pub trait ItemStackCx: ProvideIdTy + ProvideNbtTy {}
+
+impl<T> ItemStackCx for T where T: ProvideIdTy + ProvideNbtTy {}
 
 /// A stack of items.
 ///
 /// This is a data container that holds the item count and the stack's NBT.
-#[derive(Debug)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(bound(
-        serialize = "K: serde::Serialize + std::hash::Hash + Eq",
-        deserialize = r#"
-            'r: 'de,
-            K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + std::hash::Hash + Eq + 'r,
-            Cx: InitAttachments<K> + rimecraft_registry::ProvideRegistry<'r, K, crate::RawItem<Cx>> + 'r"#
-    ))
-)]
-pub struct ItemStack<'r, K, Cx> {
-    #[cfg_attr(
-        feature = "serde",
-        serde(default),
-        serde(rename = "id"),
-        serde(with = "serde_helper::item_serde")
-    )]
-    item: Item<'r, K, Cx>,
-
-    #[cfg_attr(feature = "serde", serde(rename = "Count"))]
+pub struct ItemStack<'r, Cx>
+where
+    Cx: ItemStackCx,
+{
+    item: Item<'r, Cx>,
     count: u32,
 
     /// Item stack's custom NBT.
-    #[cfg_attr(feature = "serde", serde(rename = "tag"), serde(default))]
-    nbt: Option<Compound>,
-
-    #[cfg_attr(
-        feature = "serde",
-        serde(skip_serializing_if = "serde_helper::should_skip_attachment_ser"),
-        serde(default = "serde_helper::default_attachments"),
-        serde(serialize_with = "serde_helper::ser_attachments"),
-        serde(deserialize_with = "serde_helper::deser_attachments")
-    )]
-    attachments: (Attachments<K>, PhantomData<Cx>),
+    nbt: Option<Cx::Compound>,
 }
 
-impl<'r, K, Cx> ItemStack<'r, K, Cx>
+impl<'r, Cx> ItemStack<'r, Cx>
 where
-    Cx: InitAttachments<K>,
+    Cx: ItemStackCx,
 {
     /// Creates a new item stack with the given item and count.
     #[inline]
-    pub fn new<I>(item: I, count: u32) -> Self
-    where
-        I: for<'a> ToItem<'a, 'r, K, Cx>,
-    {
+    pub fn new(item: Item<'r, Cx>, count: u32) -> Self {
         Self::with_nbt(item, count, None)
     }
 
     /// Creates a new item stack with the given item, count, and custom NBT tag.
-    pub fn with_nbt<I>(item: I, count: u32, nbt: Option<Compound>) -> Self
-    where
-        I: for<'a> ToItem<'a, 'r, K, Cx>,
-    {
-        let mut attachments = Attachments::new();
-        Cx::init_attachments(&mut attachments);
-
-        Self {
-            item: item.to_item(),
-            count,
-            nbt,
-            attachments: (attachments, PhantomData),
-        }
+    pub fn with_nbt(item: Item<'r, Cx>, count: u32, nbt: Option<Cx::Compound>) -> Self {
+        Self { item, count, nbt }
     }
 }
 
-impl<'r, K, Cx> ItemStack<'r, K, Cx>
+impl<'r, Cx> ItemStack<'r, Cx>
 where
-    Cx: InitAttachments<K> + ProvideRegistry<'r, K, RawItem<Cx>> + 'r,
+    Cx: ItemStackCx + ProvideRegistry<'r, Cx::Id, RawItem<Cx>> + 'r,
 {
     /// Creates an empty item stack.
     #[inline]
     pub fn empty() -> Self {
         Self::new(Item::default(), 0)
     }
+}
 
+impl<'r, Cx> ItemStack<'r, Cx>
+where
+    Cx: ItemStackCx + ProvideRegistry<'r, Cx::Id, RawItem<Cx>> + 'r,
+{
     /// Returns whether the stack is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -96,10 +64,13 @@ where
     }
 }
 
-impl<'r, K, Cx> ItemStack<'r, K, Cx> {
+impl<'r, Cx> ItemStack<'r, Cx>
+where
+    Cx: ItemStackCx,
+{
     /// Returns the item of the stack.
     #[inline]
-    pub fn item(&self) -> Item<'r, K, Cx> {
+    pub fn item(&self) -> Item<'r, Cx> {
         self.item
     }
 
@@ -111,20 +82,14 @@ impl<'r, K, Cx> ItemStack<'r, K, Cx> {
 
     /// Returns the custom NBT of the stack.
     #[inline]
-    pub fn nbt(&self) -> Option<&Compound> {
+    pub fn nbt(&self) -> Option<&Cx::Compound> {
         self.nbt.as_ref()
     }
 
     /// Returns a mutable reference to the custom NBT of the stack.
     #[inline]
-    pub fn nbt_mut(&mut self) -> Option<&mut Compound> {
+    pub fn nbt_mut(&mut self) -> Option<&mut Cx::Compound> {
         self.nbt.as_mut()
-    }
-
-    /// Returns the custom NBT of the stack, create one if it does not exist.
-    #[inline]
-    pub fn get_or_create_nbt(&mut self) -> &mut Compound {
-        self.nbt.get_or_insert_with(Compound::new)
     }
 
     /// Sets the count of the stack.
@@ -135,26 +100,26 @@ impl<'r, K, Cx> ItemStack<'r, K, Cx> {
 
     /// Sets the custom NBT of the stack.
     #[inline]
-    pub fn set_nbt(&mut self, nbt: Option<Compound>) {
+    pub fn set_nbt(&mut self, nbt: Option<Cx::Compound>) {
         self.nbt = nbt;
-    }
-
-    /// Returns the attachments of the stack.
-    #[inline]
-    pub fn attachments(&self) -> &Attachments<K> {
-        &self.attachments.0
-    }
-
-    /// Returns the mutable view of attachments of the stack.
-    #[inline]
-    pub fn attachments_mut(&mut self) -> &mut Attachments<K> {
-        &mut self.attachments.0
     }
 }
 
-impl<'r, K, Cx> Default for ItemStack<'r, K, Cx>
+impl<Cx> ItemStack<'_, Cx>
 where
-    Cx: InitAttachments<K> + ProvideRegistry<'r, K, RawItem<Cx>> + 'r,
+    Cx: ItemStackCx,
+    Cx::Compound: Default,
+{
+    /// Returns the custom NBT of the stack, create one if it does not exist.
+    #[inline]
+    pub fn get_or_create_nbt(&mut self) -> &mut Cx::Compound {
+        self.nbt.get_or_insert_with(Default::default)
+    }
+}
+
+impl<'r, Cx> Default for ItemStack<'r, Cx>
+where
+    Cx: ItemStackCx + ProvideRegistry<'r, Cx::Id, RawItem<Cx>> + 'r,
 {
     #[inline]
     fn default() -> Self {
@@ -162,135 +127,225 @@ where
     }
 }
 
-impl<'r, K, Cx> From<Item<'r, K, Cx>> for ItemStack<'r, K, Cx>
+impl<'r, Cx> From<Item<'r, Cx>> for ItemStack<'r, Cx>
 where
-    Cx: InitAttachments<K>,
+    Cx: ItemStackCx,
 {
     #[inline]
-    fn from(value: Item<'r, K, Cx>) -> Self {
+    fn from(value: Item<'r, Cx>) -> Self {
         Self::new(value, 1)
     }
 }
 
-impl<'r, K, Cx> From<ItemStack<'r, K, Cx>> for Item<'r, K, Cx> {
+impl<'r, Cx> From<ItemStack<'r, Cx>> for Item<'r, Cx>
+where
+    Cx: ItemStackCx,
+{
     #[inline]
-    fn from(value: ItemStack<'r, K, Cx>) -> Self {
+    fn from(value: ItemStack<'r, Cx>) -> Self {
         value.item
     }
 }
 
-impl<'s, 'r, K, Cx> ToItem<'s, 'r, K, Cx> for ItemStack<'r, K, Cx> {
-    #[inline]
-    fn to_item(&'s self) -> Item<'r, K, Cx> {
-        self.item
-    }
-}
-
-impl<K, Cx> PartialEq for ItemStack<'_, K, Cx> {
+impl<Cx> PartialEq for ItemStack<'_, Cx>
+where
+    Cx: ItemStackCx,
+    Cx::Compound: PartialEq,
+{
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.item == other.item && self.count == other.count && self.nbt == other.nbt
     }
 }
 
-impl<K, Cx> Eq for ItemStack<'_, K, Cx> {}
-
-impl<K, Cx> Clone for ItemStack<'_, K, Cx>
+impl<Cx> Eq for ItemStack<'_, Cx>
 where
-    Cx: InitAttachments<K>,
+    Cx: ItemStackCx,
+    Cx::Compound: Eq,
 {
-    /// Clones the item stack.
-    ///
-    /// This will not clone the attachments of the item stack.
+}
+
+impl<Cx> Clone for ItemStack<'_, Cx>
+where
+    Cx: ItemStackCx,
+    Cx::Compound: Clone,
+{
     #[inline]
     fn clone(&self) -> Self {
         Self::with_nbt(self.item, self.count, self.nbt.clone())
     }
 }
 
-/// A trait for initializing attachments of an item stack.
-pub trait InitAttachments<K> {
-    /// Initializes the attachments of the item stack.
-    fn init_attachments(attachments: &mut Attachments<K>);
+impl<Cx> Debug for ItemStack<'_, Cx>
+where
+    Cx: ItemStackCx + Debug,
+    Cx::Id: Debug,
+    Cx::Compound: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ItemStack")
+            .field("item", &self.item)
+            .field("count", &self.count)
+            .field("nbt", &self.nbt)
+            .finish()
+    }
 }
 
 #[cfg(feature = "serde")]
-mod serde_helper {
-    use super::*;
+pub use _serde::{deserialize_vanilla, serialize_vanilla, DeserItemStack, SerItemStack};
 
+#[cfg(feature = "serde")]
+#[allow(clippy::missing_errors_doc)]
+mod _serde {
     use std::hash::Hash;
 
-    #[inline]
-    pub fn default_attachments<K, Cx>() -> (Attachments<K>, PhantomData<Cx>)
+    use rimecraft_registry::entry::RefEntry;
+    use serde::{Deserialize, Serialize};
+
+    use super::*;
+
+    /// Global context behavior for serializing item stacks.
+    pub trait SerItemStack<'r>: ItemStackCx {
+        /// Serializes the item stack.
+        fn serialize<S>(serializer: S, stack: &ItemStack<'r, Self>) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer;
+    }
+
+    /// Global context behavior for deserializing item stacks.
+    pub trait DeserItemStack<'r, 'de>: ItemStackCx {
+        /// Deserializes the item stack.
+        fn deserialize<D>(deserializer: D) -> Result<ItemStack<'r, Self>, D::Error>
+        where
+            D: serde::Deserializer<'de>;
+    }
+
+    impl<'r, Cx> Serialize for ItemStack<'r, Cx>
     where
-        Cx: InitAttachments<K>,
+        Cx: SerItemStack<'r>,
     {
-        let mut att = Attachments::new();
-        Cx::init_attachments(&mut att);
-        (att, PhantomData)
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            Cx::serialize(serializer, self)
+        }
     }
 
-    #[inline]
-    pub fn should_skip_attachment_ser<K, Cx>(
-        attachments: &(Attachments<K>, PhantomData<Cx>),
-    ) -> bool {
-        attachments.0.is_persistent_data_empty()
+    impl<'r, 'de, Cx> Deserialize<'de> for ItemStack<'r, Cx>
+    where
+        Cx: DeserItemStack<'r, 'de>,
+    {
+        #[inline]
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            Cx::deserialize(deserializer)
+        }
     }
 
-    #[inline]
-    pub fn ser_attachments<K, Cx, S>(
-        attachments: &(Attachments<K>, PhantomData<Cx>),
+    /// Serializes the item stack in vanilla format.
+    ///
+    /// This is a helper function for implementing [`SerItemStack`] for a global context.
+    pub fn serialize_vanilla<S, Cx>(
         serializer: S,
+        stack: &ItemStack<'_, Cx>,
     ) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
-        K: serde::Serialize + Hash + Eq,
+        Cx: ItemStackCx,
+        Cx::Id: Serialize,
+        Cx::Compound: Serialize,
     {
-        serde::Serialize::serialize(&attachments.0, serializer)
+        use serde::ser::SerializeStruct;
+
+        let mut state =
+            serializer.serialize_struct("ItemStack", 2 + stack.nbt.is_some() as usize)?;
+        let entry: &RefEntry<_, _> = stack.item.into();
+        state.serialize_field("id", entry)?;
+        state.serialize_field("Count", &stack.count)?;
+        if let Some(nbt) = &stack.nbt {
+            state.serialize_field("tag", nbt)?;
+        }
+        state.end()
     }
 
-    pub fn deser_attachments<'de, K, Cx, D>(
+    /// Deserializes the item stack in vanilla format.
+    ///
+    /// This is a helper function for implementing [`DeserItemStack`] for a global context.
+    pub fn deserialize_vanilla<'r, 'de, Cx, D>(
         deserializer: D,
-    ) -> Result<(Attachments<K>, PhantomData<Cx>), <D as serde::Deserializer<'de>>::Error>
+    ) -> Result<ItemStack<'r, Cx>, D::Error>
     where
+        'r: 'de,
         D: serde::Deserializer<'de>,
-        Cx: InitAttachments<K>,
-        K: serde::Deserialize<'de> + rimecraft_serde_update::Update<'de> + Hash + Eq,
+        Cx: ItemStackCx + ProvideRegistry<'r, Cx::Id, RawItem<Cx>>,
+        Cx::Id: Deserialize<'de> + Hash + Eq,
+        Cx::Compound: Deserialize<'de>,
     {
-        use rimecraft_serde_update::Update;
-        let mut attachments = Attachments::new();
-        Cx::init_attachments(&mut attachments);
-        attachments.update(deserializer)?;
-        Ok((attachments, PhantomData))
-    }
-
-    pub mod item_serde {
-        use rimecraft_registry::ProvideRegistry;
-        use rimecraft_serde_humanreadctl::HumanReadableControlled;
-        use serde::{Deserialize, Serialize};
-
-        use crate::RawItem;
-
-        use super::*;
-
-        #[inline]
-        pub fn serialize<K, Cx, S>(item: &Item<'_, K, Cx>, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-            K: Serialize + Hash + Eq,
-        {
-            item.serialize(HumanReadableControlled::new(serializer, true))
+        struct Visitor<'r, Cx> {
+            _marker: PhantomData<fn(&'r Cx)>,
         }
 
-        #[inline]
-        pub fn deserialize<'rr, 'd, K, Cx, D>(deserializer: D) -> Result<Item<'rr, K, Cx>, D::Error>
+        impl<'r, 'de, Cx> serde::de::Visitor<'de> for Visitor<'r, Cx>
         where
-            'rr: 'd,
-            D: serde::Deserializer<'d>,
-            K: Deserialize<'d> + Hash + Eq + 'rr,
-            Cx: InitAttachments<K> + ProvideRegistry<'rr, K, RawItem<Cx>> + 'rr,
+            'r: 'de,
+            Cx: ItemStackCx + ProvideRegistry<'r, Cx::Id, RawItem<Cx>>,
+            Cx::Id: Deserialize<'de> + Hash + Eq,
+            Cx::Compound: Deserialize<'de>,
         {
-            Item::deserialize(HumanReadableControlled::new(deserializer, true))
+            type Value = ItemStack<'r, Cx>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a vanilla item stack structure")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut id = None;
+                let mut count = 0u32;
+                let mut tag = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        "id" => {
+                            if id.is_some() {
+                                return Err(serde::de::Error::duplicate_field("id"));
+                            }
+                            let entry: &RefEntry<Cx::Id, RawItem<Cx>> = map.next_value()?;
+                            id = Some(Cx::registry().of_raw(entry.raw_id()).unwrap());
+                        }
+                        "Count" => {
+                            count = map.next_value::<i32>()? as u32;
+                        }
+                        "tag" => {
+                            if tag.is_some() {
+                                return Err(serde::de::Error::duplicate_field("tag"));
+                            }
+                            tag = Some(map.next_value()?);
+                        }
+                        _ => {}
+                    }
+                }
+
+                Ok(ItemStack {
+                    item: id.ok_or_else(|| serde::de::Error::missing_field("id"))?,
+                    count,
+                    nbt: tag.ok_or_else(|| serde::de::Error::missing_field("tag"))?,
+                })
+            }
         }
+
+        deserializer.deserialize_struct(
+            "ItemStack",
+            &["id", "Count", "tag"],
+            Visitor {
+                _marker: PhantomData,
+            },
+        )
     }
 }

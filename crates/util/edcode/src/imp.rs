@@ -80,7 +80,7 @@ impl Decode for bool {
     }
 }
 
-#[cfg(feature = "nbt")]
+#[cfg(feature = "fastnbt")]
 impl<T> Encode for Nbt<T>
 where
     T: serde::Serialize,
@@ -95,7 +95,7 @@ where
     }
 }
 
-#[cfg(feature = "nbt")]
+#[cfg(feature = "fastnbt")]
 impl<T> Decode for Nbt<T>
 where
     T: for<'a> serde::Deserialize<'a>,
@@ -355,7 +355,7 @@ impl Decode for uuid::Uuid {
     }
 }
 
-#[cfg(feature = "nbt")]
+#[cfg(feature = "fastnbt")]
 impl Encode for HashMap<String, fastnbt::Value> {
     #[inline]
     fn encode<B>(&self, buf: B) -> Result<(), io::Error>
@@ -366,7 +366,7 @@ impl Encode for HashMap<String, fastnbt::Value> {
     }
 }
 
-#[cfg(feature = "nbt")]
+#[cfg(feature = "fastnbt")]
 impl Decode for HashMap<String, fastnbt::Value> {
     #[inline]
     fn decode<B>(buf: B) -> Result<Self, io::Error>

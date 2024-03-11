@@ -1,10 +1,11 @@
 //! Minecraft chunk palette implementation.
 
-use std::{collections::HashMap, hash::Hash};
+use std::hash::Hash;
 
 pub mod container;
 mod iter;
 
+use ahash::AHashMap;
 pub use iter::Iter;
 use iter::IterImpl;
 
@@ -52,7 +53,7 @@ enum PaletteImpl<T> {
     /// A palette backed by bidirectional hash tables.
     BiMap {
         forward: Vec<T>,
-        reverse: HashMap<T, usize>,
+        reverse: AHashMap<T, usize>,
     },
     Direct,
 }
@@ -112,7 +113,7 @@ where
             Strategy::BiMap => {
                 let len = 1 << bits_size;
                 let mut forward = Vec::with_capacity(len);
-                let mut reverse = HashMap::with_capacity(len);
+                let mut reverse = AHashMap::with_capacity(len);
                 assert!(
                     entries.len() <= forward.capacity(),
                     "can't initialize BiMapPalette of length {} with {} entries",
@@ -289,7 +290,7 @@ where
 #[cfg(feature = "edcode")]
 mod _edcode {
 
-    use std::io;
+    use std::io::{self, ErrorKind};
 
     use rimecraft_edcode::{Decode, Encode, Update, VarI32};
 
@@ -306,10 +307,10 @@ mod _edcode {
             match &self.internal {
                 PaletteImpl::Singular(value) => value
                     .as_ref()
-                    .ok_or_else(|| io::Error::new(std::io::ErrorKind::Other, Error::Uninitialized))
+                    .ok_or_else(|| io::Error::new(ErrorKind::Other, Error::Uninitialized))
                     .and_then(|v| {
                         self.list.raw_id(v).ok_or_else(|| {
-                            io::Error::new(std::io::ErrorKind::InvalidData, Error::UnknownEntry)
+                            io::Error::new(ErrorKind::InvalidData, Error::UnknownEntry)
                         })
                     })
                     .and_then(|id| VarI32(id as i32).encode(buf)),
@@ -317,7 +318,7 @@ mod _edcode {
                     VarI32(forward.len() as i32).encode(&mut buf)?;
                     for entry in forward {
                         VarI32(self.list.raw_id(entry).ok_or_else(|| {
-                            io::Error::new(io::ErrorKind::InvalidData, Error::UnknownEntry)
+                            io::Error::new(ErrorKind::InvalidData, Error::UnknownEntry)
                         })? as i32)
                         .encode(&mut buf)?;
                     }
@@ -340,7 +341,7 @@ mod _edcode {
                 PaletteImpl::Singular(entry) => {
                     let id = VarI32::decode(buf)?.0 as usize;
                     *entry = Some(self.list.of_raw(id).ok_or_else(|| {
-                        io::Error::new(std::io::ErrorKind::InvalidData, Error::UnknownId(id))
+                        io::Error::new(ErrorKind::InvalidData, Error::UnknownId(id))
                     })?);
                 }
                 PaletteImpl::Array(forward) | PaletteImpl::BiMap { forward, .. } => {
@@ -349,7 +350,7 @@ mod _edcode {
                     for _ in 0..len {
                         let id = VarI32::decode(&mut buf)?.0 as usize;
                         forward.push(self.list.of_raw(id).ok_or_else(|| {
-                            io::Error::new(std::io::ErrorKind::InvalidData, Error::UnknownId(id))
+                            io::Error::new(ErrorKind::InvalidData, Error::UnknownId(id))
                         })?);
                     }
                 }

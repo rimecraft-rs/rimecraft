@@ -12,13 +12,15 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+rimecraft-global-cx = { path = "../global-cx" }
 rgb = "0.8"
 rimecraft-fmt = { path = "../../util/fmt" }
 serde = { version = "1.0", features = ["derive"], optional = true }
 
 [features]
-default = []
+default = ["macros"]
 serde = ["dep:serde"]
+macros = []
 
 [lints]
 workspace = true

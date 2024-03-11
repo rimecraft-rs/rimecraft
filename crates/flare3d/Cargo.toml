@@ -32,3 +32,6 @@ futures-executor = "0.3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 display-link = { git = "https://github.com/BrainiumLLC/display-link", rev = "32780138c65ee3981d0fa44f321bb9946146a580" }
+
+[lints]
+workspace = true

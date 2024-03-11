@@ -8,14 +8,10 @@ pub fn max_f32(a: f32, b: f32) -> f32 {
         NAN
     } else if a == NAN {
         b
-    } else if b == NAN {
+    } else if b == NAN || a > b {
         a
     } else {
-        if a > b {
-            a
-        } else {
-            b
-        }
+        b
     }
 }
 
@@ -25,20 +21,16 @@ pub fn min_f32(a: f32, b: f32) -> f32 {
         NAN
     } else if a == NAN {
         b
-    } else if b == NAN {
+    } else if b == NAN || a < b {
         a
     } else {
-        if a < b {
-            a
-        } else {
-            b
-        }
+        b
     }
 }
 
 /// Returns if a [`f32`] is in the specified range.
 pub fn in_range(value: f32, min: f32, max: f32) -> bool {
-	value >= min && value <= max
+    value >= min && value <= max
 }
 
 /// Clamps a [`f32`] to an inclusive range.

@@ -160,11 +160,11 @@ impl<K: Hash + Eq> Attachments<K> {
     /// Whether the attachments contains a value
     /// with given [`Type`].
     #[inline]
-    pub fn contains<T: Any, Q>(&self, ty: &Type<&Q, T>) -> bool
+    pub fn contains<T, Q>(&self, ty: &Type<&Q, T>) -> bool
     where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
-        T: Send + Sync + 'static,
+        T: Any + Send + Sync + 'static,
     {
         self.raw.get(ty.key).is_some_and(|val| val.is::<T>())
     }
