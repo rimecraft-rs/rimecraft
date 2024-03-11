@@ -46,9 +46,7 @@ pub enum SlowDown {
 }
 
 impl<T> SlowDownTickable for Input<T> {
-    fn tick(&mut self, _slow_down: SlowDown) {
-
-    }
+    fn tick(&mut self, _slow_down: SlowDown) {}
 }
 
 impl<T> Input<T> {

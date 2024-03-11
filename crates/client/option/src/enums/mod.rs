@@ -9,8 +9,11 @@ pub mod perspective;
 
 /// If a [`Sequence`], often enums, implements this, it will be allowed to get items directly through [`usize`] indexes. Wrapping behavior is configurable.
 pub trait ByUSizeId: Sequence {
-	/// Gets the [`usize`] id.
-    fn get_usize_id(&self) -> Option<usize> where Self: PartialEq {
+    /// Gets the [`usize`] id.
+    fn get_usize_id(&self) -> Option<usize>
+    where
+        Self: PartialEq,
+    {
         let all = enum_iterator::all::<Self>().collect::<Vec<_>>();
         all.iter().position(|value| value == self)
     }

@@ -12,7 +12,6 @@ fn create_identifiers() {
     let identifier = Identifier::new(Namespace::new("n"), path);
     assert_eq!("n:a_b/42", identifier.to_string());
 
-    let identifier =
-        format_identifier!("namespace".parse().unwrap() => "a", "b"; "c"; "42");
+    let identifier = format_identifier!("namespace".parse().unwrap() => "a", "b"; "c"; "42");
     assert_eq!("namespace:a_b/c/42", identifier.to_string());
 }

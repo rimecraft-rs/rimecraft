@@ -1,5 +1,8 @@
 use glam::{Mat4, Quat, Vec3};
-use winit::{event::{ElementState, KeyEvent, WindowEvent}, keyboard::{KeyCode, PhysicalKey}};
+use winit::{
+    event::{ElementState, KeyEvent, WindowEvent},
+    keyboard::{KeyCode, PhysicalKey},
+};
 
 pub struct Camera {
     pub eye: Vec3,
