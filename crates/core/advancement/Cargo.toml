@@ -16,6 +16,7 @@ rimecraft-text = { path = "../text" }
 rimecraft-identifier = { path = "../../util/identifier" }
 rimecraft-item = { path = "../item" }
 rimecraft-fmt = { path = "../../util/fmt" }
+rimecraft-global-cx = { path = "../global-cx" }
 
 [lints]
 workspace = true

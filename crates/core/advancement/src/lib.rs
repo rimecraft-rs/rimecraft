@@ -1,7 +1,10 @@
 //! Advancement related types.
 
-use rimecraft_item::{stack::InitAttachments, ItemStack};
-use rimecraft_text::Texts;
+use std::fmt::Debug;
+
+use rimecraft_global_cx::ProvideIdTy;
+use rimecraft_item::{stack::ItemStackCx, ItemStack};
+use rimecraft_text::{ProvideTextTy, Text};
 
 /// All information about an advancement.\
 /// `'r` is registry lifetime.\
@@ -9,11 +12,11 @@ use rimecraft_text::Texts;
 ///
 /// # MCJE Reference
 /// `net.minecraft.advancement.Advancement` in yarn.
-#[derive(Debug)]
 pub struct Advancement<'r, T, Id, Cx>
 where
-    T: Texts,
-    Cx: InitAttachments<Id>,
+    T: ProvideTextTy,
+    Id: ProvideIdTy,
+    Cx: ItemStackCx,
 {
     /// Parent advancement.
     pub parent: Option<Id>,
@@ -22,15 +25,15 @@ where
 
 /// # MCJE Reference
 /// `net.minecraft.advancement.AdvancementDisplay` in yarn.
-#[derive(Debug)]
 pub struct DisplayInfo<'r, T, Id, Cx>
 where
-    T: Texts,
-    Cx: InitAttachments<Id>,
+    T: ProvideTextTy,
+    Id: ProvideIdTy,
+    Cx: ItemStackCx,
 {
-    title: T,
-    description: T,
-    icon: ItemStack<'r, Id, Cx>,
+    title: Text<T>,
+    description: Text<T>,
+    icon: ItemStack<'r, Cx>,
     background: Option<Id>,
     frame: Frame,
     show_toast: bool,
@@ -41,14 +44,15 @@ where
 
 impl<'r, T, Id, Cx> DisplayInfo<'r, T, Id, Cx>
 where
-    T: Texts,
-    Cx: InitAttachments<Id>,
+    T: ProvideTextTy,
+    Id: ProvideIdTy,
+    Cx: ItemStackCx,
 {
     /// Create a new [`DisplayInfo`].
     pub fn new(
-        title: T,
-        description: T,
-        icon: ItemStack<'r, Id, Cx>,
+        title: Text<T>,
+        description: Text<T>,
+        icon: ItemStack<'r, Cx>,
         background: Option<Id>,
         frame: Frame,
         show_toast: bool,
@@ -68,12 +72,13 @@ where
         }
     }
 
+    /// Sets advancement's position.
     pub fn set_pos(&mut self, x: f32, y: f32) {
         self.pos = (x, y);
     }
 
     /// Get the title of this advancement.
-    pub fn title(&self) -> &T {
+    pub fn title(&self) -> &Text<T> {
         &self.title
     }
 }
