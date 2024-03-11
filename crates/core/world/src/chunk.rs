@@ -4,7 +4,6 @@ mod internal_types;
 mod section;
 mod upgrade;
 
-use core::panic;
 use std::fmt::Debug;
 
 pub use internal_types::*;
@@ -82,14 +81,17 @@ where
     /// chunk sections of given `height_limit`.
     ///
     /// See [`HeightLimit::count_vertical_sections`].
-    pub fn new(
+    pub fn new<I>(
         pos: ChunkPos,
         upgrade_data: UpgradeData<'w, Cx>,
         height_limit: HeightLimit,
         biome_registry: &'w Registry<Cx::Id, Cx::Biome>,
-        section_array: Option<Vec<Option<ChunkSection<'w, Cx>>>>,
+        section_array: Option<I>,
         vdata: T,
-    ) -> Self {
+    ) -> Self
+    where
+        I: Iterator<Item = Option<ChunkSection<'w, Cx>>> + ExactSizeIterator,
+    {
         Self {
             pos,
             udata: upgrade_data,
