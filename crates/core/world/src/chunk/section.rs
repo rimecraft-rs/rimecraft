@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 
-use rimecraft_block::ProvideStateIds;
+use rimecraft_block::{Block, ProvideStateIds, RawBlock};
 use rimecraft_chunk_palette::{
     container::{PalettedContainer, ProvidePalette},
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
 };
-use rimecraft_registry::Registry;
+use rimecraft_registry::{ProvideRegistry, Registry};
 
 use super::{internal_types::*, ChunkTy};
 
@@ -210,15 +210,45 @@ where
 impl<'w, Cx> From<&'w Registry<Cx::Id, Cx::Biome>> for ChunkSection<'w, Cx>
 where
     Cx: ChunkTy<'w>
-        + ProvideStateIds
+        + ProvideStateIds<List = Cx::BlockStateList>
         + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
-        + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>,
+        + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>
+        + ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>,
+
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
-        + for<'s> PalIndexFromRaw<'s, &'s IBlockState<'w, Cx>>
+        + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>
+        + Clone,
+
+    &'w Registry<Cx::Id, Cx::Biome>: Into<Cx::BiomeList>,
+    Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>
+        + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
         + Clone,
 {
-    fn from(_value: &'w Registry<Cx::Id, Cx::Biome>) -> Self {
-        unimplemented!()
+    /// Creates a [`ChunkSection`] for the given `Biome` registry/
+    ///
+    /// # Panics
+    ///
+    /// Panics if the biome registry doesn't contains a default entry.
+    fn from(registry: &'w Registry<Cx::Id, Cx::Biome>) -> Self {
+        let default_block = Block::default();
+        Self {
+            bsc: PalettedContainer::of_single(
+                Cx::state_ids(),
+                IBlockState {
+                    block: default_block,
+                    state: default_block.states().default_state().clone(),
+                },
+            ),
+            bic: PalettedContainer::of_single(
+                registry.into(),
+                registry
+                    .default_entry()
+                    .expect("biome registry should contains a default entry"),
+            ),
+            ne_block_c: 0,
+            rt_block_c: 0,
+            ne_fluid_c: 0,
+        }
     }
 }
 
