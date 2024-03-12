@@ -72,3 +72,26 @@ impl HeightLimit {
         index + self.bottom_section_coord()
     }
 }
+
+/// Trait for obtaining a [`HeightLimit`] from reference.
+pub trait AsHeightLimit {
+    /// Returns the [`HeightLimit`].
+    fn as_height_limit(&self) -> HeightLimit;
+}
+
+impl<T: ?Sized> AsHeightLimit for T
+where
+    for<'a> &'a T: Into<HeightLimit>,
+{
+    #[inline]
+    fn as_height_limit(&self) -> HeightLimit {
+        self.into()
+    }
+}
+
+impl AsHeightLimit for HeightLimit {
+    #[inline]
+    fn as_height_limit(&self) -> HeightLimit {
+        *self
+    }
+}
