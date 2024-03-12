@@ -2,39 +2,38 @@
 
 use std::fmt::Debug;
 
-use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_item::{stack::ItemStackCx, ItemStack};
 use rimecraft_text::{ProvideTextTy, Text};
 
+/// Global context for [`Advancement`].
+pub trait AdvancementCx: ProvideTextTy + ItemStackCx {}
+impl<T> AdvancementCx for T where T: ProvideTextTy + ItemStackCx {}
+
 /// All information about an advancement.\
 /// `'r` is registry lifetime.\
-/// Generic type `T` is text type, `Id` is identifier type, `Cx` is context type.
+/// Generic type `Cx` is context type.
 ///
 /// # MCJE Reference
 /// `net.minecraft.advancement.Advancement` in yarn.
-pub struct Advancement<'r, T, Id, Cx>
+pub struct Advancement<'r, Cx>
 where
-    T: ProvideTextTy,
-    Id: ProvideIdTy,
-    Cx: ItemStackCx,
+    Cx: AdvancementCx,
 {
     /// Parent advancement.
-    pub parent: Option<Id>,
-    pub display: Option<DisplayInfo<'r, T, Id, Cx>>,
+    pub parent: Option<Cx::Id>,
+    pub display: Option<DisplayInfo<'r, Cx>>,
 }
 
 /// # MCJE Reference
 /// `net.minecraft.advancement.AdvancementDisplay` in yarn.
-pub struct DisplayInfo<'r, T, Id, Cx>
+pub struct DisplayInfo<'r, Cx>
 where
-    T: ProvideTextTy,
-    Id: ProvideIdTy,
-    Cx: ItemStackCx,
+    Cx: ItemStackCx + ProvideTextTy,
 {
-    title: Text<T>,
-    description: Text<T>,
+    title: Text<Cx>,
+    description: Text<Cx>,
     icon: ItemStack<'r, Cx>,
-    background: Option<Id>,
+    background: Option<Cx::Id>,
     frame: Frame,
     show_toast: bool,
     announce_to_chat: bool,
@@ -42,18 +41,16 @@ where
     pos: (f32, f32),
 }
 
-impl<'r, T, Id, Cx> DisplayInfo<'r, T, Id, Cx>
+impl<'r, Cx> DisplayInfo<'r, Cx>
 where
-    T: ProvideTextTy,
-    Id: ProvideIdTy,
-    Cx: ItemStackCx,
+    Cx: AdvancementCx,
 {
     /// Create a new [`DisplayInfo`].
     pub fn new(
-        title: Text<T>,
-        description: Text<T>,
+        title: Text<Cx>,
+        description: Text<Cx>,
         icon: ItemStack<'r, Cx>,
-        background: Option<Id>,
+        background: Option<Cx::Id>,
         frame: Frame,
         show_toast: bool,
         announce_to_chat: bool,
@@ -78,7 +75,7 @@ where
     }
 
     /// Get the title of this advancement.
-    pub fn title(&self) -> &Text<T> {
+    pub fn title(&self) -> &Text<Cx> {
         &self.title
     }
 }
@@ -89,6 +86,7 @@ where
 /// # MCJE Reference
 /// `net.minecraft.advancement.AdvancementFrame` in yarn.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Frame {
     /// Regular advancement.
     Task,
