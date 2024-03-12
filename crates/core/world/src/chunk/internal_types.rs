@@ -6,17 +6,17 @@ use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
 use rimecraft_state::State;
 
-use super::ChunkTy;
+use super::ChunkCx;
 
 /// The internal-used `Biome` type.
-pub type IBiome<'w, Cx> = Reg<'w, <Cx as ProvideIdTy>::Id, <Cx as ChunkTy<'w>>::Biome>;
+pub type IBiome<'w, Cx> = Reg<'w, <Cx as ProvideIdTy>::Id, <Cx as ChunkCx<'w>>::Biome>;
 
 /// The internal-used `BlockState` type.
 ///
 /// This contains the block registration and the [`State`].
 pub struct IBlockState<'w, Cx>
 where
-    Cx: ChunkTy<'w>,
+    Cx: ChunkCx<'w>,
 {
     /// The block.
     pub block: Block<'w, Cx>,
@@ -26,7 +26,7 @@ where
 
 impl<'w, Cx> Debug for IBlockState<'w, Cx>
 where
-    Cx: ChunkTy<'w> + Debug,
+    Cx: ChunkCx<'w> + Debug,
     Cx::Id: Debug,
     Cx::BlockStateExt: Debug,
 {
@@ -40,7 +40,7 @@ where
 
 impl<'w, Cx> Clone for IBlockState<'w, Cx>
 where
-    Cx: ChunkTy<'w>,
+    Cx: ChunkCx<'w>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -53,7 +53,7 @@ where
 
 impl<'w, Cx> PartialEq for IBlockState<'w, Cx>
 where
-    Cx: ChunkTy<'w>,
+    Cx: ChunkCx<'w>,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -61,11 +61,11 @@ where
     }
 }
 
-impl<'w, Cx> Eq for IBlockState<'w, Cx> where Cx: ChunkTy<'w> {}
+impl<'w, Cx> Eq for IBlockState<'w, Cx> where Cx: ChunkCx<'w> {}
 
 impl<'w, Cx> Hash for IBlockState<'w, Cx>
 where
-    Cx: ChunkTy<'w>,
+    Cx: ChunkCx<'w>,
 {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -79,7 +79,7 @@ where
 /// This contains the fluid registration and the [`State`].
 pub struct IFluidState<'w, Cx>
 where
-    Cx: ChunkTy<'w>,
+    Cx: ChunkCx<'w>,
 {
     /// The fluid.
     pub fluid: Fluid<'w, Cx>,
@@ -89,7 +89,7 @@ where
 
 impl<'w, Cx> Debug for IFluidState<'w, Cx>
 where
-    Cx: ChunkTy<'w> + Debug,
+    Cx: ChunkCx<'w> + Debug,
     Cx::Id: Debug,
     Cx::FluidStateExt: Debug,
 {
@@ -103,7 +103,7 @@ where
 
 impl<'w, Cx> Clone for IFluidState<'w, Cx>
 where
-    Cx: ChunkTy<'w>,
+    Cx: ChunkCx<'w>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -116,7 +116,7 @@ where
 
 impl<'w, Cx> PartialEq for IFluidState<'w, Cx>
 where
-    Cx: ChunkTy<'w>,
+    Cx: ChunkCx<'w>,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -124,11 +124,11 @@ where
     }
 }
 
-impl<'w, Cx> Eq for IFluidState<'w, Cx> where Cx: ChunkTy<'w> {}
+impl<'w, Cx> Eq for IFluidState<'w, Cx> where Cx: ChunkCx<'w> {}
 
 impl<'w, Cx> Hash for IFluidState<'w, Cx>
 where
-    Cx: ChunkTy<'w>,
+    Cx: ChunkCx<'w>,
 {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {

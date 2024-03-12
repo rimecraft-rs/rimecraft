@@ -25,7 +25,7 @@ use crate::view::HeightLimit;
 /// # Generics
 ///
 /// - `'w`: The world lifetime. See the crate document for more information.
-pub trait ChunkTy<'w>: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideIdTy {
+pub trait ChunkCx<'w>: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideIdTy {
     /// The type of block state id list.
     type BlockStateList;
 
@@ -46,7 +46,7 @@ pub trait ChunkTy<'w>: ProvideBlockStateExtTy + ProvideFluidStateExtTy + Provide
 /// - `Cx`: The global context type, providing access to the static fields and logics of the game.
 pub struct Chunk<'w, T, Cx>
 where
-    Cx: ChunkTy<'w>,
+    Cx: ChunkCx<'w>,
 {
     pos: ChunkPos,
     udata: UpgradeData<'w, Cx>,
@@ -58,7 +58,7 @@ where
 
 impl<'w, T, Cx> Chunk<'w, T, Cx>
 where
-    Cx: ChunkTy<'w>
+    Cx: ChunkCx<'w>
         + ProvideStateIds<List = Cx::BlockStateList>
         + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>
@@ -119,7 +119,7 @@ where
 impl<'w, T, Cx> Debug for Chunk<'w, T, Cx>
 where
     T: Debug,
-    Cx: ChunkTy<'w> + Debug,
+    Cx: ChunkCx<'w> + Debug,
     Cx::Id: Debug,
     Cx::BlockStateExt: Debug,
     Cx::BlockStateList: Debug,

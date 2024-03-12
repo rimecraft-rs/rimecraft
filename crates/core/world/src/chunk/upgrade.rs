@@ -10,12 +10,12 @@ use serde::Deserialize;
 
 use crate::view::HeightLimit;
 
-use super::ChunkTy;
+use super::ChunkCx;
 
 /// Upgrade data for a chunk.
 pub struct UpgradeData<'w, Cx>
 where
-    Cx: ChunkTy<'w>,
+    Cx: ChunkCx<'w>,
 {
     sides_to_upgrade: Vec<EightWayDirection>,
     center_indices_upgrade: Box<[Box<[i32]>]>,
@@ -32,7 +32,7 @@ struct TickedReg<'r, T, K>(Reg<'r, K, T>);
 
 impl<'w, Cx> UpgradeData<'w, Cx>
 where
-    Cx: ChunkTy<'w>
+    Cx: ChunkCx<'w>
         + ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>
         + ProvideRegistry<'w, Cx::Id, RawFluid<'w, Cx>>,
     Cx::Id: Hash + Eq,
@@ -57,11 +57,11 @@ where
                 Cx::Id: Deserialize<'de> + Hash + Eq,
                 Cx: ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>
                     + ProvideRegistry<'w, Cx::Id, RawFluid<'w, Cx>>
-                    + ChunkTy<'w>
+                    + ChunkCx<'w>
                 "#))]
         struct Serialized<'w, Cx>
         where
-            Cx: ChunkTy<'w>,
+            Cx: ChunkCx<'w>,
         {
             #[serde(rename = "Indices")]
             #[serde(default)]
@@ -114,7 +114,7 @@ where
 
 impl<'w, Cx> Debug for UpgradeData<'w, Cx>
 where
-    Cx: ChunkTy<'w> + Debug,
+    Cx: ChunkCx<'w> + Debug,
     Cx::Id: Debug,
     Cx::BlockStateExt: Debug,
     Cx::BlockStateList: Debug,
