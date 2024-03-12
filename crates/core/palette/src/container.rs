@@ -1,6 +1,6 @@
 //! Paletted containers.
 
-use std::{collections::HashMap, hash::Hash, marker::PhantomData};
+use std::{hash::Hash, marker::PhantomData};
 
 use ahash::AHashMap;
 use rimecraft_maybe::Maybe;

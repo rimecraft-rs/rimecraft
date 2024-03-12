@@ -186,14 +186,14 @@ where
     ) -> Option<Maybe<'_, IBlockState<'w, Cx>>> {
         let bs_old = self.bsc.swap(Cx::compute_index(x, y, z), state.clone());
 
-        if let Some(ref state_old) = bs_old {
+        if let Some(state_old) = bs_old.as_deref() {
             if !state_old.block.settings().is_empty {
                 self.ne_block_c -= 1;
                 if state_old.block.settings().random_ticks {
                     self.rt_block_c -= 1;
                 }
             }
-            let fs: Maybe<'_, IFluidState<'_, _>> = state_old.state.data().into();
+            let fs = state_old.to_fluid_state();
             if !fs.fluid.settings().is_empty {
                 self.ne_fluid_c -= 1;
             }
