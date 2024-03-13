@@ -13,8 +13,9 @@ use rimecraft_text::{ProvideTextTy, Text};
 pub trait AdvancementCx: ProvideTextTy + ItemStackCx {}
 
 #[cfg(feature = "edcode")]
+/// Additional requirements when enabling `edcode` on [`Advancement`].
 pub trait AdvancementEdcodeCx: AdvancementCx {
-    /// Given [`Frame`] name, returns corresponding [`Formatting`]
+    /// Given [`FrameData::name`], returns corresponding [`Frame`].
     fn frame_fmt(name: &str) -> Frame<Self>;
 }
 
@@ -133,7 +134,7 @@ pub struct FrameData {
     pub fmt: Formatting,
 }
 
-impl<'r, Cx> Debug for DisplayInfo<'r, Cx>
+impl<Cx> Debug for DisplayInfo<'_, Cx>
 where
     Cx: AdvancementCx + Debug,
     Cx::Content: Debug,

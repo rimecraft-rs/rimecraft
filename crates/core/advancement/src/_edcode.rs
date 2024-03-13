@@ -1,6 +1,6 @@
 use rimecraft_edcode::{decode_cow_str, Decode, Encode};
 
-use crate::{AdvancementEdcodeCx, Frame};
+use crate::{AdvancementEdcodeCx, DisplayInfo, Frame};
 
 impl<Cx> Encode for Frame<Cx>
 where
@@ -25,5 +25,14 @@ where
     {
         let name = decode_cow_str(&mut buf)?;
         Ok(Cx::frame_fmt(&name))
+    }
+}
+
+impl<Cx> Encode for DisplayInfo<'_,Cx>where Cx :AdvancementEdcodeCx{
+    fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
+        where
+            B: rimecraft_edcode::bytes::BufMut {
+        // `RawText`, `ItemStack` doesn't implement edcode.
+        todo!()
     }
 }
