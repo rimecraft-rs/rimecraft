@@ -17,6 +17,11 @@ rimecraft-identifier = { path = "../../util/identifier" }
 rimecraft-item = { path = "../item" }
 rimecraft-fmt = { path = "../../util/fmt" }
 rimecraft-global-cx = { path = "../global-cx" }
+rimecraft-edcode = { path = "../../util/edcode", optional = true }
 
 [lints]
 workspace = true
+
+[features]
+default=["edcode"]
+edcode = ['dep:rimecraft-edcode']
