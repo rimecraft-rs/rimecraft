@@ -8,7 +8,6 @@ mod tests;
 use std::{borrow::Cow, io};
 
 pub use bytes;
-use bytes::Buf;
 
 /// Describes types that can be encoded into a packet buffer.
 pub trait Encode {
@@ -114,12 +113,12 @@ impl VarI32 {
 
 pub fn decode_cow_str<'a, B>(mut buf: &'a mut B) -> io::Result<Cow<'a, str>>
 where
-    B: Buf,
+    B: bytes::Buf,
 {
     let len = VarI32::decode(&mut buf)?.0 as usize;
     if len <= buf.remaining() {
         buf.advance(len);
-        std::str::from_utf8(&Buf::chunk(buf)[..len])
+        std::str::from_utf8(&bytes::Buf::chunk(buf)[..len])
             .map(Cow::Borrowed)
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
     } else {
