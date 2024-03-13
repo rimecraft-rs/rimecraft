@@ -16,10 +16,12 @@ rimecraft-global-cx = { path = "../global-cx" }
 rimecraft-registry = { path = "../../util/registry" }
 rimecraft-fmt = { path = "../../util/fmt" }
 serde = { version = "1.0", optional = true }
+rimecraft-edcode = { path = "../../util/edcode", optional = true }
 
 [features]
 default = ["serde"]
 serde = ["dep:serde", "rimecraft-registry/serde"]
+edcode = ["dep:rimecraft-edcode"]
 
 [lints]
 workspace = true
