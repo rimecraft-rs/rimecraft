@@ -6,6 +6,8 @@ use rimecraft_fmt::Formatting;
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{ProvideRegistry, Reg};
 
+#[cfg(feature = "edcode")]
+mod edcode;
 pub mod stack;
 
 pub use stack::ItemStack;
