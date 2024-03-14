@@ -72,6 +72,9 @@ pub struct Settings {
 
     /// The rarity of the item.
     pub rarity: Rarity,
+
+    /// Whether an item should have its NBT data sent to the client.
+    pub sync_nbt: bool,
 }
 
 impl Default for Settings {
@@ -81,6 +84,7 @@ impl Default for Settings {
             max_count: NonZeroU32::new(MAX_STACK_COUNT).unwrap(),
             max_damage: None,
             rarity: Default::default(),
+            sync_nbt: true,
         }
     }
 }
