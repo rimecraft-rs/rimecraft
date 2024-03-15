@@ -34,57 +34,54 @@ pub trait ProvideNbtTy: GlobalContext {
 #[cfg(feature = "std")]
 /// NBT `edcode`-ing related marker traits.
 pub mod nbt_edcode {
-    use crate::ProvideNbtTy;
+    use std::io;
 
-    /// Marker trait for global contexts that can write nbt tags to a [`std::io::Write`] object.
-    pub trait WriteNbt<T>: ProvideNbtTy {
-        /// Error type.
-        type Error;
+    use crate::GlobalContext;
 
+    /// Marker trait for global contexts that can write nbt tags to a [`io::Write`] object.
+    pub trait WriteNbt<T>: GlobalContext {
         /// Function that performs writing operation.
+        ///
         /// # Errors
+        ///
         /// I/O errors.
-        fn write_nbt<W>(value: T, writer: W) -> Result<(), Self::Error>
+        fn write_nbt<W>(value: T, writer: W) -> Result<(), io::Error>
         where
-            W: std::io::Write;
+            W: io::Write;
     }
 
-    /// Marker trait for global contexts that can read nbt tags from a [`std::io::Read`] object.
-    pub trait ReadNbt<T>: ProvideNbtTy {
-        /// Error type.
-        type Error;
-
+    /// Marker trait for global contexts that can read nbt tags from a [`io::Read`] object.
+    pub trait ReadNbt<T>: GlobalContext {
         /// Function that performs reading operation.
+        ///
         /// # Errors
+        ///
         /// I/O errors.
-        fn read_nbt<R>(reader: R) -> Result<T, Self::Error>
+        fn read_nbt<R>(reader: R) -> Result<T, io::Error>
         where
-            R: std::io::Read;
+            R: io::Read;
     }
 
-    /// Marker trait for global contexts that can update existing nbt tags from a [`std::io::Read`] object.
-    pub trait UpdateNbt<T: ?Sized>: ProvideNbtTy {
-        /// Error type.
-        type Error;
-
+    /// Marker trait for global contexts that can update existing nbt tags from a [`io::Read`] object.
+    pub trait UpdateNbt<T: ?Sized>: GlobalContext {
         /// Function that performs updating operation.
+        ///
         /// # Errors
+        ///
         /// I/O errors.
-        fn update_nbt<R>(value: &mut T, reader: R) -> Result<(), Self::Error>
+        fn update_nbt<R>(value: &mut T, reader: R) -> Result<(), io::Error>
         where
-            R: std::io::Read;
+            R: io::Read;
     }
 
     impl<T, Cx> UpdateNbt<T> for Cx
     where
         Cx: ReadNbt<T>,
     {
-        type Error = <Self as ReadNbt<T>>::Error;
-
         #[inline]
-        fn update_nbt<R>(value: &mut T, reader: R) -> Result<(), Self::Error>
+        fn update_nbt<R>(value: &mut T, reader: R) -> Result<(), io::Error>
         where
-            R: std::io::Read,
+            R: io::Read,
         {
             *value = Self::read_nbt(reader)?;
             Ok(())
