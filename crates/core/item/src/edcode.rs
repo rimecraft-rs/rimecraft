@@ -1,6 +1,8 @@
 use rimecraft_edcode::Encode;
+use rimecraft_global_cx::{nbt_edcode::{WriteNbt, ReadNbt}, ProvideNbtTy};
 
 use crate::{stack::ItemStackCx, ItemStack};
+
 
 impl<Cx> Encode for ItemStack<'_, Cx>
 where
