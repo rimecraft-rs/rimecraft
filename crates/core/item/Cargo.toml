@@ -2,7 +2,10 @@
 name = "rimecraft-item"
 version = "0.1.0"
 edition = "2021"
-authors = ["JieningYu <jiening.yu@outlook.com>"]
+authors = [
+    "JieningYu <jiening.yu@outlook.com>",
+    "C191239 <zhushunzhong2025@i.pkuschool.edu.cn>",
+]
 description = "Minecraft item primitives"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
@@ -16,10 +19,12 @@ rimecraft-global-cx = { path = "../global-cx" }
 rimecraft-registry = { path = "../../util/registry" }
 rimecraft-fmt = { path = "../../util/fmt" }
 serde = { version = "1.0", optional = true }
+rimecraft-edcode = { path = "../../util/edcode", optional = true }
 
 [features]
-default = ["serde"]
+default = ["serde", "edcode"]
 serde = ["dep:serde", "rimecraft-registry/serde"]
+edcode = ["dep:rimecraft-edcode", "rimecraft-registry/edcode"]
 
 [lints]
 workspace = true
