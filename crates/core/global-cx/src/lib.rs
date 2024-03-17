@@ -8,6 +8,10 @@
 
 #![no_std]
 
+extern crate alloc;
+
+use alloc::boxed::Box;
+
 /// Marker trait for global contexts.
 pub trait GlobalContext: Sized + 'static {}
 
@@ -23,7 +27,8 @@ pub trait ProvideNbtTy: GlobalContext {
     type Compound;
 
     /// [`i32`] array type.
-    type IntArray;
+    type IntArray: Into<Box<[i32]>> + From<Box<[i32]>>;
+
     /// [`i64`] array type.
-    type LongArray;
+    type LongArray: Into<Box<[i64]>> + From<Box<[i32]>>;
 }

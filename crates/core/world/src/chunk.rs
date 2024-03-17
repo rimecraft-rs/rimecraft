@@ -12,7 +12,7 @@ use rimecraft_chunk_palette::{
     container::ProvidePalette, IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
 };
 use rimecraft_fluid::ProvideFluidStateExtTy;
-use rimecraft_global_cx::ProvideIdTy;
+use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
 use rimecraft_registry::{ProvideRegistry, Registry};
 pub use rimecraft_voxel_math::ChunkPos;
 pub use section::ChunkSection;
@@ -25,7 +25,10 @@ use crate::view::HeightLimit;
 /// # Generics
 ///
 /// - `'w`: The world lifetime. See the crate document for more information.
-pub trait ChunkCx<'w>: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideIdTy {
+pub trait ChunkCx<'w>
+where
+    Self: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideIdTy + ProvideNbtTy,
+{
     /// The type of block state id list.
     type BlockStateList;
 
@@ -42,7 +45,6 @@ pub trait ChunkCx<'w>: ProvideBlockStateExtTy + ProvideFluidStateExtTy + Provide
 ///
 /// - `'w`: The world lifetime. See the crate document for more information.
 /// - `T`: The chunk implementation data type. It provides functionalities like `WorldChunk` and `ProtoChunk`.
-/// - `K`: The `Identifier` type.
 /// - `Cx`: The global context type, providing access to the static fields and logics of the game.
 pub struct Chunk<'w, T, Cx>
 where
@@ -51,7 +53,7 @@ where
     pos: ChunkPos,
     udata: UpgradeData<'w, Cx>,
     hlimit: HeightLimit,
-    section_array: Vec<ChunkSection<'w, Cx>>,
+    section_array: Box<[ChunkSection<'w, Cx>]>,
 
     vdata: T,
 }
@@ -116,6 +118,27 @@ where
     }
 }
 
+impl<'w, T, Cx> Chunk<'w, T, Cx>
+where
+    Cx: ChunkCx<'w>,
+    T: DataBehave<'w, Cx>,
+{
+    /// Returns the chunk section array of this chunk.
+    ///
+    /// This will be effected by the variant data. This should only happen with MCJE's `WrapperProtoChunk`.
+    #[inline]
+    pub fn sections(&self) -> &[ChunkSection<'w, Cx>] {
+        self.vdata.sections(&self.section_array)
+    }
+
+    /// Searches for the highest non-empty `ChunkSection` of this chunk and returns its index.
+    ///
+    /// See [`ChunkSection::is_empty`].
+    pub fn highest_non_empty_section(&self) -> Option<usize> {
+        self.sections().iter().rposition(|sec| !sec.is_empty())
+    }
+}
+
 impl<'w, T, Cx> Debug for Chunk<'w, T, Cx>
 where
     T: Debug,
@@ -135,5 +158,20 @@ where
             .field("section_array", &self.section_array)
             .field("vdata", &self.vdata)
             .finish()
+    }
+}
+
+/// Common behaviors of a chunk variant data.
+pub trait DataBehave<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    /// Gets the chunk section slice, with the given internal section slice of [`Chunk`].
+    #[inline(always)]
+    fn sections<'a>(&'a self, super_secs: &'a [ChunkSection<'w, Cx>]) -> &'a [ChunkSection<'w, Cx>]
+    where
+        'w: 'a,
+    {
+        super_secs
     }
 }

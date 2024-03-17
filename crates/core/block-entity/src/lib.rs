@@ -1,11 +1,14 @@
 //! Rimecraft block entity primitives.
 
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 use ahash::AHashSet;
+use erased_serde::Serialize as ErasedSerialize;
+
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
+use rimecraft_serde_update::erased::ErasedUpdate;
 use rimecraft_voxel_math::BlockPos;
 
 /// Raw instance of [`BlockEntityType`].
@@ -24,7 +27,7 @@ where
     Cx: ProvideBlockStateExtTy,
 {
     ty: BlockEntityType<'a, Cx>,
-    cached_state: BlockState<'a, Cx>,
+    cached_state: Arc<BlockState<'a, Cx>>,
 
     pos: BlockPos,
     removed: bool,
@@ -59,3 +62,5 @@ where
             .finish()
     }
 }
+
+trait BEData: ErasedSerialize + for<'de> ErasedUpdate<'de> {}

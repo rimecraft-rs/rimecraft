@@ -5,9 +5,8 @@ use rimecraft_chunk_palette::{
     container::{PalettedContainer, ProvidePalette},
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
 };
+use rimecraft_fluid::{BlockStateExt as _, BsToFs};
 use rimecraft_registry::{ProvideRegistry, Registry};
-
-use crate::{BlockStateExt as _, BsToFs};
 
 use super::{internal_types::*, ChunkCx};
 
@@ -26,7 +25,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: BsToFs<'w>,
+    Cx: BsToFs<'w> + ChunkCx<'w>,
     Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>,
 
     for<'a> &'a Cx::BlockStateList: IntoIterator,
@@ -169,7 +168,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: BsToFs<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, Cx>>,
+    Cx: BsToFs<'w> + ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>
         + Clone,

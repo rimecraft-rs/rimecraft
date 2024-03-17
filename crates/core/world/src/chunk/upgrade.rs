@@ -1,6 +1,5 @@
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
-use fastnbt::IntArray;
 use rimecraft_block::RawBlock;
 use rimecraft_fluid::RawFluid;
 use rimecraft_global_cx::ProvideIdTy;
@@ -28,6 +27,7 @@ type TickedBlock<'w, Cx> = TickedReg<'w, RawBlock<'w, Cx>, <Cx as ProvideIdTy>::
 type TickedFluid<'w, Cx> = TickedReg<'w, RawFluid<'w, Cx>, <Cx as ProvideIdTy>::Id>;
 
 #[derive(Debug)]
+#[repr(transparent)]
 struct TickedReg<'r, T, K>(Reg<'r, K, T>);
 
 impl<'w, Cx> UpgradeData<'w, Cx>
@@ -51,13 +51,15 @@ where
     where
         D: serde::Deserializer<'de>,
         Cx::Id: Deserialize<'de>,
+        Cx::IntArray: Deserialize<'de>,
     {
         #[derive(Deserialize)]
         #[serde(bound(deserialize = r#"
-                Cx::Id: Deserialize<'de> + Hash + Eq,
                 Cx: ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>
                     + ProvideRegistry<'w, Cx::Id, RawFluid<'w, Cx>>
-                    + ChunkCx<'w>
+                    + ChunkCx<'w>,
+                Cx::Id: Deserialize<'de> + Hash + Eq,
+                Cx::IntArray: Deserialize<'de>,
                 "#))]
         struct Serialized<'w, Cx>
         where
@@ -65,7 +67,7 @@ where
         {
             #[serde(rename = "Indices")]
             #[serde(default)]
-            indices: HashMap<String, IntArray>,
+            indices: HashMap<String, Cx::IntArray>,
 
             #[serde(rename = "Sides")]
             #[serde(default)]
@@ -98,11 +100,11 @@ where
                 let mut center_indices_upgrade: Box<[Box<[i32]>]> =
                     vec![vec![].into_boxed_slice(); len].into_boxed_slice();
                 for (section, indices) in indices
-                    .iter()
+                    .into_iter()
                     .filter_map(|(k, v)| k.parse::<usize>().ok().map(|k| (k, v)))
                     .filter(|(k, _)| *k < len)
                 {
-                    center_indices_upgrade[section] = indices.iter().copied().collect();
+                    center_indices_upgrade[section] = indices.into();
                 }
                 center_indices_upgrade
             },
