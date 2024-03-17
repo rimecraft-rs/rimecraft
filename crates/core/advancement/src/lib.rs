@@ -1,7 +1,7 @@
 //! Advancement related types.
 
 #[cfg(feature = "edcode")]
-mod _edcode;
+mod edcode;
 
 use std::{fmt::Debug, marker::PhantomData};
 
@@ -13,11 +13,7 @@ use rimecraft_text::{ProvideTextTy, Text};
 pub trait AdvancementCx: ProvideTextTy + ItemStackCx {}
 
 #[cfg(feature = "edcode")]
-/// Additional requirements when enabling `edcode` on [`Advancement`].
-pub trait AdvancementEdcodeCx: AdvancementCx {
-    /// Given [`FrameData::name`], returns corresponding [`Frame`].
-    fn frame_fmt(name: &str) -> Frame<Self>;
-}
+pub use edcode::AdvancementEdcodeCx;
 
 /// All information about an advancement.\
 /// `'r` is registry lifetime.\
