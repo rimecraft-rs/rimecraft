@@ -20,7 +20,7 @@ where
     Cx: ItemStackCx,
 {
     item: Item<'r, Cx>,
-    count: u32,
+    count: u8,
 
     /// Item stack's custom NBT.
     nbt: Option<Cx::Compound>,
@@ -32,12 +32,12 @@ where
 {
     /// Creates a new item stack with the given item and count.
     #[inline]
-    pub fn new(item: Item<'r, Cx>, count: u32) -> Self {
+    pub fn new(item: Item<'r, Cx>, count: u8) -> Self {
         Self::with_nbt(item, count, None)
     }
 
     /// Creates a new item stack with the given item, count, and custom NBT tag.
-    pub fn with_nbt(item: Item<'r, Cx>, count: u32, nbt: Option<Cx::Compound>) -> Self {
+    pub fn with_nbt(item: Item<'r, Cx>, count: u8, nbt: Option<Cx::Compound>) -> Self {
         Self { item, count, nbt }
     }
 }
@@ -76,7 +76,7 @@ where
 
     /// Returns the count of the stack.
     #[inline]
-    pub fn count(&self) -> u32 {
+    pub fn count(&self) -> u8 {
         self.count
     }
 
@@ -94,7 +94,7 @@ where
 
     /// Sets the count of the stack.
     #[inline]
-    pub fn set_count(&mut self, count: u32) {
+    pub fn set_count(&mut self, count: u8) {
         self.count = count;
     }
 
@@ -307,7 +307,7 @@ mod _serde {
                 A: serde::de::MapAccess<'de>,
             {
                 let mut id = None;
-                let mut count = 0u32;
+                let mut count = 0u8;
                 let mut tag = None;
 
                 while let Some(key) = map.next_key()? {
@@ -320,7 +320,7 @@ mod _serde {
                             id = Some(Cx::registry().of_raw(entry.raw_id()).unwrap());
                         }
                         "Count" => {
-                            count = map.next_value::<i32>()? as u32;
+                            count = map.next_value::<u8>()?;
                         }
                         "tag" => {
                             if tag.is_some() {
