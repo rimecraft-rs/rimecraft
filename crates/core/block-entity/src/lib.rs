@@ -1,66 +1,195 @@
 //! Rimecraft block entity primitives.
 
-use std::{fmt::Debug, sync::Arc};
+use std::{any::TypeId, fmt::Debug};
 
-use ahash::AHashSet;
-use erased_serde::Serialize as ErasedSerialize;
+use erased_serde::{serialize_trait_object, Serialize as ErasedSerialize};
 
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::Reg;
-use rimecraft_serde_update::erased::ErasedUpdate;
+use rimecraft_registry::{entry::RefEntry, Reg};
+use rimecraft_serde_update::{erased::ErasedUpdate, update_trait_object};
 use rimecraft_voxel_math::BlockPos;
+use serde::Serialize;
 
-/// Raw instance of [`BlockEntityType`].
-#[derive(Debug)]
-pub struct RawBlockEntityType {
-    /// Block raw IDs this BE type targets.
-    blocks: AHashSet<usize>,
+pub use rimecraft_downcast::ToStatic;
+
+/// A type of [`BlockEntity`].
+pub trait RawBlockEntityType<Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+{
+    /// Whether the block entity supports the given state.
+    fn supports(&self, state: &BlockState<'_, Cx>) -> bool;
+
+    /// Creates a new instance of the block entity.
+    fn instantiate<'w>(
+        &self,
+        pos: BlockPos,
+        state: BlockState<'w, Cx>,
+    ) -> Option<BlockState<'w, Cx>>;
 }
 
 /// A type of [`BlockEntity`].
-pub type BlockEntityType<'r, Cx> = Reg<'r, <Cx as ProvideIdTy>::Id, RawBlockEntityType>;
+pub type BlockEntityType<'r, Cx> =
+    Reg<'r, <Cx as ProvideIdTy>::Id, Box<dyn RawBlockEntityType<Cx> + Send + Sync + 'r>>;
 
 /// An object holding extra data about a block in a world.
-pub struct BlockEntity<'a, T, Cx>
+pub struct RawBlockEntity<'a, T: ?Sized, Cx>
 where
     Cx: ProvideBlockStateExtTy,
 {
     ty: BlockEntityType<'a, Cx>,
-    cached_state: Arc<BlockState<'a, Cx>>,
-
     pos: BlockPos,
     removed: bool,
+    cached_state: BlockState<'a, Cx>,
 
     data: T,
 }
 
-/// A context representing status of a [`BlockEntity`].
-#[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
-pub struct Context {
-    /// Whether the block entity is removed.
-    pub removed: bool,
-    /// Position of the block entity.
-    pub pos: BlockPos,
+impl<'a, T, Cx> RawBlockEntity<'a, T, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+{
+    /// Creates a new block entity.
+    pub fn new(
+        ty: BlockEntityType<'a, Cx>,
+        pos: BlockPos,
+        state: BlockState<'a, Cx>,
+        data: T,
+    ) -> Self {
+        Self {
+            ty,
+            pos,
+            removed: false,
+            cached_state: state,
+            data,
+        }
+    }
+
+    /// Gets the immutable inner data of this block entity.
+    #[inline]
+    pub fn data(&self) -> &T {
+        &self.data
+    }
+
+    /// Gets the mutable inner data of this block entity.
+    #[inline]
+    pub fn data_mut(&mut self) -> &mut T {
+        &mut self.data
+    }
 }
 
-impl<T, Cx> Debug for BlockEntity<'_, T, Cx>
+impl<T, Cx> Serialize for RawBlockEntity<'_, T, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+    T: Serialize + ?Sized,
+{
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.data.serialize(serializer)
+    }
+}
+
+impl<'de, T, Cx> rimecraft_serde_update::Update<'de> for RawBlockEntity<'_, T, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+    T: rimecraft_serde_update::Update<'de> + ?Sized,
+{
+    #[inline]
+    fn update<D>(&mut self, deserializer: D) -> Result<(), <D as serde::Deserializer<'de>>::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        self.data.update(deserializer)
+    }
+}
+
+impl<T, Cx> Debug for RawBlockEntity<'_, T, Cx>
 where
     Cx: ProvideBlockStateExtTy + Debug,
     Cx::BlockStateExt: Debug,
     Cx::Id: Debug,
-    T: Debug,
+    T: Debug + ?Sized,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BlockEntity")
-            .field("type", &self.ty)
+            .field("type", &<&RefEntry<_, _>>::from(self.ty).key().value())
             .field("pos", &self.pos)
             .field("removed", &self.removed)
             .field("cached_state", &self.cached_state)
-            .field("data", &self.data)
+            .field("data", &&self.data)
             .finish()
     }
 }
 
-trait BEData: ErasedSerialize + for<'de> ErasedUpdate<'de> {}
+/// Type erased block entity data.
+pub trait ErasedData
+where
+    Self: ErasedSerialize + for<'de> ErasedUpdate<'de> + Send + Sync + sealed::Sealed,
+{
+    /// The [`TypeId`] of this data.
+    fn type_id(&self) -> TypeId;
+}
+
+serialize_trait_object! { ErasedData }
+update_trait_object! { ErasedData }
+
+mod sealed {
+    pub trait Sealed {}
+}
+
+impl<T> sealed::Sealed for T where T: ErasedSerialize + for<'de> ErasedUpdate<'de> + Send + Sync {}
+
+impl<T> ErasedData for T
+where
+    T: ErasedSerialize + for<'de> ErasedUpdate<'de> + ToStatic + Send + Sync,
+{
+    #[inline]
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<<Self as ToStatic>::StaticRepr>()
+    }
+}
+
+/// A type-erased variant of [`RawBlockEntity`].
+pub type BlockEntity<'w, Cx> = RawBlockEntity<'w, dyn ErasedData + 'w, Cx>;
+
+impl<'w, Cx> BlockEntity<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+{
+    /// Downcasts this type erased block entity into block entity with a concrete data type.
+    ///
+    /// This function returns an immutable reference if the type matches.
+    pub fn downcast_ref<T: ToStatic>(&self) -> Option<&RawBlockEntity<'w, T, Cx>> {
+        if self.matches_type::<T>() {
+            unsafe {
+                Some(&*(self as *const BlockEntity<'w, Cx> as *const RawBlockEntity<'w, T, Cx>))
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Downcasts this type erased block entity into block entity with a concrete data type.
+    ///
+    /// This function returns a mutable reference if the type matches.
+    pub fn downcast_mut<T: ToStatic>(&mut self) -> Option<&mut RawBlockEntity<'w, T, Cx>> {
+        if self.matches_type::<T>() {
+            unsafe {
+                Some(&mut *(self as *mut BlockEntity<'w, Cx> as *mut RawBlockEntity<'w, T, Cx>))
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Whether the type of data in this block entity can be safely downcasted
+    /// into the target type.
+    #[inline]
+    pub fn matches_type<T: ToStatic>(&self) -> bool {
+        self.data.type_id() == TypeId::of::<T::StaticRepr>()
+    }
+}
