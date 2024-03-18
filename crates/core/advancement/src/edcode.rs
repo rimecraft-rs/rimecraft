@@ -45,8 +45,8 @@ where
     where
         B: rimecraft_edcode::bytes::BufMut,
     {
-        // @TODO: `RawText` doesn't implement edcode.
-        // Encode `title` and `description`.
+        // TODO: `RawText` doesn't implement edcode.
+        // TODO: Encode `title` and `description`.
         self.icon.encode(&mut buf)?;
         // Encode `frame`.
         let mut i = 0_i32;
