@@ -3,7 +3,7 @@
 #[cfg(feature = "edcode")]
 mod edcode;
 
-use std::{fmt::Debug, marker::PhantomData};
+mod dbg_impl;
 
 use rimecraft_fmt::Formatting;
 use rimecraft_item::{stack::ItemStackCx, ItemStack};
@@ -40,7 +40,7 @@ where
     description: Text<Cx>,
     icon: ItemStack<'r, Cx>,
     background: Option<Cx::Id>,
-    frame: Frame<Cx>,
+    frame: Frame,
     /// Send message in chat when obtained.
     show_toast: bool,
     announce_to_chat: bool,
@@ -62,7 +62,7 @@ where
     /// See [`DisplayInfo::background`].
     pub background: Option<Cx::Id>,
     /// See [`DisplayInfo::frame`].
-    pub frame: Frame<Cx>,
+    pub frame: Frame,
     /// See [`DisplayInfo::show_toast`].
     pub show_toast: bool,
     /// See [`DisplayInfo::announce_to_chat`].
@@ -115,40 +115,42 @@ where
 /// Describes how an advancement will be announced in the chat.
 /// # MCJE Reference
 /// `net.minecraft.advancement.AdvancementFrame` in yarn.
-#[derive(Debug)]
-pub struct Frame<Cx: AdvancementCx> {
-    pub(crate) data: &'static FrameData,
-    kim: PhantomData<Cx>,
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum Frame {
+    /// Regular task.
+    Task = 0,
+    /// A hard challenge, sometimes hidden.
+    Challenge = 1,
+    /// A regular goal.
+    Goal = 2,
+}
+
+impl Frame {
+    /// Turns [`Frame`] into corresponding [`FrameData`].
+    pub fn data(&self) -> FrameData {
+        match self {
+            Self::Task => FrameData {
+                name: "task",
+                fmt: Formatting::Green,
+            },
+            Self::Challenge => FrameData {
+                name: "challenge",
+                fmt: Formatting::DarkPurple,
+            },
+            Self::Goal => FrameData {
+                name: "goal",
+                fmt: Formatting::Green,
+            },
+        }
+    }
 }
 
 /// Inner type of [`Frame`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FrameData {
     /// Chat announcement text id.
     pub name: &'static str,
     /// Color
     pub fmt: Formatting,
-}
-
-impl<Cx> Debug for DisplayInfo<'_, Cx>
-where
-    Cx: AdvancementCx + Debug,
-    Cx::Content: Debug,
-    Cx::Id: Debug,
-    Cx::Compound: Debug,
-    Cx::StyleExt: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DisplayInfo")
-            .field("title", &self.title)
-            .field("description", &self.description)
-            .field("icon", &self.icon)
-            .field("background", &self.background)
-            .field("frame", &self.frame)
-            .field("show_toast", &self.show_toast)
-            .field("announce_to_chat", &self.announce_to_chat)
-            .field("hidden", &self.hidden)
-            .field("pos", &self.pos)
-            .finish()
-    }
 }
