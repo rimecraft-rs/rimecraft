@@ -6,14 +6,17 @@ mod upgrade;
 
 use std::fmt::Debug;
 
+use ahash::AHashMap;
 pub use internal_types::*;
 use rimecraft_block::{ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
+use rimecraft_block_entity::BlockEntity;
 use rimecraft_chunk_palette::{
     container::ProvidePalette, IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
 };
 use rimecraft_fluid::ProvideFluidStateExtTy;
 use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
 use rimecraft_registry::{ProvideRegistry, Registry};
+use rimecraft_voxel_math::BlockPos;
 pub use rimecraft_voxel_math::ChunkPos;
 pub use section::ChunkSection;
 pub use upgrade::UpgradeData;
@@ -53,6 +56,7 @@ where
     pos: ChunkPos,
     udata: UpgradeData<'w, Cx>,
     hlimit: HeightLimit,
+    block_entities: AHashMap<BlockPos, BEWithCompound<'w, Cx>>,
     section_array: Box<[ChunkSection<'w, Cx>]>,
 
     vdata: T,
@@ -98,13 +102,13 @@ where
             pos,
             udata: upgrade_data,
             hlimit: height_limit,
+            block_entities: AHashMap::new(),
             section_array: {
                 let len = height_limit.count_vertical_sections() as usize;
                 if let Some(section_array) = section_array {
                     assert_eq!(section_array.len(), len, "length of given section array should be the count of vertical sections of the chunk");
 
                     section_array
-                        .into_iter()
                         .map(|opt| opt.unwrap_or_else(|| ChunkSection::from(biome_registry)))
                         .collect()
                 } else {
@@ -136,6 +140,17 @@ where
     /// See [`ChunkSection::is_empty`].
     pub fn highest_non_empty_section(&self) -> Option<usize> {
         self.sections().iter().rposition(|sec| !sec.is_empty())
+    }
+}
+
+impl<'w, T, Cx> Chunk<'w, T, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    /// Gets the position of this chunk.
+    #[inline]
+    pub fn pos(&self) -> ChunkPos {
+        self.pos
     }
 }
 
@@ -173,5 +188,28 @@ where
         'w: 'a,
     {
         super_secs
+    }
+}
+
+struct BEWithCompound<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    pub nbt: Cx::Compound,
+    pub be: Box<BlockEntity<'w, Cx>>,
+}
+
+impl<'w, Cx> Debug for BEWithCompound<'w, Cx>
+where
+    Cx: ChunkCx<'w> + Debug,
+    Cx::Compound: Debug,
+    Cx::BlockStateExt: Debug,
+    Cx::Id: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BlockEntityWithCompound")
+            .field("nbt", &self.nbt)
+            .field("be", &&self.be)
+            .finish()
     }
 }

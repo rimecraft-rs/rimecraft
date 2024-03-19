@@ -128,7 +128,7 @@ where
 /// Type erased block entity data.
 pub trait ErasedData
 where
-    Self: ErasedSerialize + for<'de> ErasedUpdate<'de> + Send + Sync + sealed::Sealed,
+    Self: ErasedSerialize + for<'de> ErasedUpdate<'de> + Send + Sync + Debug + sealed::Sealed,
 {
     /// The [`TypeId`] of this data.
     fn type_id(&self) -> TypeId;
@@ -145,7 +145,7 @@ impl<T> sealed::Sealed for T where T: ErasedSerialize + for<'de> ErasedUpdate<'d
 
 impl<T> ErasedData for T
 where
-    T: ErasedSerialize + for<'de> ErasedUpdate<'de> + ToStatic + Send + Sync,
+    T: ErasedSerialize + for<'de> ErasedUpdate<'de> + ToStatic + Debug + Send + Sync,
 {
     #[inline]
     fn type_id(&self) -> TypeId {
