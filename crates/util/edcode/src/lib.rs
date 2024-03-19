@@ -9,6 +9,9 @@ use std::io;
 
 pub use bytes;
 
+#[cfg(feature = "macros")]
+pub use rimecraft_edcode_macros::Encode;
+
 /// Describes types that can be encoded into a packet buffer.
 pub trait Encode {
     /// Encode into a buffer.

@@ -1,0 +1,26 @@
+[package]
+name = "rimecraft-edcode-macros"
+version = "0.1.0"
+edition = "2021"
+authors = ["C191239 <zhushunzhong2025@i.pkuschool.edu.cn>"]
+description = "Derive macros for rimecraft-edcode"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["encoding"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+syn = { version = "2.0" }
+
+[dev-dependencies]
+rimecraft-edcode = { path = "../edcode" }
+
+[lints]
+workspace = true
+
+[lib]
+proc-macro = true
