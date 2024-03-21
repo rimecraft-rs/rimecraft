@@ -5,7 +5,7 @@ use syn::{parse_macro_input, Data, DeriveInput};
 
 macro_rules! unsupported_error {
     ($tr:literal, $ty:literal) => {
-        "deriving `$tr` to `$ty` is not supported"
+        concat!("deriving `", $tr, "` to `", $ty, "` is not supported")
     };
 }
 
