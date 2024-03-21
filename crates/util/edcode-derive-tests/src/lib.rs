@@ -2,12 +2,10 @@
 
 #[cfg(test)]
 mod tests {
-    use rimecraft_edcode::{
-        bytes::{BytesMut},
-        Decode, Encode,
-    };
+    use rimecraft_edcode::{bytes::BytesMut, Decode, Encode};
 
     #[test]
+    #[allow(dead_code)]
     fn derive_enum() {
         #[derive(Encode)]
         enum Topics {
