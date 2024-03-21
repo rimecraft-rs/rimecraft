@@ -12,6 +12,7 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+# Rimecraft crates
 rimecraft-global-cx = { path = "../global-cx" }
 rimecraft-chunk-palette = { path = "../palette" }
 rimecraft-registry = { path = "../../util/registry", features = ["serde"] }
@@ -20,6 +21,8 @@ rimecraft-block = { path = "../block" }
 rimecraft-fluid = { path = "../fluid" }
 rimecraft-block-entity = { path = "../block-entity" }
 rimecraft-voxel-math = { path = "../../util/voxel-math" }
+rimecraft-packed-int-array = { path = "../../util/packed-int-array" }
+# External utils
 serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"
 rimecraft-edcode = { path = "../../util/edcode", optional = true }

@@ -8,6 +8,7 @@
 //! and `BlockState`s, `FluidState`s and the `Biome` registry should be bound to this lifetime.
 
 pub mod chunk;
+pub mod heightmap;
 pub mod tick;
 pub mod view;
 

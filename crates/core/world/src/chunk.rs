@@ -4,7 +4,7 @@ mod internal_types;
 mod section;
 mod upgrade;
 
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 
 use ahash::AHashMap;
 pub use internal_types::*;
@@ -21,7 +21,10 @@ pub use rimecraft_voxel_math::ChunkPos;
 pub use section::ChunkSection;
 pub use upgrade::UpgradeData;
 
-use crate::view::HeightLimit;
+use crate::{
+    heightmap::{self, Heightmap},
+    view::HeightLimit,
+};
 
 /// Types associated with a `Chunk`.
 ///
@@ -39,6 +42,9 @@ where
     type Biome: 'w;
     /// The type of biome id list.
     type BiomeList;
+
+    /// The `Heightmap.Type` type of heightmaps.
+    type HeightmapType: heightmap::Type<'w, Self> + Hash + Eq;
 }
 
 /// A scoped, mutable view of biomes, block states, fluid states and
@@ -49,14 +55,15 @@ where
 /// - `'w`: The world lifetime. See the crate document for more information.
 /// - `T`: The chunk implementation data type. It provides functionalities like `WorldChunk` and `ProtoChunk`.
 /// - `Cx`: The global context type, providing access to the static fields and logics of the game.
-pub struct Chunk<'w, T, Cx>
+pub struct Chunk<'w, T: ?Sized, Cx>
 where
     Cx: ChunkCx<'w>,
 {
     pos: ChunkPos,
     udata: UpgradeData<'w, Cx>,
+    heightmaps: AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>,
     hlimit: HeightLimit,
-    block_entities: AHashMap<BlockPos, BEWithCompound<'w, Cx>>,
+    bes: AHashMap<BlockPos, BEWithCompound<'w, Cx>>,
     section_array: Box<[ChunkSection<'w, Cx>]>,
 
     vdata: T,
@@ -102,12 +109,12 @@ where
             pos,
             udata: upgrade_data,
             hlimit: height_limit,
-            block_entities: AHashMap::new(),
+            heightmaps: AHashMap::new(),
+            bes: AHashMap::new(),
             section_array: {
                 let len = height_limit.count_vertical_sections() as usize;
                 if let Some(section_array) = section_array {
                     assert_eq!(section_array.len(), len, "length of given section array should be the count of vertical sections of the chunk");
-
                     section_array
                         .map(|opt| opt.unwrap_or_else(|| ChunkSection::from(biome_registry)))
                         .collect()
@@ -125,7 +132,7 @@ where
 impl<'w, T, Cx> Chunk<'w, T, Cx>
 where
     Cx: ChunkCx<'w>,
-    T: DataBehave<'w, Cx>,
+    T: DataBehave<'w, Cx> + ?Sized,
 {
     /// Returns the chunk section array of this chunk.
     ///
@@ -143,20 +150,26 @@ where
     }
 }
 
-impl<'w, T, Cx> Chunk<'w, T, Cx>
+impl<'w, T: ?Sized, Cx> Chunk<'w, T, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    /// Gets the position of this chunk.
+    /// Returns the position of this chunk.
     #[inline]
     pub fn pos(&self) -> ChunkPos {
         self.pos
+    }
+
+    /// Returns the [`HeightLimit`] of this chunk.
+    #[inline]
+    pub fn height_limit(&self) -> HeightLimit {
+        self.hlimit
     }
 }
 
 impl<'w, T, Cx> Debug for Chunk<'w, T, Cx>
 where
-    T: Debug,
+    T: Debug + ?Sized,
     Cx: ChunkCx<'w> + Debug,
     Cx::Id: Debug,
     Cx::BlockStateExt: Debug,
@@ -171,7 +184,7 @@ where
             .field("udata", &self.udata)
             .field("hlimit", &self.hlimit)
             .field("section_array", &self.section_array)
-            .field("vdata", &self.vdata)
+            .field("vdata", &&self.vdata)
             .finish()
     }
 }
@@ -182,7 +195,7 @@ where
     Cx: ChunkCx<'w>,
 {
     /// Gets the chunk section slice, with the given internal section slice of [`Chunk`].
-    #[inline(always)]
+    #[inline]
     fn sections<'a>(&'a self, super_secs: &'a [ChunkSection<'w, Cx>]) -> &'a [ChunkSection<'w, Cx>]
     where
         'w: 'a,
