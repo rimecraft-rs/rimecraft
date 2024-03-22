@@ -38,6 +38,14 @@ macro_rules! repr_required {
 }
 
 /// Derive [`rimecraft_edcode::Encode`] to objects.
+///
+/// # Enum
+///
+/// ## Requirements:
+/// - All variants must be field-less.
+/// - Enum must explicitly specify its representation through `#[repr()]`, and
+///   only `u*` and `i*` (excluding 128-bit types) repr are allowed.
+/// - All variants must have explicit discriminant.
 #[proc_macro_derive(Encode)]
 pub fn derive_encode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -127,7 +135,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
             };
             expanded.into()
         }
-        Data::Struct(data) => syn::Error::new(
+        Data::Struct(data) => Error::new(
             data.struct_token.span,
             unsupported_object!("Encode", "struct"),
         )
