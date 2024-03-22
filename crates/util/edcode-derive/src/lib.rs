@@ -1,7 +1,5 @@
 //! Proc-macros for deriving [`rimecraft_edcode`] traits.
 
-use std::f32::consts::E;
-
 use proc_macro::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
