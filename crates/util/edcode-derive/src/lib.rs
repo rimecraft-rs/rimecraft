@@ -125,7 +125,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
                     where
                         B: ::rimecraft_edcode::bytes::BufMut,
                     {
-                        let x:#repr_type = match self{
+                        let x:#repr_type = match self {
                             #( Self::#enum_idents => #enum_vals, )*
                         };
                         ::rimecraft_edcode::Encode::encode(&x, &mut buf)?;

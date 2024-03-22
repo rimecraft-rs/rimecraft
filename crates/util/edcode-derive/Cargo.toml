@@ -18,9 +18,6 @@ syn = { version = "2.0" }
 quote = { version = "1.0" }
 proc-macro2 = { version = "1.0" }
 
-[dev-dependencies]
-rimecraft-edcode = { path = "../edcode" }
-
 [lints]
 workspace = true
 
