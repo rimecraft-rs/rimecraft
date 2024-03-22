@@ -1,12 +1,15 @@
 //! Proc-macros for deriving [`rimecraft_edcode`] traits.
 
+use std::f32::consts::E;
+
 use proc_macro::TokenStream;
+use proc_macro2::TokenTree;
 use quote::quote;
 use syn::{
     parse_macro_input, spanned::Spanned, Data, DeriveInput, Error, Expr, Fields, Ident, Meta,
 };
 
-macro_rules! unsupported_error {
+macro_rules! unsupported_object {
     ($tr:literal, $ty:literal) => {
         concat!("deriving `", $tr, "` to `", $ty, "` is not supported")
     };
@@ -14,13 +17,25 @@ macro_rules! unsupported_error {
 
 macro_rules! fields_disallowed {
     () => {
-        "enum with fields is not supported"
+        "variants with fields are not supported"
     };
 }
 
 macro_rules! discriminant_required {
     () => {
-        "enum variants must have explicit discriminant"
+        "variants must have explicit discriminant"
+    };
+}
+
+macro_rules! unsupported_repr {
+    () => {
+        "only `u*` and `i*` (excluding 128-bit types) repr is supported"
+    };
+}
+
+macro_rules! repr_required {
+    () => {
+        "must specify repr"
     };
 }
 
@@ -61,20 +76,53 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
                     if is_repr {
                         let mut iter = meta.tokens.into_iter().peekable();
                         let span = iter.peek().span();
-                        todo!()
+                        macro_rules! ident_helper {
+                            ($span:expr => $( $ty:ident ),*) => {
+                                vec![
+                                    $( Ident::new(stringify!($ty), $span) ),*
+                                ]
+                            };
+                        }
+                        let supported = iter.next().is_some_and(|x| {
+                            if let TokenTree::Ident(id) = x {
+                                if ident_helper!(span => u8, u16, u32, u64, i8, i16, i32, i64)
+                                    .contains(&id)
+                                {
+                                    repr_type = Some(id);
+                                    true
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        });
+                        if !supported {
+                            return Error::new(span, unsupported_repr!())
+                                .into_compile_error()
+                                .into();
+                        }
                     }
                 }
             }
+            let repr_type = match repr_type {
+                None => {
+                    return Error::new(ident.span(), repr_required!())
+                        .into_compile_error()
+                        .into()
+                }
+                Some(x) => x,
+            };
             let expanded = quote! {
-                impl Encode for #ident {
+                impl ::rimecraft_edcode::Encode for #ident {
                     fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
                     where
                         B: ::rimecraft_edcode::bytes::BufMut,
                     {
-                        let x = match self{
+                        let x:#repr_type = match self{
                             #( Self::#enum_idents => #enum_vals, )*
                         };
-                        x.encode(&mut buf)?;
+                        ::rimecraft_edcode::Encode::encode(&x, &mut buf)?;
                         Ok(())
                     }
                 }
@@ -83,14 +131,15 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
         }
         Data::Struct(data) => syn::Error::new(
             data.struct_token.span,
-            unsupported_error!("Encode", "struct"),
+            unsupported_object!("Encode", "struct"),
         )
         .to_compile_error()
         .into(),
-        Data::Union(data) => {
-            Error::new(data.union_token.span, unsupported_error!("Encode", "union"))
-                .to_compile_error()
-                .into()
-        }
+        Data::Union(data) => Error::new(
+            data.union_token.span,
+            unsupported_object!("Encode", "union"),
+        )
+        .to_compile_error()
+        .into(),
     }
 }

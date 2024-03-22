@@ -8,6 +8,7 @@ mod tests {
     #[allow(dead_code)]
     fn derive_enum() {
         #[derive(Encode)]
+        #[repr(u8)]
         enum Topics {
             Pearl = 15,
             Lakers = 24,
