@@ -50,7 +50,7 @@ fn parse_derive_enum(
     let mut enum_idents: Vec<Ident> = vec![];
     let mut enum_vals: Vec<Expr> = vec![];
     for var in data.variants.into_iter() {
-        if let Fields::Unit = var.fields {
+        if matches!(var.fields, Fields::Unit) {
             enum_idents.push(var.ident.clone());
         } else {
             return Err(Error::new(var.fields.span(), fields_disallowed!())
@@ -78,12 +78,12 @@ fn parse_derive_enum(
                 let mut iter = meta.tokens.into_iter().peekable();
                 let span = iter.peek().span();
                 macro_rules! ident_helper {
-                            ($span:expr => $( $ty:ident ),*) => {
-                                vec![
-                                    $( Ident::new(stringify!($ty), $span) ),*
-                                ]
-                            };
-                        }
+                    ($span:expr => $( $ty:ident ),*) => {
+                        vec![
+                            $( Ident::new(stringify!($ty), $span) ),*
+                        ]
+                    };
+                }
                 let supported = iter.next().is_some_and(|x| {
                     if let TokenTree::Ident(id) = x {
                         if ident_helper!(span => u8, u16, u32, u64, i8, i16, i32, i64).contains(&id)
@@ -105,14 +105,11 @@ fn parse_derive_enum(
             }
         }
     }
-    let repr_type = match repr_type {
-        None => {
-            return Err(Error::new(ident.span(), repr_required!())
-                .into_compile_error()
-                .into())
-        }
-        Some(x) => x,
-    };
+    let repr_type = repr_type.ok_or_else(|| {
+        std::convert::Into::<TokenStream>::into(
+            Error::new(ident.span(), repr_required!()).into_compile_error(),
+        )
+    })?;
     Ok((ident, repr_type, enum_idents, enum_vals))
 }
 
