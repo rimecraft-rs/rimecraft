@@ -7,7 +7,7 @@ mod tests {
     #[test]
     #[allow(dead_code)]
     fn derive_enum() {
-        #[derive(Encode)]
+        #[derive(Encode, Decode, PartialEq, Eq)]
         #[repr(u8)]
         enum Topics {
             Pearl = 15,
@@ -18,6 +18,6 @@ mod tests {
 
         let mut buf = BytesMut::new();
         assert!(Topics::Someone.encode(&mut buf).is_ok());
-        assert!(<u8 as Decode>::decode(buf).is_ok_and(|x| x == 36));
+        assert!(Topics::decode(buf).is_ok_and(|x| x == Topics::Someone));
     }
 }
