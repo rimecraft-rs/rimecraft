@@ -31,7 +31,7 @@ macro_rules! discriminant_required {
 
 macro_rules! unsupported_repr {
     () => {
-        "only `u*` and `i*` (excluding 128-bit types) repr is supported"
+        "only primitive reprs which can be safely turned into an `i32` are supported"
     };
 }
 
@@ -86,8 +86,7 @@ fn parse_derive_enum(
                 }
                 let supported = iter.next().is_some_and(|x| {
                     if let TokenTree::Ident(id) = x {
-                        if ident_helper!(span => u8, u16, u32, u64, i8, i16, i32, i64).contains(&id)
-                        {
+                        if ident_helper!(span => u8, u16, i8, i16, i32).contains(&id) {
                             repr_type = Some(id);
                             true
                         } else {
@@ -120,14 +119,15 @@ fn parse_derive_enum(
 /// ## Requirements:
 /// - All variants must be field-less.
 /// - Enum must explicitly specify its representation through `#[repr()]`, and
-///   only `u*` and `i*` (excluding 128-bit types) repr are allowed.
+///   only primitive representations which can be safely turned into an `i32`
+///   are allowed.
 /// - All variants must have explicit discriminant.
 #[proc_macro_derive(Encode)]
 pub fn derive_encode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match input.data {
         Data::Enum(data) => {
-            let (ident, repr_type, enum_idents, enum_vals) =
+            let (ident, _repr_type, enum_idents, enum_vals) =
                 match parse_derive_enum(input.ident, input.attrs, data) {
                     Ok(x) => x,
                     Err(err) => return err,
@@ -138,9 +138,11 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
                     where
                         B: ::rimecraft_edcode::bytes::BufMut,
                     {
-                        let x:#repr_type = match self {
-                            #( Self::#enum_idents => #enum_vals, )*
-                        };
+                        let x = ::rimecraft_edcode::VarI32(
+                            match self {
+                                #( Self::#enum_idents => #enum_vals, )*
+                            }
+                        );
                         ::rimecraft_edcode::Encode::encode(&x, &mut buf)?;
                         Ok(())
                     }
@@ -169,7 +171,7 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match input.data {
         Data::Enum(data) => {
-            let (ident, repr_type, enum_idents, enum_vals) =
+            let (ident, _repr_type, enum_idents, enum_vals) =
                 match parse_derive_enum(input.ident, input.attrs, data) {
                     Ok(x) => x,
                     Err(err) => {
@@ -182,8 +184,8 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
                     where
                         B: ::rimecraft_edcode::bytes::Buf,
                     {
-                        let x:#repr_type = ::rimecraft_edcode::Decode::decode(&mut buf)?;
-                        let var = match x {
+                        let x: ::rimecraft_edcode::VarI32 = ::rimecraft_edcode::Decode::decode(&mut buf)?;
+                        let var = match x.0 {
                             #( #enum_vals => Self::#enum_idents, )*
                             unknown => return Err(std::io::Error::other(format!("unknown variant {}", unknown))),
                         };
