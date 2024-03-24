@@ -115,8 +115,13 @@ where
 /// Describes how an advancement will be announced in the chat.
 /// # MCJE Reference
 /// `net.minecraft.advancement.AdvancementFrame` in yarn.
+#[cfg_attr(
+    feature = "edcode",
+    derive(::rimecraft_edcode::Encode, ::rimecraft_edcode::Decode)
+)]
 #[derive(Debug, Clone)]
 #[non_exhaustive]
+#[repr(u8)]
 pub enum Frame {
     /// Regular task.
     Task = 0,

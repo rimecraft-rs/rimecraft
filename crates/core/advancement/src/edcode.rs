@@ -22,7 +22,7 @@ where
         // TODO: `RawText` doesn't implement edcode.
         // TODO: Encode `title` and `description`.
         self.icon.encode(&mut buf)?;
-        // Encode `frame`.
+        self.frame.encode(&mut buf)?;
         let mut i = 0_i32;
         if self.background.is_some() {
             i |= 1;
