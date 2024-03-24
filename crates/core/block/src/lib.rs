@@ -1,10 +1,13 @@
 //! Minecraft block primitives.
 
+use behave::ProvideLuminance;
 use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
 use rimecraft_registry::{ProvideRegistry, Reg};
 use rimecraft_state::{State, States, StatesMut};
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
+
+pub mod behave;
 
 pub use rimecraft_state as state;
 
@@ -121,6 +124,18 @@ where
 
     /// The state.
     pub state: Arc<State<'w, Cx::BlockStateExt>>,
+}
+
+impl<Cx> BlockState<'_, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+    Cx::BlockStateExt: ProvideLuminance,
+{
+    /// Returns the luminance level of this block state.
+    #[inline]
+    pub fn luminance(&self) -> u32 {
+        self.state.data().luminance(&self.state)
+    }
 }
 
 impl<Cx> Debug for BlockState<'_, Cx>

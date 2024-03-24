@@ -13,3 +13,8 @@ pub mod tick;
 pub mod view;
 
 pub mod behave;
+
+pub use ahash::{AHashMap, AHashSet};
+
+/// The default max light level of Minecraft.
+pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;

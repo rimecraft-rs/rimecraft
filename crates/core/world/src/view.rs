@@ -1,6 +1,12 @@
 //! View traits.
 
-use rimecraft_voxel_math::section_coord;
+use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
+use rimecraft_block_entity::BlockEntity;
+use rimecraft_chunk_palette::Maybe;
+use rimecraft_fluid::{FluidState, ProvideFluidStateExtTy};
+use rimecraft_voxel_math::{section_coord, BlockPos};
+
+use crate::DEFAULT_MAX_LIGHT_LEVEL;
 
 /// Height limit specification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,5 +76,63 @@ impl HeightLimit {
     /// Converts a zero-based section index to a section coordinate.
     pub const fn section_index_to_coord(&self, index: i32) -> i32 {
         index + self.bottom_section_coord()
+    }
+}
+
+/// A scoped, immutable view of [`BlockState`]s, [`FluidState`]s and [`BlockEntity`]s.
+pub trait BlockView<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+{
+    /// Returns the [`BlockEntity`] at the given position.
+    fn block_entity(&self, pos: BlockPos) -> Option<&BlockEntity<'w, Cx>>;
+
+    /// Returns the [`BlockState`] at the given position.
+    fn block_state(&self, pos: BlockPos) -> StateOption<Maybe<'_, BlockState<'w, Cx>>>;
+
+    /// Returns the [`FluidState`] at the given position.
+    fn fluid_state(&self, pos: BlockPos) -> StateOption<Maybe<'_, FluidState<'w, Cx>>>;
+}
+
+/// View of block luminance source levels.
+pub trait BlockLuminanceView<'w, Cx>: BlockView<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+{
+    /// Returns the luminance source level of the given position.
+    fn luminance(&self, pos: BlockPos) -> StateOption<u32>;
+
+    /// Returns the max light level of this view.
+    ///
+    /// The default one is [`DEFAULT_MAX_LIGHT_LEVEL`].
+    #[inline]
+    fn max_light_level(&self) -> u32 {
+        DEFAULT_MAX_LIGHT_LEVEL
+    }
+}
+
+/// Optional state result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(clippy::exhaustive_enums)]
+pub enum StateOption<T> {
+    /// A state.
+    Some(T),
+    /// The void variant of the state.
+    Void,
+    /// No state available.
+    None,
+}
+
+impl<T> StateOption<T> {
+    /// Maps this optional state to another type.
+    pub fn map<O, F>(self, mapper: F) -> StateOption<O>
+    where
+        F: FnOnce(T) -> O,
+    {
+        match self {
+            StateOption::Some(val) => StateOption::Some(mapper(val)),
+            StateOption::Void => StateOption::Void,
+            StateOption::None => StateOption::None,
+        }
     }
 }

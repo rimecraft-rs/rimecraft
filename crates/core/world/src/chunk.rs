@@ -1,4 +1,6 @@
-//! Types and traits for working with chunks of blocks in a world.
+//! Types and traits for working with chunks in a world.
+//!
+//! A chunk represents a scoped, mutable view of `Biome`s, [`BlockState`]s, [`FluidState`]s and [`BlockEntity`]s.
 
 mod internal_types;
 mod section;
@@ -7,7 +9,6 @@ mod upgrade;
 use std::{fmt::Debug, hash::Hash};
 
 use ahash::AHashMap;
-pub use internal_types::*;
 use rimecraft_block::{ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
 use rimecraft_block_entity::BlockEntity;
 use rimecraft_chunk_palette::{
@@ -17,13 +18,16 @@ use rimecraft_fluid::ProvideFluidStateExtTy;
 use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
 use rimecraft_registry::{ProvideRegistry, Registry};
 use rimecraft_voxel_math::BlockPos;
+
 pub use rimecraft_voxel_math::ChunkPos;
 pub use section::ChunkSection;
 pub use upgrade::UpgradeData;
 
+pub use internal_types::*;
+
 use crate::{
     heightmap::{self, Heightmap},
-    view::HeightLimit,
+    view::{BlockLuminanceView, BlockView, HeightLimit},
 };
 
 /// Types associated with a `Chunk`.
@@ -47,29 +51,53 @@ where
     type HeightmapType: heightmap::Type<'w, Self> + Hash + Eq;
 }
 
-/// A scoped, mutable view of biomes, block states, fluid states and
-/// block entities.
-///
-/// # Generics
-///
-/// - `'w`: The world lifetime. See the crate document for more information.
-/// - `T`: The chunk implementation data type. It provides functionalities like `WorldChunk` and `ProtoChunk`.
-/// - `Cx`: The global context type, providing access to the static fields and logics of the game.
-pub struct Chunk<'w, T: ?Sized, Cx>
+/// A generic chunk data structure.
+#[non_exhaustive]
+pub struct BaseChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    pos: ChunkPos,
-    udata: UpgradeData<'w, Cx>,
-    heightmaps: AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>,
-    hlimit: HeightLimit,
-    bes: AHashMap<BlockPos, BEWithCompound<'w, Cx>>,
-    section_array: Box<[ChunkSection<'w, Cx>]>,
+    /// Position of this chunk.
+    pub pos: ChunkPos,
+    /// Upgrade data of this chunk.
+    pub upgrade_data: UpgradeData<'w, Cx>,
+    /// Heightmaps of this chunk.
+    pub heightmaps: AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>,
+    /// Height limit of this chunk.
+    pub height_limit: HeightLimit,
+    /// Map of block positions to block entities.
+    pub block_entities: AHashMap<BlockPos, CompoundedBlockEntity<'w, Cx>>,
+    /// The internal chunk sections.
+    pub section_array: Box<[ChunkSection<'w, Cx>]>,
 
-    vdata: T,
+    inhabited_time: u64,
+    /// Whether this chunk needs saving.
+    pub needs_saving: bool,
 }
 
-impl<'w, T, Cx> Chunk<'w, T, Cx>
+impl<'w, Cx> Debug for BaseChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w> + Debug,
+    Cx::Id: Debug,
+    Cx::BlockStateExt: Debug,
+    Cx::BlockStateList: Debug,
+    Cx::FluidStateExt: Debug,
+    Cx::Biome: Debug,
+    Cx::BiomeList: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Chunk")
+            .field("pos", &self.pos)
+            .field("upgrade_data", &self.upgrade_data)
+            .field("height_limit", &self.height_limit)
+            .field("section_array", &self.section_array)
+            .field("inhabited_time", &self.inhabited_time)
+            .field("needs_saving", &self.needs_saving)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'w, Cx> BaseChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>
         + ProvideStateIds<List = Cx::BlockStateList>
@@ -99,18 +127,20 @@ where
         upgrade_data: UpgradeData<'w, Cx>,
         height_limit: HeightLimit,
         biome_registry: &'w Registry<Cx::Id, Cx::Biome>,
+        inhabited_time: u64,
         section_array: Option<I>,
-        vdata: T,
     ) -> Self
     where
         I: Iterator<Item = Option<ChunkSection<'w, Cx>>> + ExactSizeIterator,
     {
         Self {
             pos,
-            udata: upgrade_data,
-            hlimit: height_limit,
+            needs_saving: false,
+            inhabited_time,
+            upgrade_data,
+            height_limit,
             heightmaps: AHashMap::new(),
-            bes: AHashMap::new(),
+            block_entities: AHashMap::new(),
             section_array: {
                 let len = height_limit.count_vertical_sections() as usize;
                 if let Some(section_array) = section_array {
@@ -124,95 +154,22 @@ where
                         .collect()
                 }
             },
-            vdata,
         }
     }
 }
 
-impl<'w, T, Cx> Chunk<'w, T, Cx>
-where
-    Cx: ChunkCx<'w>,
-    T: DataBehave<'w, Cx> + ?Sized,
-{
-    /// Returns the chunk section array of this chunk.
-    ///
-    /// This will be effected by the variant data. This should only happen with MCJE's `WrapperProtoChunk`.
-    #[inline]
-    pub fn sections(&self) -> &[ChunkSection<'w, Cx>] {
-        self.vdata.sections(&self.section_array)
-    }
-
-    /// Searches for the highest non-empty `ChunkSection` of this chunk and returns its index.
-    ///
-    /// See [`ChunkSection::is_empty`].
-    pub fn highest_non_empty_section(&self) -> Option<usize> {
-        self.sections().iter().rposition(|sec| !sec.is_empty())
-    }
-}
-
-impl<'w, T: ?Sized, Cx> Chunk<'w, T, Cx>
+/// Boxed [`BlockEntity`] with NBT compound.
+pub struct CompoundedBlockEntity<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    /// Returns the position of this chunk.
-    #[inline]
-    pub fn pos(&self) -> ChunkPos {
-        self.pos
-    }
-
-    /// Returns the [`HeightLimit`] of this chunk.
-    #[inline]
-    pub fn height_limit(&self) -> HeightLimit {
-        self.hlimit
-    }
-}
-
-impl<'w, T, Cx> Debug for Chunk<'w, T, Cx>
-where
-    T: Debug + ?Sized,
-    Cx: ChunkCx<'w> + Debug,
-    Cx::Id: Debug,
-    Cx::BlockStateExt: Debug,
-    Cx::BlockStateList: Debug,
-    Cx::FluidStateExt: Debug,
-    Cx::Biome: Debug,
-    Cx::BiomeList: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Chunk")
-            .field("pos", &self.pos)
-            .field("udata", &self.udata)
-            .field("hlimit", &self.hlimit)
-            .field("section_array", &self.section_array)
-            .field("vdata", &&self.vdata)
-            .finish()
-    }
-}
-
-/// Common behaviors of a chunk variant data.
-pub trait DataBehave<'w, Cx>
-where
-    Cx: ChunkCx<'w>,
-{
-    /// Gets the chunk section slice, with the given internal section slice of [`Chunk`].
-    #[inline]
-    fn sections<'a>(&'a self, super_secs: &'a [ChunkSection<'w, Cx>]) -> &'a [ChunkSection<'w, Cx>]
-    where
-        'w: 'a,
-    {
-        super_secs
-    }
-}
-
-struct BEWithCompound<'w, Cx>
-where
-    Cx: ChunkCx<'w>,
-{
+    /// The NBT compound.
     pub nbt: Cx::Compound,
+    /// The block entity.
     pub be: Box<BlockEntity<'w, Cx>>,
 }
 
-impl<'w, Cx> Debug for BEWithCompound<'w, Cx>
+impl<'w, Cx> Debug for CompoundedBlockEntity<'w, Cx>
 where
     Cx: ChunkCx<'w> + Debug,
     Cx::Compound: Debug,
@@ -224,5 +181,63 @@ where
             .field("nbt", &self.nbt)
             .field("be", &&self.be)
             .finish()
+    }
+}
+
+/// Types that can represent an immutable [`BaseChunk`].
+pub trait AsBaseChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    /// Returns a [`BaseChunk`].
+    fn as_base_chunk(&self) -> &BaseChunk<'w, Cx>;
+}
+
+/// Immutable chunk behaviors.
+pub trait Chunk<'w, Cx>
+where
+    Self: AsBaseChunk<'w, Cx> + BlockView<'w, Cx> + BlockLuminanceView<'w, Cx>,
+    Cx: ChunkCx<'w>,
+{
+    /// Returns the array of chunk sections of this chunk.
+    #[inline]
+    fn sections(&self) -> &[ChunkSection<'w, Cx>] {
+        &self.as_base_chunk().section_array
+    }
+
+    /// Gets the [`ChunkSection`] at the given Y index of this chunk.
+    #[inline]
+    fn section(&self, index: usize) -> Option<&ChunkSection<'w, Cx>> {
+        self.sections().get(index)
+    }
+
+    /// Returns the index of highest non-empty [`ChunkSection`] in this chunk.
+    ///
+    /// See [`ChunkSection::is_empty`].
+    fn highest_non_empty_section(&self) -> Option<usize> {
+        self.sections().iter().rposition(|s| !s.is_empty())
+    }
+
+    /// Returns the heightmaps of this chunk.
+    #[inline]
+    fn heightmaps(&self) -> &AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>> {
+        &self.as_base_chunk().heightmaps
+    }
+
+    /// Returns the position of this chunk.
+    #[inline]
+    fn pos(&self) -> ChunkPos {
+        self.as_base_chunk().pos
+    }
+}
+
+impl<'w, Cx, T> AsBaseChunk<'w, Cx> for T
+where
+    T: AsRef<BaseChunk<'w, Cx>>,
+    Cx: ChunkCx<'w>,
+{
+    #[inline]
+    fn as_base_chunk(&self) -> &BaseChunk<'w, Cx> {
+        self.as_ref()
     }
 }
