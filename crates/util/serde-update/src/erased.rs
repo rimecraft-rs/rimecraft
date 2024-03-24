@@ -16,11 +16,11 @@ macro_rules! __internal_update_from_erased {
         where
             D: ::serde::Deserializer<'de>,
         {
-            use ::serde::de::Error;
-            self.erased_update(&mut <dyn erased_serde::Deserializer<'de>>::erase(
-                deserializer,
-            ))
-            .map_err(D::Error::custom)
+            $crate::erased::ErasedUpdate::erased_update(
+                self,
+                &mut <dyn ::erased_serde::Deserializer<'de>>::erase(deserializer),
+            )
+            .map_err(::serde::de::Error::custom)
         }
     };
 }
@@ -34,15 +34,15 @@ macro_rules! update_trait_object {
             $crate::__internal_update_from_erased!();
         }
 
-        impl<'de> $crate::Update<'de> for dyn $($t)* + Send {
+        impl<'de> $crate::Update<'de> for dyn $($t)* + ::core::marker::Send {
             $crate::__internal_update_from_erased!();
         }
 
-        impl<'de> $crate::Update<'de> for dyn $($t)* + Sync {
+        impl<'de> $crate::Update<'de> for dyn $($t)* + ::core::marker::Sync {
             $crate::__internal_update_from_erased!();
         }
 
-        impl<'de> $crate::Update<'de> for dyn $($t)* + Send + Sync {
+        impl<'de> $crate::Update<'de> for dyn $($t)* + ::core::marker::Send + ::core::marker::Sync {
             $crate::__internal_update_from_erased!();
         }
     };

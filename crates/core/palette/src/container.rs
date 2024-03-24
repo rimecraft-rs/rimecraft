@@ -1,7 +1,8 @@
 //! Paletted containers.
 
-use std::{collections::HashMap, hash::Hash, marker::PhantomData};
+use std::{hash::Hash, marker::PhantomData};
 
+use ahash::AHashMap;
 use rimecraft_maybe::Maybe;
 use rimecraft_packed_int_array::PackedIntArray;
 
@@ -135,7 +136,7 @@ where
         {
             counter(&val, self.data.storage.len());
         } else {
-            let mut map = HashMap::new();
+            let mut map = AHashMap::new();
             if let Some(array) = self.data.storage.as_array() {
                 array.iter().for_each(|i| {
                     if let Some(val) = map.get_mut(&i) {
