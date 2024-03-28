@@ -2,14 +2,11 @@
 //!
 //! A chunk represents a scoped, mutable view of `Biome`s, [`BlockState`]s, [`FluidState`]s and [`BlockEntity`]s.
 
-mod internal_types;
-mod section;
-mod upgrade;
-
-use std::{fmt::Debug, hash::Hash};
+use std::fmt::Debug;
 
 use ahash::AHashMap;
-use rimecraft_block::{ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
+use parking_lot::RwLock;
+use rimecraft_block::{BlockState, ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
 use rimecraft_block_entity::BlockEntity;
 use rimecraft_chunk_palette::{
     container::ProvidePalette, IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
@@ -19,16 +16,30 @@ use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
 use rimecraft_registry::{ProvideRegistry, Registry};
 use rimecraft_voxel_math::BlockPos;
 
+use crate::{
+    heightmap::{self, Heightmap},
+    view::{BlockLuminanceView, BlockView, HeightLimit, LockedBlockViewMut},
+    Sealed,
+};
+
+mod internal_types;
+
+pub mod light;
+mod section;
+mod upgrade;
+
+pub mod world_chunk;
+
 pub use rimecraft_voxel_math::ChunkPos;
+
 pub use section::ChunkSection;
 pub use upgrade::UpgradeData;
+pub use world_chunk::WorldChunk;
 
 pub use internal_types::*;
 
-use crate::{
-    heightmap::{self, Heightmap},
-    view::{BlockLuminanceView, BlockView, HeightLimit},
-};
+/// The length of the border of a chunk.
+pub const BORDER_LEN: u32 = 16;
 
 /// Types associated with a `Chunk`.
 ///
@@ -40,7 +51,7 @@ where
     Self: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideIdTy + ProvideNbtTy,
 {
     /// The type of block state id list.
-    type BlockStateList;
+    type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>;
 
     /// The type of biomes.
     type Biome: 'w;
@@ -48,7 +59,7 @@ where
     type BiomeList;
 
     /// The `Heightmap.Type` type of heightmaps.
-    type HeightmapType: heightmap::Type<'w, Self> + Hash + Eq;
+    type HeightmapType: heightmap::Type<'w, Self>;
 }
 
 /// A generic chunk data structure.
@@ -68,9 +79,10 @@ where
     /// Map of block positions to block entities.
     pub block_entities: AHashMap<BlockPos, CompoundedBlockEntity<'w, Cx>>,
     /// The internal chunk sections.
-    pub section_array: Box<[ChunkSection<'w, Cx>]>,
-
-    inhabited_time: u64,
+    pub section_array: Box<[RwLock<ChunkSection<'w, Cx>>]>,
+    /// Increases for each tick a player spends with the chunk loaded.
+    /// This is a cumulative measure of time.
+    pub inhabited_time: u64,
     /// Whether this chunk needs saving.
     pub needs_saving: bool,
 }
@@ -146,11 +158,13 @@ where
                 if let Some(section_array) = section_array {
                     assert_eq!(section_array.len(), len, "length of given section array should be the count of vertical sections of the chunk");
                     section_array
-                        .map(|opt| opt.unwrap_or_else(|| ChunkSection::from(biome_registry)))
+                        .map(|opt| {
+                            RwLock::new(opt.unwrap_or_else(|| ChunkSection::from(biome_registry)))
+                        })
                         .collect()
                 } else {
                     (0..len)
-                        .map(|_| ChunkSection::from(biome_registry))
+                        .map(|_| RwLock::new(ChunkSection::from(biome_registry)))
                         .collect()
                 }
             },
@@ -190,7 +204,16 @@ where
     Cx: ChunkCx<'w>,
 {
     /// Returns a [`BaseChunk`].
-    fn as_base_chunk(&self) -> &BaseChunk<'w, Cx>;
+    fn as_base_chunk(&self) -> Sealed<&BaseChunk<'w, Cx>>;
+}
+
+/// Types that can represent a mutable [`BaseChunk`].
+pub trait AsBaseChunkMut<'w, Cx>: AsBaseChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    /// Returns a [`BaseChunk`].
+    fn as_base_chunk_mut(&mut self) -> Sealed<&mut BaseChunk<'w, Cx>>;
 }
 
 /// Immutable chunk behaviors.
@@ -201,13 +224,13 @@ where
 {
     /// Returns the array of chunk sections of this chunk.
     #[inline]
-    fn sections(&self) -> &[ChunkSection<'w, Cx>] {
-        &self.as_base_chunk().section_array
+    fn sections(&self) -> &[RwLock<ChunkSection<'w, Cx>>] {
+        &self.as_base_chunk().0.section_array
     }
 
     /// Gets the [`ChunkSection`] at the given Y index of this chunk.
     #[inline]
-    fn section(&self, index: usize) -> Option<&ChunkSection<'w, Cx>> {
+    fn section(&self, index: usize) -> Option<&RwLock<ChunkSection<'w, Cx>>> {
         self.sections().get(index)
     }
 
@@ -215,29 +238,48 @@ where
     ///
     /// See [`ChunkSection::is_empty`].
     fn highest_non_empty_section(&self) -> Option<usize> {
-        self.sections().iter().rposition(|s| !s.is_empty())
+        self.sections().iter().rposition(|s| !s.read().is_empty())
     }
 
     /// Returns the heightmaps of this chunk.
     #[inline]
     fn heightmaps(&self) -> &AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>> {
-        &self.as_base_chunk().heightmaps
+        &self.as_base_chunk().0.heightmaps
     }
 
     /// Returns the position of this chunk.
     #[inline]
     fn pos(&self) -> ChunkPos {
-        self.as_base_chunk().pos
+        self.as_base_chunk().0.pos
     }
 }
 
-impl<'w, Cx, T> AsBaseChunk<'w, Cx> for T
+/// Mutable chunk behaviors.
+pub trait ChunkMut<'w, Cx>
 where
-    T: AsRef<BaseChunk<'w, Cx>>,
+    Self: AsBaseChunkMut<'w, Cx> + Chunk<'w, Cx> + LockedBlockViewMut<'w, Cx>,
     Cx: ChunkCx<'w>,
 {
+    /// Returns the array of chunk sections of this chunk.
     #[inline]
-    fn as_base_chunk(&self) -> &BaseChunk<'w, Cx> {
-        self.as_ref()
+    fn sections_mut(&mut self) -> &mut [RwLock<ChunkSection<'w, Cx>>] {
+        &mut self.as_base_chunk_mut().0.section_array
+    }
+
+    /// Gets the [`ChunkSection`] at the given Y index of this chunk.
+    #[inline]
+    fn section_mut(&mut self, index: usize) -> Option<&mut RwLock<ChunkSection<'w, Cx>>> {
+        self.sections_mut().get_mut(index)
+    }
+
+    /// Returns the index of highest non-empty [`ChunkSection`] in this chunk.
+    ///
+    /// This method is the same as [`Chunk::highest_non_empty_section`] but lock-free.
+    ///
+    /// See [`ChunkSection::is_empty`].
+    fn highest_non_empty_section_lf(&mut self) -> Option<usize> {
+        self.sections_mut()
+            .iter_mut()
+            .rposition(|s| !s.get_mut().is_empty())
     }
 }

@@ -22,12 +22,13 @@ pub enum Maybe<'a, T: ?Sized, Owned = SimpleOwned<T>> {
 
 impl<T: ?Sized, Owned> Maybe<'_, T, Owned>
 where
-    T: ToOwned<Owned = Owned>,
+    T: ToOwned,
+    <T as ToOwned>::Owned: Into<Owned>,
 {
     /// Converts the cell into an owned value.
     pub fn into_owned(self) -> Owned {
         match self {
-            Maybe::Borrowed(val) => val.to_owned(),
+            Maybe::Borrowed(val) => val.to_owned().into(),
             Maybe::Owned(owned) => owned,
         }
     }

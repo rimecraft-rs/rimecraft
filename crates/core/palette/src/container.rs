@@ -134,7 +134,7 @@ where
             .then(|| self.data.palette.get(0))
             .flatten()
         {
-            counter(&val, self.data.storage.len());
+            counter(&*val, self.data.storage.len());
         } else {
             let mut map = AHashMap::new();
             if let Some(array) = self.data.storage.as_array() {
@@ -152,7 +152,7 @@ where
                 .into_iter()
                 .filter_map(|(i, c)| self.data.palette.get(i as usize).map(|i| (i, c)))
             {
-                counter(&obj, c);
+                counter(&*obj, c);
             }
         }
     }
@@ -286,7 +286,7 @@ where
                 .as_array()
                 .and_then(|array| array.get(i))
                 .and_then(|i| palette.get(i as usize))
-                .and_then(|obj| self.palette.index(&obj))
+                .and_then(|obj| self.palette.index(&*obj))
             {
                 self.storage.as_array_mut().unwrap().swap(i, raw as u32);
             }

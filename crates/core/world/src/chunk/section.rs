@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use rimecraft_block::{Block, ProvideStateIds, RawBlock};
+use rimecraft_block::{Block, BlockState, ProvideStateIds, RawBlock};
 use rimecraft_chunk_palette::{
     container::{PalettedContainer, ProvidePalette},
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
@@ -15,7 +15,7 @@ pub struct ChunkSection<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    bsc: PalettedContainer<Cx::BlockStateList, IBlockState<'w, Cx>, Cx>,
+    bsc: PalettedContainer<Cx::BlockStateList, BlockState<'w, Cx>, Cx>,
     bic: PalettedContainer<Cx::BiomeList, IBiome<'w, Cx>, Cx>,
 
     ne_block_c: u16,
@@ -26,7 +26,7 @@ where
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
     Cx: BsToFs<'w> + ChunkCx<'w>,
-    Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>,
+    Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>,
 
     for<'a> &'a Cx::BlockStateList: IntoIterator,
     for<'a> <&'a Cx::BlockStateList as IntoIterator>::IntoIter: ExactSizeIterator,
@@ -34,7 +34,7 @@ where
     /// Creates a new chunk section with the given containers.
     #[inline]
     pub fn new(
-        bs_container: PalettedContainer<Cx::BlockStateList, IBlockState<'w, Cx>, Cx>,
+        bs_container: PalettedContainer<Cx::BlockStateList, BlockState<'w, Cx>, Cx>,
         bi_container: PalettedContainer<Cx::BiomeList, IBiome<'w, Cx>, Cx>,
     ) -> Self {
         let mut this = Self {
@@ -82,7 +82,7 @@ where
 {
     /// Returns the block state container of the chunk section.
     #[inline]
-    pub fn bs_container(&self) -> &PalettedContainer<Cx::BlockStateList, IBlockState<'w, Cx>, Cx> {
+    pub fn bs_container(&self) -> &PalettedContainer<Cx::BlockStateList, BlockState<'w, Cx>, Cx> {
         &self.bsc
     }
 
@@ -90,7 +90,7 @@ where
     #[inline]
     pub fn bs_container_mut(
         &mut self,
-    ) -> &mut PalettedContainer<Cx::BlockStateList, IBlockState<'w, Cx>, Cx> {
+    ) -> &mut PalettedContainer<Cx::BlockStateList, BlockState<'w, Cx>, Cx> {
         &mut self.bsc
     }
 
@@ -135,12 +135,11 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, Cx>>,
-    Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>,
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
 {
     /// Returns the block state at the given position.
     #[inline]
-    pub fn block_state(&self, x: u32, y: u32, z: u32) -> Option<Maybe<'_, IBlockState<'w, Cx>>> {
+    pub fn block_state(&self, x: u32, y: u32, z: u32) -> Option<Maybe<'_, BlockState<'w, Cx>>> {
         self.bsc.get(Cx::compute_index(x, y, z)).map(From::from)
     }
 
@@ -168,9 +167,9 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: BsToFs<'w> + ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, IBlockState<'w, Cx>>,
-    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
-        + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>
+    Cx: BsToFs<'w> + ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
+        + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
         + Clone,
 {
     /// Sets the block state at the given position and returns the
@@ -181,8 +180,8 @@ where
         x: u32,
         y: u32,
         z: u32,
-        state: IBlockState<'w, Cx>,
-    ) -> Option<Maybe<'_, IBlockState<'w, Cx>>> {
+        state: BlockState<'w, Cx>,
+    ) -> Option<Maybe<'_, BlockState<'w, Cx>>> {
         let bs_old = self.bsc.swap(Cx::compute_index(x, y, z), state.clone());
 
         if let Some(state_old) = bs_old.as_deref() {
@@ -218,12 +217,12 @@ impl<'w, Cx> From<&'w Registry<Cx::Id, Cx::Biome>> for ChunkSection<'w, Cx>
 where
     Cx: ChunkCx<'w>
         + ProvideStateIds<List = Cx::BlockStateList>
-        + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
+        + ProvidePalette<Cx::BlockStateList, BlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>
         + ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>,
 
-    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
-        + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>
+    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
+        + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
         + Clone,
 
     &'w Registry<Cx::Id, Cx::Biome>: Into<Cx::BiomeList>,
@@ -241,7 +240,7 @@ where
         Self {
             bsc: PalettedContainer::of_single(
                 Cx::state_ids(),
-                IBlockState {
+                BlockState {
                     block: default_block,
                     state: default_block.states().default_state().clone(),
                 },
@@ -283,7 +282,7 @@ where
 pub trait ComputeIndex<L, T>: ProvidePalette<L, T> {
     /// Computes the index of the given position.
     ///
-    /// The number type is unsigned because the index will overflow if it's negative.
+    /// The number type is unsigned because the index will overflow when it's negative.
     #[inline]
     fn compute_index(x: u32, y: u32, z: u32) -> usize {
         ((y << Self::EDGE_BITS | z) << Self::EDGE_BITS | x) as usize
@@ -299,7 +298,7 @@ mod _edcode {
     impl<'w, Cx> Encode for ChunkSection<'w, Cx>
     where
         Cx: ChunkCx<'w>,
-        Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>,
+        Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>,
         Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>,
     {
         fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
@@ -316,13 +315,13 @@ mod _edcode {
     where
         Cx: ChunkCx<'w>,
 
-        Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, IBlockState<'w, Cx>> + Clone,
+        Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, BlockState<'w, Cx>> + Clone,
         Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
             + for<'s> PalIndexFromRaw<'s, IBiome<'w, Cx>>
             + for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>
             + Clone,
 
-        Cx: ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>,
+        Cx: ProvidePalette<Cx::BlockStateList, BlockState<'w, Cx>>,
         Cx: ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
     {
         fn update<B>(&mut self, mut buf: B) -> Result<(), std::io::Error>
@@ -341,7 +340,7 @@ mod _edcode {
     impl<'w, Cx> ChunkSection<'w, Cx>
     where
         Cx: ChunkCx<'w>,
-        Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>,
+        Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>,
         Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>,
     {
         /// Returns the encoded length of the chunk section.

@@ -13,6 +13,8 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+use core::fmt::Display;
+
 use alloc::boxed::Box;
 
 /// Marker trait for global contexts.
@@ -21,7 +23,7 @@ pub trait GlobalContext: Sized + 'static {}
 /// Marker trait for global contexts that provide an identifier type.
 pub trait ProvideIdTy: GlobalContext {
     /// Identifier type.
-    type Id;
+    type Id: Display;
 }
 
 /// Marker trait for global contexts that provide a `NbtCompound` type and friends.

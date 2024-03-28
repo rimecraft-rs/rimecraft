@@ -530,10 +530,9 @@ impl<K, T> Registry<K, T>
 where
     K: Hash + Eq + Clone,
 {
-    /// Binds given tags to entries, and
-    /// removes old tag bindings.
-    #[doc(alias = "populate_tags")]
-    pub fn bind_tags<'a, I>(&'a self, entries: I)
+    /// Binds given tags to entries, and removes old tag bindings.
+    #[doc(alias = "bind_tags")]
+    pub fn populate_tags<'a, I>(&'a self, entries: I)
     where
         I: IntoIterator<Item = (TagKey<K, T>, Vec<&'a RefEntry<K, T>>)>,
     {
@@ -564,8 +563,6 @@ where
 
 #[cfg(feature = "serde")]
 mod serde {
-    //! Helper module for `serde` support.
-
     use std::hash::Hash;
 
     use crate::{entry::RefEntry, ProvideRegistry, Reg};
@@ -605,16 +602,14 @@ mod serde {
                 let raw = i32::deserialize(deserializer)? as usize;
                 T::registry()
                     .of_raw(raw)
-                    .ok_or_else(|| serde::de::Error::custom(format!("raw id {raw} not found")))
+                    .ok_or_else(|| serde::de::Error::custom(format!("raw id {} not found", raw)))
             }
         }
     }
 }
 
 #[cfg(feature = "edcode")]
-pub mod edcode {
-    //! Helper module for `edcode` support.
-
+mod edcode {
     use rimecraft_edcode::{Decode, Encode, VarI32};
 
     use crate::{ProvideRegistry, Reg};
