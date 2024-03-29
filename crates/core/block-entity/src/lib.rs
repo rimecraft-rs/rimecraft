@@ -67,7 +67,12 @@ where
             data,
         }
     }
+}
 
+impl<T: ?Sized, Cx> RawBlockEntity<'_, T, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+{
     /// Gets the immutable inner data of this block entity.
     #[inline]
     pub fn data(&self) -> &T {
@@ -78,6 +83,30 @@ where
     #[inline]
     pub fn data_mut(&mut self) -> &mut T {
         &mut self.data
+    }
+
+    /// Gets the position of this block entity.
+    #[inline]
+    pub fn pos(&self) -> BlockPos {
+        self.pos
+    }
+
+    /// Marks this block entity as not removed.
+    #[inline]
+    pub fn cancel_removal(&mut self) {
+        self.removed = false;
+    }
+
+    /// Marks this block entity as removed.
+    #[inline]
+    pub fn mark_removed(&mut self) {
+        self.removed = true;
+    }
+
+    /// Whether this block entity is marked as removed.
+    #[inline]
+    pub fn is_removed(&self) -> bool {
+        self.removed
     }
 }
 
@@ -200,6 +229,23 @@ where
     {
         self.data.update(deserializer)
     }
+}
+
+/// A trait for providing block entities.
+///
+/// This could only be implemented for [`ProvideBlockStateExtTy::BlockStateExt`]s.
+pub trait ProvideBlockEntity<Cx>
+where
+    Cx: ProvideBlockStateExtTy<BlockStateExt = Self>,
+{
+    /// Whether this block has a block entity.
+    #[inline]
+    fn has_block_entity(&self) -> bool {
+        self.constructor().is_some()
+    }
+
+    /// Gets the block entity constructor of this block.
+    fn constructor<'w>(&'w self) -> Option<impl FnOnce(BlockPos) -> Box<BlockEntity<'w, Cx>> + 'w>;
 }
 
 /// A [`DeserializeSeed`] for [`BlockEntity`].

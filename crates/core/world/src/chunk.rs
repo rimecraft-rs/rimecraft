@@ -18,7 +18,10 @@ use rimecraft_voxel_math::BlockPos;
 
 use crate::{
     heightmap::{self, Heightmap},
-    view::{BlockLuminanceView, BlockView, HeightLimit, LockedBlockViewMut},
+    view::{
+        block::{BlockLuminanceView, BlockView, LockedBlockViewMut},
+        HeightLimit,
+    },
     Sealed,
 };
 
@@ -77,7 +80,9 @@ where
     /// Height limit of this chunk.
     pub height_limit: HeightLimit,
     /// Map of block positions to block entities.
-    pub block_entities: AHashMap<BlockPos, CompoundedBlockEntity<'w, Cx>>,
+    pub block_entities: AHashMap<BlockPos, Box<BlockEntity<'w, Cx>>>,
+    /// Map of block positions to block entities.
+    pub block_entity_nbt: AHashMap<BlockPos, Cx::Compound>,
     /// The internal chunk sections.
     pub section_array: Box<[RwLock<ChunkSection<'w, Cx>>]>,
     /// Increases for each tick a player spends with the chunk loaded.
@@ -153,6 +158,7 @@ where
             height_limit,
             heightmaps: AHashMap::new(),
             block_entities: AHashMap::new(),
+            block_entity_nbt: AHashMap::new(),
             section_array: {
                 let len = height_limit.count_vertical_sections() as usize;
                 if let Some(section_array) = section_array {
@@ -169,32 +175,6 @@ where
                 }
             },
         }
-    }
-}
-
-/// Boxed [`BlockEntity`] with NBT compound.
-pub struct CompoundedBlockEntity<'w, Cx>
-where
-    Cx: ChunkCx<'w>,
-{
-    /// The NBT compound.
-    pub nbt: Cx::Compound,
-    /// The block entity.
-    pub be: Box<BlockEntity<'w, Cx>>,
-}
-
-impl<'w, Cx> Debug for CompoundedBlockEntity<'w, Cx>
-where
-    Cx: ChunkCx<'w> + Debug,
-    Cx::Compound: Debug,
-    Cx::BlockStateExt: Debug,
-    Cx::Id: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BlockEntityWithCompound")
-            .field("nbt", &self.nbt)
-            .field("be", &&self.be)
-            .finish()
     }
 }
 
