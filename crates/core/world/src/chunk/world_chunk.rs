@@ -1,18 +1,26 @@
 //! World chunks.
 
+use parking_lot::RwLock;
 use rimecraft_block::BlockState;
-use rimecraft_block_entity::{BlockEntity, ProvideBlockEntity};
+use rimecraft_block_entity::{
+    deser_nbt::CreateFromNbt, BlockEntity, ProvideBlockEntity, RawBlockEntityTypeDyn,
+};
 use rimecraft_fluid::{BsToFs, FluidState};
+use rimecraft_registry::ProvideRegistry;
 use rimecraft_voxel_math::{BlockPos, IVec3};
+use serde::{de::DeserializeSeed, Deserialize};
 
 use crate::{
-    view::block::{BlockView, BlockViewMut, LockFreeBlockView},
+    view::block::{BlockView, BlockViewMut, LockFreeBlockView, LockedBlockViewMut},
     Sealed,
 };
 
-use super::{section::ComputeIndex, AsBaseChunk, AsBaseChunkMut, BaseChunk, ChunkCx, BORDER_LEN};
+use super::{
+    section::ComputeIndex, AsBaseChunk, AsBaseChunkMut, BaseChunk, BlockEntityCell, ChunkCx,
+    BORDER_LEN,
+};
 
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 /// Chunk for worlds.
 pub struct WorldChunk<'w, Cx>
@@ -55,14 +63,160 @@ pub enum CreationType {
 
 impl<'w, Cx> WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx::Id: for<'de> Deserialize<'de>,
 {
+    /// Peeks a [`BlockEntity`] at the target location, with given [`CreationType`].
     pub fn peek_block_entity_typed<F, T>(&self, pos: BlockPos, pk: F, ty: CreationType) -> Option<T>
     where
-        F: for<'s> FnOnce(&'s BlockEntity<'w, Cx>) -> T,
+        F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
     {
-        let be = self.base.block_entities.get(&pos);
-        todo!()
+        let be = self.base.block_entities.read().get(&pos).cloned();
+        if let Some(ref be) = be {
+            if be.read().is_removed() {
+                self.base.block_entities.write().remove(&pos);
+                return None;
+            }
+        } else {
+            if let Some(nbt) = self.base.block_entity_nbts.lock().remove(&pos) {
+                if let Some(be2) = self.load_block_entity_locked(pos, nbt) {
+                    return Some(pk(&be2));
+                }
+            }
+            if ty == CreationType::Immediate {
+                if let Some(be) = self.create_block_entity(pos) {
+                    self.add_block_entity_locked(be)
+                }
+            }
+        }
+
+        be.as_ref().map(pk)
+    }
+
+    /// Peeks a [`BlockEntity`] at the target location, with given [`CreationType`].
+    pub fn peek_block_entity_typed_lf<F, T>(
+        &mut self,
+        pos: BlockPos,
+        pk: F,
+        ty: CreationType,
+    ) -> Option<T>
+    where
+        F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
+    {
+        let be = self.base.block_entities.get_mut().get(&pos).cloned();
+        if let Some(ref be) = be {
+            if be.read().is_removed() {
+                self.base.block_entities.get_mut().remove(&pos);
+                return None;
+            }
+        } else {
+            if let Some(nbt) = self.base.block_entity_nbts.get_mut().remove(&pos) {
+                if let Some(be2) = self.load_block_entity(pos, nbt) {
+                    return Some(pk(&be2));
+                }
+            }
+            if ty == CreationType::Immediate {
+                if let Some(be) = self.create_block_entity_lf(pos) {
+                    self.add_block_entity(be)
+                }
+            }
+        }
+
+        be.as_ref().map(pk)
+    }
+
+    /// Adds a block entity to this chunk.
+    pub fn add_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>) {
+        self.set_block_entity(block_entity);
+        //TODO: Update tickers and game event listeners
+    }
+
+    /// Adds a block entity to this chunk.
+    pub fn add_block_entity_locked(&self, block_entity: Box<BlockEntity<'w, Cx>>) {
+        self.set_block_entity_locked(block_entity);
+        //TODO: Update tickers and game event listeners
+    }
+
+    fn load_block_entity(
+        &mut self,
+        pos: BlockPos,
+        nbt: Cx::Compound,
+    ) -> Option<BlockEntityCell<'w, Cx>> {
+        let be = DeserializeSeed::deserialize(
+            CreateFromNbt {
+                pos,
+                state: self.peek_block_state_lf(pos, BlockState::clone).unwrap(),
+                respect_dummy: true,
+            },
+            Cx::compound_to_deserializer(&nbt),
+        )
+        .ok()
+        .flatten();
+
+        if let Some(be) = be {
+            self.add_block_entity(be);
+            Some(
+                self.base
+                    .block_entities
+                    .get_mut()
+                    .get(&pos)
+                    .expect("block entity should be inserted into this chunk")
+                    .clone(),
+            )
+        } else {
+            None
+        }
+    }
+
+    fn load_block_entity_locked(
+        &self,
+        pos: BlockPos,
+        nbt: Cx::Compound,
+    ) -> Option<BlockEntityCell<'w, Cx>> {
+        let be = DeserializeSeed::deserialize(
+            CreateFromNbt {
+                pos,
+                state: self.peek_block_state(pos, BlockState::clone).unwrap(),
+                respect_dummy: true,
+            },
+            Cx::compound_to_deserializer(&nbt),
+        )
+        .ok()
+        .flatten();
+
+        if let Some(be) = be {
+            self.add_block_entity_locked(be);
+            Some(
+                self.base
+                    .block_entities
+                    .read()
+                    .get(&pos)
+                    .expect("block entity should be inserted into this chunk")
+                    .clone(),
+            )
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn create_block_entity(&self, pos: BlockPos) -> Option<Box<BlockEntity<'w, Cx>>> {
+        self.peek_block_state(pos, |be| {
+            be.state.data().block_entity_constructor().map(|f| f(pos))
+        })
+        .flatten()
+    }
+
+    #[inline]
+    fn create_block_entity_lf(&mut self, pos: BlockPos) -> Option<Box<BlockEntity<'w, Cx>>> {
+        self.peek_block_state_lf(pos, |be| {
+            be.state.data().block_entity_constructor().map(|f| f(pos))
+        })
+        .flatten()
     }
 }
 
@@ -88,7 +242,12 @@ where
 
 impl<'w, Cx> BlockView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx::Id: for<'de> Deserialize<'de>,
 {
     fn peek_block_state<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
     where
@@ -130,17 +289,23 @@ where
             })
     }
 
+    #[inline(always)]
     fn peek_block_entity<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
     where
-        F: for<'s> FnOnce(&'s BlockEntity<'w, Cx>) -> T,
+        F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
     {
-        todo!()
+        self.peek_block_entity_typed(pos, pk, CreationType::Check)
     }
 }
 
 impl<'w, Cx> LockFreeBlockView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx::Id: for<'de> Deserialize<'de>,
 {
     fn peek_block_state_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
     where
@@ -182,18 +347,23 @@ where
             })
     }
 
+    #[inline(always)]
     fn peek_block_entity_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
     where
-        F: for<'s> FnOnce(&'s BlockEntity<'w, Cx>) -> T,
+        F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
     {
-        todo!()
+        self.peek_block_entity_typed_lf(pos, pk, CreationType::Check)
     }
 }
 
 impl<'w, Cx> BlockViewMut<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::BlockStateExt: ProvideBlockEntity<Cx>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx::Id: for<'de> Deserialize<'de>,
 {
     fn set_block_state(
         &mut self,
@@ -214,10 +384,47 @@ where
             let mut be2 = self
                 .base
                 .block_entities
-                .insert(block_entity.pos(), block_entity);
+                .get_mut()
+                .insert(block_entity.pos(), Arc::new(RwLock::new(block_entity)));
             if let Some(be) = &mut be2 {
-                be.mark_removed();
+                if let Some(be) = Arc::get_mut(be) {
+                    be.get_mut().mark_removed();
+                } else {
+                    be.write().mark_removed();
+                }
             }
+        }
+    }
+}
+
+impl<'w, Cx> LockedBlockViewMut<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx::Id: for<'de> Deserialize<'de>,
+{
+    fn set_block_state_locked(
+        &self,
+        pos: BlockPos,
+        state: BlockState<'w, Cx>,
+        moved: bool,
+    ) -> Option<BlockState<'w, Cx>> {
+        todo!()
+    }
+
+    fn set_block_entity_locked(&self, mut block_entity: Box<BlockEntity<'w, Cx>>) {
+        //TODO: set world for block entity if necessary.
+        block_entity.cancel_removal();
+        let mut be2 = self
+            .base
+            .block_entities
+            .write()
+            .insert(block_entity.pos(), Arc::new(RwLock::new(block_entity)));
+        if let Some(be) = &mut be2 {
+            be.write().mark_removed();
         }
     }
 }

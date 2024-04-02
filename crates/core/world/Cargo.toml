@@ -13,7 +13,7 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 # Rimecraft crates
-rimecraft-global-cx = { path = "../global-cx" }
+rimecraft-global-cx = { path = "../global-cx", features = ["nbt"] }
 rimecraft-chunk-palette = { path = "../palette" }
 rimecraft-registry = { path = "../../util/registry", features = ["serde"] }
 rimecraft-state = { path = "../state" }
@@ -29,6 +29,7 @@ rimecraft-edcode = { path = "../../util/edcode", optional = true }
 parking_lot = "0.12"
 fastnbt = "2.5"
 ahash = "0.8"
+scc = "2.0"
 
 [features]
 default = ["edcode"]

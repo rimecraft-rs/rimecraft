@@ -391,10 +391,9 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
+/// Serde support for `State`s.
 #[cfg(feature = "serde")]
 pub mod serde {
-    //! Serde support for state.
-
     use std::sync::Arc;
 
     use rimecraft_serde_update::Update;

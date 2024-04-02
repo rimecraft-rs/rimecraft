@@ -14,7 +14,11 @@ pub mod view;
 
 pub mod behave;
 
+use std::sync::Arc;
+
 pub use ahash::{AHashMap, AHashSet};
+use parking_lot::RwLock;
+use rimecraft_block_entity::BlockEntity;
 
 /// The default max light level of Minecraft.
 pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
@@ -30,3 +34,6 @@ impl<T> From<T> for Sealed<T> {
         Self(value)
     }
 }
+
+/// Boxed block entity cell with internal mutability and reference-counting.
+pub type BlockEntityCell<'w, Cx> = Arc<RwLock<Box<BlockEntity<'w, Cx>>>>;

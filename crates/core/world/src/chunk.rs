@@ -5,9 +5,8 @@
 use std::fmt::Debug;
 
 use ahash::AHashMap;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
-use rimecraft_block_entity::BlockEntity;
 use rimecraft_chunk_palette::{
     container::ProvidePalette, IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
 };
@@ -22,7 +21,7 @@ use crate::{
         block::{BlockLuminanceView, BlockView, LockedBlockViewMut},
         HeightLimit,
     },
-    Sealed,
+    BlockEntityCell, Sealed,
 };
 
 mod internal_types;
@@ -80,9 +79,9 @@ where
     /// Height limit of this chunk.
     pub height_limit: HeightLimit,
     /// Map of block positions to block entities.
-    pub block_entities: AHashMap<BlockPos, Box<BlockEntity<'w, Cx>>>,
+    pub block_entities: RwLock<AHashMap<BlockPos, BlockEntityCell<'w, Cx>>>,
     /// Map of block positions to block entities.
-    pub block_entity_nbt: AHashMap<BlockPos, Cx::Compound>,
+    pub block_entity_nbts: Mutex<AHashMap<BlockPos, Cx::Compound>>,
     /// The internal chunk sections.
     pub section_array: Box<[RwLock<ChunkSection<'w, Cx>>]>,
     /// Increases for each tick a player spends with the chunk loaded.
@@ -157,8 +156,8 @@ where
             upgrade_data,
             height_limit,
             heightmaps: AHashMap::new(),
-            block_entities: AHashMap::new(),
-            block_entity_nbt: AHashMap::new(),
+            block_entities: RwLock::new(AHashMap::new()),
+            block_entity_nbts: Mutex::new(AHashMap::new()),
             section_array: {
                 let len = height_limit.count_vertical_sections() as usize;
                 if let Some(section_array) = section_array {

@@ -1,17 +1,19 @@
 //! Rimecraft block entity primitives.
 
-use std::{any::TypeId, fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{any::TypeId, fmt::Debug};
 
 use erased_serde::{serialize_trait_object, Serialize as ErasedSerialize};
 
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
-use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
-use rimecraft_registry::{entry::RefEntry, ProvideRegistry, Reg, Registry};
+use rimecraft_global_cx::ProvideIdTy;
+use rimecraft_registry::{entry::RefEntry, Reg};
 use rimecraft_serde_update::{erased::ErasedUpdate, update_trait_object};
 use rimecraft_voxel_math::BlockPos;
-use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize};
+use serde::{Deserializer, Serialize};
 
 pub use rimecraft_downcast::ToStatic;
+
+pub mod deser_nbt;
 
 /// A type of [`BlockEntity`].
 pub trait RawBlockEntityType<Cx>: Debug
@@ -233,158 +235,19 @@ where
 
 /// A trait for providing block entities.
 ///
-/// This could only be implemented for [`ProvideBlockStateExtTy::BlockStateExt`]s.
-pub trait ProvideBlockEntity<Cx>
+/// This should be implemented for [`ProvideBlockStateExtTy::BlockStateExt`]s.
+pub trait ProvideBlockEntity<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy<BlockStateExt = Self>,
 {
     /// Whether this block has a block entity.
     #[inline]
     fn has_block_entity(&self) -> bool {
-        self.constructor().is_some()
+        self.block_entity_constructor().is_some()
     }
 
     /// Gets the block entity constructor of this block.
-    fn constructor<'w>(&'w self) -> Option<impl FnOnce(BlockPos) -> Box<BlockEntity<'w, Cx>> + 'w>;
-}
-
-/// A [`DeserializeSeed`] for [`BlockEntity`].
-///
-/// This deserializes the id of the block entity type and its data.
-pub struct CreateFromNbt<'w, Cx>
-where
-    Cx: ProvideBlockStateExtTy,
-{
-    /// The position of the block entity.
-    pub pos: BlockPos,
-    /// The state of the [`Block`] the block entity belongs to.
-    pub state: BlockState<'w, Cx>,
-}
-
-impl<Cx> Debug for CreateFromNbt<'_, Cx>
-where
-    Cx: ProvideBlockStateExtTy + Debug,
-    Cx::BlockStateExt: Debug,
-    Cx::Id: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CreateFromNbt")
-            .field("pos", &self.pos)
-            .field("state", &self.state)
-            .finish()
-    }
-}
-
-impl<'w, 'de, Cx> DeserializeSeed<'de> for CreateFromNbt<'w, Cx>
-where
-    Cx: ProvideBlockStateExtTy
-        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>
-        + ProvideNbtTy,
-    Cx::Id: Deserialize<'de> + Hash + Eq,
-{
-    type Value = Option<Box<BlockEntity<'w, Cx>>>;
-
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct Visitor<'a, 'w, Cx>(&'a CreateFromNbt<'w, Cx>)
-        where
-            Cx: ProvideBlockStateExtTy;
-
-        impl<'de, 'w, Cx> serde::de::Visitor<'de> for Visitor<'_, 'w, Cx>
-        where
-            Cx: ProvideBlockStateExtTy
-                + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>
-                + ProvideNbtTy,
-            Cx::Id: Deserialize<'de> + Hash + Eq,
-        {
-            type Value = Option<Box<BlockEntity<'w, Cx>>>;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("a block entity")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                use serde::__private::de::Content;
-
-                let mut id: Option<Cx::Id> = None;
-                let mut collect: Vec<Option<(Content<'de>, Content<'de>)>> =
-                    Vec::with_capacity(map.size_hint().map_or(0, |i| i - 1));
-
-                enum Field<'de> {
-                    Id,
-                    Other(Content<'de>),
-                }
-
-                impl<'de> Deserialize<'de> for Field<'de> {
-                    fn deserialize<D>(deserializer: D) -> Result<Field<'de>, D::Error>
-                    where
-                        D: Deserializer<'de>,
-                    {
-                        struct FieldVisitor;
-
-                        impl<'de> serde::de::Visitor<'de> for FieldVisitor {
-                            type Value = Field<'de>;
-
-                            fn expecting(
-                                &self,
-                                formatter: &mut std::fmt::Formatter<'_>,
-                            ) -> std::fmt::Result {
-                                formatter.write_str("a field")
-                            }
-
-                            fn visit_str<E>(self, v: &str) -> Result<Field<'de>, E>
-                            where
-                                E: serde::de::Error,
-                            {
-                                match v {
-                                    "id" => Ok(Field::Id),
-                                    _ => Ok(Field::Other(Content::String(v.into()))),
-                                }
-                            }
-                        }
-
-                        deserializer.deserialize_identifier(FieldVisitor)
-                    }
-                }
-
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Field::Id => {
-                            if id.is_some() {
-                                return Err(serde::de::Error::duplicate_field("id"));
-                            }
-
-                            id = Some(map.next_value()?);
-                        }
-                        Field::Other(content) => {
-                            collect.push(Some((content, map.next_value()?)));
-                        }
-                    }
-                }
-
-                let id = id.ok_or_else(|| serde::de::Error::missing_field("id"))?;
-                let registry: &Registry<_, RawBlockEntityTypeDyn<'w, Cx>> = Cx::registry();
-                let ty = registry.get(&id).ok_or_else(|| {
-                    serde::de::Error::custom(format!("unknown block entity type: {}", id))
-                })?;
-
-                let mut be = ty.instantiate(self.0.pos, self.0.state.clone());
-                // Update the block entity data.
-                if let Some(be) = &mut be {
-                    rimecraft_serde_update::Update::update(
-                        &mut be.data,
-                        serde::__private::de::FlatMapDeserializer(&mut collect, PhantomData),
-                    )?;
-                }
-                Ok(be)
-            }
-        }
-
-        deserializer.deserialize_map(Visitor(&self))
-    }
+    fn block_entity_constructor<'s>(
+        &'s self,
+    ) -> Option<impl FnOnce(BlockPos) -> Box<BlockEntity<'w, Cx>> + 's>;
 }
