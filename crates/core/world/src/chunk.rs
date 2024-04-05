@@ -53,7 +53,9 @@ where
     Self: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideIdTy + ProvideNbtTy,
 {
     /// The type of block state id list.
-    type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>;
+    type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>
+        + for<'a> PalIndexToRaw<&'a BlockState<'w, Self>>
+        + Clone;
 
     /// The type of biomes.
     type Biome: 'w;
@@ -75,7 +77,7 @@ where
     /// Upgrade data of this chunk.
     pub upgrade_data: UpgradeData<'w, Cx>,
     /// Heightmaps of this chunk.
-    pub heightmaps: AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>,
+    pub heightmaps: RwLock<AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>,
     /// Height limit of this chunk.
     pub height_limit: HeightLimit,
     /// Map of block positions to block entities.
@@ -155,7 +157,7 @@ where
             inhabited_time,
             upgrade_data,
             height_limit,
-            heightmaps: AHashMap::new(),
+            heightmaps: RwLock::new(AHashMap::new()),
             block_entities: RwLock::new(AHashMap::new()),
             block_entity_nbts: Mutex::new(AHashMap::new()),
             section_array: {
@@ -213,6 +215,12 @@ where
         self.sections().get(index)
     }
 
+    /// Returns the [`HeightLimit`] of this chunk.
+    #[inline]
+    fn height_limit(&self) -> HeightLimit {
+        self.as_base_chunk().0.height_limit
+    }
+
     /// Returns the index of highest non-empty [`ChunkSection`] in this chunk.
     ///
     /// See [`ChunkSection::is_empty`].
@@ -220,10 +228,24 @@ where
         self.sections().iter().rposition(|s| !s.read().is_empty())
     }
 
-    /// Returns the heightmaps of this chunk.
+    /// Peeks the heightmaps of this chunk.
     #[inline]
-    fn heightmaps(&self) -> &AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>> {
-        &self.as_base_chunk().0.heightmaps
+    fn peek_heightmaps<F, T>(&self, pk: F) -> T
+    where
+        F: for<'a> FnOnce(&'a AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
+    {
+        let rg = self.as_base_chunk().0.heightmaps.read();
+        pk(&rg)
+    }
+
+    /// Peeks the heightmaps of this chunk.
+    #[inline]
+    fn peek_heightmaps_mut_locked<F, T>(&self, pk: F) -> T
+    where
+        F: for<'a> FnOnce(&'a mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
+    {
+        let mut rg = self.as_base_chunk().0.heightmaps.write();
+        pk(&mut rg)
     }
 
     /// Returns the position of this chunk.
@@ -249,6 +271,15 @@ where
     #[inline]
     fn section_mut(&mut self, index: usize) -> Option<&mut RwLock<ChunkSection<'w, Cx>>> {
         self.sections_mut().get_mut(index)
+    }
+
+    /// Peeks the heightmaps of this chunk.
+    #[inline]
+    fn peek_heightmaps_mut<F, T>(&mut self, pk: F) -> T
+    where
+        F: for<'a> FnOnce(&'a mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
+    {
+        pk(self.as_base_chunk_mut().0.heightmaps.get_mut())
     }
 
     /// Returns the index of highest non-empty [`ChunkSection`] in this chunk.

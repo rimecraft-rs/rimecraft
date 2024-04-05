@@ -202,7 +202,6 @@ where
                     self.rt_block_c += 1;
                 }
             }
-
             let fs = state.to_fluid_state();
             if !fs.fluid.settings().is_empty {
                 self.ne_fluid_c += 1;

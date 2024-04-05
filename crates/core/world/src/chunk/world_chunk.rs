@@ -11,13 +11,15 @@ use rimecraft_voxel_math::{BlockPos, IVec3};
 use serde::{de::DeserializeSeed, Deserialize};
 
 use crate::{
-    view::block::{BlockView, BlockViewMut, LockFreeBlockView, LockedBlockViewMut},
+    view::block::{
+        BlockLuminanceView, BlockView, BlockViewMut, LockFreeBlockView, LockedBlockViewMut,
+    },
     Sealed,
 };
 
 use super::{
-    section::ComputeIndex, AsBaseChunk, AsBaseChunkMut, BaseChunk, BlockEntityCell, ChunkCx,
-    BORDER_LEN,
+    section::ComputeIndex, AsBaseChunk, AsBaseChunkMut, BaseChunk, BlockEntityCell, Chunk, ChunkCx,
+    ChunkMut, BORDER_LEN,
 };
 
 use std::{fmt::Debug, sync::Arc};
@@ -371,6 +373,30 @@ where
         state: BlockState<'w, Cx>,
         moved: bool,
     ) -> Option<BlockState<'w, Cx>> {
+        let section = self
+            .section_mut(self.height_limit().section_index(pos.y()))?
+            .get_mut();
+        let sec_is_empty = section.is_empty();
+        if sec_is_empty && state.block.settings().is_empty {
+            return None;
+        }
+
+        let bs;
+        let state_ptr = Arc::as_ptr(&state.state);
+        {
+            let IVec3 { x, y, z } = pos.0 & (BORDER_LEN as i32 - 1);
+            bs = section.set_block_state(x as u32, y as u32, z as u32, state);
+        }
+
+        if bs
+            .as_ref()
+            .map_or(false, |s| Arc::as_ptr(&s.state) == state_ptr)
+        {
+            return None;
+        }
+
+        //TODO: Update heightmaps and block entities.
+
         todo!()
     }
 
@@ -427,4 +453,40 @@ where
             be.write().mark_removed();
         }
     }
+}
+
+impl<'w, Cx> BlockLuminanceView<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx::Id: for<'de> Deserialize<'de>,
+{
+    fn luminance(&self, pos: BlockPos) -> crate::view::StateOption<u32> {
+        todo!()
+    }
+}
+
+impl<'w, Cx> Chunk<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx::Id: for<'de> Deserialize<'de>,
+{
+}
+
+impl<'w, Cx> ChunkMut<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx::Id: for<'de> Deserialize<'de>,
+{
 }
