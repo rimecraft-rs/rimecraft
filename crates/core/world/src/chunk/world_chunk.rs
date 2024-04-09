@@ -1,5 +1,6 @@
 //! World chunks.
 
+use ahash::AHashMap;
 use parking_lot::RwLock;
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
@@ -11,6 +12,7 @@ use rimecraft_voxel_math::{BlockPos, IVec3};
 use serde::{de::DeserializeSeed, Deserialize};
 
 use crate::{
+    heightmap::{self, Heightmap},
     view::block::{
         BlockLuminanceView, BlockView, BlockViewMut, LockFreeBlockView, LockedBlockViewMut,
     },
@@ -382,17 +384,35 @@ where
         }
 
         let bs;
-        let state_ptr = Arc::as_ptr(&state.state);
+        let pos_alt = pos.0 & (BORDER_LEN as i32 - 1);
         {
-            let IVec3 { x, y, z } = pos.0 & (BORDER_LEN as i32 - 1);
-            bs = section.set_block_state(x as u32, y as u32, z as u32, state);
+            let IVec3 { x, y, z } = pos_alt;
+            bs = section.set_block_state(x as u32, y as u32, z as u32, state.clone());
         }
 
         if bs
             .as_ref()
-            .map_or(false, |s| Arc::as_ptr(&s.state) == state_ptr)
+            .map_or(false, |s| Arc::ptr_eq(&s.state, &state.state))
         {
             return None;
+        }
+
+        {
+            let IVec3 { x, y, z } = IVec3 {
+                y: pos.y(),
+                ..pos_alt
+            };
+            let hms = self.base.heightmaps.get_mut()
+                as *mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>;
+            for ty in <Cx::HeightmapType as heightmap::Type<'w, Cx>>::iter_block_update_types() {
+                // SAFETY: This is safe because the `hms` is a valid pointer, and `peek_block_state_lf` does not interact with heightmaps.
+                if let Some(hm) = unsafe { &mut *hms }.get_mut(ty) {
+                    hm.track_update(x, y, z, &state, |pos, pred| {
+                        self.peek_block_state_lf(pos, |bs| pred(Some(bs)))
+                            .unwrap_or_else(|| pred(None))
+                    });
+                }
+            }
         }
 
         //TODO: Update heightmaps and block entities.

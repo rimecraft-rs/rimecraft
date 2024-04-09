@@ -2,7 +2,7 @@
 //!
 //! A chunk represents a scoped, mutable view of `Biome`s, [`BlockState`]s, [`FluidState`]s and [`BlockEntity`]s.
 
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 
 use ahash::AHashMap;
 use parking_lot::{Mutex, RwLock};
@@ -63,7 +63,7 @@ where
     type BiomeList;
 
     /// The `Heightmap.Type` type of heightmaps.
-    type HeightmapType: heightmap::Type<'w, Self>;
+    type HeightmapType: heightmap::Type<'w, Self> + Hash + Eq;
 }
 
 /// A generic chunk data structure.
