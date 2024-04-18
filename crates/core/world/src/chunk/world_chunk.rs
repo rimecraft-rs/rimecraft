@@ -5,7 +5,7 @@ use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
     deser_nbt::CreateFromNbt, BlockEntity, ProvideBlockEntity, RawBlockEntityTypeDyn,
 };
-use rimecraft_chunk_palette::Maybe;
+use rimecraft_chunk_palette::{Maybe, SimpleOwned};
 use rimecraft_fluid::{BsToFs, FluidState};
 use rimecraft_registry::ProvideRegistry;
 use rimecraft_voxel_math::{BlockPos, IVec3};
@@ -402,7 +402,10 @@ where
             let IVec3 { x, y, z } = pos_alt;
             bs = section
                 .set_block_state(x as u32, y as u32, z as u32, state.clone())
-                .map(Maybe::into_owned);
+                .map(|maybe| match maybe {
+                    Maybe::Borrowed(bs) => bs.clone(),
+                    Maybe::Owned(SimpleOwned(bs)) => bs,
+                });
         }
 
         if bs
