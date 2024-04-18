@@ -3,6 +3,7 @@
 use rimecraft_voxel_math::section_coord;
 
 pub mod block;
+pub mod light;
 mod state_option;
 
 pub use state_option::StateOption;

@@ -45,8 +45,6 @@ impl<N, P> Identifier<N, P> {
 
 /// Namespace types that are able to separate with paths, or path types that are able to split by itself.
 pub trait Separate {
-    //TODO: use `Pattern` when it's stable
-
     /// The separator used to separate namespace and path.
     const SEPARATOR: char;
 }

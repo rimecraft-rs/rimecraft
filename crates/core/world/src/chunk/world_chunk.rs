@@ -1,18 +1,18 @@
 //! World chunks.
 
-use ahash::AHashMap;
 use parking_lot::RwLock;
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
     deser_nbt::CreateFromNbt, BlockEntity, ProvideBlockEntity, RawBlockEntityTypeDyn,
 };
+use rimecraft_chunk_palette::Maybe;
 use rimecraft_fluid::{BsToFs, FluidState};
 use rimecraft_registry::ProvideRegistry;
 use rimecraft_voxel_math::{BlockPos, IVec3};
 use serde::{de::DeserializeSeed, Deserialize};
 
 use crate::{
-    heightmap::{self, Heightmap},
+    heightmap,
     view::block::{
         BlockLuminanceView, BlockView, BlockViewMut, LockFreeBlockView, LockedBlockViewMut,
     },
@@ -33,7 +33,9 @@ where
 {
     /// The [`BaseChunk`].
     pub base: BaseChunk<'w, Cx>,
-    //TODO： The `World` pointer.
+
+    is_client: bool,
+    loaded_to_world: bool,
 }
 
 impl<'w, Cx> Debug for WorldChunk<'w, Cx>
@@ -63,6 +65,17 @@ pub enum CreationType {
     Queued,
     /// Checks if the block entity exists.
     Check,
+}
+
+impl<'w, Cx> WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    /// Whether this chunk can tick [`BlockEntity`]s.
+    #[inline(always)]
+    fn can_tick_be_glob(&self) -> bool {
+        self.loaded_to_world || self.is_client
+    }
 }
 
 impl<'w, Cx> WorldChunk<'w, Cx>
@@ -387,7 +400,9 @@ where
         let pos_alt = pos.0 & (BORDER_LEN as i32 - 1);
         {
             let IVec3 { x, y, z } = pos_alt;
-            bs = section.set_block_state(x as u32, y as u32, z as u32, state.clone());
+            bs = section
+                .set_block_state(x as u32, y as u32, z as u32, state.clone())
+                .map(Maybe::into_owned);
         }
 
         if bs
@@ -402,20 +417,32 @@ where
                 y: pos.y(),
                 ..pos_alt
             };
-            let hms = self.base.heightmaps.get_mut()
-                as *mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>;
-            for ty in <Cx::HeightmapType as heightmap::Type<'w, Cx>>::iter_block_update_types() {
+            let this_ptr = self as *mut WorldChunk<'w, Cx>;
+            for ty in <Cx::HeightmapType as heightmap::Type<'w, Cx>>::iter_block_update_types_wc() {
                 // SAFETY: This is safe because the `hms` is a valid pointer, and `peek_block_state_lf` does not interact with heightmaps.
-                if let Some(hm) = unsafe { &mut *hms }.get_mut(ty) {
-                    hm.track_update(x, y, z, &state, |pos, pred| {
-                        self.peek_block_state_lf(pos, |bs| pred(Some(bs)))
-                            .unwrap_or_else(|| pred(None))
-                    });
+                unsafe {
+                    if let Some(hm) = self.base.heightmaps.get_mut().get_mut(ty) {
+                        hm.track_update(x, y, z, &state, |pos, pred| {
+                            (*this_ptr)
+                                .peek_block_state_lf(pos, |bs| pred(Some(bs)))
+                                .unwrap_or_else(|| pred(None))
+                        });
+                    }
                 }
             }
         }
 
-        //TODO: Update heightmaps and block entities.
+        //TODO: update lighting
+        //TODO: update profiler
+
+        if let Some(ref bs) = bs {
+            let has_be = bs.state.data().has_block_entity();
+            if !self.is_client {
+                //TODO: call `on_state_replaced`.
+            } else if bs.block != state.block && has_be {
+                self.remove_block_entity(pos);
+            }
+        }
 
         todo!()
     }
@@ -439,6 +466,24 @@ where
                     be.write().mark_removed();
                 }
             }
+        }
+    }
+
+    fn remove_block_entity(&mut self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>> {
+        if self.can_tick_be_glob() {
+            let mut be = self.base.block_entities.get_mut().remove(&pos);
+            if let Some(be) = &mut be {
+                //TODO: remove game event listener
+                if let Some(raw) = Arc::get_mut(be) {
+                    raw.get_mut().mark_removed();
+                } else {
+                    be.write().mark_removed();
+                }
+            }
+            //TODO: remove ticker
+            be
+        } else {
+            None
         }
     }
 }
@@ -472,6 +517,10 @@ where
         if let Some(be) = &mut be2 {
             be.write().mark_removed();
         }
+    }
+
+    fn remove_block_entity_locked(&self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>> {
+        todo!()
     }
 }
 

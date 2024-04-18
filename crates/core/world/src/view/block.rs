@@ -1,5 +1,7 @@
 //! Block views.
 
+use std::sync::Arc;
+
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_block_entity::BlockEntity;
 use rimecraft_fluid::{FluidState, ProvideFluidStateExtTy};
@@ -85,6 +87,9 @@ where
 
     /// Adds a [`BlockEntity`] to this view.
     fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>);
+
+    /// Removes a [`BlockEntity`] from this view, and returns it if presents.
+    fn remove_block_entity(&mut self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>>;
 }
 
 /// [`BlockViewMut`] with internal mutability.
@@ -104,4 +109,7 @@ where
 
     /// Adds a [`BlockEntity`] to this view.
     fn set_block_entity_locked(&self, block_entity: Box<BlockEntity<'w, Cx>>);
+
+    /// Removes a [`BlockEntity`] from this view, and returns it if presents.
+    fn remove_block_entity_locked(&self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>>;
 }

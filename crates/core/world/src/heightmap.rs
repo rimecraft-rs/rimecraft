@@ -120,8 +120,8 @@ pub trait Type<'w, Cx: ChunkCx<'w>>: 'w {
     fn predicate(&self) -> Self::Predicate;
 
     /// Returns an [`Iterator`] of this type, containing all types that is required
-    /// to be updated on block state updates.
-    fn iter_block_update_types() -> impl Iterator<Item = &'w Self>;
+    /// to be updated on block state updates in `WorldChunk`.
+    fn iter_block_update_types_wc() -> impl Iterator<Item = &'w Self>;
 }
 
 /// [`RawHeightmap`] with predicate type filled with [`Type::Predicate`].

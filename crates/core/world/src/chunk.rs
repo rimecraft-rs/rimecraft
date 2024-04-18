@@ -26,6 +26,7 @@ use crate::{
 
 mod internal_types;
 
+mod be_tick;
 pub mod light;
 mod section;
 mod upgrade;
