@@ -1,24 +1,19 @@
 [package]
-name = "rimecraft-global-cx"
+name = "rimecraft-downcast"
 version = "0.1.0"
 edition = "2021"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
-description = "Rimecraft global context traits"
+description = "Downcastable cells and non-static downcasting for Rust"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
-categories = []
+categories = ["rust-patterns"]
 
 [badges]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-serde = { version = "1.0", default-features = false, optional = true }
 
 [features]
-default = ["std"]
-std = []
-serde = ["dep:serde"]
-nbt = ["serde"]
 
 [lints]
 workspace = true

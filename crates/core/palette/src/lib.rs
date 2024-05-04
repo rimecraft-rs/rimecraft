@@ -9,7 +9,7 @@ use ahash::AHashMap;
 pub use iter::Iter;
 use iter::IterImpl;
 
-pub use rimecraft_maybe::Maybe;
+pub use rimecraft_maybe::{Maybe, SimpleOwned};
 
 /// A palette maps object from and to small integer IDs that uses less number of bits
 /// to make storage smaller.
@@ -448,5 +448,3 @@ impl std::fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
-
-//TODO: tests

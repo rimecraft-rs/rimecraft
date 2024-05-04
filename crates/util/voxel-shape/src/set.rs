@@ -118,7 +118,7 @@ impl<'a> VoxelSetSlice<'a> {
 
 /// Basic properties of a voxel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(packed)]
+// Don't use `repr(packed)`: it's discouraged by rustc.
 pub struct Props {
     /// Length of the set in the X direction.
     pub len_x: u32,

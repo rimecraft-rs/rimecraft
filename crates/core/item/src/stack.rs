@@ -310,25 +310,35 @@ mod _serde {
                 let mut count = 0u8;
                 let mut tag = None;
 
+                #[derive(Deserialize)]
+                #[serde(field_identifier)]
+                enum Field {
+                    #[serde(rename = "id")]
+                    Id,
+                    #[serde(rename = "Count")]
+                    Count,
+                    #[serde(rename = "tag")]
+                    Tag,
+                }
+
                 while let Some(key) = map.next_key()? {
                     match key {
-                        "id" => {
+                        Field::Id => {
                             if id.is_some() {
                                 return Err(serde::de::Error::duplicate_field("id"));
                             }
                             let entry: &RefEntry<Cx::Id, RawItem<Cx>> = map.next_value()?;
                             id = Some(Cx::registry().of_raw(entry.raw_id()).unwrap());
                         }
-                        "Count" => {
+                        Field::Count => {
                             count = map.next_value::<u8>()?;
                         }
-                        "tag" => {
+                        Field::Tag => {
                             if tag.is_some() {
                                 return Err(serde::de::Error::duplicate_field("tag"));
                             }
                             tag = Some(map.next_value()?);
                         }
-                        _ => {}
                     }
                 }
 

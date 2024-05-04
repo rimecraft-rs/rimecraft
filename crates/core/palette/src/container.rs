@@ -1,7 +1,8 @@
 //! Paletted containers.
 
-use std::{collections::HashMap, hash::Hash, marker::PhantomData};
+use std::{hash::Hash, marker::PhantomData};
 
+use ahash::AHashMap;
 use rimecraft_maybe::Maybe;
 use rimecraft_packed_int_array::PackedIntArray;
 
@@ -133,9 +134,9 @@ where
             .then(|| self.data.palette.get(0))
             .flatten()
         {
-            counter(&val, self.data.storage.len());
+            counter(&*val, self.data.storage.len());
         } else {
-            let mut map = HashMap::new();
+            let mut map = AHashMap::new();
             if let Some(array) = self.data.storage.as_array() {
                 array.iter().for_each(|i| {
                     if let Some(val) = map.get_mut(&i) {
@@ -151,7 +152,7 @@ where
                 .into_iter()
                 .filter_map(|(i, c)| self.data.palette.get(i as usize).map(|i| (i, c)))
             {
-                counter(&obj, c);
+                counter(&*obj, c);
             }
         }
     }
@@ -285,7 +286,7 @@ where
                 .as_array()
                 .and_then(|array| array.get(i))
                 .and_then(|i| palette.get(i as usize))
-                .and_then(|obj| self.palette.index(&obj))
+                .and_then(|obj| self.palette.index(&*obj))
             {
                 self.storage.as_array_mut().unwrap().swap(i, raw as u32);
             }

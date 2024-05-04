@@ -136,10 +136,9 @@ mod serde {
     }
 }
 
+/// Helper module for `edcode` support.
 #[cfg(feature = "edcode")]
 pub mod edcode {
-    //! Helper module for `edcode` support.
-
     use rimecraft_edcode::{bytes, Decode, Encode};
 
     use crate::ProvideRegistry;
