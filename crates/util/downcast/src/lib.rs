@@ -69,8 +69,12 @@ where
 
 impl<T: ?Sized> Downcast<T> {
     /// Downcasts the value into a concrete type, returning an immutable reference.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because it could not make sure the lifetime is safe.
     #[inline]
-    pub fn downcast_ref<V: ToStatic>(&self) -> Option<&V> {
+    pub unsafe fn downcast_ref<V: ToStatic>(&self) -> Option<&V> {
         if self.is_safe::<V>() {
             unsafe { Some(&*(&self.value as *const T as *const V)) }
         } else {
@@ -79,8 +83,12 @@ impl<T: ?Sized> Downcast<T> {
     }
 
     /// Downcasts the value into a concrete type, returning a mutable reference.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because it could not make sure the lifetime is safe.
     #[inline]
-    pub fn downcast_mut<V: ToStatic>(&mut self) -> Option<&mut V> {
+    pub unsafe fn downcast_mut<V: ToStatic>(&mut self) -> Option<&mut V> {
         if self.is_safe::<V>() {
             unsafe { Some(&mut *(&mut self.value as *mut T as *mut V)) }
         } else {

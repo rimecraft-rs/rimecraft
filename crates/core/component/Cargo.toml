@@ -1,0 +1,27 @@
+[package]
+name = "rimecraft-component"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Minecraft Component implementation"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+serde = "1.0"
+erased-serde = "0.4"
+bytes = "1.6"
+ahash = "0.8"
+rimecraft-edcode = { path = "../../util/edcode" }
+rimecraft-registry = { path = "../../util/registry" }
+rimecraft-global-cx = { path = "../global-cx" }
+rimecraft-maybe = { path = "../../util/maybe" }
+
+[features]
+
+[lints]
+workspace = true

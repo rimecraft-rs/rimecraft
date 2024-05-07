@@ -16,7 +16,6 @@ extern crate std;
 use core::{fmt::Display, hash::Hash};
 
 use alloc::boxed::Box;
-use serde::Deserializer;
 
 /// Marker trait for global contexts.
 pub trait GlobalContext: Sized + 'static {}
@@ -40,7 +39,7 @@ pub trait ProvideNbtTy: GlobalContext {
     type LongArray: Into<Box<[i64]>> + From<Box<[i32]>>;
 
     /// Function that converts a `Compound` to a [`Deserializer`].
-    fn compound_to_deserializer(compound: &Self::Compound) -> impl Deserializer<'_>;
+    fn compound_to_deserializer(compound: &Self::Compound) -> impl serde::Deserializer<'_>;
 }
 
 #[cfg(feature = "std")]
