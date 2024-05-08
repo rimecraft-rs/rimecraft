@@ -23,9 +23,7 @@ pub mod map;
 #[derive(Debug)]
 #[doc(alias = "DataComponentType")]
 pub struct ComponentType<T> {
-    serde_codec: Option<SerdeCodec>,
-    packet_codec: PacketCodec,
-    util: DynUtil,
+    f: &'static Funcs,
     _marker: PhantomData<T>,
 }
 
@@ -34,7 +32,7 @@ impl<T> ComponentType<T> {
     #[inline]
     #[doc(alias = "should_skip_serialization")]
     pub fn is_transient(&self) -> bool {
-        self.serde_codec.is_none()
+        self.f.serde_codec.is_none()
     }
 }
 
@@ -44,12 +42,7 @@ where
 {
     const UTIL: DynUtil = DynUtil {
         clone: |obj| Box::new(obj.downcast_ref::<T>().expect("mismatched type").clone()),
-        eq: |a, b| {
-            a.downcast_ref::<T>()
-                .zip(b.downcast_ref::<T>())
-                .map(|(a, b)| a == b)
-                .unwrap_or_default()
-        },
+        eq: |a, b| a.downcast_ref::<T>() == b.downcast_ref::<T>(),
     };
 }
 
@@ -80,9 +73,11 @@ where
     #[inline]
     pub const fn transient() -> Self {
         Self {
-            serde_codec: None,
-            packet_codec: Self::PACKET_CODEC,
-            util: Self::UTIL,
+            f: &Funcs {
+                serde_codec: None,
+                packet_codec: Self::PACKET_CODEC,
+                util: Self::UTIL,
+            },
             _marker: PhantomData,
         }
     }
@@ -123,9 +118,11 @@ where
     #[allow(clippy::missing_panics_doc)]
     pub const fn persistent() -> Self {
         Self {
-            serde_codec: Some(Self::SERDE_CODEC),
-            packet_codec: Self::PACKET_CODEC,
-            util: Self::UTIL,
+            f: &Funcs {
+                serde_codec: Some(Self::SERDE_CODEC),
+                packet_codec: Self::PACKET_CODEC,
+                util: Self::UTIL,
+            },
             _marker: PhantomData,
         }
     }
@@ -172,30 +169,35 @@ impl<T> Clone for ComponentType<T> {
 #[derive(Debug)]
 pub struct RawErasedComponentType<Cx> {
     ty: TypeId,
-    serde_codec: Option<SerdeCodec>,
-    packet_codec: PacketCodec,
-    util: DynUtil,
+    f: &'static Funcs,
     _marker: PhantomData<Cx>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 struct SerdeCodec {
     ser: fn(&Object, &mut dyn erased_serde::Serializer) -> erased_serde::Result<()>,
     de: fn(&mut dyn erased_serde::Deserializer<'_>) -> erased_serde::Result<Box<Object>>,
     upd: fn(&mut Object, &mut dyn erased_serde::Deserializer<'_>) -> erased_serde::Result<()>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 struct PacketCodec {
     encode: fn(&Object, &mut dyn bytes::BufMut) -> Result<(), std::io::Error>,
     decode: fn(&mut dyn bytes::Buf) -> Result<Box<Object>, std::io::Error>,
     upd: fn(&mut Object, &mut dyn bytes::Buf) -> Result<(), std::io::Error>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 struct DynUtil {
     clone: fn(&Object) -> Box<Object>,
     eq: fn(&Object, &Object) -> bool,
+}
+
+#[derive(Debug)]
+struct Funcs {
+    serde_codec: Option<SerdeCodec>,
+    packet_codec: PacketCodec,
+    util: DynUtil,
 }
 
 impl<Cx> RawErasedComponentType<Cx> {
@@ -203,9 +205,7 @@ impl<Cx> RawErasedComponentType<Cx> {
     #[inline]
     pub fn downcast<T: 'static>(&self) -> Option<ComponentType<T>> {
         (TypeId::of::<T>() == self.ty).then_some(ComponentType {
-            serde_codec: self.serde_codec,
-            packet_codec: self.packet_codec,
-            util: self.util,
+            f: self.f,
             _marker: PhantomData,
         })
     }
@@ -216,9 +216,7 @@ impl<T: 'static, Cx> From<&ComponentType<T>> for RawErasedComponentType<Cx> {
     fn from(value: &ComponentType<T>) -> Self {
         Self {
             ty: TypeId::of::<T>(),
-            serde_codec: value.serde_codec,
-            packet_codec: value.packet_codec,
-            util: value.util,
+            f: value.f,
             _marker: PhantomData,
         }
     }

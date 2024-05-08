@@ -1,6 +1,6 @@
 //! Component map implementation.
 
-use std::{any::TypeId, borrow::Borrow, hash::Hash};
+use std::{any::TypeId, borrow::Borrow, collections::hash_map, hash::Hash};
 
 use ahash::AHashMap;
 use rimecraft_global_cx::ProvideIdTy;
@@ -23,6 +23,7 @@ where
     Patched {
         base: &'a ComponentMap<'a, Cx>,
         changes: AHashMap<CompTyCell<'a, Cx>, Option<Box<Object>>>,
+        changes_count: isize,
     },
     Simple(AHashMap<CompTyCell<'a, Cx>, Box<Object>>),
 }
@@ -33,27 +34,19 @@ where
 {
     /// Gets the component with given type.
     pub fn get<T: 'static>(&self, ty: &ComponentType<T>) -> Option<&T> {
-        match &self.0 {
-            MapInner::Empty => None,
-            MapInner::Patched { base, changes } => changes
-                .get(&RawErasedComponentType::from(ty))
-                .map(|o| o.as_ref().and_then(|o| o.downcast_ref::<T>()))
-                .unwrap_or_else(|| base.get(ty)),
-            MapInner::Simple(map) => map
-                .get(&RawErasedComponentType::from(ty))
-                .and_then(|any| any.downcast_ref()),
-        }
+        self.get_raw(&RawErasedComponentType::from(ty))
+            .and_then(Object::downcast_ref)
     }
 
     #[inline]
-    fn get_raw<T: 'static>(&self, ty: &ComponentType<T>) -> Option<&Object> {
+    fn get_raw(&self, ty: &RawErasedComponentType<Cx>) -> Option<&Object> {
         match &self.0 {
             MapInner::Empty => None,
-            MapInner::Patched { base, changes } => changes
-                .get(&RawErasedComponentType::from(ty))
+            MapInner::Patched { base, changes, .. } => changes
+                .get(ty)
                 .map(Option::as_deref)
                 .unwrap_or_else(|| base.get_raw(ty)),
-            MapInner::Simple(map) => map.get(&RawErasedComponentType::from(ty)).map(|b| &**b),
+            MapInner::Simple(map) => map.get(ty).map(|b| &**b),
         }
     }
 
@@ -62,81 +55,90 @@ where
         &self,
         ty: &ComponentType<T>,
     ) -> Option<(ErasedComponentType<'a, Cx>, &T)> {
-        match &self.0 {
-            MapInner::Empty => None,
-            MapInner::Patched { base, changes } => changes
-                .get_key_value(&RawErasedComponentType::from(ty))
-                .map(|(k, o)| {
-                    o.as_ref()
-                        .and_then(|o| o.downcast_ref::<T>())
-                        .map(|o| (k.0, o))
-                })
-                .unwrap_or_else(|| base.get_key_value(ty)),
-            MapInner::Simple(map) => map
-                .get_key_value(&RawErasedComponentType::from(ty))
-                .and_then(|(k, any)| any.downcast_ref().map(|a| (k.0, a))),
-        }
+        self.get_key_value_raw(&RawErasedComponentType::from(ty))
+            .and_then(|(k, v)| v.downcast_ref().map(|v| (k, v)))
     }
 
     #[inline]
-    fn get_raw_key_value<T: 'static>(
+    fn get_key_value_raw(
         &self,
-        ty: &ComponentType<T>,
+        ty: &RawErasedComponentType<Cx>,
     ) -> Option<(ErasedComponentType<'a, Cx>, &Object)> {
         match &self.0 {
             MapInner::Empty => None,
-            MapInner::Patched { base, changes } => changes
-                .get_key_value(&RawErasedComponentType::from(ty))
+            MapInner::Patched { base, changes, .. } => changes
+                .get_key_value(ty)
                 .map(|(a, b)| b.as_deref().map(|b| (a.0, b)))
-                .unwrap_or_else(|| base.get_raw_key_value(ty)),
-            MapInner::Simple(map) => map
-                .get_key_value(&RawErasedComponentType::from(ty))
-                .map(|(k, any)| (k.0, &**any)),
+                .unwrap_or_else(|| base.get_key_value_raw(ty)),
+            MapInner::Simple(map) => map.get_key_value(ty).map(|(k, any)| (k.0, &**any)),
         }
     }
 
     /// Returns whether a component with given type exist.
     pub fn contains<T: 'static>(&self, ty: &ComponentType<T>) -> bool {
+        self.contains_raw(&RawErasedComponentType::from(ty))
+    }
+
+    #[inline]
+    fn contains_raw(&self, ty: &RawErasedComponentType<Cx>) -> bool {
         match &self.0 {
             MapInner::Empty => false,
-            MapInner::Patched { base, changes } => changes
-                .get(&RawErasedComponentType::from(ty))
+            MapInner::Patched { base, changes, .. } => changes
+                .get(ty)
                 .map(|opt| opt.is_some())
-                .unwrap_or_else(|| base.contains(ty)),
-            MapInner::Simple(map) => map.contains_key(&RawErasedComponentType::from(ty)),
+                .unwrap_or_else(|| base.contains_raw(ty)),
+            MapInner::Simple(map) => map.contains_key(ty),
         }
     }
 
     /// Gets the component with given type, with mutable access.
     pub fn get_mut<T: 'static>(&mut self, ty: &ComponentType<T>) -> Option<&mut T> {
+        self.get_mut_raw(&RawErasedComponentType::from(ty))
+            .and_then(Object::downcast_mut)
+    }
+
+    #[inline]
+    fn get_mut_raw(&mut self, ty: &RawErasedComponentType<Cx>) -> Option<&mut Object> {
         match &mut self.0 {
             MapInner::Empty => None,
-            MapInner::Patched { base, changes } => {
-                if !changes.contains_key(&RawErasedComponentType::from(ty)) {
-                    let (k, v) = base.get_raw_key_value(ty)?;
-                    changes.insert(CompTyCell(k), Some((ty.util.clone)(v)));
+            MapInner::Patched { base, changes, .. } => {
+                if !changes.contains_key(ty) {
+                    let (k, v) = base.get_key_value_raw(ty)?;
+                    changes.insert(CompTyCell(k), Some((ty.f.util.clone)(v)));
                 }
-                changes
-                    .get_mut(&RawErasedComponentType::from(ty))
-                    .and_then(Option::as_mut)
-                    .and_then(|obj| obj.downcast_mut::<T>())
+                changes.get_mut(ty).and_then(Option::as_mut)
             }
-            MapInner::Simple(map) => map
-                .get_mut(&RawErasedComponentType::from(ty))
-                .and_then(|any| any.downcast_mut()),
+            MapInner::Simple(map) => map.get_mut(ty),
         }
+        .map(Box::as_mut)
     }
 
     /// Inserts a component into this map, and returns the old one if valid.
     ///
-    /// This function receives a type-erased component type, because it contains the registration information,
-    /// which is useful for interacting with Minecraft protocol.
+    /// This function receives a type-erased component type, because it contains the registration
+    /// information, which is useful for interacting with Minecraft protocol.
     ///
     /// # Panics
     ///
     /// This function panics when the given component type's type information does not match with
     /// the given static type.
     pub fn insert<T>(&mut self, ty: ErasedComponentType<'a, Cx>, val: T) -> Option<Maybe<'a, T>>
+    where
+        T: Send + Sync + 'static,
+    {
+        let value = self.insert_untracked(ty, val);
+        if value.is_none() {
+            self.track_add()
+        }
+        value
+    }
+
+    #[inline]
+    fn insert_untracked<T>(
+        &mut self,
+        ty: ErasedComponentType<'a, Cx>,
+        val: T,
+    ) -> Option<Maybe<'a, T>>
     where
         T: Send + Sync + 'static,
     {
@@ -147,9 +149,9 @@ where
         };
         match &mut self.0 {
             MapInner::Empty => None,
-            MapInner::Patched { base, changes } => {
-                let old = base.get_raw(&ty.downcast::<T>()?);
-                if old.is_some_and(|old| (ty.util.eq)(&val, old)) {
+            MapInner::Patched { base, changes, .. } => {
+                let old = base.get_raw(&ty);
+                if old.is_some_and(|old| (ty.f.util.eq)(&val, old)) {
                     changes.remove(&CompTyCell(ty))
                 } else if let Some(v) = changes.insert(CompTyCell(ty), Some(Box::new(val))) {
                     Some(v)
@@ -168,18 +170,32 @@ where
 
     /// Removes a component with given type, and returns it if valid.
     pub fn remove<T: 'static>(&mut self, ty: &ComponentType<T>) -> Option<Maybe<'a, T>> {
+        let value = self.remove_untracked(ty);
+        if value.is_some() {
+            self.track_rm()
+        }
+        value
+    }
+
+    #[inline]
+    fn remove_untracked<T: 'static>(&mut self, ty: &ComponentType<T>) -> Option<Maybe<'a, T>> {
         match &mut self.0 {
             MapInner::Empty => None,
-            MapInner::Patched { base, changes } => {
-                let old = base.get_raw_key_value(ty);
-                let now = changes.get_mut(&RawErasedComponentType::from(ty));
+            MapInner::Patched { base, changes, .. } => {
+                let era_ty = &RawErasedComponentType::from(ty);
+                let old = base.get_key_value_raw(era_ty);
+                let now = changes.get_mut(era_ty);
                 match (old, now) {
                     (Some((k, v)), None) => {
                         changes.insert(CompTyCell(k), None);
                         v.downcast_ref::<T>().map(Maybe::Borrowed)
                     }
-                    (_, Some(now)) => now
+                    (Some(_), Some(now)) => now
                         .take()
+                        .and_then(|obj| obj.downcast().ok())
+                        .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
+                    (None, Some(_)) => changes
+                        .remove(era_ty)?
                         .and_then(|obj| obj.downcast().ok())
                         .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
                     (None, None) => None,
@@ -190,6 +206,43 @@ where
                 .and_then(|obj| obj.downcast().ok())
                 .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
         }
+    }
+
+    #[inline]
+    fn track_add(&mut self) {
+        if let MapInner::Patched { changes_count, .. } = &mut self.0 {
+            *changes_count += 1;
+        }
+    }
+
+    #[inline]
+    fn track_rm(&mut self) {
+        if let MapInner::Patched { changes_count, .. } = &mut self.0 {
+            *changes_count -= 1;
+        }
+    }
+
+    /// Returns the count of valid components.
+    pub fn len(&self) -> usize {
+        self._len()
+    }
+
+    #[inline(always)]
+    fn _len(&self) -> usize {
+        match &self.0 {
+            MapInner::Empty => 0,
+            MapInner::Patched {
+                base,
+                changes_count,
+                ..
+            } => ((base.len() as isize) + changes_count) as usize,
+            MapInner::Simple(map) => map.len(),
+        }
+    }
+
+    /// Returns whether this map is empty.
+    pub fn is_empty(&self) -> bool {
+        self._len() == 0
     }
 }
 
@@ -213,5 +266,57 @@ impl<Cx: ProvideIdTy> Borrow<RawErasedComponentType<Cx>> for CompTyCell<'_, Cx> 
     #[inline]
     fn borrow(&self) -> &RawErasedComponentType<Cx> {
         &self.0
+    }
+}
+
+pub struct Iter<'a, Cx>(IterInner<'a, Cx>)
+where
+    Cx: ProvideIdTy;
+
+enum IterInner<'a, Cx: ProvideIdTy> {
+    Empty,
+    Patched {
+        changes: &'a AHashMap<CompTyCell<'a, Cx>, Option<Box<Object>>>,
+        base_it: Box<Iter<'a, Cx>>,
+        changes_it: hash_map::Iter<'a, CompTyCell<'a, Cx>, Option<Box<Object>>>,
+    },
+    Simple(hash_map::Iter<'a, CompTyCell<'a, Cx>, Box<Object>>),
+}
+
+impl<'a, Cx> Iterator for Iter<'a, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    type Item = (ErasedComponentType<'a, Cx>, &'a Object);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.0 {
+            IterInner::Empty => None,
+            IterInner::Patched {
+                changes,
+                base_it,
+                changes_it,
+            } => {
+                for (k, v) in changes_it {
+                    if let Some(v) = v {
+                        return Some((k.0, &**v));
+                    }
+                }
+
+                for (k, v) in base_it {
+                    let patched = changes.get(&CompTyCell(k));
+                    match patched {
+                        Some(Some(opt)) => {
+                            return Some((k, &**opt));
+                        }
+                        Some(None) => continue,
+                        None => return Some((k, v)),
+                    }
+                }
+
+                None
+            }
+            IterInner::Simple(it) => it.next().map(|(k, v)| (k.0, &**v)),
+        }
     }
 }
