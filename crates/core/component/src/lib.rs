@@ -88,12 +88,9 @@ where
     T: Clone + Eq + Encode + Decode + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
     const SERDE_CODEC: SerdeCodec = SerdeCodec {
-        ser: |obj, serializer| {
-            erased_serde::Serialize::erased_serialize(
-                obj.downcast_ref::<T>()
-                    .expect("the erased type should matches the actual type"),
-                serializer,
-            )
+        ser: |obj| {
+            obj.downcast_ref::<T>()
+                .expect("the erased type should matches the actual type")
         },
         de: |deserializer| {
             erased_serde::deserialize::<T>(deserializer).map(|v| {
@@ -175,7 +172,7 @@ pub struct RawErasedComponentType<Cx> {
 
 #[derive(Debug)]
 struct SerdeCodec {
-    ser: fn(&Object, &mut dyn erased_serde::Serializer) -> erased_serde::Result<()>,
+    ser: for<'a> fn(&'a Object) -> &'a dyn erased_serde::Serialize,
     de: fn(&mut dyn erased_serde::Deserializer<'_>) -> erased_serde::Result<Box<Object>>,
     upd: fn(&mut Object, &mut dyn erased_serde::Deserializer<'_>) -> erased_serde::Result<()>,
 }

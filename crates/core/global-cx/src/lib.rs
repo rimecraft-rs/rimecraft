@@ -18,7 +18,13 @@ use core::{fmt::Display, hash::Hash};
 use alloc::boxed::Box;
 
 /// Marker trait for global contexts.
-pub trait GlobalContext: Sized + 'static {}
+///
+/// # Safety
+///
+/// The type should be zero-sized, and should contains no valid instances,
+/// as it is used as a marker trait, and this guarantees that the type is
+/// FFI-safe.
+pub unsafe trait GlobalContext: Sized + 'static {}
 
 /// Marker trait for global contexts that provide an identifier type.
 pub trait ProvideIdTy: GlobalContext {
@@ -42,8 +48,8 @@ pub trait ProvideNbtTy: GlobalContext {
     fn compound_to_deserializer(compound: &Self::Compound) -> impl serde::Deserializer<'_>;
 }
 
-#[cfg(feature = "std")]
 /// NBT `edcode`-ing related marker traits.
+#[cfg(feature = "std")]
 pub mod nbt_edcode {
     use std::io;
 

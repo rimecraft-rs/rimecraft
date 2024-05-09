@@ -1,16 +1,18 @@
 //! Component map implementation.
 
-use std::{any::TypeId, borrow::Borrow, collections::hash_map, hash::Hash};
+use std::{any::TypeId, borrow::Borrow, collections::hash_map, fmt::Debug, hash::Hash};
 
 use ahash::AHashMap;
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
+use serde::{Deserialize, Serialize};
 
-use crate::{ComponentType, ErasedComponentType, Object, RawErasedComponentType};
+use crate::{ComponentType, ErasedComponentType, Object, RawErasedComponentType, SerdeCodec};
 
 #[repr(transparent)]
 struct CompTyCell<'a, Cx: ProvideIdTy>(ErasedComponentType<'a, Cx>);
 
+/// A map that stores components.
 pub struct ComponentMap<'a, Cx>(MapInner<'a, Cx>)
 where
     Cx: ProvideIdTy;
@@ -28,10 +30,44 @@ where
     Simple(AHashMap<CompTyCell<'a, Cx>, Box<Object>>),
 }
 
+impl<Cx> Default for ComponentMap<'_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    #[inline]
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
 impl<'a, Cx> ComponentMap<'a, Cx>
 where
     Cx: ProvideIdTy,
 {
+    /// Creates an empty component map.
+    #[inline]
+    pub const fn empty() -> Self {
+        Self(MapInner::Empty)
+    }
+
+    /// Creates a **patched** component map with given base map.
+    #[inline]
+    pub fn new(base: &'a ComponentMap<'a, Cx>) -> Self {
+        Self(MapInner::Patched {
+            base,
+            changes: AHashMap::new(),
+            changes_count: 0,
+        })
+    }
+
+    /// Returns a builder for creating a simple component map.
+    #[inline]
+    pub fn builder() -> Builder<'a, Cx> {
+        Builder {
+            map: AHashMap::new(),
+        }
+    }
+
     /// Gets the component with given type.
     pub fn get<T: 'static>(&self, ty: &ComponentType<T>) -> Option<&T> {
         self.get_raw(&RawErasedComponentType::from(ty))
@@ -244,6 +280,36 @@ where
     pub fn is_empty(&self) -> bool {
         self._len() == 0
     }
+
+    /// Returns an iterator over the components in this map.
+    #[inline]
+    pub fn iter(&self) -> Iter<'_, Cx> {
+        self.into_iter()
+    }
+}
+
+impl<'a, Cx> IntoIterator for &'a ComponentMap<'a, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    type Item = <Iter<'a, Cx> as Iterator>::Item;
+
+    type IntoIter = Iter<'a, Cx>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Iter(
+            match &self.0 {
+                MapInner::Empty => IterInner::Empty,
+                MapInner::Patched { base, changes, .. } => IterInner::Patched {
+                    base_it: Box::new(base.into_iter()),
+                    changes,
+                    changes_it: changes.iter(),
+                },
+                MapInner::Simple(map) => IterInner::Simple(map.iter()),
+            },
+            self,
+        )
+    }
 }
 
 impl<Cx: ProvideIdTy> PartialEq for CompTyCell<'_, Cx> {
@@ -269,7 +335,8 @@ impl<Cx: ProvideIdTy> Borrow<RawErasedComponentType<Cx>> for CompTyCell<'_, Cx> 
     }
 }
 
-pub struct Iter<'a, Cx>(IterInner<'a, Cx>)
+/// Iterates over the components in this map.
+pub struct Iter<'a, Cx>(IterInner<'a, Cx>, &'a ComponentMap<'a, Cx>)
 where
     Cx: ProvideIdTy;
 
@@ -318,5 +385,160 @@ where
             }
             IterInner::Simple(it) => it.next().map(|(k, v)| (k.0, &**v)),
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.1.len();
+        (len, Some(len))
+    }
+}
+
+/// A builder for creating a simple component map.
+pub struct Builder<'a, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    map: AHashMap<CompTyCell<'a, Cx>, Box<Object>>,
+}
+
+impl<'a, Cx> Builder<'a, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    /// Inserts a component into this map.
+    ///
+    /// # Panics
+    ///
+    /// This function panics when the given component type's type information does not match with
+    /// the given static type.
+    #[inline]
+    pub fn insert<T>(mut self, ty: ErasedComponentType<'a, Cx>, val: T) -> Self
+    where
+        T: Send + Sync + 'static,
+    {
+        assert_eq!(
+            ty.ty,
+            TypeId::of::<T>(),
+            "the component type should matches the type of given value"
+        );
+        self.map.insert(CompTyCell(ty), Box::new(val));
+        self
+    }
+
+    /// Builds the component map.
+    pub fn build(self) -> ComponentMap<'a, Cx> {
+        ComponentMap(MapInner::Simple(self.map))
+    }
+}
+
+impl<'a, Cx> From<Builder<'a, Cx>> for ComponentMap<'a, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    #[inline]
+    fn from(builder: Builder<'a, Cx>) -> Self {
+        builder.build()
+    }
+}
+
+impl<Cx> Debug for CompTyCell<'_, Cx>
+where
+    Cx: ProvideIdTy + Debug,
+    Cx::Id: Debug,
+{
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.0, f)
+    }
+}
+
+impl<Cx> Debug for ComponentMap<'_, Cx>
+where
+    Cx: ProvideIdTy + Debug,
+    Cx::Id: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            MapInner::Empty => f.write_str("EmptyComponentMap"),
+            MapInner::Patched {
+                base,
+                changes,
+                changes_count,
+            } => f
+                .debug_struct("PatchedComponentMap")
+                .field("base", base)
+                .field("changes", changes)
+                .field("changes_count", changes_count)
+                .finish(),
+            MapInner::Simple(map) => f.debug_tuple("SimpleComponentMap").field(&map).finish(),
+        }
+    }
+}
+
+impl<Cx> Debug for Iter<'_, Cx>
+where
+    Cx: ProvideIdTy + Debug,
+    Cx::Id: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            IterInner::Empty => f.write_str("EmptyComponentMapIter"),
+            IterInner::Patched {
+                changes,
+                base_it,
+                changes_it,
+            } => f
+                .debug_struct("PatchedComponentMapIter")
+                .field("changes", changes)
+                .field("base_it", base_it)
+                .field("changes_it", changes_it)
+                .finish(),
+            IterInner::Simple(it) => f.debug_tuple("SimpleComponentMapIter").field(it).finish(),
+        }
+    }
+}
+
+impl<Cx> Debug for Builder<'_, Cx>
+where
+    Cx: ProvideIdTy + Debug,
+    Cx::Id: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ComponentMapBuilder")
+            .field("map", &self.map)
+            .finish()
+    }
+}
+
+impl<Cx> Serialize for ComponentMap<'_, Cx>
+where
+    Cx: ProvideIdTy,
+    Cx::Id: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(None)?;
+        for (ty, val) in self {
+            if let Some(codec) = &ty.f.serde_codec {
+                map.serialize_entry(&ty, (codec.ser)(val))?;
+            }
+        }
+        map.end()
+    }
+}
+
+impl<'a, 'de, Cx> Deserialize<'de> for ComponentMap<'a, Cx>
+where
+    Cx: ProvideIdTy,
+    Cx::Id: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        todo!()
     }
 }
