@@ -1,10 +1,13 @@
 //! Component map implementation.
 
-use std::{any::TypeId, borrow::Borrow, collections::hash_map, fmt::Debug, hash::Hash};
+use std::{
+    any::TypeId, borrow::Borrow, collections::hash_map, fmt::Debug, hash::Hash, marker::PhantomData,
+};
 
 use ahash::AHashMap;
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
+use rimecraft_registry::ProvideRegistry;
 use serde::{Deserialize, Serialize};
 
 use crate::{ComponentType, ErasedComponentType, Object, RawErasedComponentType, SerdeCodec};
@@ -427,7 +430,11 @@ where
 
     /// Builds the component map.
     pub fn build(self) -> ComponentMap<'a, Cx> {
-        ComponentMap(MapInner::Simple(self.map))
+        if self.map.is_empty() {
+            ComponentMap(MapInner::Empty)
+        } else {
+            ComponentMap(MapInner::Simple(self.map))
+        }
     }
 }
 
@@ -532,13 +539,73 @@ where
 
 impl<'a, 'de, Cx> Deserialize<'de> for ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy,
-    Cx::Id: Deserialize<'de>,
+    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<Cx>>,
+    Cx::Id: Deserialize<'de> + Hash + Eq,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        todo!()
+        struct Visitor<'a, Cx>(PhantomData<&'a Cx>);
+
+        impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
+        where
+            Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<Cx>>,
+            Cx::Id: Deserialize<'de> + Hash + Eq,
+        {
+            type Value = ComponentMap<'a, Cx>;
+
+            #[inline]
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut m = if let Some(sz) = map.size_hint() {
+                    AHashMap::with_capacity(sz)
+                } else {
+                    AHashMap::new()
+                };
+                struct DeSeed<'a, Cx>(&'a SerdeCodec, PhantomData<&'a Cx>);
+
+                impl<'a, 'de, Cx> serde::de::DeserializeSeed<'de> for DeSeed<'a, Cx>
+                where
+                    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<Cx>>,
+                    Cx::Id: Deserialize<'de> + Hash + Eq,
+                {
+                    type Value = Box<Object>;
+
+                    #[inline]
+                    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+                    where
+                        D: serde::Deserializer<'de>,
+                    {
+                        (self.0.de)(&mut <dyn erased_serde::Deserializer<'de>>::erase(
+                            deserializer,
+                        ))
+                        .map_err(serde::de::Error::custom)
+                    }
+                }
+                while let Some(k) = map.next_key::<ErasedComponentType<'a, Cx>>()? {
+                    let codec = k.f.serde_codec.as_ref().ok_or_else(|| {
+                        serde::de::Error::invalid_type(
+                            serde::de::Unexpected::Other("transient component type"),
+                            &"persistent component type",
+                        )
+                    })?;
+                    m.insert(
+                        CompTyCell(k),
+                        map.next_value_seed(DeSeed(codec, PhantomData::<&Cx>))?,
+                    );
+                }
+                m.shrink_to_fit();
+                Ok(Builder { map: m }.build())
+            }
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "a component map")
+            }
+        }
+
+        deserializer.deserialize_map(Visitor(PhantomData))
     }
 }

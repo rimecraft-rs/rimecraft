@@ -15,8 +15,6 @@ extern crate std;
 
 use core::{fmt::Display, hash::Hash};
 
-use alloc::boxed::Box;
-
 /// Marker trait for global contexts.
 ///
 /// # Safety
@@ -39,10 +37,10 @@ pub trait ProvideNbtTy: GlobalContext {
     type Compound;
 
     /// [`i32`] array type.
-    type IntArray: Into<Box<[i32]>> + From<Box<[i32]>>;
+    type IntArray: Into<alloc::boxed::Box<[i32]>> + From<alloc::boxed::Box<[i32]>>;
 
     /// [`i64`] array type.
-    type LongArray: Into<Box<[i64]>> + From<Box<[i32]>>;
+    type LongArray: Into<alloc::boxed::Box<[i64]>> + From<alloc::boxed::Box<[i32]>>;
 
     /// Function that converts a `Compound` to a [`Deserializer`].
     fn compound_to_deserializer(compound: &Self::Compound) -> impl serde::Deserializer<'_>;
