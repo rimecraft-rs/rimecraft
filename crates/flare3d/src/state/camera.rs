@@ -9,15 +9,45 @@ use winit::{
 /// Represents a camera with position, direction, and perspective parameters.
 #[derive(Debug, Copy, Clone)]
 pub struct Camera {
+    /// Camera position.
     pub eye: Vec3,
+    /// Camera direction.
     pub direction: Vec3,
+
+    /// Aspect ratio of the viewport.
     pub aspect: f32,
+    /// Field of view in the y direction.
     pub fov_y: f32,
+
+    /// Near frustum plane.
     pub z_near: f32,
+    /// Far frustum plane.
     pub z_far: f32,
 }
 
 impl Camera {
+    /// Eular pitch in radians.
+    pub fn pitch(&self) -> f32 {
+        self.direction.y.atan2(self.direction.x)
+    }
+
+    /// Eular yaw in radians.
+    pub fn yaw(&self) -> f32 {
+        self.direction.z.atan2(self.direction.x)
+    }
+    /// Eular pitch in degrees.
+    pub fn pitch_deg(&self) -> f32 {
+        self.pitch().to_degrees()
+    }
+
+    /// Eular yaw in degrees.
+    pub fn yaw_deg(&self) -> f32 {
+        self.yaw().to_degrees()
+    }
+}
+
+impl Camera {
+    /// Builds the view projection matrix for the camera.
     pub fn build_view_projection_matrix(&self) -> Mat4 {
         let view = Mat4::look_at_rh(self.eye, self.eye + self.direction, Vec3::Y);
         let proj = Mat4::perspective_rh(self.fov_y.to_radians(), self.aspect, self.z_near, self.z_far);
@@ -25,6 +55,7 @@ impl Camera {
         proj * view
     }
 
+    /// Builds the orthographic projection matrix for the camera.
     pub fn build_orthographic_projection_matrix(&self) -> Mat4 {
         let view = Mat4::look_at_rh(self.eye, self.eye + self.direction, Vec3::Y);
         let proj = Mat4::orthographic_rh(
@@ -48,16 +79,19 @@ pub struct CameraUniform {
 }
 
 impl CameraUniform {
+    /// Creates a new camera uniform buffer object.
     pub fn new() -> Self {
         Self {
             view_proj: Mat4::IDENTITY.to_cols_array_2d(),
         }
     }
 
+    /// Updates the view projection matrix of a [Camera].
     pub fn update_view_proj(&mut self, camera: &Camera) {
         self.view_proj = camera.build_view_projection_matrix().to_cols_array_2d()
     }
 
+    /// Updates the orthographic projection matrix of a [Camera].
     pub fn update_orthographic_proj(&mut self, camera: &Camera) {
         self.view_proj = camera.build_orthographic_projection_matrix().to_cols_array_2d()
     }
@@ -68,16 +102,15 @@ impl CameraUniform {
 pub struct CameraController {
     speed: f32,
 
-    mv_speed: f32,
-    keep_mv_speed: bool,
-    mv_acceleration: f32,
+    mv: Vec3,
+    mv_lerp: f32,
 
-    forward: bool,
-    backward: bool,
-    strafe_left: bool,
-    strafe_right: bool,
-    fly: bool,
-    dive: bool,
+    forwarding: bool,
+    backwarding: bool,
+    strafing_left: bool,
+    strafing_right: bool,
+    flying: bool,
+    diving: bool,
 
     turn_up: bool,
     turn_down: bool,
@@ -86,25 +119,28 @@ pub struct CameraController {
 }
 
 impl CameraController {
+    /// Creates a new camera controller.
     pub fn new(speed: f32) -> Self {
         Self {
             speed,
-            forward: false,
-            backward: false,
-            strafe_left: false,
-            strafe_right: false,
-            fly: false,
-            dive: false,
+            forwarding: false,
+            backwarding: false,
+            strafing_left: false,
+            strafing_right: false,
+            flying: false,
+            diving: false,
+
             turn_up: false,
             turn_down: false,
             turn_left: false,
             turn_right: false,
-            mv_acceleration: -0.01,
-            mv_speed: 0.0,
-            keep_mv_speed: false,
+
+            mv_lerp: 0.1,
+            mv: Vec3::ZERO,
         }
     }
 
+    /// Processes a window event.
     pub fn process_events(&mut self, event: &WindowEvent) -> bool {
         match event {
             WindowEvent::KeyboardInput {
@@ -120,46 +156,48 @@ impl CameraController {
                 match key_code {
                     KeyCode::KeyW | KeyCode::KeyA | KeyCode::KeyS | KeyCode::KeyD => {
                         if is_pressed {
-                            self.keep_mv_speed = true;
                             match key_code {
                                 KeyCode::KeyW => {
-                                    self.forward = true;
-                                    self.backward = false;
-                                    self.strafe_left = false;
-                                    self.strafe_right = false;
+                                    self.forwarding = true;
                                 }
                                 KeyCode::KeyS => {
-                                    self.forward = false;
-                                    self.backward = true;
-                                    self.strafe_left = false;
-                                    self.strafe_right = false;
+                                    self.backwarding = true;
                                 }
                                 KeyCode::KeyA => {
-                                    self.forward = false;
-                                    self.backward = false;
-                                    self.strafe_left = true;
-                                    self.strafe_right = false;
+                                    self.strafing_left = true;
                                 }
                                 KeyCode::KeyD => {
-                                    self.forward = false;
-                                    self.backward = false;
-                                    self.strafe_left = false;
-                                    self.strafe_right = true;
+                                    self.strafing_right = true;
                                 }
                                 _ => unreachable!(),
                             }
                         } else {
-                            self.keep_mv_speed = false
+                            match key_code {
+                                KeyCode::KeyW => {
+                                    self.forwarding = false;
+                                }
+                                KeyCode::KeyS => {
+                                    self.backwarding = false;
+                                }
+                                KeyCode::KeyA => {
+                                    self.strafing_left = false;
+                                }
+                                KeyCode::KeyD => {
+                                    self.strafing_right = false;
+                                }
+                                _ => unreachable!(),
+                            }
                         }
+
                         true
                     }
 
                     KeyCode::Space => {
-                        self.fly = is_pressed;
+                        self.flying = is_pressed;
                         true
                     }
                     KeyCode::ShiftLeft | KeyCode::ShiftRight => {
-                        self.dive = is_pressed;
+                        self.diving = is_pressed;
                         true
                     }
                     KeyCode::ArrowUp | KeyCode::KeyK => {
@@ -185,44 +223,44 @@ impl CameraController {
         }
     }
 
+    /// Updates a [Camera].
     pub fn update_camera(&mut self, camera: &mut Camera) {
-        if !self.keep_mv_speed {
-            self.mv_speed += self.mv_acceleration;
-            if self.mv_speed <= 0.0 {
-                self.mv_speed = 0.0
-            }
-        } else {
-            self.mv_speed = self.speed
-        }
-
-        camera.direction = camera.direction.normalize();
-
         let plane_normal = Vec3::Y;
         let forward = camera.direction - (camera.direction.dot(plane_normal) * plane_normal);
         let forward_normal = forward.normalize();
-
-        if self.fly {
-            camera.eye += plane_normal * self.speed;
-        }
-        if self.dive {
-            camera.eye -= plane_normal * self.speed;
-        }
-
-        if self.forward {
-            camera.eye += forward_normal * self.mv_speed;
-        }
-        if self.backward {
-            camera.eye -= forward_normal * self.mv_speed;
-        }
-
         let right_normal = forward_normal.cross(plane_normal).normalize();
 
-        if self.strafe_right {
-            camera.eye += right_normal * self.mv_speed;
+        // Movement
+
+        let mut mv_target = Vec3::ZERO;
+
+        if self.forwarding {
+            mv_target += forward_normal;
         }
-        if self.strafe_left {
-            camera.eye -= right_normal * self.mv_speed;
+        if self.backwarding {
+            mv_target -= forward_normal;
         }
+
+        if self.strafing_left {
+            mv_target -= right_normal;
+        }
+        if self.strafing_right {
+            mv_target += right_normal;
+        }
+
+        if self.flying {
+            mv_target += plane_normal;
+        }
+        if self.diving {
+            mv_target -= plane_normal;
+        }
+
+        mv_target = if mv_target == Vec3::ZERO { Vec3::ZERO } else { mv_target.normalize() * self.speed };
+        self.mv = self.mv.lerp(mv_target, self.mv_lerp);
+
+        camera.eye += self.mv;
+
+        // Rotation
 
         let rotation = 1.0_f32.to_radians();
 

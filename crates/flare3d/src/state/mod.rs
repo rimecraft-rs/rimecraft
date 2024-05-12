@@ -40,7 +40,7 @@ const VERTICES: &[Vertex] = &[
 ];
 
 const INDICES: &[u16] = &[0, 1, 4, 1, 2, 4, 2, 3, 4];
-const NUM_INSTANCES_PER_ROW: u32 = 10;
+const NUM_INSTANCES_PER_ROW: u32 = 1000;
 const INSTANCE_DISPLACEMENT: Vec3 = Vec3::new(
     NUM_INSTANCES_PER_ROW as f32 * 0.5,
     0.0,
