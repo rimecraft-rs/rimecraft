@@ -1,5 +1,9 @@
+//! Instance implementations.
+
 use glam::{Mat4, Quat, Vec3};
 
+/// Reperesents an instance with a position and rotation.
+#[derive(Debug, Copy, Clone)]
 pub struct Instance {
     pub position: Vec3,
     pub rotation: Quat,
@@ -14,8 +18,9 @@ impl Instance {
     }
 }
 
+/// A raw instance with a model matrix.
 #[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct InstanceRaw {
     pub model: [[f32; 4]; 4],
 }

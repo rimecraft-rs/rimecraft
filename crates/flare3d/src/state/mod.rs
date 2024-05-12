@@ -1,3 +1,5 @@
+//! State implementations.
+
 pub mod camera;
 pub mod instance;
 pub mod vertex;
@@ -45,6 +47,7 @@ const INSTANCE_DISPLACEMENT: Vec3 = Vec3::new(
     NUM_INSTANCES_PER_ROW as f32 * 0.5,
 );
 
+#[derive(Debug)]
 pub struct State<'s> {
     pub window: Arc<Window>,
     pub size: winit::dpi::PhysicalSize<u32>,

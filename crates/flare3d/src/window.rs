@@ -1,11 +1,14 @@
+//! Window implementations.
+
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
 };
 
 use crate::state::State;
 
+/// Represents a window with a [State].
+#[derive(Debug)]
 pub struct Window<'w> {
     state: State<'w>,
 }
@@ -13,7 +16,7 @@ pub struct Window<'w> {
 impl<'w> Window<'w> {
     pub fn new() -> Window<'w> {
         let event_loop = EventLoop::new().unwrap();
-        let mut state = futures_executor::block_on(State::new(&event_loop));
+        let mut state: State<'_> = futures_executor::block_on(State::new(&event_loop));
 
         #[cfg(target_os = "macos")]
         let (_dl, semaphore) = {

@@ -1,3 +1,6 @@
+//! Vertex implementations.
+
+/// Represents a vertex with position and texture coordinates.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {

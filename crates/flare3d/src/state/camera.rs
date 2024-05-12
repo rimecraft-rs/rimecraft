@@ -1,9 +1,13 @@
+//! Camera implementations.
+
 use glam::{Mat4, Quat, Vec3};
 use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
 };
 
+/// Represents a camera with position, direction, and perspective parameters.
+#[derive(Debug, Copy, Clone)]
 pub struct Camera {
     pub eye: Vec3,
     pub direction: Vec3,
@@ -22,6 +26,7 @@ impl Camera {
     }
 }
 
+/// Represents a camera uniform buffer object.
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniform {
@@ -40,6 +45,8 @@ impl CameraUniform {
     }
 }
 
+/// Represents a camera controller.
+#[derive(Debug)]
 pub struct CameraController {
     speed: f32,
 

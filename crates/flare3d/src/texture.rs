@@ -1,6 +1,10 @@
+//! Texture implementations.
+
 use anyhow::*;
 use image::GenericImageView;
 
+/// Represents a texture.
+#[derive(Debug)]
 pub struct Texture {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
