@@ -325,7 +325,7 @@ impl<'s> State<'s> {
 
     pub fn update(&mut self) {
         self.camera_controller.update_camera(&mut self.camera);
-        self.camera_uniform.update_view_proj(&self.camera);
+        self.camera_uniform.update_view_or_orthographic_proj(self.camera_controller.is_orthographic(), &self.camera);
         self.queue.write_buffer(
             &self.camera_buffer,
             0,

@@ -86,14 +86,28 @@ impl CameraUniform {
         }
     }
 
+    /// Updates the projection matrix from a [Mat4].
+    pub fn update_proj(&mut self, proj: Mat4) {
+        self.view_proj = proj.to_cols_array_2d()
+    }
+
+    /// Updates the view or orthographic projection matrix of a [Camera].
+    pub fn update_view_or_orthographic_proj(&mut self, is_orthographic: bool, camera: &Camera) {
+        if is_orthographic {
+            self.update_orthographic_proj(camera);
+        } else {
+            self.update_view_proj(camera);
+        }
+    }
+
     /// Updates the view projection matrix of a [Camera].
     pub fn update_view_proj(&mut self, camera: &Camera) {
-        self.view_proj = camera.build_view_projection_matrix().to_cols_array_2d()
+        self.update_proj(camera.build_view_projection_matrix())
     }
 
     /// Updates the orthographic projection matrix of a [Camera].
     pub fn update_orthographic_proj(&mut self, camera: &Camera) {
-        self.view_proj = camera.build_orthographic_projection_matrix().to_cols_array_2d()
+        self.update_proj(camera.build_orthographic_projection_matrix())
     }
 }
 
@@ -116,6 +130,8 @@ pub struct CameraController {
     turn_down: bool,
     turn_left: bool,
     turn_right: bool,
+
+    is_orthographic: bool,
 }
 
 impl CameraController {
@@ -137,7 +153,12 @@ impl CameraController {
 
             mv_lerp: 0.1,
             mv: Vec3::ZERO,
+            is_orthographic: false,
         }
+    }
+
+    pub fn is_orthographic(&self) -> bool {
+        self.is_orthographic
     }
 
     /// Processes a window event.
@@ -214,6 +235,10 @@ impl CameraController {
                     }
                     KeyCode::ArrowRight | KeyCode::KeyL => {
                         self.turn_right = is_pressed;
+                        true
+                    }
+                    KeyCode::KeyO => {
+                        self.is_orthographic = is_pressed;
                         true
                     }
                     _ => false,
