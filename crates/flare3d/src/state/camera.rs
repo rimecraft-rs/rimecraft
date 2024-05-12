@@ -12,15 +12,29 @@ pub struct Camera {
     pub eye: Vec3,
     pub direction: Vec3,
     pub aspect: f32,
-    pub fovy: f32,
-    pub znear: f32,
-    pub zfar: f32,
+    pub fov_y: f32,
+    pub z_near: f32,
+    pub z_far: f32,
 }
 
 impl Camera {
     pub fn build_view_projection_matrix(&self) -> Mat4 {
         let view = Mat4::look_at_rh(self.eye, self.eye + self.direction, Vec3::Y);
-        let proj = Mat4::perspective_rh(self.fovy.to_radians(), self.aspect, self.znear, self.zfar);
+        let proj = Mat4::perspective_rh(self.fov_y.to_radians(), self.aspect, self.z_near, self.z_far);
+
+        proj * view
+    }
+
+    pub fn build_orthographic_projection_matrix(&self) -> Mat4 {
+        let view = Mat4::look_at_rh(self.eye, self.eye + self.direction, Vec3::Y);
+        let proj = Mat4::orthographic_rh(
+            -self.fov_y * self.z_near,
+            self.fov_y * self.z_near,
+            -self.fov_y * self.z_near,
+            self.fov_y * self.z_near,
+            self.z_near,
+            self.z_far,
+        );
 
         proj * view
     }
@@ -41,7 +55,11 @@ impl CameraUniform {
     }
 
     pub fn update_view_proj(&mut self, camera: &Camera) {
-        self.view_proj = camera.build_view_projection_matrix().to_cols_array_2d();
+        self.view_proj = camera.build_view_projection_matrix().to_cols_array_2d()
+    }
+
+    pub fn update_orthographic_proj(&mut self, camera: &Camera) {
+        self.view_proj = camera.build_orthographic_projection_matrix().to_cols_array_2d()
     }
 }
 

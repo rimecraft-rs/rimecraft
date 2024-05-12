@@ -161,9 +161,9 @@ impl<'s> State<'s> {
             eye: (0.0, 1.0, 2.0).into(),
             direction: Vec3::X,
             aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
+            fov_y: 45.0,
+            z_near: 0.1,
+            z_far: 100.0,
         };
 
         let mut camera_uniform = CameraUniform::new();
