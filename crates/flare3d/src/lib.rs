@@ -1,6 +1,6 @@
 //! # Flare3D
 //!
-//! Renders in 3D using wgpu.
+//! Rust reimplementation of the blaze3d renderer, based on Wgpu.
 
 pub mod state;
 pub mod texture;
