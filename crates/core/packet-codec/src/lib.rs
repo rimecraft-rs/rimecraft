@@ -2,6 +2,9 @@
 
 use std::marker::PhantomData;
 
+use bytes::{Buf, BufMut};
+use codecs::Variable;
+
 pub mod codecs;
 
 /// A boxed error type.
@@ -60,3 +63,56 @@ where
         Decode::decode(buf)
     }
 }
+
+/// Extension trait for [`BufMut`].
+pub trait BufMutExt {
+    /// Puts a variable value into the buffer.
+    #[inline]
+    fn put_variable<'a, T>(&'a mut self, value: T)
+    where
+        Variable<T>: Encode<&'a mut Self>,
+        Self: Sized,
+    {
+        Variable(value)
+            .encode(self)
+            .expect("a variable value should be encoded without errors")
+    }
+
+    /// Puts a boolean value into the buffer.
+    #[inline]
+    fn put_bool<'a>(&'a mut self, value: bool)
+    where
+        bool: Encode<&'a mut Self>,
+    {
+        value
+            .encode(self)
+            .expect("a bool value should be encoded without errors")
+    }
+}
+
+/// Extension trait for [`Buf`].
+pub trait BufExt {
+    /// Gets a variable value from the buffer.
+    #[inline]
+    fn get_variable<'a, T>(&'a mut self) -> T
+    where
+        Variable<T>: Decode<'a, &'a mut Self>,
+        Self: Sized,
+    {
+        Variable::<T>::decode(self)
+            .expect("the variable value should not be overflowed")
+            .0
+    }
+
+    /// Gets a boolean value from the buffer.
+    #[inline]
+    fn get_bool<'a>(&'a mut self) -> bool
+    where
+        bool: Decode<'a, &'a mut Self>,
+    {
+        bool::decode(self).expect("the bool value should not be overflowed")
+    }
+}
+
+impl<T: BufMut + ?Sized> BufMutExt for T {}
+impl<T: Buf + ?Sized> BufExt for T {}
