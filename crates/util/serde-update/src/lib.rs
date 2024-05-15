@@ -26,7 +26,6 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        *self = Self::deserialize(deserializer)?;
-        Ok(())
+        serde::Deserialize::deserialize_in_place(deserializer, self)
     }
 }
