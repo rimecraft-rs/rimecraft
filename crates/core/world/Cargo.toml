@@ -15,7 +15,7 @@ maintenance = { status = "passively-maintained" }
 # Rimecraft crates
 rimecraft-global-cx = { path = "../global-cx", features = ["nbt"] }
 rimecraft-chunk-palette = { path = "../palette" }
-rimecraft-registry = { path = "../../util/registry", features = ["serde"] }
+rimecraft-registry = { path = "../registry", features = ["serde"] }
 rimecraft-state = { path = "../state" }
 rimecraft-block = { path = "../block" }
 rimecraft-fluid = { path = "../fluid" }

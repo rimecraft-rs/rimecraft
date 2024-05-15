@@ -13,7 +13,7 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 rimecraft-global-cx = { path = "../global-cx" }
-rimecraft-registry = { path = "../../util/registry" }
+rimecraft-registry = { path = "../registry" }
 rimecraft-block = { path = "../block" }
 rimecraft-voxel-math = { path = "../../util/voxel-math" }
 rimecraft-downcast = { path = "../../util/downcast" }
