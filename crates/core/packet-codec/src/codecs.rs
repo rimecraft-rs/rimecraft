@@ -112,7 +112,7 @@ macro_rules! unsigned_variable_primitives {
 }
 
 unsigned_variable_primitives! {
-    u8, u16, u32, u64, u128,
+    u16, u32, u64, u128, usize,
 }
 
 macro_rules! signed_variable_primitives {
@@ -137,11 +137,11 @@ macro_rules! signed_variable_primitives {
 }
 
 signed_variable_primitives! {
-    i8 => u8,
     i16 => u16,
     i32 => u32,
     i64 => u64,
     i128 => u128,
+    isize => usize,
 }
 
 impl<B: BufMut, T> Encode<B> for [T]
