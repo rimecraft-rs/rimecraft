@@ -98,7 +98,7 @@ macro_rules! unsigned_variable_primitives {
                     let b = buf.get_u8();
                     i |= ((b & 0b0111_1111) as $t) << shift;
                     shift += VAR_SHIFT;
-                    if shift > <$t>::BITS {
+                    if shift > <$t>::BITS + u8::BITS {
                         return Err("variable integer too large".into());
                     }
                     if b & 0b1000_0000 != 0b1000_0000 {

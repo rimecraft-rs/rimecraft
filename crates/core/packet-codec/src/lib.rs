@@ -116,3 +116,6 @@ pub trait BufExt {
 
 impl<T: BufMut + ?Sized> BufMutExt for T {}
 impl<T: Buf + ?Sized> BufExt for T {}
+
+#[cfg(test)]
+mod tests;
