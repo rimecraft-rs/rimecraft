@@ -42,6 +42,16 @@ where
     }
 }
 
+impl<B, T> Encode<B> for &T
+where
+    T: Encode<B> + ?Sized,
+{
+    #[inline(always)]
+    fn encode(&self, buf: B) -> Result<(), BoxedError<'static>> {
+        Encode::encode(*self, buf)
+    }
+}
+
 /// Packet decoders that decodes into a specified type.
 pub trait DecodeSeed<'de, B> {
     /// The output type of the decoder.
