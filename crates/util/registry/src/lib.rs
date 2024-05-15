@@ -208,6 +208,12 @@ impl<'a, K, T> Reg<'a, K, T> {
     pub fn registry(this: Self) -> &'a Registry<K, T> {
         this.registry
     }
+
+    /// Gets the ID of this registration.
+    #[inline]
+    pub fn id(this: Self) -> &'a K {
+        <&RefEntry<_, _>>::from(this).key().value()
+    }
 }
 
 impl<'a, K, T> From<Reg<'a, K, T>> for &'a RefEntry<K, T> {

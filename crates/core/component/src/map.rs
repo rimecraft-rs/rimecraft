@@ -10,10 +10,13 @@ use rimecraft_maybe::{Maybe, SimpleOwned};
 use rimecraft_registry::ProvideRegistry;
 use serde::{Deserialize, Serialize};
 
-use crate::{ComponentType, ErasedComponentType, Object, RawErasedComponentType, SerdeCodec};
+use crate::{
+    changes::ComponentChanges, ComponentType, ErasedComponentType, Object, RawErasedComponentType,
+    SerdeCodec,
+};
 
 #[repr(transparent)]
-struct CompTyCell<'a, Cx: ProvideIdTy>(ErasedComponentType<'a, Cx>);
+pub(crate) struct CompTyCell<'a, Cx: ProvideIdTy>(ErasedComponentType<'a, Cx>);
 
 /// A map that stores components.
 pub struct ComponentMap<'a, Cx>(MapInner<'a, Cx>)
@@ -288,6 +291,17 @@ where
     #[inline]
     pub fn iter(&self) -> Iter<'_, Cx> {
         self.into_iter()
+    }
+
+    /// Returns the changes of this map.
+    pub fn changes(&self) -> Option<ComponentChanges<'a, '_, Cx>> {
+        if let MapInner::Patched { changes, .. } = &self.0 {
+            Some(ComponentChanges {
+                changes: Maybe::Borrowed(changes),
+            })
+        } else {
+            None
+        }
     }
 }
 

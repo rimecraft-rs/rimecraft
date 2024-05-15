@@ -13,6 +13,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 type Object = dyn Any + Send + Sync;
 
+pub mod changes;
 pub mod map;
 
 /// Type of a component data.
@@ -23,7 +24,7 @@ pub mod map;
 #[derive(Debug)]
 #[doc(alias = "DataComponentType")]
 pub struct ComponentType<T> {
-    f: &'static Funcs,
+    f: Funcs,
     _marker: PhantomData<T>,
 }
 
@@ -48,9 +49,10 @@ where
 
 impl<T> ComponentType<T>
 where
-    T: Clone + Eq + Encode + Decode + Send + Sync + 'static,
+    T: Encode + Decode + Send + Sync + 'static,
 {
-    const PACKET_CODEC: PacketCodec = PacketCodec {
+    /// Codec for packet encoding and decoding.
+    pub const PACKET_CODEC: PacketCodec = PacketCodec {
         encode: |obj, buf| {
             obj.downcast_ref::<T>()
                 .expect("mismatched type")
@@ -63,7 +65,12 @@ where
                 .decode_in_place(buf)
         },
     };
+}
 
+impl<T> ComponentType<T>
+where
+    T: Clone + Eq + Send + Sync + 'static,
+{
     /// Creates a new transient component type.
     ///
     /// Transient components are not serialized.
@@ -71,12 +78,12 @@ where
     /// This function requires the type to be `'static`. If the type is not `'static`, transmutes
     /// the type to `'static`, which is unsound but works.
     #[inline]
-    pub const fn transient() -> Self {
+    pub const fn transient(packet_codec: Option<&'static PacketCodec>) -> Self {
         Self {
-            f: &Funcs {
+            f: Funcs {
                 serde_codec: None,
-                packet_codec: Self::PACKET_CODEC,
-                util: Self::UTIL,
+                packet_codec,
+                util: &Self::UTIL,
             },
             _marker: PhantomData,
         }
@@ -85,7 +92,7 @@ where
 
 impl<T> ComponentType<T>
 where
-    T: Clone + Eq + Encode + Decode + Serialize + DeserializeOwned + Send + Sync + 'static,
+    T: Clone + Eq + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
     const SERDE_CODEC: SerdeCodec = SerdeCodec {
         ser: |obj| {
@@ -112,13 +119,12 @@ where
     ///
     /// This function requires the type to be `'static`. If the type is not `'static`, transmutes
     /// the type to `'static`, which is unsound but works.
-    #[allow(clippy::missing_panics_doc)]
-    pub const fn persistent() -> Self {
+    pub const fn persistent(packet_codec: Option<&'static PacketCodec>) -> Self {
         Self {
-            f: &Funcs {
-                serde_codec: Some(Self::SERDE_CODEC),
-                packet_codec: Self::PACKET_CODEC,
-                util: Self::UTIL,
+            f: Funcs {
+                serde_codec: Some(&Self::SERDE_CODEC),
+                packet_codec,
+                util: &Self::UTIL,
             },
             _marker: PhantomData,
         }
@@ -143,11 +149,11 @@ impl<T> ComponentType<T> where T: Encode + Decode {}
 
 impl<T> Default for ComponentType<T>
 where
-    T: Clone + Eq + Encode + Decode + Send + Sync + 'static,
+    T: Clone + Eq + Send + Sync + 'static,
 {
     #[inline]
     fn default() -> Self {
-        Self::transient()
+        Self::transient(None)
     }
 }
 
@@ -166,35 +172,39 @@ impl<T> Clone for ComponentType<T> {
 #[derive(Debug)]
 pub struct RawErasedComponentType<Cx> {
     ty: TypeId,
-    f: &'static Funcs,
+    f: Funcs,
     _marker: PhantomData<Cx>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 struct SerdeCodec {
     ser: for<'a> fn(&'a Object) -> &'a dyn erased_serde::Serialize,
     de: fn(&mut dyn erased_serde::Deserializer<'_>) -> erased_serde::Result<Box<Object>>,
     upd: fn(&mut Object, &mut dyn erased_serde::Deserializer<'_>) -> erased_serde::Result<()>,
 }
 
-#[derive(Debug)]
-struct PacketCodec {
+/// Codec for packet encoding and decoding.
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
+pub struct PacketCodec {
     encode: fn(&Object, &mut dyn bytes::BufMut) -> Result<(), std::io::Error>,
     decode: fn(&mut dyn bytes::Buf) -> Result<Box<Object>, std::io::Error>,
     upd: fn(&mut Object, &mut dyn bytes::Buf) -> Result<(), std::io::Error>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct DynUtil {
     clone: fn(&Object) -> Box<Object>,
     eq: fn(&Object, &Object) -> bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 struct Funcs {
-    serde_codec: Option<SerdeCodec>,
-    packet_codec: PacketCodec,
-    util: DynUtil,
+    serde_codec: Option<&'static SerdeCodec>,
+    packet_codec: Option<&'static PacketCodec>,
+    util: &'static DynUtil,
 }
 
 impl<Cx> RawErasedComponentType<Cx> {

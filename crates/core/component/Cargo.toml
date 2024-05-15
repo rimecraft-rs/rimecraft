@@ -18,7 +18,7 @@ bytes = "1.6"
 ahash = "0.8"
 rimecraft-edcode = { path = "../../util/edcode" }
 rimecraft-registry = { path = "../../util/registry", features = ["serde"] }
-rimecraft-global-cx = { path = "../global-cx" }
+rimecraft-global-cx = { path = "../global-cx", features = ["nbt", "std"] }
 rimecraft-maybe = { path = "../../util/maybe" }
 
 [features]
