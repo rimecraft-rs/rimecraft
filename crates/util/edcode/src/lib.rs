@@ -1,5 +1,7 @@
 //! Encoding and decoding utilities for packet buffers.
 
+#![deprecated = "use the `rimecraft-packet-codec` crate instead"]
+
 mod imp;
 
 #[cfg(test)]
