@@ -5,7 +5,7 @@ mod imp;
 #[cfg(test)]
 mod tests;
 
-use std::io;
+use std::{borrow::Cow, io};
 
 pub use bytes;
 
@@ -104,5 +104,20 @@ impl VarI32 {
     #[inline]
     pub fn is_empty(self) -> bool {
         false
+    }
+}
+
+pub fn decode_cow_str<'a, B>(mut buf: &'a mut B) -> io::Result<Cow<'a, str>>
+where
+    B: bytes::Buf,
+{
+    let len = VarI32::decode(&mut buf)?.0 as usize;
+    if len <= buf.remaining() {
+        buf.advance(len);
+        std::str::from_utf8(&bytes::Buf::chunk(buf)[..len])
+            .map(Cow::Borrowed)
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
+    } else {
+        String::decode(buf).map(Cow::Owned)
     }
 }
