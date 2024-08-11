@@ -8,7 +8,6 @@ use std::{
 
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, DecodeInPlace, Encode};
-// use rimecraft_edcode::{Decode, Encode};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{ProvideRegistry, Reg};
 use serde::{de::DeserializeOwned, Serialize};

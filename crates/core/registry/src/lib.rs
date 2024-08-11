@@ -616,64 +616,39 @@ mod serde {
 
 #[cfg(feature = "edcode")]
 mod edcode {
-    use rimecraft_edcode::{Decode, Encode, VarI32};
+
+    use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
 
     use crate::{ProvideRegistry, Reg};
 
-    impl<K, T> Encode for Reg<'_, K, T> {
-        #[inline]
-        fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::BufMut,
-        {
-            VarI32(self.raw as i32).encode(buf)
+    impl<K, T, B> Encode<B> for Reg<'_, K, T>
+    where
+        B: BufMut,
+    {
+        fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
+            buf.put_variable(self.raw as u32);
+            Ok(())
         }
     }
 
-    impl<'a, 'r, K, T> Decode for Reg<'a, K, T>
+    impl<'a, 'r, 'de, K, T, B> Decode<'de, B> for Reg<'a, K, T>
     where
         'r: 'a,
         K: 'r,
         T: ProvideRegistry<'r, K, T> + 'r,
+        B: Buf,
     {
-        fn decode<B>(buf: B) -> Result<Self, std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::Buf,
-        {
-            let id = VarI32::decode(buf)?.0 as usize;
+        fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+            let id = buf.get_variable::<i32>() as usize;
             T::registry()
                 .of_raw(id)
-                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid id"))
+                .ok_or_else(|| format!("invalid id: {}", id).into())
         }
     }
 }
 
 #[allow(dead_code)]
 type BoxedError = Box<dyn std::error::Error + Send + Sync>;
-
-#[cfg(feature = "vanilla-identifier")]
-/// Vanilla root registry key.
-pub const VANILLA_ROOT_KEY: rimecraft_identifier::vanilla::Identifier =
-    rimecraft_identifier::vanilla::Identifier::new(
-        rimecraft_identifier::vanilla::MINECRAFT,
-        rimecraft_identifier::vanilla::Path::new_unchecked("root"),
-    );
-
-#[cfg(feature = "vanilla-identifier")]
-impl crate::key::Root for rimecraft_identifier::vanilla::Identifier {
-    #[inline(always)]
-    fn root() -> Self {
-        VANILLA_ROOT_KEY
-    }
-}
-
-#[cfg(feature = "vanilla-identifier")]
-#[doc = "`Registry` using vanilla `Identifier`."]
-pub type VanillaRegistry<T> = Registry<rimecraft_identifier::vanilla::Identifier, T>;
-
-#[cfg(feature = "vanilla-identifier")]
-#[doc = "Mutable `Registry` using vanilla `Identifier`."]
-pub type VanillaRegistryMut<T> = RegistryMut<rimecraft_identifier::vanilla::Identifier, T>;
 
 #[cfg(test)]
 mod tests;
