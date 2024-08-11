@@ -3,7 +3,6 @@
 use std::{fmt::Debug, marker::PhantomData, str::FromStr};
 
 use ahash::AHashMap;
-use rimecraft_edcode::{Encode, VarI32};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::Maybe;
 use rimecraft_registry::{ProvideRegistry, Reg};
@@ -98,24 +97,6 @@ where
         })
     }
 }
-
-//TODO: implement encode and decode
-/*
-impl<Cx> Encode for ComponentChanges<'_, '_, Cx>
-where
-    Cx: ProvideIdTy,
-{
-    fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
-    where
-        B: bytes::BufMut,
-    {
-        let c_valid = self.changes.iter().filter(|(_, v)| v.is_some()).count();
-        let c_rm = self.changes.len() - c_valid;
-        VarI32(c_valid as i32).encode(buf)?;
-        VarI32(c_rm as i32).encode(buf)?;
-    }
-}
-*/
 
 impl<Cx> Debug for ComponentChanges<'_, '_, Cx>
 where
