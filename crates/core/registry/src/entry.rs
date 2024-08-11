@@ -159,7 +159,7 @@ mod serde {
 
 #[cfg(feature = "edcode")]
 mod edcode {
-    use std::{fmt::Debug, hash::Hash};
+    use std::{fmt::Display, hash::Hash};
 
     use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
 
@@ -169,15 +169,15 @@ mod edcode {
 
     impl<'r, K, T, B> Encode<B> for RefEntry<K, T>
     where
-        K: Hash + Eq + Clone + Debug + 'r,
+        K: Hash + Eq + Clone + Display + 'r,
         T: ProvideRegistry<'r, K, T> + 'r,
         B: BufMut,
     {
         fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             let id = Reg::raw_id(T::registry().get(self.key()).ok_or_else(|| {
                 edcode2::BoxedError::<'static>::from(format!(
-                    "unknown registry key {:?}",
-                    self.key()
+                    "unknown registry id {}",
+                    self.key().value()
                 ))
             })?);
             buf.put_variable((id + 1) as u32);
@@ -203,7 +203,7 @@ mod edcode {
 
     impl<'r, K, T, B> Encode<B> for Entry<'_, K, T>
     where
-        K: Hash + Eq + Clone + Debug + 'r,
+        K: Hash + Eq + Clone + Display + 'r,
         T: ProvideRegistry<'r, K, T> + Encode<B> + 'r,
         B: BufMut,
     {
