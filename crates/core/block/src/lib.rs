@@ -1,10 +1,13 @@
 //! Minecraft block primitives.
 
+use behave::ProvideLuminance;
 use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
 use rimecraft_registry::{ProvideRegistry, Reg};
-use rimecraft_state::{States, StatesMut};
+use rimecraft_state::{State, States, StatesMut};
 
-use std::marker::PhantomData;
+use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
+
+pub mod behave;
 
 pub use rimecraft_state as state;
 
@@ -104,7 +107,82 @@ pub trait ProvideStateIds: GlobalContext {
 }
 
 /// Global contexts providing block state extensions.
-pub trait ProvideBlockStateExtTy: GlobalContext {
+pub trait ProvideBlockStateExtTy: ProvideIdTy {
     /// The type of the block state extension.
     type BlockStateExt;
+}
+
+/// The `BlockState` type.
+///
+/// This contains the block registration and the [`State`].
+pub struct BlockState<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+{
+    /// The block.
+    pub block: Block<'w, Cx>,
+
+    /// The state.
+    pub state: Arc<State<'w, Cx::BlockStateExt>>,
+}
+
+impl<Cx> BlockState<'_, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+    Cx::BlockStateExt: ProvideLuminance,
+{
+    /// Returns the luminance level of this block state.
+    #[inline]
+    pub fn luminance(&self) -> u32 {
+        self.state.data().luminance(&self.state)
+    }
+}
+
+impl<Cx> Debug for BlockState<'_, Cx>
+where
+    Cx: ProvideBlockStateExtTy + Debug,
+    Cx::Id: Debug,
+    Cx::BlockStateExt: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IBlockState")
+            .field("block", &self.block)
+            .field("state", &self.state)
+            .finish()
+    }
+}
+
+impl<Cx> Clone for BlockState<'_, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            block: self.block,
+            state: self.state.clone(),
+        }
+    }
+}
+
+impl<Cx> PartialEq for BlockState<'_, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.block == other.block && Arc::ptr_eq(&self.state, &other.state)
+    }
+}
+
+impl<Cx> Eq for BlockState<'_, Cx> where Cx: ProvideBlockStateExtTy {}
+
+impl<Cx> Hash for BlockState<'_, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.block.hash(state);
+        Arc::as_ptr(&self.state).hash(state);
+    }
 }

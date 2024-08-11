@@ -7,14 +7,34 @@
 //! The world lifetime is `'w`, in common. It is the lifetime of the world itself,
 //! and `BlockState`s, `FluidState`s and the `Biome` registry should be bound to this lifetime.
 
-use rimecraft_registry::Registry;
-
 pub mod chunk;
+pub mod event;
+pub mod heightmap;
 pub mod tick;
 pub mod view;
 
 pub mod behave;
 
-/// A wrapper for the `Registry` to adapt it to [`rimecraft_chunk_palette`] traits.
-#[derive(Debug, Clone, Copy)]
-pub struct RegPalWrapper<'a, K, T>(pub &'a Registry<K, T>);
+use std::sync::Arc;
+
+pub use ahash::{AHashMap, AHashSet};
+use parking_lot::RwLock;
+use rimecraft_block_entity::BlockEntity;
+
+/// The default max light level of Minecraft.
+pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
+
+/// A sealed cell.
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct Sealed<T>(pub(crate) T);
+
+impl<T> From<T> for Sealed<T> {
+    #[inline(always)]
+    fn from(value: T) -> Self {
+        Self(value)
+    }
+}
+
+/// Boxed block entity cell with internal mutability and reference-counting.
+pub type BlockEntityCell<'w, Cx> = Arc<RwLock<Box<BlockEntity<'w, Cx>>>>;

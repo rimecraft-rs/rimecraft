@@ -8,31 +8,46 @@
 
 #![no_std]
 
+extern crate alloc;
+
 #[cfg(feature = "std")]
 extern crate std;
 
+use core::{fmt::Display, hash::Hash};
+
 /// Marker trait for global contexts.
-pub trait GlobalContext: Sized + 'static {}
+///
+/// # Safety
+///
+/// The type should be zero-sized, and should contains no valid instances,
+/// as it is used as a marker trait, and this guarantees that the type is
+/// FFI-safe.
+pub unsafe trait GlobalContext: Sized + 'static {}
 
 /// Marker trait for global contexts that provide an identifier type.
 pub trait ProvideIdTy: GlobalContext {
     /// Identifier type.
-    type Id;
+    type Id: Display + Hash + Eq;
 }
 
 /// Marker trait for global contexts that provide a `NbtCompound` type and friends.
+#[cfg(feature = "nbt")]
 pub trait ProvideNbtTy: GlobalContext {
     /// NBT compound type.
     type Compound;
 
     /// [`i32`] array type.
-    type IntArray;
+    type IntArray: Into<alloc::boxed::Box<[i32]>> + From<alloc::boxed::Box<[i32]>>;
+
     /// [`i64`] array type.
-    type LongArray;
+    type LongArray: Into<alloc::boxed::Box<[i64]>> + From<alloc::boxed::Box<[i32]>>;
+
+    /// Function that converts a `Compound` to a [`Deserializer`].
+    fn compound_to_deserializer(compound: &Self::Compound) -> impl serde::Deserializer<'_>;
 }
 
-#[cfg(feature = "std")]
 /// NBT `edcode`-ing related marker traits.
+#[cfg(feature = "std")]
 pub mod nbt_edcode {
     use std::io;
 

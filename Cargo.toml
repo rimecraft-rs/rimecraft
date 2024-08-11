@@ -4,9 +4,6 @@ members = [
     "crates/util/*",
     "crates/client/*",
     "crates/core/*",
-
-    "crates/flare3d",
-    "crates/flare3d/example",
 ]
 
 [workspace.lints.rust]

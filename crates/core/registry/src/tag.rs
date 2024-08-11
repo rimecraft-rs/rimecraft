@@ -109,10 +109,9 @@ impl<'a, K, T> Iterator for Iter<'a, K, T> {
     }
 }
 
+/// Helper module for `serde` support.
 #[cfg(feature = "serde")]
 pub mod serde {
-    //! Helper module for `serde` support.
-
     use std::str::FromStr;
 
     use crate::ProvideRegistry;

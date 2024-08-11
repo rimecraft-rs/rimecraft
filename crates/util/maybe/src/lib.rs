@@ -5,7 +5,7 @@
 
 extern crate alloc;
 
-use core::ops::Deref;
+use core::ops::{Deref, DerefMut};
 
 use alloc::borrow::ToOwned;
 
@@ -22,12 +22,27 @@ pub enum Maybe<'a, T: ?Sized, Owned = SimpleOwned<T>> {
 
 impl<T: ?Sized, Owned> Maybe<'_, T, Owned>
 where
-    T: ToOwned<Owned = Owned>,
+    T: ToOwned,
+    <T as ToOwned>::Owned: Into<Owned>,
 {
     /// Converts the cell into an owned value.
     pub fn into_owned(self) -> Owned {
         match self {
-            Maybe::Borrowed(val) => val.to_owned(),
+            Maybe::Borrowed(val) => val.to_owned().into(),
+            Maybe::Owned(owned) => owned,
+        }
+    }
+
+    /// Returns a mutable reference to the owned value, cloning it if necessary.
+    pub fn get_mut(this: &mut Self) -> &mut Owned
+    where
+        Owned: DerefMut<Target = Owned>,
+    {
+        match this {
+            Maybe::Borrowed(val) => {
+                *this = Maybe::Owned(val.to_owned().into());
+                Self::get_mut(this)
+            }
             Maybe::Owned(owned) => owned,
         }
     }

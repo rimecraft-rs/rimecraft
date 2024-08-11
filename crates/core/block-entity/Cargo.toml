@@ -1,0 +1,28 @@
+[package]
+name = "rimecraft-block-entity"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Minecraft block entity primitives"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+rimecraft-global-cx = { path = "../global-cx" }
+rimecraft-registry = { path = "../registry" }
+rimecraft-block = { path = "../block" }
+rimecraft-voxel-math = { path = "../../util/voxel-math" }
+rimecraft-downcast = { path = "../../util/downcast" }
+ahash = "0.8"
+serde = "1.0"
+erased-serde = "0.4"
+rimecraft-serde-update = { path = "../../util/serde-update", features = ["erased"] }
+
+[features]
+
+[lints]
+workspace = true

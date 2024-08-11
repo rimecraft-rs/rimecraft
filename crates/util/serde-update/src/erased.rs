@@ -16,11 +16,11 @@ macro_rules! __internal_update_from_erased {
         where
             D: ::serde::Deserializer<'de>,
         {
-            use ::serde::de::Error;
-            self.erased_update(&mut <dyn erased_serde::Deserializer<'de>>::erase(
-                deserializer,
-            ))
-            .map_err(D::Error::custom)
+            $crate::erased::ErasedUpdate::erased_update(
+                self,
+                &mut <dyn ::erased_serde::Deserializer<'de>>::erase(deserializer),
+            )
+            .map_err(::serde::de::Error::custom)
         }
     };
 }
@@ -30,19 +30,19 @@ macro_rules! __internal_update_from_erased {
 #[macro_export]
 macro_rules! update_trait_object {
     ($($t:tt)*) => {
-        impl<'de> $crate::Update<'de> for dyn $($t)* {
+        impl<'a, 'de> $crate::Update<'de> for dyn $($t)* + 'a {
             $crate::__internal_update_from_erased!();
         }
 
-        impl<'de> $crate::Update<'de> for dyn $($t)* + Send {
+        impl<'a, 'de> $crate::Update<'de> for dyn $($t)* + ::core::marker::Send + 'a {
             $crate::__internal_update_from_erased!();
         }
 
-        impl<'de> $crate::Update<'de> for dyn $($t)* + Sync {
+        impl<'a, 'de> $crate::Update<'de> for dyn $($t)* + ::core::marker::Sync + 'a {
             $crate::__internal_update_from_erased!();
         }
 
-        impl<'de> $crate::Update<'de> for dyn $($t)* + Send + Sync {
+        impl<'a, 'de> $crate::Update<'de> for dyn $($t)* + ::core::marker::Send + ::core::marker::Sync + 'a {
             $crate::__internal_update_from_erased!();
         }
     };
@@ -74,22 +74,5 @@ where
         deserializer: &mut dyn erased_serde::Deserializer<'de>,
     ) -> Result<(), erased_serde::Error> {
         self.update(deserializer)
-    }
-}
-
-struct ErasedWrapper<'a, 'de>(pub &'a mut dyn ErasedUpdate<'de>);
-
-impl<'de> Update<'de> for ErasedWrapper<'_, 'de> {
-    #[inline]
-    fn update<D>(&mut self, deserializer: D) -> Result<(), <D as serde::Deserializer<'de>>::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de::Error;
-        self.0
-            .erased_update(&mut <dyn erased_serde::Deserializer<'de>>::erase(
-                deserializer,
-            ))
-            .map_err(D::Error::custom)
     }
 }

@@ -118,8 +118,6 @@ impl<K: std::fmt::Debug, T> std::fmt::Debug for TagsGuard<'_, K, T> {
 
 #[cfg(feature = "serde")]
 mod serde {
-    //! Helper module for `serde` support.
-
     use std::hash::Hash;
 
     use crate::ProvideRegistry;
@@ -161,8 +159,6 @@ mod serde {
 
 #[cfg(feature = "edcode")]
 mod edcode {
-    //! Helper module for `edcode` support.
-
     use std::hash::Hash;
 
     use rimecraft_edcode::{Decode, Encode, VarI32};

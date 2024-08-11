@@ -24,26 +24,6 @@ pub trait Encode {
         B: bytes::BufMut;
 }
 
-/// [`Encode`], but can be used as trait objects.
-pub trait BytesEncode {
-    /// Encodes into a bytes buffer.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the encoding failed.
-    fn encode_bytes(&self, bytes: &mut bytes::BytesMut) -> Result<(), io::Error>;
-}
-
-impl<T> BytesEncode for T
-where
-    T: Encode,
-{
-    #[inline(always)]
-    fn encode_bytes(&self, bytes: &mut bytes::BytesMut) -> Result<(), io::Error> {
-        self.encode(bytes)
-    }
-}
-
 /// Describes types that can be decoded from a packet buffer.
 pub trait Decode: Sized {
     /// Decode from a buffer.
@@ -54,6 +34,20 @@ pub trait Decode: Sized {
     fn decode<B>(buf: B) -> Result<Self, io::Error>
     where
         B: bytes::Buf;
+
+    /// Decode from a buffer in place.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoding failed.
+    #[inline]
+    fn decode_in_place<B>(&mut self, buf: B) -> Result<(), io::Error>
+    where
+        B: bytes::Buf,
+    {
+        *self = Self::decode(buf)?;
+        Ok(())
+    }
 }
 
 /// Represents types that can be updated from a buffer.
@@ -77,8 +71,7 @@ where
     where
         B: bytes::Buf,
     {
-        *self = Self::decode(buf)?;
-        Ok(())
+        self.decode_in_place(buf)
     }
 }
 

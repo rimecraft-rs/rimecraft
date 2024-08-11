@@ -12,10 +12,13 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+serde = { version = "1.0", default-features = false, optional = true }
 
 [features]
 default = ["std"]
 std = []
+serde = ["dep:serde"]
+nbt = ["serde"]
 
 [lints]
 workspace = true

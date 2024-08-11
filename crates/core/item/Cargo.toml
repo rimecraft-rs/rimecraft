@@ -15,8 +15,8 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-global-cx = { path = "../global-cx" }
-rimecraft-registry = { path = "../../util/registry" }
+rimecraft-global-cx = { path = "../global-cx", features = ["nbt"] }
+rimecraft-registry = { path = "../registry" }
 rimecraft-fmt = { path = "../../util/fmt" }
 serde = { version = "1.0", optional = true }
 rimecraft-edcode = { path = "../../util/edcode", optional = true }
