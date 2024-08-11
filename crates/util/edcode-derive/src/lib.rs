@@ -106,7 +106,7 @@ fn parse_derive_enum(
         }
     }
     let repr_type = repr_type.ok_or_else(|| {
-        std::convert::Into::<TokenStream>::into(
+        Into::<TokenStream>::into(
             Error::new(ident.span(), repr_required!()).into_compile_error(),
         )
     })?;
