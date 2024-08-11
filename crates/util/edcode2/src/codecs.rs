@@ -167,6 +167,27 @@ where
     }
 }
 
+impl<'de, B: Buf, T> DecodeInPlace<'de, B> for [T]
+where
+    T: for<'a> DecodeInPlace<'de, &'a mut B>,
+{
+    fn decode_in_place(&mut self, mut buf: B) -> Result<(), BoxedError<'de>> {
+        let len = buf.get_variable::<u32>() as usize;
+        if self.len() < len {
+            return Err(format!(
+                "slice too short: received {} items, have {} slots",
+                len,
+                self.len()
+            )
+            .into());
+        }
+        for val in self[..len].iter_mut() {
+            val.decode_in_place(&mut buf)?;
+        }
+        Ok(())
+    }
+}
+
 impl<'de, B: Buf, T> Decode<'de, B> for Vec<T>
 where
     T: for<'a> Decode<'de, &'a mut B>,

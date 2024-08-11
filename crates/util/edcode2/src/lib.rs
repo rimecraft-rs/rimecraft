@@ -1,11 +1,9 @@
 //! Traits for serialization and deserialization of packets.
 
-#![deprecated = "migration to the `edcode` crate is recommended"]
-
 use std::marker::PhantomData;
 
-use bytes::{Buf, BufMut};
-use codecs::Variable;
+pub use bytes::{Buf, BufMut};
+pub use codecs::Variable;
 
 pub mod codecs;
 

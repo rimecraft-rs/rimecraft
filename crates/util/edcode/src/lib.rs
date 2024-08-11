@@ -1,9 +1,6 @@
 //! Encoding and decoding utilities for packet buffers.
 
-mod imp;
-
-#[cfg(test)]
-mod tests;
+#![deprecated = "use the `edcode2` crate instead"]
 
 use std::io;
 
@@ -62,28 +59,45 @@ pub trait Update {
         B: bytes::Buf;
 }
 
-impl<T> Update for T
+impl<T> Encode for T
 where
-    T: Decode,
+    T: for<'a> edcode2::Encode<&'a mut dyn bytes::BufMut> + ?Sized,
 {
-    #[inline]
-    fn update<B>(&mut self, buf: B) -> Result<(), io::Error>
+    fn encode<B>(&self, mut buf: B) -> Result<(), io::Error>
     where
-        B: bytes::Buf,
+        B: bytes::BufMut,
     {
-        self.decode_in_place(buf)
+        edcode2::Encode::encode(self, &mut buf)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
     }
 }
 
-/// Layer for encoding and decoding in nbt binary format for packets.
-#[cfg(feature = "fastnbt")]
-#[derive(Debug)]
-pub struct Nbt<T>(pub T);
+impl<T> Decode for T
+where
+    T: for<'a> edcode2::Decode<'static, &'a mut dyn bytes::Buf>,
+{
+    fn decode<B>(mut buf: B) -> Result<Self, io::Error>
+    where
+        B: bytes::Buf,
+    {
+        let val: &mut dyn bytes::Buf = &mut buf;
+        edcode2::Decode::decode(val).map_err(|err| io::Error::new(io::ErrorKind::Other, err))
+    }
+}
 
-/// Layer for encoding and decoding in json utf8 for packets.
-#[cfg(feature = "json")]
-#[derive(Debug)]
-pub struct Json<T>(pub T);
+impl<T> Update for T
+where
+    T: for<'a> edcode2::DecodeInPlace<'static, &'a mut dyn bytes::Buf> + ?Sized,
+{
+    fn update<B>(&mut self, mut buf: B) -> Result<(), io::Error>
+    where
+        B: bytes::Buf,
+    {
+        let val: &mut dyn bytes::Buf = &mut buf;
+        edcode2::DecodeInPlace::decode_in_place(self, val)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
+    }
+}
 
 /// Represents a variable integer.
 #[derive(Debug)]
@@ -104,5 +118,18 @@ impl VarI32 {
     #[inline]
     pub fn is_empty(self) -> bool {
         false
+    }
+}
+
+impl<B: bytes::BufMut> edcode2::Encode<B> for VarI32 {
+    fn encode(&self, buf: B) -> Result<(), edcode2::BoxedError<'static>> {
+        edcode2::Encode::encode(&edcode2::Variable(self.0), buf)
+    }
+}
+
+impl<'de, B: bytes::Buf> edcode2::Decode<'de, B> for VarI32 {
+    fn decode(buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+        <edcode2::Variable<i32> as edcode2::Decode<'de, B>>::decode(buf)
+            .map(|edcode2::Variable(i)| Self(i))
     }
 }
