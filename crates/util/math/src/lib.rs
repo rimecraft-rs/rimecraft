@@ -1,6 +1,6 @@
 //! Math library for Rimecraft
 
-use std::f32::NAN;
+const NAN: f32 = f32::NAN;
 
 /// Returns the larger one of the two [`f32`].
 pub fn max_f32(a: f32, b: f32) -> f32 {

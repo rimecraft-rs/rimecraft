@@ -1,7 +1,5 @@
 //! Block views.
 
-use std::sync::Arc;
-
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_block_entity::BlockEntity;
 use rimecraft_fluid::{FluidState, ProvideFluidStateExtTy};
