@@ -1,6 +1,8 @@
 //! Attachments are a way to attach arbitrary data to  an object. This is useful for storing data that
 //! is not directly related to the object, but is still useful to store.
 
+#![deprecated = "use the `component` crate instead, which provides an implementation of attachments in a Minecraft way"]
+
 use std::{
     any::Any,
     borrow::Borrow,

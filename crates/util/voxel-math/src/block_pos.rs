@@ -213,27 +213,30 @@ mod _serde {
 
 #[cfg(feature = "edcode")]
 mod edcode {
-    use rimecraft_edcode::{Decode, Encode};
+
+    use edcode2::{Buf, BufMut, Decode, Encode};
 
     use super::*;
 
-    impl Encode for BlockPos {
+    impl<B> Encode<B> for BlockPos
+    where
+        B: BufMut,
+    {
         #[inline]
-        fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::BufMut,
-        {
+        fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             buf.put_i64((*self).into());
             Ok(())
         }
     }
 
-    impl Decode for BlockPos {
+    impl<'de, B> Decode<'de, B> for BlockPos
+    where
+        B: Buf,
+    {
+        const SUPPORT_NON_IN_PLACE: bool = true;
+
         #[inline]
-        fn decode<B>(mut buf: B) -> Result<Self, std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::Buf,
-        {
+        fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
             Ok(buf.get_i64().into())
         }
     }

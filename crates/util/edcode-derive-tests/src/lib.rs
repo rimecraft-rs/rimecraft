@@ -1,5 +1,7 @@
 //! Tests for `rimecraft-edcode-derive` crate.
 
+#![allow(deprecated)]
+
 #[cfg(test)]
 mod tests {
     use rimecraft_edcode::{bytes::BytesMut, Decode, Encode};

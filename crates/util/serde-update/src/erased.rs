@@ -76,20 +76,3 @@ where
         self.update(deserializer)
     }
 }
-
-struct ErasedWrapper<'a, 'de>(pub &'a mut dyn ErasedUpdate<'de>);
-
-impl<'de> Update<'de> for ErasedWrapper<'_, 'de> {
-    #[inline]
-    fn update<D>(&mut self, deserializer: D) -> Result<(), <D as serde::Deserializer<'de>>::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de::Error;
-        self.0
-            .erased_update(&mut <dyn erased_serde::Deserializer<'de>>::erase(
-                deserializer,
-            ))
-            .map_err(D::Error::custom)
-    }
-}
