@@ -187,12 +187,8 @@ mod edcode {
         #[inline]
         fn decode(buf: B) -> Result<Self, rimecraft_edcode2::BoxedError<'de>> {
             let str = String::decode(buf)?;
-            Ok(Self::from_str(str.as_str()).map_err(|_| {
-                Box::new(io::Error::new(
-                    ErrorKind::InvalidData,
-                    format!("unable to parse identifier {str}"),
-                ))
-            })?)
+            Self::from_str(str.as_str())
+                .map_err(|_| format!("unable to parse identifier {str}").into())
         }
     }
 }
