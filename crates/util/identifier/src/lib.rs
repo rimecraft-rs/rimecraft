@@ -163,41 +163,36 @@ mod edcode {
         str::FromStr,
     };
 
-    use rimecraft_edcode::{Decode, Encode};
+    use rimecraft_edcode2::{Buf, BufMut, Decode, Encode};
 
     use crate::{Identifier, Separate};
 
-    impl<N, P> Encode for Identifier<N, P>
+    impl<N, P, B> Encode<B> for Identifier<N, P>
     where
         N: Display + Separate,
         P: Display,
+        B: BufMut,
     {
         #[inline]
-        fn encode<B>(&self, buf: B) -> Result<(), io::Error>
-        where
-            B: rimecraft_edcode::bytes::BufMut,
-        {
+        fn encode(&self, buf: B) -> Result<(), rimecraft_edcode2::BoxedError<'static>> {
             self.to_string().encode(buf)
         }
     }
 
-    impl<N, P> Decode for Identifier<N, P>
+    impl<'de, N, P, B: Buf> Decode<'de, B> for Identifier<N, P>
     where
         N: FromStr + Separate,
         P: FromStr,
     {
         #[inline]
-        fn decode<B>(buf: B) -> Result<Self, io::Error>
-        where
-            B: rimecraft_edcode::bytes::Buf,
-        {
+        fn decode(buf: B) -> Result<Self, rimecraft_edcode2::BoxedError<'de>> {
             let str = String::decode(buf)?;
-            Self::from_str(str.as_str()).map_err(|_| {
-                io::Error::new(
+            Ok(Self::from_str(str.as_str()).map_err(|_| {
+                Box::new(io::Error::new(
                     ErrorKind::InvalidData,
                     format!("unable to parse identifier {str}"),
-                )
-            })
+                ))
+            })?)
         }
     }
 }

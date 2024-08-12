@@ -7,6 +7,9 @@ pub use codecs::Variable;
 
 pub mod codecs;
 
+#[cfg(feature = "derive")]
+pub use rimecraft_edcode2_derive::{Decode, Encode};
+
 /// A boxed error type.
 pub type BoxedError<'a> = Box<dyn std::error::Error + Send + Sync + 'a>;
 

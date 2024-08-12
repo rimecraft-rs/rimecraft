@@ -13,12 +13,12 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 serde = { version = "1.0", optional = true }
-rimecraft-edcode = { path = "../edcode", optional = true }
+rimecraft-edcode2 = { path = "../edcode2", optional = true }
 
 [features]
 default = ["vanilla"]
 serde = ["dep:serde"]
-edcode = ["dep:rimecraft-edcode"]
+edcode = ["dep:rimecraft-edcode2"]
 vanilla = []
 
 [lints]
