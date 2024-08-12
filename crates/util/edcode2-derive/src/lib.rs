@@ -31,7 +31,7 @@ macro_rules! discriminant_required {
 
 macro_rules! unsupported_repr {
     () => {
-        "only primitive reprs which can be safely turned into an `i32` are supported"
+        "only `u*` and `i*` (excluding 128-bit types) repr is supported"
     };
 }
 
@@ -86,7 +86,8 @@ fn parse_derive_enum(
                 }
                 let supported = iter.next().is_some_and(|x| {
                     if let TokenTree::Ident(id) = x {
-                        if ident_helper!(span => u8, u16, i8, i16, i32).contains(&id) {
+                        if ident_helper!(span => u8, u16, u32, u64, i8, i16, i32, i64).contains(&id)
+                        {
                             repr_type = Some(id);
                             true
                         } else {
@@ -117,8 +118,7 @@ fn parse_derive_enum(
 /// ## Requirements:
 /// - All variants must be field-less.
 /// - Enum must explicitly specify its representation through `#[repr()]`, and
-///   only primitive representations which can be safely turned into an `i32`
-///   are allowed.
+///   only `u*` and `i*` (excluding 128-bit types) repr are allowed.
 /// - All variants must have explicit discriminant.
 #[proc_macro_derive(Encode)]
 pub fn derive_encode(input: TokenStream) -> TokenStream {
