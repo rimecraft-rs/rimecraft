@@ -7,7 +7,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut};
-use edcode2::{Decode, DecodeInPlace, Encode};
+use edcode2::{Decode, Encode};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{ProvideRegistry, Reg};
 use serde::{de::DeserializeOwned, Serialize};
@@ -52,7 +52,6 @@ impl<T> ComponentType<T>
 where
     T: for<'a> Encode<&'a dyn BufMut>
         + for<'a> Decode<'static, &'a dyn Buf>
-        + for<'a> DecodeInPlace<'static, &'a dyn Buf>
         + Send
         + Sync
         + 'static,
@@ -64,7 +63,13 @@ where
                 .expect("mismatched type")
                 .encode(buf)
         },
-        decode: |buf| Ok(Box::new(T::decode(buf)?)),
+        decode: {
+            assert!(
+                <T as Decode<'static, &dyn Buf>>::SUPPORT_NON_IN_PLACE,
+                "non-in-place decoding is not supported for this type",
+            );
+            |buf| Ok(Box::new(T::decode(buf)?))
+        },
         upd: |obj, buf| {
             obj.downcast_mut::<T>()
                 .expect("mismatched type")

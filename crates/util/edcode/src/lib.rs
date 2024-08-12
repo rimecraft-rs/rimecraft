@@ -87,14 +87,14 @@ where
 
 impl<T> Update for T
 where
-    T: for<'a> edcode2::DecodeInPlace<'static, &'a mut dyn bytes::Buf> + ?Sized,
+    T: for<'a> edcode2::Decode<'static, &'a mut dyn bytes::Buf>,
 {
     fn update<B>(&mut self, mut buf: B) -> Result<(), io::Error>
     where
         B: bytes::Buf,
     {
         let val: &mut dyn bytes::Buf = &mut buf;
-        edcode2::DecodeInPlace::decode_in_place(self, val)
+        edcode2::Decode::decode_in_place(self, val)
             .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
     }
 }

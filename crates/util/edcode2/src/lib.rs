@@ -22,20 +22,13 @@ pub trait Decode<'de, B>: Sized {
     /// Decodes this packet from the buffer.
     #[allow(clippy::missing_errors_doc)]
     fn decode(buf: B) -> Result<Self, BoxedError<'de>>;
-}
 
-/// Packet decoders that decode in place.
-pub trait DecodeInPlace<'de, B> {
+    /// Whether this decoder supports non-in-place decoding.
+    const SUPPORT_NON_IN_PLACE: bool = true;
+
     /// Decodes this packet from the buffer in place.
     #[allow(clippy::missing_errors_doc)]
-    fn decode_in_place(&mut self, buf: B) -> Result<(), BoxedError<'de>>;
-}
-
-impl<'de, B, T> DecodeInPlace<'de, B> for T
-where
-    T: Decode<'de, B>,
-{
-    #[inline]
+    #[inline(always)]
     fn decode_in_place(&mut self, buf: B) -> Result<(), BoxedError<'de>> {
         *self = Decode::decode(buf)?;
         Ok(())
