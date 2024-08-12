@@ -1,6 +1,6 @@
 //! Minecraft Component implementation.
 
-use std::{any::TypeId, hash::Hash, marker::PhantomData};
+use std::{any::TypeId, cell::UnsafeCell, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
@@ -272,3 +272,17 @@ where
 /// Registration wrapper of [`RawErasedComponentType`].
 pub type ErasedComponentType<'a, Cx> =
     Reg<'a, <Cx as ProvideIdTy>::Id, RawErasedComponentType<'a, Cx>>;
+
+struct UnsafeDebugIter<I>(UnsafeCell<I>);
+
+impl<I> Debug for UnsafeDebugIter<I>
+where
+    I: Iterator<Item: Debug>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        unsafe {
+            let it = &mut *self.0.get();
+            f.debug_list().entries(it).finish()
+        }
+    }
+}

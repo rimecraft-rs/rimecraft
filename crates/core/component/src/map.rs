@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     changes::ComponentChanges, dyn_any, ComponentType, ErasedComponentType, Object,
-    RawErasedComponentType, SerdeCodec,
+    RawErasedComponentType, SerdeCodec, UnsafeDebugIter,
 };
 
 #[repr(transparent)]
@@ -496,20 +496,6 @@ where
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(&self.0, f)
-    }
-}
-
-struct UnsafeDebugIter<I>(UnsafeCell<I>);
-
-impl<I> Debug for UnsafeDebugIter<I>
-where
-    I: Iterator<Item: Debug>,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        unsafe {
-            let it = &mut *self.0.get();
-            f.debug_list().entries(it).finish()
-        }
     }
 }
 
