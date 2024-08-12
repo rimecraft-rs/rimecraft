@@ -14,13 +14,13 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 rimecraft-packed-int-array = { path = "../../util/packed-int-array" }
 rimecraft-maybe = { path = "../../util/maybe" }
-rimecraft-edcode = { path = "../../util/edcode", optional = true }
+edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 rimecraft-serde-update = { path = "../../util/serde-update", optional = true }
 ahash = "0.8"
 
 [features]
-edcode = ["dep:rimecraft-edcode"]
+edcode = ["dep:edcode2"]
 serde = ["dep:serde", "dep:rimecraft-serde-update"]
 
 [lints]

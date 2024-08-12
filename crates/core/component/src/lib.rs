@@ -6,7 +6,8 @@ use std::{
     marker::PhantomData,
 };
 
-use rimecraft_edcode::{Decode, Encode};
+use bytes::{Buf, BufMut};
+use edcode2::{Decode, Encode};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{ProvideRegistry, Reg};
 use serde::{de::DeserializeOwned, Serialize};
@@ -49,7 +50,11 @@ where
 
 impl<T> ComponentType<T>
 where
-    T: Encode + Decode + Send + Sync + 'static,
+    T: for<'a> Encode<&'a dyn BufMut>
+        + for<'a> Decode<'static, &'a dyn Buf>
+        + Send
+        + Sync
+        + 'static,
 {
     /// Codec for packet encoding and decoding.
     pub const PACKET_CODEC: PacketCodec = PacketCodec {
@@ -58,7 +63,13 @@ where
                 .expect("mismatched type")
                 .encode(buf)
         },
-        decode: |buf| Ok(Box::new(T::decode(buf)?)),
+        decode: {
+            assert!(
+                <T as Decode<'static, &dyn Buf>>::SUPPORT_NON_IN_PLACE,
+                "non-in-place decoding is not supported for this type",
+            );
+            |buf| Ok(Box::new(T::decode(buf)?))
+        },
         upd: |obj, buf| {
             obj.downcast_mut::<T>()
                 .expect("mismatched type")
@@ -145,8 +156,6 @@ impl<T> PartialEq for ComponentType<T> {
     }
 }
 
-impl<T> ComponentType<T> where T: Encode + Decode {}
-
 impl<T> Default for ComponentType<T>
 where
     T: Clone + Eq + Send + Sync + 'static,
@@ -188,9 +197,9 @@ struct SerdeCodec {
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 pub struct PacketCodec {
-    encode: fn(&Object, &mut dyn bytes::BufMut) -> Result<(), std::io::Error>,
-    decode: fn(&mut dyn bytes::Buf) -> Result<Box<Object>, std::io::Error>,
-    upd: fn(&mut Object, &mut dyn bytes::Buf) -> Result<(), std::io::Error>,
+    encode: fn(&Object, &mut dyn BufMut) -> Result<(), edcode2::BoxedError<'static>>,
+    decode: fn(&mut dyn Buf) -> Result<Box<Object>, edcode2::BoxedError<'static>>,
+    upd: fn(&mut Object, &mut dyn Buf) -> Result<(), edcode2::BoxedError<'static>>,
 }
 
 #[derive(Debug, Clone, Copy)]

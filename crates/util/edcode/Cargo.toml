@@ -12,6 +12,7 @@ categories = ["encoding"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+edcode2 = { path = "../edcode2", package = "rimecraft-edcode2" }
 bytes = "1.6"
 serde = { version = "1.0", optional = true }
 rimecraft-edcode-derive = { path = "../edcode-derive", optional = true }

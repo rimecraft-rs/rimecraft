@@ -292,63 +292,54 @@ mod _edcode {
 
     use std::io::{self, ErrorKind};
 
-    use rimecraft_edcode::{Decode, Encode, Update, VarI32};
+    use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
 
     use super::*;
 
-    impl<L, T> Encode for Palette<L, T>
+    impl<L, T, B> Encode<B> for Palette<L, T>
     where
         L: for<'a> IndexToRaw<&'a T>,
+        B: BufMut,
     {
-        fn encode<B>(&self, mut buf: B) -> Result<(), io::Error>
-        where
-            B: rimecraft_edcode::bytes::BufMut,
-        {
+        fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             match &self.internal {
-                PaletteImpl::Singular(value) => value
-                    .as_ref()
-                    .ok_or_else(|| io::Error::new(ErrorKind::Other, Error::Uninitialized))
-                    .and_then(|v| {
-                        self.list.raw_id(v).ok_or_else(|| {
-                            io::Error::new(ErrorKind::InvalidData, Error::UnknownEntry)
-                        })
-                    })
-                    .and_then(|id| VarI32(id as i32).encode(buf)),
+                PaletteImpl::Singular(value) => buf.put_variable(
+                    value
+                        .as_ref()
+                        .ok_or(Error::Uninitialized)
+                        .and_then(|v| self.list.raw_id(v).ok_or(Error::UnknownEntry))?
+                        as u32,
+                ),
                 PaletteImpl::Array(forward) | PaletteImpl::BiMap { forward, .. } => {
-                    VarI32(forward.len() as i32).encode(&mut buf)?;
+                    buf.put_variable(forward.len() as u32);
                     for entry in forward {
-                        VarI32(self.list.raw_id(entry).ok_or_else(|| {
-                            io::Error::new(ErrorKind::InvalidData, Error::UnknownEntry)
-                        })? as i32)
-                        .encode(&mut buf)?;
+                        buf.put_variable(self.list.raw_id(entry).ok_or(Error::UnknownEntry)? as u32)
                     }
-                    Ok(())
                 }
-                PaletteImpl::Direct => Ok(()),
+                PaletteImpl::Direct => {}
             }
+            Ok(())
         }
     }
 
-    impl<L, T> Update for Palette<L, T>
+    impl<'de, L, T, B> Decode<'de, B> for Palette<L, T>
     where
         L: for<'s> IndexFromRaw<'s, T>,
+        B: Buf,
     {
-        fn update<B>(&mut self, mut buf: B) -> Result<(), io::Error>
-        where
-            B: rimecraft_edcode::bytes::Buf,
-        {
+        fn decode_in_place(&mut self, mut buf: B) -> Result<(), edcode2::BoxedError<'de>> {
             match &mut self.internal {
                 PaletteImpl::Singular(entry) => {
-                    let id = VarI32::decode(buf)?.0 as usize;
+                    let id = buf.get_variable::<u32>() as usize;
                     *entry = Some(self.list.of_raw(id).ok_or_else(|| {
                         io::Error::new(ErrorKind::InvalidData, Error::UnknownId(id))
                     })?);
                 }
                 PaletteImpl::Array(forward) | PaletteImpl::BiMap { forward, .. } => {
-                    let len = VarI32::decode(&mut buf)?.0 as usize;
+                    let len = buf.get_variable::<u32>() as usize;
                     *forward = Vec::with_capacity(len);
                     for _ in 0..len {
-                        let id = VarI32::decode(&mut buf)?.0 as usize;
+                        let id = buf.get_variable::<u32>() as usize;
                         forward.push(self.list.of_raw(id).ok_or_else(|| {
                             io::Error::new(ErrorKind::InvalidData, Error::UnknownId(id))
                         })?);
@@ -358,38 +349,13 @@ mod _edcode {
             }
             Ok(())
         }
-    }
 
-    impl<L, T> Palette<L, T>
-    where
-        L: for<'a> IndexToRaw<&'a T>,
-    {
-        /// Returns the encoded length of this palette.
-        ///
-        /// # Errors
-        ///
-        /// - Returns `Err` if the palette is uninitialized.
-        /// - Returns `Err` if the palette entry is unknown.
         #[inline]
-        pub fn encoded_len(&self) -> Result<usize, Error> {
-            match &self.internal {
-                PaletteImpl::Singular(Some(entry)) => self
-                    .list
-                    .raw_id(entry)
-                    .ok_or(Error::UnknownEntry)
-                    .map(|id| VarI32(id as i32).encoded_len()),
-                PaletteImpl::Singular(None) => Err(Error::Uninitialized),
-                PaletteImpl::Array(forward) | PaletteImpl::BiMap { forward, .. } => {
-                    let mut len = VarI32(forward.len() as i32).encoded_len();
-                    for entry in forward {
-                        len += VarI32(self.list.raw_id(entry).ok_or(Error::UnknownEntry)? as i32)
-                            .encoded_len();
-                    }
-                    Ok(len)
-                }
-                PaletteImpl::Direct => Ok(0),
-            }
+        fn decode(_buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+            Err("palettes does not support non-in-place decoding".into())
         }
+
+        const SUPPORT_NON_IN_PLACE: bool = false;
     }
 }
 

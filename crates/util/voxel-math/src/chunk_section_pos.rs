@@ -113,27 +113,28 @@ impl From<ChunkSectionPos> for u64 {
 
 #[cfg(feature = "edcode")]
 mod _edcode {
-    use rimecraft_edcode::{Decode, Encode};
+
+    use edcode2::{Buf, BufMut, Decode, Encode};
 
     use super::*;
 
-    impl Encode for ChunkSectionPos {
+    impl<B> Encode<B> for ChunkSectionPos
+    where
+        B: BufMut,
+    {
         #[inline]
-        fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::BufMut,
-        {
+        fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             buf.put_u64((*self).into());
             Ok(())
         }
     }
 
-    impl Decode for ChunkSectionPos {
+    impl<'de, B> Decode<'de, B> for ChunkSectionPos
+    where
+        B: Buf,
+    {
         #[inline]
-        fn decode<B>(mut buf: B) -> Result<Self, std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::Buf,
-        {
+        fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
             Ok(buf.get_u64().into())
         }
     }

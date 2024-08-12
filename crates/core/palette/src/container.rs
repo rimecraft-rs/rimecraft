@@ -314,18 +314,16 @@ where
 
 #[cfg(feature = "edcode")]
 mod _edcode {
-    use rimecraft_edcode::{Encode, Update, VarI32};
+    use edcode2::{Buf, BufMut, Decode, Encode};
 
     use super::*;
 
-    impl<L, T> Encode for Data<L, T>
+    impl<L, T, B> Encode<B> for Data<L, T>
     where
         L: for<'a> IndexToRaw<&'a T>,
+        B: BufMut,
     {
-        fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::BufMut,
-        {
+        fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             buf.put_u8(
                 self.storage
                     .as_array()
@@ -341,53 +339,25 @@ mod _edcode {
         }
     }
 
-    impl<L, T> Data<L, T>
+    impl<L, T, Cx, B> Encode<B> for PalettedContainer<L, T, Cx>
     where
         L: for<'a> IndexToRaw<&'a T>,
-    {
-        /// Returns the encoded length of this data.
-        ///
-        /// # Panics
-        ///
-        /// See errors in [`Palette::encoded_len`].
-        pub fn encoded_len(&self) -> usize {
-            let len = self
-                .storage
-                .as_array()
-                .map(|array| array.data().len())
-                .unwrap_or_default();
-            1 + self
-                .palette
-                .encoded_len()
-                .expect("palette is not encodable")
-                + VarI32(len as i32).encoded_len()
-                + len * 8
-        }
-    }
-
-    impl<L, T, Cx> Encode for PalettedContainer<L, T, Cx>
-    where
-        L: for<'a> IndexToRaw<&'a T>,
+        B: BufMut,
     {
         #[inline]
-        fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::BufMut,
-        {
+        fn encode(&self, buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             self.data.encode(buf)
         }
     }
 
-    impl<L, T, Cx> Update for PalettedContainer<L, T, Cx>
+    impl<'de, L, T, Cx, B> Decode<'de, B> for PalettedContainer<L, T, Cx>
     where
         L: for<'s> IndexFromRaw<'s, T> + Clone,
         T: Clone + Hash + Eq,
         Cx: ProvidePalette<L, T>,
+        B: Buf,
     {
-        fn update<B>(&mut self, mut buf: B) -> Result<(), std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::Buf,
-        {
+        fn decode_in_place(&mut self, mut buf: B) -> Result<(), edcode2::BoxedError<'de>> {
             let data = compatible_data::<L, T, Cx>(
                 self.list.clone(),
                 Some(&self.data),
@@ -397,28 +367,20 @@ mod _edcode {
                 self.data = data
             }
 
-            self.data.palette.update(&mut buf)?;
+            self.data.palette.decode_in_place(&mut buf)?;
             if let Some(array) = self.data.storage.as_array_mut() {
-                array.data_mut().update(&mut buf)?;
+                array.data_mut().decode_in_place(&mut buf)?;
             }
 
             Ok(())
         }
-    }
 
-    impl<L, T, Cx> PalettedContainer<L, T, Cx>
-    where
-        L: for<'a> IndexToRaw<&'a T>,
-    {
-        /// Returns the encoded length of this container.
-        ///
-        /// # Panics
-        ///
-        /// See errors in [`Palette::encoded_len`].
         #[inline]
-        pub fn encoded_len(&self) -> usize {
-            self.data.encoded_len()
+        fn decode(_buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+            Err("paletted containers does not support non-in-place decoding".into())
         }
+
+        const SUPPORT_NON_IN_PLACE: bool = false;
     }
 }
 
