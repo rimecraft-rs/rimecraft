@@ -1,7 +1,8 @@
 //! Component map implementation.
 
 use std::{
-    any::TypeId, borrow::Borrow, collections::hash_map, fmt::Debug, hash::Hash, marker::PhantomData,
+    borrow::Borrow, cell::UnsafeCell, collections::hash_map, fmt::Debug, hash::Hash,
+    marker::PhantomData,
 };
 
 use ahash::AHashMap;
@@ -11,8 +12,8 @@ use rimecraft_registry::ProvideRegistry;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    changes::ComponentChanges, ComponentType, ErasedComponentType, Object, RawErasedComponentType,
-    SerdeCodec,
+    changes::ComponentChanges, dyn_any, ComponentType, ErasedComponentType, Object,
+    RawErasedComponentType, SerdeCodec, UnsafeDebugIter,
 };
 
 #[repr(transparent)]
@@ -30,10 +31,10 @@ where
     Empty,
     Patched {
         base: &'a ComponentMap<'a, Cx>,
-        changes: AHashMap<CompTyCell<'a, Cx>, Option<Box<Object>>>,
+        changes: AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
         changes_count: isize,
     },
-    Simple(AHashMap<CompTyCell<'a, Cx>, Box<Object>>),
+    Simple(AHashMap<CompTyCell<'a, Cx>, Box<Object<'a>>>),
 }
 
 impl<Cx> Default for ComponentMap<'_, Cx>
@@ -75,13 +76,18 @@ where
     }
 
     /// Gets the component with given type.
-    pub fn get<T: 'static>(&self, ty: &ComponentType<T>) -> Option<&T> {
+    ///
+    /// # Safety
+    ///
+    /// This function could not guarantee lifetime of type `T` is sound.
+    /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
+    pub unsafe fn get<T>(&self, ty: &ComponentType<'a, T>) -> Option<&T> {
         self.get_raw(&RawErasedComponentType::from(ty))
-            .and_then(Object::downcast_ref)
+            .and_then(|val| unsafe { val.downcast_ref() })
     }
 
     #[inline]
-    fn get_raw(&self, ty: &RawErasedComponentType<Cx>) -> Option<&Object> {
+    fn get_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&Object<'_>> {
         match &self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => changes
@@ -93,9 +99,14 @@ where
     }
 
     /// Gets the component and its type registration with given type.
-    pub fn get_key_value<T: 'static>(
+    ///
+    /// # Safety
+    ///
+    /// This function could not guarantee lifetime of type `T` is sound.
+    /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
+    pub unsafe fn get_key_value<T>(
         &self,
-        ty: &ComponentType<T>,
+        ty: &ComponentType<'a, T>,
     ) -> Option<(ErasedComponentType<'a, Cx>, &T)> {
         self.get_key_value_raw(&RawErasedComponentType::from(ty))
             .and_then(|(k, v)| v.downcast_ref().map(|v| (k, v)))
@@ -104,8 +115,8 @@ where
     #[inline]
     fn get_key_value_raw(
         &self,
-        ty: &RawErasedComponentType<Cx>,
-    ) -> Option<(ErasedComponentType<'a, Cx>, &Object)> {
+        ty: &RawErasedComponentType<'a, Cx>,
+    ) -> Option<(ErasedComponentType<'a, Cx>, &Object<'a>)> {
         match &self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => changes
@@ -117,12 +128,12 @@ where
     }
 
     /// Returns whether a component with given type exist.
-    pub fn contains<T: 'static>(&self, ty: &ComponentType<T>) -> bool {
+    pub fn contains<T: 'static>(&self, ty: &ComponentType<'a, T>) -> bool {
         self.contains_raw(&RawErasedComponentType::from(ty))
     }
 
     #[inline]
-    fn contains_raw(&self, ty: &RawErasedComponentType<Cx>) -> bool {
+    fn contains_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> bool {
         match &self.0 {
             MapInner::Empty => false,
             MapInner::Patched { base, changes, .. } => changes
@@ -134,13 +145,13 @@ where
     }
 
     /// Gets the component with given type, with mutable access.
-    pub fn get_mut<T: 'static>(&mut self, ty: &ComponentType<T>) -> Option<&mut T> {
+    pub fn get_mut<T: 'static>(&mut self, ty: &ComponentType<'a, T>) -> Option<&mut T> {
         self.get_mut_raw(&RawErasedComponentType::from(ty))
-            .and_then(Object::downcast_mut)
+            .and_then(|val| unsafe { val.downcast_mut() })
     }
 
     #[inline]
-    fn get_mut_raw(&mut self, ty: &RawErasedComponentType<Cx>) -> Option<&mut Object> {
+    fn get_mut_raw(&mut self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&mut Object<'a>> {
         match &mut self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => {
@@ -164,11 +175,20 @@ where
     ///
     /// This function panics when the given component type's type information does not match with
     /// the given static type.
-    pub fn insert<T>(&mut self, ty: ErasedComponentType<'a, Cx>, val: T) -> Option<Maybe<'a, T>>
+    ///
+    /// # Safety
+    ///
+    /// This function could not guarantee lifetime of type `T` is sound.
+    /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
+    pub unsafe fn insert<T>(
+        &mut self,
+        ty: ErasedComponentType<'a, Cx>,
+        val: T,
+    ) -> Option<Maybe<'a, T>>
     where
-        T: Send + Sync + 'static,
+        T: Send + Sync + 'a,
     {
-        let value = self.insert_untracked(ty, val);
+        let value = unsafe { self.insert_untracked(ty, val) };
         if value.is_none() {
             self.track_add()
         }
@@ -176,19 +196,20 @@ where
     }
 
     #[inline]
-    fn insert_untracked<T>(
+    unsafe fn insert_untracked<T>(
         &mut self,
         ty: ErasedComponentType<'a, Cx>,
         val: T,
     ) -> Option<Maybe<'a, T>>
     where
-        T: Send + Sync + 'static,
+        T: Send + Sync + 'a,
     {
         assert_eq! {
             ty.ty,
-            TypeId::of::<T>(),
+            typeid::of::<T>(),
             "the component type should matches the type of given value",
         };
+
         match &mut self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => {
@@ -199,20 +220,25 @@ where
                     Some(v)
                 } else {
                     return old
-                        .and_then(|old| old.downcast_ref::<T>())
+                        .and_then(|old| unsafe { old.downcast_ref::<T>() })
                         .map(Maybe::Borrowed);
                 }
                 .flatten()
             }
             MapInner::Simple(map) => map.insert(CompTyCell(ty), Box::new(val)),
         }
-        .and_then(|obj| obj.downcast().ok())
+        .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
         .map(|boxed| Maybe::Owned(SimpleOwned(*boxed)))
     }
 
     /// Removes a component with given type, and returns it if valid.
-    pub fn remove<T: 'static>(&mut self, ty: &ComponentType<T>) -> Option<Maybe<'a, T>> {
-        let value = self.remove_untracked(ty);
+    ///
+    /// # Safety
+    ///
+    /// This function could not guarantee lifetime of type `T` is sound.
+    /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
+    pub unsafe fn remove<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'a, T>> {
+        let value = unsafe { self.remove_untracked(ty) };
         if value.is_some() {
             self.track_rm()
         }
@@ -220,7 +246,7 @@ where
     }
 
     #[inline]
-    fn remove_untracked<T: 'static>(&mut self, ty: &ComponentType<T>) -> Option<Maybe<'a, T>> {
+    unsafe fn remove_untracked<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'a, T>> {
         match &mut self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => {
@@ -234,18 +260,18 @@ where
                     }
                     (Some(_), Some(now)) => now
                         .take()
-                        .and_then(|obj| obj.downcast().ok())
+                        .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
                         .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
                     (None, Some(_)) => changes
                         .remove(era_ty)?
-                        .and_then(|obj| obj.downcast().ok())
+                        .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
                         .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
                     (None, None) => None,
                 }
             }
             MapInner::Simple(map) => map
                 .remove(&RawErasedComponentType::from(ty))
-                .and_then(|obj| obj.downcast().ok())
+                .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
                 .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
         }
     }
@@ -289,7 +315,7 @@ where
 
     /// Returns an iterator over the components in this map.
     #[inline]
-    pub fn iter(&self) -> Iter<'_, Cx> {
+    pub fn iter<'s>(&'s self) -> Iter<'s, 'a, Cx> {
         self.into_iter()
     }
 
@@ -305,13 +331,13 @@ where
     }
 }
 
-impl<'a, Cx> IntoIterator for &'a ComponentMap<'a, Cx>
+impl<'a, 's, Cx> IntoIterator for &'s ComponentMap<'a, Cx>
 where
     Cx: ProvideIdTy,
 {
-    type Item = <Iter<'a, Cx> as Iterator>::Item;
+    type Item = <Iter<'s, 'a, Cx> as Iterator>::Item;
 
-    type IntoIter = Iter<'a, Cx>;
+    type IntoIter = Iter<'s, 'a, Cx>;
 
     fn into_iter(self) -> Self::IntoIter {
         Iter(
@@ -345,33 +371,33 @@ impl<Cx: ProvideIdTy> Hash for CompTyCell<'_, Cx> {
     }
 }
 
-impl<Cx: ProvideIdTy> Borrow<RawErasedComponentType<Cx>> for CompTyCell<'_, Cx> {
+impl<'a, Cx: ProvideIdTy> Borrow<RawErasedComponentType<'a, Cx>> for CompTyCell<'a, Cx> {
     #[inline]
-    fn borrow(&self) -> &RawErasedComponentType<Cx> {
+    fn borrow(&self) -> &RawErasedComponentType<'a, Cx> {
         &self.0
     }
 }
 
 /// Iterates over the components in this map.
-pub struct Iter<'a, Cx>(IterInner<'a, Cx>, &'a ComponentMap<'a, Cx>)
+pub struct Iter<'s, 'a, Cx>(IterInner<'s, 'a, Cx>, &'s ComponentMap<'a, Cx>)
 where
     Cx: ProvideIdTy;
 
-enum IterInner<'a, Cx: ProvideIdTy> {
+enum IterInner<'s, 'a, Cx: ProvideIdTy> {
     Empty,
     Patched {
-        changes: &'a AHashMap<CompTyCell<'a, Cx>, Option<Box<Object>>>,
-        base_it: Box<Iter<'a, Cx>>,
-        changes_it: hash_map::Iter<'a, CompTyCell<'a, Cx>, Option<Box<Object>>>,
+        changes: &'s AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
+        base_it: Box<Iter<'s, 'a, Cx>>,
+        changes_it: hash_map::Iter<'s, CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
     },
-    Simple(hash_map::Iter<'a, CompTyCell<'a, Cx>, Box<Object>>),
+    Simple(hash_map::Iter<'s, CompTyCell<'a, Cx>, Box<Object<'a>>>),
 }
 
-impl<'a, Cx> Iterator for Iter<'a, Cx>
+impl<'s, 'a, Cx> Iterator for Iter<'s, 'a, Cx>
 where
     Cx: ProvideIdTy,
 {
-    type Item = (ErasedComponentType<'a, Cx>, &'a Object);
+    type Item = (ErasedComponentType<'a, Cx>, &'s Object<'a>);
 
     fn next(&mut self) -> Option<Self::Item> {
         match &mut self.0 {
@@ -415,7 +441,7 @@ pub struct Builder<'a, Cx>
 where
     Cx: ProvideIdTy,
 {
-    map: AHashMap<CompTyCell<'a, Cx>, Box<Object>>,
+    map: AHashMap<CompTyCell<'a, Cx>, Box<Object<'a>>>,
 }
 
 impl<'a, Cx> Builder<'a, Cx>
@@ -431,11 +457,11 @@ where
     #[inline]
     pub fn insert<T>(mut self, ty: ErasedComponentType<'a, Cx>, val: T) -> Self
     where
-        T: Send + Sync + 'static,
+        T: Send + Sync + 'a,
     {
         assert_eq!(
             ty.ty,
-            TypeId::of::<T>(),
+            typeid::of::<T>(),
             "the component type should matches the type of given value"
         );
         self.map.insert(CompTyCell(ty), Box::new(val));
@@ -488,15 +514,18 @@ where
             } => f
                 .debug_struct("PatchedComponentMap")
                 .field("base", base)
-                .field("changes", changes)
+                .field("changes", &UnsafeDebugIter(UnsafeCell::new(changes.keys())))
                 .field("changes_count", changes_count)
                 .finish(),
-            MapInner::Simple(map) => f.debug_tuple("SimpleComponentMap").field(&map).finish(),
+            MapInner::Simple(map) => f
+                .debug_tuple("SimpleComponentMap")
+                .field(&UnsafeDebugIter(UnsafeCell::new(map.keys())))
+                .finish(),
         }
     }
 }
 
-impl<Cx> Debug for Iter<'_, Cx>
+impl<Cx> Debug for Iter<'_, '_, Cx>
 where
     Cx: ProvideIdTy + Debug,
     Cx::Id: Debug,
@@ -507,14 +536,13 @@ where
             IterInner::Patched {
                 changes,
                 base_it,
-                changes_it,
+                changes_it: _,
             } => f
                 .debug_struct("PatchedComponentMapIter")
-                .field("changes", changes)
+                .field("changes", &UnsafeDebugIter(UnsafeCell::new(changes.keys())))
                 .field("base_it", base_it)
-                .field("changes_it", changes_it)
                 .finish(),
-            IterInner::Simple(it) => f.debug_tuple("SimpleComponentMapIter").field(it).finish(),
+            IterInner::Simple(_it) => f.debug_tuple("SimpleComponentMapIter").finish(),
         }
     }
 }
@@ -526,7 +554,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ComponentMapBuilder")
-            .field("map", &self.map)
+            .field("map", &UnsafeDebugIter(UnsafeCell::new(self.map.keys())))
             .finish()
     }
 }
@@ -542,8 +570,8 @@ where
     {
         use serde::ser::SerializeMap;
         let mut map = serializer.serialize_map(None)?;
-        for (ty, val) in self {
-            if let Some(codec) = &ty.f.serde_codec {
+        for (ty, val) in self.iter() {
+            if let Some(codec) = ty.f.serde_codec {
                 map.serialize_entry(&ty, (codec.ser)(val))?;
             }
         }
@@ -553,7 +581,7 @@ where
 
 impl<'a, 'de, Cx> Deserialize<'de> for ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<Cx>>,
+    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
     Cx::Id: Deserialize<'de> + Hash + Eq,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -564,7 +592,7 @@ where
 
         impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
         where
-            Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<Cx>>,
+            Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
             Cx::Id: Deserialize<'de> + Hash + Eq,
         {
             type Value = ComponentMap<'a, Cx>;
@@ -579,14 +607,14 @@ where
                 } else {
                     AHashMap::new()
                 };
-                struct DeSeed<'a, Cx>(&'a SerdeCodec, PhantomData<&'a Cx>);
+                struct DeSeed<'a, Cx>(&'a SerdeCodec<'a>, PhantomData<Cx>);
 
                 impl<'a, 'de, Cx> serde::de::DeserializeSeed<'de> for DeSeed<'a, Cx>
                 where
-                    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<Cx>>,
+                    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
                     Cx::Id: Deserialize<'de> + Hash + Eq,
                 {
-                    type Value = Box<Object>;
+                    type Value = Box<Object<'a>>;
 
                     #[inline]
                     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -608,7 +636,7 @@ where
                     })?;
                     m.insert(
                         CompTyCell(k),
-                        map.next_value_seed(DeSeed(codec, PhantomData::<&Cx>))?,
+                        map.next_value_seed(DeSeed(codec, PhantomData::<Cx>))?,
                     );
                 }
                 m.shrink_to_fit();

@@ -1,6 +1,6 @@
 //! `ComponentChanges` implementation.
 
-use std::{fmt::Debug, marker::PhantomData, str::FromStr};
+use std::{cell::UnsafeCell, fmt::Debug, marker::PhantomData, str::FromStr};
 
 use ahash::AHashMap;
 use rimecraft_global_cx::ProvideIdTy;
@@ -8,14 +8,16 @@ use rimecraft_maybe::Maybe;
 use rimecraft_registry::{ProvideRegistry, Reg};
 use serde::{Deserialize, Serialize};
 
-use crate::{map::CompTyCell, ErasedComponentType, Object, RawErasedComponentType};
+use crate::{
+    map::CompTyCell, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
+};
 
 /// Changes of components.
 pub struct ComponentChanges<'a, 'cow, Cx>
 where
     Cx: ProvideIdTy,
 {
-    pub(crate) changes: Maybe<'cow, AHashMap<CompTyCell<'a, Cx>, Option<Box<Object>>>>,
+    pub(crate) changes: Maybe<'cow, AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>>,
 }
 
 const REMOVED_PREFIX: char = '!';
@@ -47,7 +49,7 @@ where
 
 impl<'a, 'de, Cx> Deserialize<'de> for Type<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<Cx>>,
+    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
     Cx::Id: FromStr,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -63,7 +65,7 @@ where
 
         impl<'a, Cx> serde::de::Visitor<'_> for Visitor<'a, Cx>
         where
-            Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<Cx>>,
+            Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
             Cx::Id: FromStr,
         {
             type Value = Type<'a, Cx>;
@@ -104,6 +106,6 @@ where
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&self.changes, f)
+        Debug::fmt(&UnsafeDebugIter(UnsafeCell::new(self.changes.keys())), f)
     }
 }
