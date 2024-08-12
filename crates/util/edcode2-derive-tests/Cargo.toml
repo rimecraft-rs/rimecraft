@@ -1,9 +1,9 @@
 [package]
-name = "rimecraft-edcode-derive-tests"
+name = "rimecraft-edcode2-derive-tests"
 version = "0.1.0"
 edition = "2021"
 authors = ["C191239 <zhushunzhong2025@i.pkuschool.edu.cn>"]
-description = "Tests for rimecraft-edcode-derive"
+description = "Tests for rimecraft-edcode2-derive"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = ["encoding"]
@@ -12,7 +12,7 @@ categories = ["encoding"]
 maintenance = { status = "passively-maintained" }
 
 [dev-dependencies]
-rimecraft-edcode = { path = "../edcode", features = ["derive"] }
+rimecraft-edcode2 = { path = "../edcode2", features = ["derive"] }
 
 [lints]
 workspace = true

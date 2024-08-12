@@ -1,10 +1,10 @@
-//! Tests for `rimecraft-edcode-derive` crate.
+//! Tests for `rimecraft-edcode2-derive` crate.
 
 #![allow(deprecated)]
 
 #[cfg(test)]
 mod tests {
-    use rimecraft_edcode::{bytes::BytesMut, Decode, Encode};
+    use rimecraft_edcode2::{Decode, Encode};
 
     #[test]
     #[allow(dead_code)]
@@ -18,8 +18,8 @@ mod tests {
             Someone = 36,
         }
 
-        let mut buf = BytesMut::new();
+        let mut buf: Vec<u8> = Vec::new();
         assert!(Topics::Someone.encode(&mut buf).is_ok());
-        assert!(Topics::decode(buf).is_ok_and(|x| x == Topics::Someone));
+        assert!(Topics::decode(buf.as_ref()).is_ok_and(|x| x == Topics::Someone));
     }
 }
