@@ -6,7 +6,7 @@ use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{ProvideRegistry, Reg};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
 type Object<'a> = dyn Any + Send + Sync + 'a;
 
@@ -90,7 +90,7 @@ where
 
 impl<'a, T> ComponentType<'a, T>
 where
-    T: Clone + Eq + Serialize + Deserialize<'a> + Send + Sync + 'a,
+    T: Clone + Eq + Serialize + DeserializeOwned + Send + Sync + 'a,
 {
     const SERDE_CODEC: SerdeCodec<'a> = SerdeCodec {
         ser: |obj| unsafe { &*(obj as *const Object<'_> as *const T) },
@@ -171,8 +171,8 @@ pub struct RawErasedComponentType<'a, Cx> {
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 struct SerdeCodec<'a> {
-    ser: fn(&'a Object<'a>) -> &'a dyn erased_serde::Serialize,
-    de: fn(&mut dyn erased_serde::Deserializer<'a>) -> erased_serde::Result<Box<Object<'a>>>,
+    ser: for<'s> fn(&'s Object<'a>) -> &'s dyn erased_serde::Serialize,
+    de: fn(&mut dyn erased_serde::Deserializer<'_>) -> erased_serde::Result<Box<Object<'a>>>,
     upd: fn(&mut Object<'a>, &mut dyn erased_serde::Deserializer<'a>) -> erased_serde::Result<()>,
 }
 
