@@ -125,7 +125,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match input.data {
         Data::Enum(data) => {
-            let (ident, _repr_type, enum_idents, enum_vals) =
+            let (ident, repr_type, enum_idents, enum_vals) =
                 match parse_derive_enum(input.ident, input.attrs, data) {
                     Ok(x) => x,
                     Err(err) => return err,
@@ -164,7 +164,7 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match input.data {
         Data::Enum(data) => {
-            let (ident, _repr_type, enum_idents, enum_vals) =
+            let (ident, repr_type, enum_idents, enum_vals) =
                 match parse_derive_enum(input.ident, input.attrs, data) {
                     Ok(x) => x,
                     Err(err) => {

@@ -117,7 +117,7 @@ where
 /// `net.minecraft.advancement.AdvancementFrame` in yarn.
 #[cfg_attr(
     feature = "edcode",
-    derive(::rimecraft_edcode::Encode, ::rimecraft_edcode::Decode)
+    derive(::rimecraft_edcode2::Encode, ::rimecraft_edcode2::Decode)
 )]
 #[derive(Debug, Clone)]
 #[non_exhaustive]

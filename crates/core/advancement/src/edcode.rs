@@ -1,4 +1,4 @@
-use rimecraft_edcode::{decode_cow_str, Decode, Encode};
+use rimecraft_edcode2::{BufMut, Decode, Encode};
 use rimecraft_global_cx::nbt_edcode::WriteNbt;
 
 use crate::{AdvancementCx, DisplayInfo, Frame};
@@ -11,14 +11,12 @@ pub trait AdvancementEdcodeCx:
     fn frame_fmt(name: &str) -> Frame;
 }
 
-impl<Cx> Encode for DisplayInfo<'_, Cx>
+impl<Cx, B> Encode<B> for DisplayInfo<'_, Cx>
 where
     Cx: AdvancementEdcodeCx,
+    B: BufMut,
 {
-    fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
-    where
-        B: rimecraft_edcode::bytes::BufMut,
-    {
+    fn encode(&self, mut buf: B) -> Result<(), rimecraft_edcode2::BoxedError<'static>> {
         // TODO: `RawText` doesn't implement edcode.
         // TODO: Encode `title` and `description`.
         self.icon.encode(&mut buf)?;
@@ -33,7 +31,7 @@ where
         if self.hidden {
             i |= 4;
         }
-        i.encode(&mut buf)?;
+        i.encode(buf)?;
         todo!()
     }
 }
