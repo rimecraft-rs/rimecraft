@@ -290,27 +290,26 @@ pub trait ComputeIndex<L, T>: ProvidePalette<L, T> {
 
 #[cfg(feature = "edcode")]
 mod _edcode {
-    use rimecraft_edcode::{Encode, Update};
+
+    use edcode2::{Buf, BufMut, Decode, Encode};
 
     use super::*;
 
-    impl<'w, Cx> Encode for ChunkSection<'w, Cx>
+    impl<'w, Cx, B> Encode<B> for ChunkSection<'w, Cx>
     where
         Cx: ChunkCx<'w>,
         Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>,
         Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>,
+        B: BufMut,
     {
-        fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::BufMut,
-        {
+        fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             buf.put_i16(self.ne_block_c as i16);
             self.bsc.encode(&mut buf)?;
             self.bic.encode(&mut buf)
         }
     }
 
-    impl<'w, Cx> Update for ChunkSection<'w, Cx>
+    impl<'w, 'de, Cx, B> Decode<'de, B> for ChunkSection<'w, Cx>
     where
         Cx: ChunkCx<'w>,
 
@@ -322,30 +321,24 @@ mod _edcode {
 
         Cx: ProvidePalette<Cx::BlockStateList, BlockState<'w, Cx>>,
         Cx: ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
+
+        B: Buf,
     {
-        fn update<B>(&mut self, mut buf: B) -> Result<(), std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::Buf,
-        {
+        fn decode_in_place(&mut self, mut buf: B) -> Result<(), edcode2::BoxedError<'de>> {
             self.ne_block_c = buf.get_i16() as u16;
-            self.bsc.update(&mut buf)?;
+            self.bsc.decode_in_place(&mut buf)?;
             let mut sliced = self.bic.to_slice();
-            sliced.update(&mut buf)?;
+            sliced.decode_in_place(&mut buf)?;
             self.bic = sliced;
             Ok(())
         }
-    }
 
-    impl<'w, Cx> ChunkSection<'w, Cx>
-    where
-        Cx: ChunkCx<'w>,
-        Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>,
-        Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>,
-    {
-        /// Returns the encoded length of the chunk section.
-        pub fn encoded_len(&self) -> usize {
-            2 + self.bsc.encoded_len() + self.bic.encoded_len()
+        #[inline]
+        fn decode(_buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+            Err("chunk sections does not support non-in-place decoding".into())
         }
+
+        const SUPPORT_NON_IN_PLACE: bool = false;
     }
 
     impl<'w, Cx> ChunkSection<'w, Cx>
@@ -359,12 +352,15 @@ mod _edcode {
     {
         /// Updates the chunk section from the given biome packet buffer.
         #[allow(clippy::missing_errors_doc)]
-        pub fn update_from_biome_buf<B>(&mut self, mut buf: B) -> Result<(), std::io::Error>
+        pub fn update_from_biome_buf<B>(
+            &mut self,
+            mut buf: B,
+        ) -> Result<(), edcode2::BoxedError<'static>>
         where
-            B: rimecraft_edcode::bytes::Buf,
+            B: Buf,
         {
             let mut sliced = self.bic.to_slice();
-            sliced.update(&mut buf)?;
+            sliced.decode_in_place(&mut buf)?;
             self.bic = sliced;
             Ok(())
         }

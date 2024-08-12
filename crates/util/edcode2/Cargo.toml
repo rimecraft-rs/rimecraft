@@ -1,5 +1,5 @@
 [package]
-name = "rimecraft-packet-codec"
+name = "rimecraft-edcode2"
 version = "0.1.0"
 edition = "2021"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
@@ -13,8 +13,11 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 bytes = "1.6"
+rimecraft-edcode2-derive = { path = "../edcode2-derive", optional = true }
 
 [features]
+default = []
+derive = ["dep:rimecraft-edcode2-derive"]
 
 [lints]
 workspace = true

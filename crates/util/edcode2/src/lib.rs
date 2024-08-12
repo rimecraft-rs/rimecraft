@@ -1,13 +1,14 @@
 //! Traits for serialization and deserialization of packets.
 
-#![deprecated = "migration to the `edcode` crate is recommended"]
-
 use std::marker::PhantomData;
 
-use bytes::{Buf, BufMut};
-use codecs::Variable;
+pub use bytes::{Buf, BufMut};
+pub use codecs::Variable;
 
 pub mod codecs;
+
+#[cfg(feature = "derive")]
+pub use rimecraft_edcode2_derive::{Decode, Encode};
 
 /// A boxed error type.
 pub type BoxedError<'a> = Box<dyn std::error::Error + Send + Sync + 'a>;
@@ -24,20 +25,13 @@ pub trait Decode<'de, B>: Sized {
     /// Decodes this packet from the buffer.
     #[allow(clippy::missing_errors_doc)]
     fn decode(buf: B) -> Result<Self, BoxedError<'de>>;
-}
 
-/// Packet decoders that decode in place.
-pub trait DecodeInPlace<'de, B> {
+    /// Whether this decoder supports non-in-place decoding.
+    const SUPPORT_NON_IN_PLACE: bool = true;
+
     /// Decodes this packet from the buffer in place.
     #[allow(clippy::missing_errors_doc)]
-    fn decode_in_place(&mut self, buf: B) -> Result<(), BoxedError<'de>>;
-}
-
-impl<'de, B, T> DecodeInPlace<'de, B> for T
-where
-    T: Decode<'de, B>,
-{
-    #[inline]
+    #[inline(always)]
     fn decode_in_place(&mut self, buf: B) -> Result<(), BoxedError<'de>> {
         *self = Decode::decode(buf)?;
         Ok(())

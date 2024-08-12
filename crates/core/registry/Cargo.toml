@@ -14,15 +14,11 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 parking_lot = "0.12"
 serde = { version = "1.0", optional = true }
-rimecraft-edcode = { path = "../../util/edcode", optional = true }
-rimecraft-identifier = { path = "../../util/identifier", optional = true, features = [
-    "vanilla",
-] }
+edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 
 [features]
 serde = ["dep:serde"]
-edcode = ["dep:rimecraft-edcode"]
-vanilla-identifier = ["dep:rimecraft-identifier"]
+edcode = ["dep:edcode2"]
 
 [lints]
 workspace = true

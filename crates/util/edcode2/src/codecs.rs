@@ -112,7 +112,7 @@ macro_rules! unsigned_variable_primitives {
 }
 
 unsigned_variable_primitives! {
-    u16, u32, u64, u128, usize,
+    u16, u32, u64, u128,
 }
 
 macro_rules! signed_variable_primitives {
@@ -141,7 +141,6 @@ signed_variable_primitives! {
     i32 => u32,
     i64 => u64,
     i128 => u128,
-    isize => usize,
 }
 
 impl<B: BufMut, T> Encode<B> for [T]
@@ -165,6 +164,34 @@ where
     fn encode(&self, buf: B) -> Result<(), BoxedError<'static>> {
         (**self).encode(buf)
     }
+}
+
+impl<'de, B: Buf, T> Decode<'de, B> for &mut [T]
+where
+    T: for<'a> Decode<'de, &'a mut B>,
+{
+    fn decode_in_place(&mut self, mut buf: B) -> Result<(), BoxedError<'de>> {
+        let len = buf.get_variable::<u32>() as usize;
+        if self.len() < len {
+            return Err(format!(
+                "slice too short: received {} items, have {} slots",
+                len,
+                self.len()
+            )
+            .into());
+        }
+        for val in self[..len].iter_mut() {
+            val.decode_in_place(&mut buf)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn decode(_buf: B) -> Result<Self, BoxedError<'de>> {
+        Err("slices does not support non-in-place decoding".into())
+    }
+
+    const SUPPORT_NON_IN_PLACE: bool = false;
 }
 
 impl<'de, B: Buf, T> Decode<'de, B> for Vec<T>

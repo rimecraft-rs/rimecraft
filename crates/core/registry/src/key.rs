@@ -139,79 +139,65 @@ mod serde {
 /// Helper module for `edcode` support.
 #[cfg(feature = "edcode")]
 pub mod edcode {
-    use rimecraft_edcode::{bytes, Decode, Encode};
+
+    use edcode2::{Decode, Encode};
 
     use crate::ProvideRegistry;
 
     use super::{Key, Root};
 
-    impl<K, T> Encode for Key<K, T>
+    impl<K, T, B> Encode<B> for Key<K, T>
     where
-        K: Encode,
+        K: Encode<B>,
     {
         #[inline]
-        fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
-        where
-            B: bytes::BufMut,
-        {
+        fn encode(&self, buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             self.value.encode(buf)
         }
     }
 
-    impl<'r, K, T> Decode for Key<K, T>
+    impl<'r, 'de, K, T, B> Decode<'de, B> for Key<K, T>
     where
-        K: Decode + Clone + 'r,
+        K: Decode<'de, B> + Clone + 'r,
         T: ProvideRegistry<'r, K, T> + 'r,
     {
         #[inline]
-        fn decode<B>(buf: B) -> Result<Self, std::io::Error>
-        where
-            B: bytes::Buf,
-        {
+        fn decode(buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
             let value = K::decode(buf)?;
             Ok(Key::new(T::registry().key.value.to_owned(), value))
         }
     }
 
-    /// Serde wrapper for registry reference keys.
+    /// Wrapper for registry reference keys.
     #[derive(Debug, Clone, Copy)]
     pub struct RegRef<T>(pub T);
 
-    impl<K, T> Encode for RegRef<&Key<K, T>>
+    impl<K, T, B> Encode<B> for RegRef<&Key<K, T>>
     where
-        K: Encode,
+        K: Encode<B>,
     {
         #[inline]
-        fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
-        where
-            B: bytes::BufMut,
-        {
+        fn encode(&self, buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             self.0.value.encode(buf)
         }
     }
 
-    impl<K, T> Encode for RegRef<Key<K, T>>
+    impl<K, T, B> Encode<B> for RegRef<Key<K, T>>
     where
-        K: Encode,
+        K: Encode<B>,
     {
         #[inline]
-        fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
-        where
-            B: bytes::BufMut,
-        {
+        fn encode(&self, buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             RegRef(&self.0).encode(buf)
         }
     }
 
-    impl<'r, K, T> Decode for RegRef<Key<K, T>>
+    impl<'r, 'de, K, T, B> Decode<'de, B> for RegRef<Key<K, T>>
     where
-        K: Decode + Clone + Root + 'r,
+        K: Decode<'de, B> + Clone + Root + 'r,
     {
         #[inline]
-        fn decode<B>(buf: B) -> Result<Self, std::io::Error>
-        where
-            B: bytes::Buf,
-        {
+        fn decode(buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
             Ok(Self(Key::new(K::root(), K::decode(buf)?)))
         }
     }

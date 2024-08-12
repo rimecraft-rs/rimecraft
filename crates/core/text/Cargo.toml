@@ -19,13 +19,13 @@ rimecraft-global-cx = { path = "../global-cx" }
 rgb = "0.8"
 rimecraft-fmt = { path = "../../util/fmt" }
 serde = { version = "1.0", features = ["derive"], optional = true }
-rimecraft-edcode = { path = "../../util/edcode", optional = true }
+rimecraft-edcode2 = { path = "../../util/edcode2", optional = true }
 
 [features]
 default = ["macros"]
 serde = ["dep:serde"]
 macros = []
-edcode = ["dep:rimecraft-edcode"]
+edcode = ["dep:rimecraft-edcode2"]
 
 [lints]
 workspace = true

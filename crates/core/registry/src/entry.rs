@@ -159,59 +159,58 @@ mod serde {
 
 #[cfg(feature = "edcode")]
 mod edcode {
-    use std::hash::Hash;
+    use std::{fmt::Display, hash::Hash};
 
-    use rimecraft_edcode::{Decode, Encode, VarI32};
+    use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
 
     use crate::{ProvideRegistry, Reg};
 
     use super::{Entry, RefEntry};
 
-    impl<'r, K, T> Encode for RefEntry<K, T>
+    impl<'r, K, T, B> Encode<B> for RefEntry<K, T>
     where
-        K: Hash + Eq + Clone + 'r,
+        K: Hash + Eq + Clone + Display + 'r,
         T: ProvideRegistry<'r, K, T> + 'r,
+        B: BufMut,
     {
-        fn encode<B>(&self, buf: B) -> Result<(), std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::BufMut,
-        {
+        fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             let id = Reg::raw_id(T::registry().get(self.key()).ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, "unknown registry key")
+                edcode2::BoxedError::<'static>::from(format!(
+                    "unknown registry id {}",
+                    self.key().value()
+                ))
             })?);
-            VarI32((id + 1) as i32).encode(buf)
+            buf.put_variable((id + 1) as u32);
+            Ok(())
         }
     }
 
-    impl<'a, 'r, K, T> Decode for &'a RefEntry<K, T>
+    impl<'a, 'r, 'de, K, T, B> Decode<'de, B> for &'a RefEntry<K, T>
     where
         'r: 'a,
         K: 'r,
         T: ProvideRegistry<'r, K, T> + 'r,
+        B: Buf,
     {
-        fn decode<B>(buf: B) -> Result<Self, std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::Buf,
-        {
-            let id = (VarI32::decode(buf)?.0 - 1) as usize;
-            T::registry().of_raw(id).map(From::from).ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, "unknown registry id")
-            })
+        fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+            let id = buf.get_variable::<u32>() as usize - 1;
+            T::registry()
+                .of_raw(id)
+                .map(From::from)
+                .ok_or_else(|| format!("unknown registry id: {}", id).into())
         }
     }
 
-    impl<'r, K, T> Encode for Entry<'_, K, T>
+    impl<'r, K, T, B> Encode<B> for Entry<'_, K, T>
     where
-        K: Hash + Eq + Clone + 'r,
-        T: ProvideRegistry<'r, K, T> + Encode + 'r,
+        K: Hash + Eq + Clone + Display + 'r,
+        T: ProvideRegistry<'r, K, T> + Encode<B> + 'r,
+        B: BufMut,
     {
-        fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::BufMut,
-        {
+        fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             match self {
                 Entry::Direct(value) => {
-                    VarI32(0).encode(&mut buf)?;
+                    buf.put_variable(0i32);
                     value.encode(buf)
                 }
                 Entry::Ref(entry) => entry.encode(buf),
@@ -219,25 +218,21 @@ mod edcode {
         }
     }
 
-    impl<'a, 'r, K, T> Decode for Entry<'a, K, T>
+    impl<'a, 'r, 'de, K, T, B> Decode<'de, B> for Entry<'a, K, T>
     where
         'r: 'a,
         K: 'r,
-        T: ProvideRegistry<'r, K, T> + Decode + 'r,
+        T: ProvideRegistry<'r, K, T> + Decode<'de, B> + 'r,
+        B: Buf,
     {
-        fn decode<B>(mut buf: B) -> Result<Self, std::io::Error>
-        where
-            B: rimecraft_edcode::bytes::Buf,
-        {
-            let id = VarI32::decode(&mut buf)?.0;
+        fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+            let id = buf.get_variable::<u32>() as usize;
             match id {
                 0 => T::decode(buf).map(Entry::Direct),
                 id => T::registry()
-                    .of_raw((id - 1) as usize)
+                    .of_raw(id - 1)
                     .map(|r| Entry::Ref(r.into()))
-                    .ok_or_else(|| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidData, "unknown registry id")
-                    }),
+                    .ok_or_else(|| format!("unknown registry id: {}", id - 1).into()),
             }
         }
     }
