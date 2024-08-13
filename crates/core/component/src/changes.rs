@@ -104,7 +104,7 @@ where
             map.serialize_key(&ty)?;
             if obj.is_none() {
                 // Dummy value. fastnbt does not support Unit values.
-                map.serialize_value(&0u32)?;
+                map.serialize_value(&0u8)?;
             } else {
                 map.serialize_value(&Ser {
                     obj: obj.as_ref().unwrap(),
