@@ -13,11 +13,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     changes::ComponentChanges, dyn_any, ComponentType, ErasedComponentType, Object,
-    RawErasedComponentType, SerdeCodec, UnsafeDebugIter,
+    RawErasedComponentType, UnsafeSerdeCodec, UnsafeDebugIter,
 };
 
 #[repr(transparent)]
-pub(crate) struct CompTyCell<'a, Cx: ProvideIdTy>(ErasedComponentType<'a, Cx>);
+pub(crate) struct CompTyCell<'a, Cx: ProvideIdTy>(pub(crate) ErasedComponentType<'a, Cx>);
 
 /// A map that stores components.
 pub struct ComponentMap<'a, Cx>(MapInner<'a, Cx>)
@@ -128,7 +128,7 @@ where
     }
 
     /// Returns whether a component with given type exist.
-    pub fn contains<T: 'static>(&self, ty: &ComponentType<'a, T>) -> bool {
+    pub fn contains<T>(&self, ty: &ComponentType<'a, T>) -> bool {
         self.contains_raw(&RawErasedComponentType::from(ty))
     }
 
@@ -145,13 +145,21 @@ where
     }
 
     /// Gets the component with given type, with mutable access.
-    pub fn get_mut<T: 'static>(&mut self, ty: &ComponentType<'a, T>) -> Option<&mut T> {
+    ///
+    /// # Safety
+    ///
+    /// This function could not guarantee lifetime of type `T` is sound.
+    /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
+    pub unsafe fn get_mut<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<&mut T> {
         self.get_mut_raw(&RawErasedComponentType::from(ty))
             .and_then(|val| unsafe { val.downcast_mut() })
     }
 
     #[inline]
-    fn get_mut_raw(&mut self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&mut Object<'a>> {
+    unsafe fn get_mut_raw(
+        &mut self,
+        ty: &RawErasedComponentType<'a, Cx>,
+    ) -> Option<&mut Object<'a>> {
         match &mut self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => {
@@ -323,7 +331,11 @@ where
     pub fn changes(&self) -> Option<ComponentChanges<'a, '_, Cx>> {
         if let MapInner::Patched { changes, .. } = &self.0 {
             Some(ComponentChanges {
-                changes: Maybe::Borrowed(changes),
+                changed: Maybe::Borrowed(changes),
+                ser_count: changes
+                    .iter()
+                    .filter(|(cell, _)| cell.0.is_serializable())
+                    .count(),
             })
         } else {
             None
@@ -607,7 +619,7 @@ where
                 } else {
                     AHashMap::new()
                 };
-                struct DeSeed<'a, Cx>(&'a SerdeCodec<'a>, PhantomData<Cx>);
+                struct DeSeed<'a, Cx>(&'a UnsafeSerdeCodec<'a>, PhantomData<Cx>);
 
                 impl<'a, 'de, Cx> serde::de::DeserializeSeed<'de> for DeSeed<'a, Cx>
                 where

@@ -65,6 +65,7 @@ where
 
 /// A cell that simply owns a value.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
+#[repr(transparent)]
 pub struct SimpleOwned<T>(pub T);
 
 impl<T> Deref for SimpleOwned<T> {
