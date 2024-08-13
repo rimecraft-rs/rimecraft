@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     changes::ComponentChanges, dyn_any, ComponentType, ErasedComponentType, Object,
-    RawErasedComponentType, SerdeCodec, UnsafeDebugIter,
+    RawErasedComponentType, UnsafeSerdeCodec, UnsafeDebugIter,
 };
 
 #[repr(transparent)]
@@ -619,7 +619,7 @@ where
                 } else {
                     AHashMap::new()
                 };
-                struct DeSeed<'a, Cx>(&'a SerdeCodec<'a>, PhantomData<Cx>);
+                struct DeSeed<'a, Cx>(&'a UnsafeSerdeCodec<'a>, PhantomData<Cx>);
 
                 impl<'a, 'de, Cx> serde::de::DeserializeSeed<'de> for DeSeed<'a, Cx>
                 where

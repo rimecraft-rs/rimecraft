@@ -3,6 +3,8 @@
 use std::{cell::UnsafeCell, fmt::Debug, marker::PhantomData, str::FromStr, sync::OnceLock};
 
 use ahash::AHashMap;
+use bytes::{Buf, BufMut};
+use edcode2::{BufExt as _, BufMutExt as _, Decode, Encode};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
 use rimecraft_registry::{ProvideRegistry, Reg};
@@ -10,7 +12,7 @@ use serde::{de::DeserializeSeed, ser::SerializeMap, Deserialize, Serialize};
 
 use crate::{
     map::CompTyCell, ComponentType, ErasedComponentType, Object, RawErasedComponentType,
-    SerdeCodec, UnsafeDebugIter,
+    UnsafeDebugIter, UnsafeSerdeCodec,
 };
 
 /// Changes of components.
@@ -80,7 +82,7 @@ where
         for (&CompTyCell(ty), obj) in self.changed.iter().filter(|(k, _)| k.0.is_serializable()) {
             struct Ser<'a, 's> {
                 obj: &'s Object<'a>,
-                codec: &'a SerdeCodec<'a>,
+                codec: &'a UnsafeSerdeCodec<'a>,
             }
 
             impl Serialize for Ser<'_, '_> {
@@ -153,7 +155,7 @@ where
                         let _: () = map.next_value()?;
                         changes.insert(CompTyCell(ty.ty), None);
                     } else {
-                        struct Seed<'a>(&'a SerdeCodec<'a>);
+                        struct Seed<'a>(&'a UnsafeSerdeCodec<'a>);
                         impl<'de, 'a> DeserializeSeed<'de> for Seed<'a> {
                             type Value = Box<Object<'a>>;
 
@@ -189,6 +191,62 @@ where
                 ser_count: changed.len(),
                 changed: Maybe::Owned(SimpleOwned(changed)),
             })
+    }
+}
+
+impl<Cx, B> Encode<B> for ComponentChanges<'_, '_, Cx>
+where
+    Cx: ProvideIdTy,
+    B: BufMut,
+{
+    fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
+        let present = self.changed.values().filter(|val| val.is_some()).count() as u32;
+        buf.put_variable(present);
+        buf.put_variable(self.changed.len() as u32 - present);
+
+        for (&CompTyCell(ty), val) in self.changed.iter() {
+            if let Some(val) = val {
+                buf.put_variable(1);
+                ty.encode(&mut buf)?;
+                (ty.f.packet_codec.encode)(&**val, &mut buf)?;
+            }
+        }
+        for (&CompTyCell(ty), val) in self.changed.iter() {
+            if val.is_none() {
+                ty.encode(&mut buf)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a: 'de, 'de, Cx, B> Decode<'de, B> for ComponentChanges<'a, '_, Cx>
+where
+    Cx: ProvideIdTy<Id: for<'b> Decode<'de, &'b mut B>>
+        + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
+    B: Buf,
+{
+    fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+        let present = buf.get_variable::<u32>();
+        let absent = buf.get_variable::<u32>();
+        let len = (present + absent) as usize;
+
+        let mut changed = AHashMap::with_capacity(len);
+        for _ in 0..present {
+            let ty = ErasedComponentType::decode(&mut buf)?;
+            let obj = (ty.f.packet_codec.decode)(&mut buf)?;
+            changed.insert(CompTyCell(ty), Some(obj));
+        }
+        for _ in 0..absent {
+            let ty = ErasedComponentType::decode(&mut buf)?;
+            changed.insert(CompTyCell(ty), None);
+        }
+
+        Ok(ComponentChanges {
+            ser_count: changed.keys().filter(|k| k.0.is_serializable()).count(),
+            changed: Maybe::Owned(SimpleOwned(changed)),
+        })
     }
 }
 
