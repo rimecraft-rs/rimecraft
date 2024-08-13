@@ -332,6 +332,10 @@ where
         if let MapInner::Patched { changes, .. } = &self.0 {
             Some(ComponentChanges {
                 changed: Maybe::Borrowed(changes),
+                ser_count: changes
+                    .iter()
+                    .filter(|(cell, _)| cell.0.is_serializable())
+                    .count(),
             })
         } else {
             None

@@ -6,10 +6,11 @@ use ahash::AHashMap;
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
 use rimecraft_registry::{ProvideRegistry, Reg};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeSeed, ser::SerializeMap, Deserialize, Serialize};
 
 use crate::{
-    map::CompTyCell, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
+    map::CompTyCell, ComponentType, ErasedComponentType, Object, RawErasedComponentType,
+    SerdeCodec, UnsafeDebugIter,
 };
 
 /// Changes of components.
@@ -18,6 +19,7 @@ where
     Cx: ProvideIdTy,
 {
     pub(crate) changed: Maybe<'cow, AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>>,
+    pub(crate) ser_count: usize,
 }
 
 impl<'a, Cx> ComponentChanges<'a, '_, Cx>
@@ -28,7 +30,165 @@ where
     pub fn builder() -> Builder<'a, Cx> {
         Builder {
             changes: AHashMap::new(),
+            ser_count: 0,
         }
+    }
+
+    /// Gets the component with given type.
+    ///
+    /// # Safety
+    ///
+    /// This function could not guarantee lifetime of type `T` is sound.
+    /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
+    pub unsafe fn get<T: 'a>(&self, ty: &ComponentType<'a, T>) -> Option<Option<&T>> {
+        let val = self.get_raw(&RawErasedComponentType::from(ty))?;
+        if let Some(val) = val {
+            let downcasted = val.downcast_ref::<T>()?;
+            Some(Some(downcasted))
+        } else {
+            Some(None)
+        }
+    }
+
+    #[inline]
+    fn get_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> Option<Option<&Object<'_>>> {
+        self.changed.get(ty).map(Option::as_deref)
+    }
+
+    /// Returns number of changed components.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.changed.len()
+    }
+
+    /// Returns `true` if there are no changed components.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.changed.is_empty()
+    }
+}
+
+impl<Cx> Serialize for ComponentChanges<'_, '_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(self.ser_count))?;
+        for (&CompTyCell(ty), obj) in self.changed.iter().filter(|(k, _)| k.0.is_serializable()) {
+            struct Ser<'a, 's> {
+                obj: &'s Object<'a>,
+                codec: &'a SerdeCodec<'a>,
+            }
+
+            impl Serialize for Ser<'_, '_> {
+                #[inline]
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where
+                    S: serde::Serializer,
+                {
+                    (self.codec.ser)(self.obj).serialize(serializer)
+                }
+            }
+
+            let ty = Type {
+                ty,
+                rm: obj.is_none(),
+                cached_ser: OnceLock::new(),
+            };
+
+            map.serialize_key(&ty)?;
+            if obj.is_none() {
+                // Dummy value. fastnbt does not support Unit values.
+                map.serialize_value(&0u32)?;
+            } else {
+                map.serialize_value(&Ser {
+                    obj: obj.as_ref().unwrap(),
+                    codec: ty.ty.f.serde_codec.expect("missing serde codec"),
+                })?;
+            }
+        }
+        map.end()
+    }
+}
+
+impl<'a, 'de, Cx> Deserialize<'de> for ComponentChanges<'a, '_, Cx>
+where
+    Cx: ProvideIdTy<Id: FromStr> + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor<'a, Cx>(PhantomData<(Cx, &'a ())>);
+
+        impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
+        where
+            Cx: ProvideIdTy<Id: FromStr>
+                + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
+        {
+            type Value = AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "a map")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut changes;
+
+                if let Some(hint) = map.size_hint() {
+                    changes = AHashMap::with_capacity(hint);
+                } else {
+                    changes = AHashMap::new();
+                }
+
+                while let Some(ty) = map.next_key::<Type<'a, Cx>>()? {
+                    if ty.rm {
+                        // Skips a dummy value. fastnbt does not support Unit values.
+                        let _: () = map.next_value()?;
+                        changes.insert(CompTyCell(ty.ty), None);
+                    } else {
+                        struct Seed<'a>(&'a SerdeCodec<'a>);
+                        impl<'de, 'a> DeserializeSeed<'de> for Seed<'a> {
+                            type Value = Box<Object<'a>>;
+
+                            fn deserialize<D>(
+                                self,
+                                deserializer: D,
+                            ) -> Result<Self::Value, D::Error>
+                            where
+                                D: serde::Deserializer<'de>,
+                            {
+                                (self.0.de)(&mut <dyn erased_serde::Deserializer<'de>>::erase(
+                                    deserializer,
+                                ))
+                                .map_err(serde::de::Error::custom)
+                            }
+                        }
+                        changes.insert(
+                            CompTyCell(ty.ty),
+                            Some(map.next_value_seed(Seed(
+                                ty.ty.f.serde_codec.expect("missing serde codec"),
+                            ))?),
+                        );
+                    }
+                }
+
+                Ok(changes)
+            }
+        }
+
+        deserializer
+            .deserialize_map(Visitor(PhantomData))
+            .map(|changed| ComponentChanges {
+                ser_count: changed.len(),
+                changed: Maybe::Owned(SimpleOwned(changed)),
+            })
     }
 }
 
@@ -38,6 +198,7 @@ where
     Cx: ProvideIdTy,
 {
     changes: AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
+    ser_count: usize,
 }
 
 impl<'a, Cx> Builder<'a, Cx>
@@ -61,6 +222,9 @@ where
             std::any::type_name::<T>()
         );
         self.changes.insert(CompTyCell(ty), Some(Box::new(value)));
+        if ty.is_serializable() {
+            self.ser_count += 1;
+        }
     }
 
     /// Inserts a component type with an empty value.
@@ -74,6 +238,7 @@ where
     pub fn build<'cow>(self) -> ComponentChanges<'a, 'cow, Cx> {
         ComponentChanges {
             changed: Maybe::Owned(SimpleOwned(self.changes)),
+            ser_count: self.ser_count,
         }
     }
 }
