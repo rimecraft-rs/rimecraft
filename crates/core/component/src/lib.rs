@@ -240,7 +240,7 @@ struct UnsafePacketCodec<'a> {
 #[derive(Debug, Clone, Copy)]
 struct DynUtil<'a> {
     clone: fn(&Object<'a>) -> Box<Object<'a>>,
-    eq: fn(&Object<'a>, &Object<'a>) -> bool,
+    eq: fn(&'_ Object<'a>, &'_ Object<'a>) -> bool,
 }
 
 #[derive(Debug, Clone, Copy)]

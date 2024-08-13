@@ -2,8 +2,9 @@
 
 use std::{marker::PhantomData, num::NonZeroU32};
 
+use component::map::ComponentMap;
 use rimecraft_fmt::Formatting;
-use rimecraft_global_cx::ProvideIdTy;
+use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
 use rimecraft_registry::{ProvideRegistry, Reg};
 
 #[cfg(feature = "edcode")]
@@ -12,17 +13,40 @@ pub mod stack;
 
 pub use stack::ItemStack;
 
+/// Provides settings type for items.
+pub trait ProvideSettingsTy: GlobalContext {
+    /// Settings type of an item.
+    type Settings<'a>: ItemSettings<'a, Self>;
+}
+
+/// Settings of an item.
+pub trait ItemSettings<'a, Cx> {
+    /// Returns the base settings of the item.
+    fn base(&self) -> &BaseSettings;
+
+    /// Returns the *base components* of the item.
+    fn components(&self) -> &'a ComponentMap<'a, Cx>
+    where
+        Cx: ProvideIdTy;
+}
+
 /// Item containing settings.
 #[derive(Debug)]
-pub struct RawItem<Cx> {
-    settings: Settings,
+pub struct RawItem<'a, Cx>
+where
+    Cx: ProvideSettingsTy,
+{
+    settings: Cx::Settings<'a>,
     _marker: PhantomData<Cx>,
 }
 
-impl<Cx> RawItem<Cx> {
+impl<'a, Cx> RawItem<'a, Cx>
+where
+    Cx: ProvideSettingsTy,
+{
     /// Creates a new `Item` with the given settings.
     #[inline]
-    pub const fn new(settings: Settings) -> Self {
+    pub const fn new(settings: Cx::Settings<'a>) -> Self {
         Self {
             settings,
             _marker: PhantomData,
@@ -31,21 +55,14 @@ impl<Cx> RawItem<Cx> {
 
     /// Returns the settings of the item.
     #[inline]
-    pub fn settings(&self) -> &Settings {
+    pub fn settings(&self) -> &Cx::Settings<'a> {
         &self.settings
     }
 }
 
-impl<Cx> From<Settings> for RawItem<Cx> {
-    #[inline]
-    fn from(settings: Settings) -> Self {
-        Self::new(settings)
-    }
-}
-
-impl<'r, K, Cx> ProvideRegistry<'r, K, Self> for RawItem<Cx>
+impl<'r, K, Cx> ProvideRegistry<'r, K, Self> for RawItem<'r, Cx>
 where
-    Cx: ProvideRegistry<'r, K, Self>,
+    Cx: ProvideRegistry<'r, K, Self> + ProvideSettingsTy,
 {
     #[inline]
     fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
@@ -54,17 +71,17 @@ where
 }
 
 /// An item usable by players and other entities.
-pub type Item<'r, Cx> = Reg<'r, <Cx as ProvideIdTy>::Id, RawItem<Cx>>;
+pub type Item<'r, Cx> = Reg<'r, <Cx as ProvideIdTy>::Id, RawItem<'r, Cx>>;
 
 /// The max item count of an `ItemStack`.
 pub const MAX_STACK_COUNT: u32 = 64;
 
-/// Settings of an [`Item`].
+/// Base settings of an [`Item`].
 ///
 /// A setting configure behaviors common to all items, such as the
 /// stack's max count.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Settings {
+pub struct BaseSettings {
     /// The maximum count of the item that can be stacked in a single slot.
     pub max_count: NonZeroU32,
     /// The maximum amount of damage the item can take.
@@ -77,7 +94,7 @@ pub struct Settings {
     pub sync_nbt: bool,
 }
 
-impl Default for Settings {
+impl Default for BaseSettings {
     #[inline]
     fn default() -> Self {
         Self {
@@ -88,10 +105,6 @@ impl Default for Settings {
         }
     }
 }
-
-#[doc(alias = "ItemProperties")]
-pub use Settings as ItemSettings;
-
 /// Rarity of an item.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Default)]
 #[non_exhaustive]

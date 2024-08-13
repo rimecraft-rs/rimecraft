@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     changes::ComponentChanges, dyn_any, ComponentType, ErasedComponentType, Object,
-    RawErasedComponentType, UnsafeSerdeCodec, UnsafeDebugIter,
+    RawErasedComponentType, UnsafeDebugIter, UnsafeSerdeCodec,
 };
 
 #[repr(transparent)]
@@ -43,7 +43,7 @@ where
 {
     #[inline]
     fn default() -> Self {
-        Self::empty()
+        Self::EMPTY
     }
 }
 
@@ -51,10 +51,14 @@ impl<'a, Cx> ComponentMap<'a, Cx>
 where
     Cx: ProvideIdTy,
 {
+    /// An empty component map.
+    pub const EMPTY: Self = Self(MapInner::Empty);
+
     /// Creates an empty component map.
+    #[deprecated = "use `ComponentMap::EMPTY` instead"]
     #[inline]
     pub const fn empty() -> Self {
-        Self(MapInner::Empty)
+        Self::EMPTY
     }
 
     /// Creates a **patched** component map with given base map.
@@ -64,6 +68,24 @@ where
             base,
             changes: AHashMap::new(),
             changes_count: 0,
+        })
+    }
+
+    /// Creates a **patched** component map with given base map and changes.
+    pub fn with_changes(
+        base: &'a ComponentMap<'a, Cx>,
+        changes: ComponentChanges<'a, '_, Cx>,
+    ) -> Self {
+        Self(MapInner::Patched {
+            base,
+            changes_count: changes.changed.values().map(|v| v.is_some() as isize).sum(),
+            changes: match changes.changed {
+                Maybe::Borrowed(c) => c
+                    .iter()
+                    .map(|(k, v)| (CompTyCell(k.0), v.as_deref().map(k.0.f.util.clone)))
+                    .collect(),
+                Maybe::Owned(c) => c.0,
+            },
         })
     }
 
@@ -87,7 +109,7 @@ where
     }
 
     #[inline]
-    fn get_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&Object<'_>> {
+    fn get_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&Object<'a>> {
         match &self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => changes
@@ -333,8 +355,8 @@ where
             Some(ComponentChanges {
                 changed: Maybe::Borrowed(changes),
                 ser_count: changes
-                    .iter()
-                    .filter(|(cell, _)| cell.0.is_serializable())
+                    .keys()
+                    .filter(|cell| cell.0.is_serializable())
                     .count(),
             })
         } else {
@@ -445,6 +467,53 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.1.len();
         (len, Some(len))
+    }
+}
+
+impl<Cx> PartialEq for ComponentMap<'_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    fn eq(&self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        self.iter().all(move |(ty, obj)| {
+            other
+                .get_raw(&*ty)
+                .map_or(false, |o| (ty.f.util.eq)(obj, o))
+        })
+    }
+}
+
+impl<Cx> Eq for ComponentMap<'_, Cx> where Cx: ProvideIdTy {}
+
+impl<Cx> Clone for ComponentMap<'_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    fn clone(&self) -> Self {
+        match &self.0 {
+            MapInner::Empty => Self::EMPTY,
+            MapInner::Patched {
+                base,
+                changes,
+                changes_count,
+            } => Self(MapInner::Patched {
+                base,
+                changes: changes
+                    .iter()
+                    .map(|(k, v)| (CompTyCell(k.0), v.as_deref().map(k.0.f.util.clone)))
+                    .collect(),
+                changes_count: *changes_count,
+            }),
+            MapInner::Simple(map) => Self(MapInner::Simple(
+                map.iter()
+                    .map(|(k, v)| (CompTyCell(k.0), (k.0.f.util.clone)(&**v)))
+                    .collect(),
+            )),
+        }
     }
 }
 
