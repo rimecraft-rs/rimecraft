@@ -56,18 +56,14 @@ where
 /// Creates a new [`PacketCodec`] by encoding and decoding through `edcode2`.
 pub const fn packet_codec_edcode<'a, T>() -> PacketCodec<'a, T>
 where
-    T: for<'b> Encode<&'b mut dyn BufMut>
-        + for<'b> Decode<'static, &'b mut dyn Buf>
-        + Send
-        + Sync
-        + 'a,
+    T: for<'b> Encode<&'b mut dyn BufMut> + for<'b> Decode<'a, &'b mut dyn Buf> + Send + Sync + 'a,
 {
     PacketCodec {
         codec: UnsafePacketCodec {
             encode: |obj, buf| unsafe { &*(obj as *const Object<'_> as *const T) }.encode(buf),
             decode: {
                 assert!(
-                    <T as Decode<'static, &mut dyn Buf>>::SUPPORT_NON_IN_PLACE,
+                    <T as Decode<'_, _>>::SUPPORT_NON_IN_PLACE,
                     "non-in-place decoding is not supported for this type",
                 );
                 |buf| Ok(Box::new(T::decode(buf)?))
@@ -189,16 +185,6 @@ impl<T> PartialEq for ComponentType<'_, T> {
     #[inline]
     fn eq(&self, _other: &Self) -> bool {
         true
-    }
-}
-
-impl<'a, T> Default for ComponentType<'a, T>
-where
-    T: Clone + Eq + Send + Sync + 'a,
-{
-    #[inline]
-    fn default() -> Self {
-        todo!()
     }
 }
 
