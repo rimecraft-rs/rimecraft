@@ -1,6 +1,6 @@
-//! Proc-macros for deriving `rimecraft_edcode` traits.
+//! Proc-macros for deriving `rimecraft_edcode2` traits.
 //!
-//! __You shouldn't use this crate directly__, use `rimecraft_edcode` crate
+//! __You shouldn't use this crate directly__, use `rimecraft_edcode2` crate
 //! with `derive` feature flag instead.
 
 use proc_macro::TokenStream;
@@ -111,7 +111,7 @@ fn parse_derive_enum(
     Ok((ident, repr_type, enum_idents, enum_vals))
 }
 
-/// Derive `rimecraft_edcode::Encode` to objects.
+/// Derive `rimecraft_edcode2::Encode` to objects.
 ///
 /// # Enum
 ///
@@ -131,15 +131,12 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
                     Err(err) => return err,
                 };
             let expanded = quote! {
-                impl ::rimecraft_edcode::Encode for #ident {
-                    fn encode<B>(&self, mut buf: B) -> Result<(), std::io::Error>
-                    where
-                        B: ::rimecraft_edcode::bytes::BufMut,
-                    {
+                impl<B: ::rimecraft_edcode2::BufMut> ::rimecraft_edcode2::Encode<B> for #ident {
+                    fn encode(&self, mut buf: B) -> Result<(), ::rimecraft_edcode2::BoxedError<'static>> {
                         let x:#repr_type = match self {
                             #( Self::#enum_idents => #enum_vals, )*
                         };
-                        ::rimecraft_edcode::Encode::encode(&x, &mut buf)?;
+                        ::rimecraft_edcode2::Encode::encode(&x, &mut buf)?;
                         Ok(())
                     }
                 }
@@ -161,7 +158,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
     }
 }
 
-/// Derive `rimecraft_edcode::Decode` to objects.
+/// Derive `rimecraft_edcode2::Decode` to objects.
 #[proc_macro_derive(Decode)]
 pub fn derive_decode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -175,15 +172,12 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
                     }
                 };
             let expanded = quote! {
-                impl ::rimecraft_edcode::Decode for #ident {
-                    fn decode<B>(mut buf: B) -> Result<Self, std::io::Error>
-                    where
-                        B: ::rimecraft_edcode::bytes::Buf,
-                    {
-                        let x:#repr_type = ::rimecraft_edcode::Decode::decode(&mut buf)?;
+                impl<'de, B: ::rimecraft_edcode2::Buf> ::rimecraft_edcode2::Decode<'de, B> for #ident {
+                    fn decode(mut buf: B) -> Result<Self, ::rimecraft_edcode2::BoxedError<'de>> {
+                        let x:#repr_type = ::rimecraft_edcode2::Decode::decode(&mut buf)?;
                         let var = match x {
                             #( #enum_vals => Self::#enum_idents, )*
-                            unknown => return Err(std::io::Error::other(format!("unknown variant {}", unknown))),
+                            unknown => return Err(Box::new(std::io::Error::other(format!("unknown variant {}", unknown)))),
                         };
                         Ok(var)
                     }

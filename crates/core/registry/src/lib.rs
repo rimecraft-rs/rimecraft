@@ -44,7 +44,7 @@ pub struct Registry<K, T> {
 ///
 /// # Serialization and Deserialization
 ///
-/// This type can be serialized and deserialized using `serde` and `edcode`.
+/// This type can be serialized and deserialized using `serde` and `edcode2`.
 /// (with `serde` feature and `edcode` feature respectively)
 ///
 /// ## Serde
