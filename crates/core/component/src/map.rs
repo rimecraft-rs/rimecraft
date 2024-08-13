@@ -17,7 +17,7 @@ use crate::{
 };
 
 #[repr(transparent)]
-pub(crate) struct CompTyCell<'a, Cx: ProvideIdTy>(ErasedComponentType<'a, Cx>);
+pub(crate) struct CompTyCell<'a, Cx: ProvideIdTy>(pub(crate) ErasedComponentType<'a, Cx>);
 
 /// A map that stores components.
 pub struct ComponentMap<'a, Cx>(MapInner<'a, Cx>)

@@ -4,13 +4,12 @@ use std::{cell::UnsafeCell, fmt::Debug, marker::PhantomData, str::FromStr, sync:
 
 use ahash::AHashMap;
 use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_maybe::Maybe;
+use rimecraft_maybe::{Maybe, SimpleOwned};
 use rimecraft_registry::{ProvideRegistry, Reg};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    map::CompTyCell, ErasedComponentType, Object, RawErasedComponentType, SerdeCodec,
-    UnsafeDebugIter,
+    map::CompTyCell, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
 };
 
 /// Changes of components.
@@ -19,6 +18,74 @@ where
     Cx: ProvideIdTy,
 {
     pub(crate) changed: Maybe<'cow, AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>>,
+}
+
+impl<'a, Cx> ComponentChanges<'a, '_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    /// Returns a builder for `ComponentChanges`.
+    pub fn builder() -> Builder<'a, Cx> {
+        Builder {
+            changes: AHashMap::new(),
+        }
+    }
+}
+
+/// Builder for [`ComponentChanges`].
+pub struct Builder<'a, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    changes: AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
+}
+
+impl<'a, Cx> Builder<'a, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    /// Inserts a component type with a valid value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the type of the value does not match the component type.
+    #[inline]
+    pub fn insert<T>(&mut self, ty: ErasedComponentType<'a, Cx>, value: T)
+    where
+        T: Send + Sync + 'a,
+    {
+        assert_eq!(
+            ty.ty,
+            typeid::of::<T>(),
+            "the type {} does not match the component type",
+            std::any::type_name::<T>()
+        );
+        self.changes.insert(CompTyCell(ty), Some(Box::new(value)));
+    }
+
+    /// Inserts a component type with an empty value.
+    #[inline]
+    pub fn remove(&mut self, ty: ErasedComponentType<'a, Cx>) {
+        self.changes.insert(CompTyCell(ty), None);
+    }
+
+    /// Builds the changes into a [`ComponentChanges`].
+    #[inline]
+    pub fn build<'cow>(self) -> ComponentChanges<'a, 'cow, Cx> {
+        ComponentChanges {
+            changed: Maybe::Owned(SimpleOwned(self.changes)),
+        }
+    }
+}
+
+impl<'a, Cx> From<Builder<'a, Cx>> for ComponentChanges<'a, '_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    #[inline]
+    fn from(builder: Builder<'a, Cx>) -> Self {
+        builder.build()
+    }
 }
 
 const REMOVED_PREFIX: char = '!';
@@ -123,5 +190,15 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(&UnsafeDebugIter(UnsafeCell::new(self.changed.keys())), f)
+    }
+}
+
+impl<Cx> Debug for Builder<'_, Cx>
+where
+    Cx: ProvideIdTy + Debug,
+    Cx::Id: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&UnsafeDebugIter(UnsafeCell::new(self.changes.keys())), f)
     }
 }
