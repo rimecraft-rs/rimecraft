@@ -128,7 +128,7 @@ where
     }
 
     /// Returns whether a component with given type exist.
-    pub fn contains<T: 'static>(&self, ty: &ComponentType<'a, T>) -> bool {
+    pub fn contains<T>(&self, ty: &ComponentType<'a, T>) -> bool {
         self.contains_raw(&RawErasedComponentType::from(ty))
     }
 
@@ -145,13 +145,21 @@ where
     }
 
     /// Gets the component with given type, with mutable access.
-    pub fn get_mut<T: 'static>(&mut self, ty: &ComponentType<'a, T>) -> Option<&mut T> {
+    ///
+    /// # Safety
+    ///
+    /// This function could not guarantee lifetime of type `T` is sound.
+    /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
+    pub unsafe fn get_mut<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<&mut T> {
         self.get_mut_raw(&RawErasedComponentType::from(ty))
             .and_then(|val| unsafe { val.downcast_mut() })
     }
 
     #[inline]
-    fn get_mut_raw(&mut self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&mut Object<'a>> {
+    unsafe fn get_mut_raw(
+        &mut self,
+        ty: &RawErasedComponentType<'a, Cx>,
+    ) -> Option<&mut Object<'a>> {
         match &mut self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => {
@@ -323,7 +331,7 @@ where
     pub fn changes(&self) -> Option<ComponentChanges<'a, '_, Cx>> {
         if let MapInner::Patched { changes, .. } = &self.0 {
             Some(ComponentChanges {
-                changes: Maybe::Borrowed(changes),
+                changed: Maybe::Borrowed(changes),
             })
         } else {
             None

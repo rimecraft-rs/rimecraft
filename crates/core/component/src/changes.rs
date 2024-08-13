@@ -1,6 +1,6 @@
 //! `ComponentChanges` implementation.
 
-use std::{cell::UnsafeCell, fmt::Debug, marker::PhantomData, str::FromStr};
+use std::{cell::UnsafeCell, fmt::Debug, marker::PhantomData, str::FromStr, sync::OnceLock};
 
 use ahash::AHashMap;
 use rimecraft_global_cx::ProvideIdTy;
@@ -9,7 +9,8 @@ use rimecraft_registry::{ProvideRegistry, Reg};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    map::CompTyCell, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
+    map::CompTyCell, ErasedComponentType, Object, RawErasedComponentType, SerdeCodec,
+    UnsafeDebugIter,
 };
 
 /// Changes of components.
@@ -17,7 +18,7 @@ pub struct ComponentChanges<'a, 'cow, Cx>
 where
     Cx: ProvideIdTy,
 {
-    pub(crate) changes: Maybe<'cow, AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>>,
+    pub(crate) changed: Maybe<'cow, AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>>,
 }
 
 const REMOVED_PREFIX: char = '!';
@@ -28,6 +29,8 @@ where
 {
     ty: ErasedComponentType<'a, Cx>,
     rm: bool,
+
+    cached_ser: OnceLock<String>,
 }
 
 impl<Cx> Serialize for Type<'_, Cx>
@@ -38,12 +41,14 @@ where
     where
         S: serde::Serializer,
     {
-        let id = Reg::id(self.ty);
-        serializer.serialize_str(&if self.rm {
-            format!("{}{}", REMOVED_PREFIX, id)
-        } else {
-            id.to_string()
-        })
+        serializer.serialize_str(self.cached_ser.get_or_init(|| {
+            let id = Reg::id(self.ty);
+            if self.rm {
+                format!("{}{}", REMOVED_PREFIX, id)
+            } else {
+                id.to_string()
+            }
+        }))
     }
 }
 
@@ -85,11 +90,22 @@ where
                     E::custom(format!("unable to deserialize the identifier {}", any))
                 })?;
 
+                let ty = Cx::registry().get(&id).ok_or_else(|| {
+                    E::custom(format!("unable to find the component type {}", id))
+                })?;
+
+                if !ty.is_serializable() {
+                    return Err(E::custom(format!(
+                        "the component type {} is not serializable",
+                        id
+                    )));
+                }
+
                 Ok(Type {
-                    ty: Cx::registry().get(&id).ok_or_else(|| {
-                        E::custom(format!("unable to find the component type {}", id))
-                    })?,
+                    ty,
                     rm: stripped.is_some(),
+
+                    cached_ser: OnceLock::new(),
                 })
             }
         }
@@ -106,6 +122,6 @@ where
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&UnsafeDebugIter(UnsafeCell::new(self.changes.keys())), f)
+        Debug::fmt(&UnsafeDebugIter(UnsafeCell::new(self.changed.keys())), f)
     }
 }

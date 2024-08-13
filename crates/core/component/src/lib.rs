@@ -230,6 +230,12 @@ impl<'a, Cx> RawErasedComponentType<'a, Cx> {
             _marker: PhantomData,
         }
     }
+
+    /// Returns whether the component is serializable.
+    #[inline]
+    pub fn is_serializable(&self) -> bool {
+        self.f.serde_codec.is_some()
+    }
 }
 
 impl<'a, T, Cx> From<&ComponentType<'a, T>> for RawErasedComponentType<'a, Cx> {
