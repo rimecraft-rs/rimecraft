@@ -5,6 +5,8 @@ mod edcode;
 
 mod dbg_impl;
 
+pub mod criterion;
+
 use rimecraft_fmt::Formatting;
 use rimecraft_item::{stack::ItemStackCx, ItemStack};
 use rimecraft_text::{ProvideTextTy, Text};
@@ -30,45 +32,25 @@ where
     pub display: Option<DisplayInfo<'r, Cx>>,
 }
 
+/// Display-related information.
+///
 /// # MCJE Reference
 /// `net.minecraft.advancement.AdvancementDisplay` in yarn.
 pub struct DisplayInfo<'r, Cx>
 where
     Cx: AdvancementCx,
 {
-    title: Text<Cx>,
-    description: Text<Cx>,
-    icon: ItemStack<'r, Cx>,
-    background: Option<Cx::Id>,
-    frame: Frame,
+    pub(crate) title: Text<Cx>,
+    pub(crate) description: Text<Cx>,
+    pub(crate) icon: ItemStack<'r, Cx>,
+    pub(crate) background: Option<Cx::Id>,
+    pub(crate) frame: Frame,
+    /// Show a notice box at the upper right corner when obtained.
+    pub(crate) show_toast: bool,
     /// Send message in chat when obtained.
-    show_toast: bool,
-    announce_to_chat: bool,
-    hidden: bool,
-    pos: (f32, f32),
-}
-
-/// Use this to construct a new [`DisplayInfo`].
-pub struct NewDisplayInfoDescriptor<'r, Cx>
-where
-    Cx: AdvancementCx,
-{
-    /// See [`DisplayInfo::title`].
-    pub title: Text<Cx>,
-    /// See [`DisplayInfo::description`].
-    pub description: Text<Cx>,
-    /// See [`DisplayInfo::icon`].
-    pub icon: ItemStack<'r, Cx>,
-    /// See [`DisplayInfo::background`].
-    pub background: Option<Cx::Id>,
-    /// See [`DisplayInfo::frame`].
-    pub frame: Frame,
-    /// See [`DisplayInfo::show_toast`].
-    pub show_toast: bool,
-    /// See [`DisplayInfo::announce_to_chat`].
-    pub announce_to_chat: bool,
-    /// See [`DisplayInfo::hidden`].
-    pub hidden: bool,
+    pub(crate) announce_to_chat: bool,
+    pub(crate) hidden: bool,
+    pub(crate) pos: (f32, f32),
 }
 
 impl<'r, Cx> DisplayInfo<'r, Cx>
@@ -76,17 +58,16 @@ where
     Cx: AdvancementCx,
 {
     /// Create a new [`DisplayInfo`].
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        NewDisplayInfoDescriptor {
-            title,
-            description,
-            icon,
-            background,
-            frame,
-            show_toast,
-            announce_to_chat,
-            hidden,
-        }: NewDisplayInfoDescriptor<'r, Cx>,
+        title: Text<Cx>,
+        description: Text<Cx>,
+        icon: ItemStack<'r, Cx>,
+        background: Option<Cx::Id>,
+        frame: Frame,
+        show_toast: bool,
+        announce_to_chat: bool,
+        hidden: bool,
     ) -> Self {
         Self {
             title,
@@ -107,8 +88,63 @@ where
     }
 
     /// Get the title of this advancement.
+    #[inline(always)]
     pub fn title(&self) -> &Text<Cx> {
         &self.title
+    }
+
+    /// Get the description of this advancement.
+    #[inline(always)]
+    pub fn description(&self) -> &Text<Cx> {
+        &self.description
+    }
+
+    /// Get the icon of tjis advancement.
+    #[inline(always)]
+    pub fn icon(&self) -> &ItemStack<'r, Cx> {
+        &self.icon
+    }
+
+    /// Get the background of this advancement.
+    #[inline(always)]
+    pub fn background(&self) -> Option<&Cx::Id> {
+        self.background.as_ref()
+    }
+
+    /// Get the frame of this advancement.
+    #[inline(always)]
+    pub fn frame(&self) -> &Frame {
+        &self.frame
+    }
+
+    /// Get advancement's X position within its board.
+    #[inline(always)]
+    pub fn x(&self) -> f32 {
+        self.pos.0
+    }
+
+    /// Get advancement's Y position within its board.
+    #[inline(always)]
+    pub fn y(&self) -> f32 {
+        self.pos.1
+    }
+
+    /// Get whether show toast when obtained this advancement.
+    #[inline(always)]
+    pub fn show_toast(&self) -> bool {
+        self.show_toast
+    }
+
+    /// Get whether announce to chat when obtained this advancement.
+    #[inline(always)]
+    pub fn announce_to_chat(&self) -> bool {
+        self.announce_to_chat
+    }
+
+    /// Get whether this advancement is hidden.
+    #[inline(always)]
+    pub fn hidden(&self) -> bool {
+        self.hidden
     }
 }
 

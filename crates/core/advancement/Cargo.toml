@@ -18,10 +18,11 @@ rimecraft-item = { path = "../item" }
 rimecraft-fmt = { path = "../../util/fmt" }
 rimecraft-global-cx = { path = "../global-cx" }
 rimecraft-edcode2 = { path = "../../util/edcode2", optional = true }
+rimecraft-registry = { path = "../registry", optional = true }
 
 [lints]
 workspace = true
 
 [features]
-default=["edcode"]
-edcode = ['dep:rimecraft-edcode2']
+default = ["edcode"]
+edcode = ['dep:rimecraft-edcode2', "dep:rimecraft-registry"]
