@@ -2,7 +2,7 @@
 
 use component::map::ComponentMap;
 use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::ProvideRegistry;
+use rimecraft_registry::{ProvideRegistry, Reg};
 
 use std::{fmt::Debug, marker::PhantomData};
 
@@ -33,7 +33,11 @@ where
     /// Creates a new item stack with the given item and count.
     #[inline]
     pub fn new(item: Item<'r, Cx>, count: u32) -> Self {
-        Self::with_component(item, count, ComponentMap::new(item.settings().components()))
+        Self::with_component(
+            item,
+            count,
+            ComponentMap::new(Reg::into_inner(item).settings().components()),
+        )
     }
 
     /// Creates a new item stack with the given item, count, and custom NBT tag.
@@ -311,7 +315,7 @@ mod _serde {
                         item,
                         count,
                         components: ComponentMap::with_changes(
-                            item.settings().components(),
+                            Reg::into_inner(item).settings().components(),
                             components
                                 .ok_or_else(|| serde::de::Error::missing_field("components"))?,
                         ),

@@ -43,12 +43,16 @@ impl<T> ComponentType<'_, T> {
 
 impl<'a, T> ComponentType<'a, T>
 where
-    T: Clone + Eq + Send + Sync + 'a,
+    T: Clone + Eq + Hash + Send + Sync + 'a,
 {
     const UTIL: DynUtil<'a> = DynUtil {
         clone: |obj| Box::new(unsafe { &*(obj as *const Object<'_> as *const T) }.clone()),
         eq: |a, b| unsafe {
             *(a as *const Object<'_> as *const T) == *(b as *const Object<'_> as *const T)
+        },
+        hash: |obj, mut state| {
+            let obj = unsafe { &*(obj as *const Object<'_> as *const T) };
+            obj.hash(&mut state);
         },
     };
 }
@@ -156,7 +160,7 @@ impl<'a, T, Cx> TypeBuilder<'a, T, Cx> {
 
 impl<'a, T, Cx> TypeBuilder<'a, T, Cx>
 where
-    T: Clone + Eq + Send + Sync + 'a,
+    T: Clone + Eq + Hash + Send + Sync + 'a,
 {
     /// Builds a new [`ComponentType`] with the given codecs.
     pub const fn build(self) -> ComponentType<'a, T> {
@@ -241,6 +245,7 @@ struct UnsafePacketCodec<'a> {
 struct DynUtil<'a> {
     clone: fn(&Object<'a>) -> Box<Object<'a>>,
     eq: fn(&'_ Object<'a>, &'_ Object<'a>) -> bool,
+    hash: fn(&'_ Object<'a>, &'_ mut dyn std::hash::Hasher),
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -489,6 +489,18 @@ where
 
 impl<Cx> Eq for ComponentMap<'_, Cx> where Cx: ProvideIdTy {}
 
+impl<Cx> Hash for ComponentMap<'_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        for (ty, obj) in self.iter() {
+            ty.hash(state);
+            (ty.f.util.hash)(obj, state);
+        }
+    }
+}
+
 impl<Cx> Clone for ComponentMap<'_, Cx>
 where
     Cx: ProvideIdTy,

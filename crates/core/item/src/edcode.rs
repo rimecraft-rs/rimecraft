@@ -1,6 +1,6 @@
 use component::{changes::ComponentChanges, map::ComponentMap, RawErasedComponentType};
 use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
-use rimecraft_registry::ProvideRegistry;
+use rimecraft_registry::{ProvideRegistry, Reg};
 
 use crate::{stack::ItemStackCx, Item, ItemSettings, ItemStack, RawItem};
 
@@ -44,7 +44,7 @@ where
             Ok(ItemStack::with_component(
                 item,
                 count,
-                ComponentMap::with_changes(item.settings().components(), changes),
+                ComponentMap::with_changes(Reg::into_inner(item).settings().components(), changes),
             ))
         }
     }
