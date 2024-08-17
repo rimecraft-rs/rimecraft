@@ -20,6 +20,8 @@ mod dyn_any;
 
 use dyn_any::Any;
 
+pub use ahash::{AHashMap, AHashSet};
+
 /// Type of a component data.
 ///
 /// The type `T` should be unique for each component, as it's used to identify the component.
@@ -115,7 +117,10 @@ where
 {
     SerdeCodec {
         codec: UnsafeSerdeCodec {
-            ser: |obj| unsafe { &*(obj as *const Object<'_> as *const T) },
+            ser: |obj| unsafe {
+                &*(obj as *const Object<'_> as *const T
+                    as *const (dyn erased_serde::Serialize + 'a))
+            },
             de: |deserializer| {
                 erased_serde::deserialize::<T>(deserializer).map(|v| {
                     let v: Box<Object<'_>> = Box::new(v);
@@ -221,7 +226,7 @@ pub struct SerdeCodec<'a, T> {
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 struct UnsafeSerdeCodec<'a> {
-    ser: for<'s> fn(&'s Object<'a>) -> &'s dyn erased_serde::Serialize,
+    ser: for<'s> fn(&'s Object<'a>) -> &'s (dyn erased_serde::Serialize + 'a),
     de: fn(&mut dyn erased_serde::Deserializer<'_>) -> erased_serde::Result<Box<Object<'a>>>,
     upd: fn(&mut Object<'a>, &mut dyn erased_serde::Deserializer<'a>) -> erased_serde::Result<()>,
 }
@@ -329,6 +334,13 @@ where
     #[inline]
     fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
         Cx::registry()
+    }
+}
+
+impl<Cx> Copy for RawErasedComponentType<'_, Cx> {}
+impl<Cx> Clone for RawErasedComponentType<'_, Cx> {
+    fn clone(&self) -> Self {
+        *self
     }
 }
 

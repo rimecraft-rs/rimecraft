@@ -3,7 +3,7 @@
 use parking_lot::RwLock;
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
-    deser_nbt::CreateFromNbt, BlockEntity, ProvideBlockEntity, RawBlockEntityTypeDyn,
+    deser_nbt::CreateFromNbt, BlockEntity, DynRawBlockEntityType, ProvideBlockEntity,
 };
 use rimecraft_chunk_palette::{Maybe, SimpleOwned};
 use rimecraft_fluid::{BsToFs, FluidState};
@@ -83,7 +83,7 @@ where
     Cx: ChunkCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>,
     Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
 {
@@ -262,7 +262,7 @@ where
     Cx: ChunkCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>,
     Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
 {
@@ -320,7 +320,7 @@ where
     Cx: ChunkCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>,
     Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
 {
@@ -378,7 +378,7 @@ where
     Cx: ChunkCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>,
     Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
 {
@@ -496,7 +496,7 @@ where
     Cx: ChunkCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>,
     Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
 {
@@ -532,7 +532,7 @@ where
     Cx: ChunkCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>,
     Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
 {
@@ -546,7 +546,7 @@ where
     Cx: ChunkCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>,
     Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
 {
@@ -557,7 +557,7 @@ where
     Cx: ChunkCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>,
+        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>,
     Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
 {

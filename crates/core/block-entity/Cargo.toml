@@ -16,11 +16,14 @@ rimecraft-global-cx = { path = "../global-cx" }
 rimecraft-registry = { path = "../registry" }
 rimecraft-block = { path = "../block" }
 rimecraft-voxel-math = { path = "../../util/voxel-math" }
-rimecraft-downcast = { path = "../../util/downcast" }
+typeid = "1.0"
 ahash = "0.8"
 serde = "1.0"
 erased-serde = "0.4"
-rimecraft-serde-update = { path = "../../util/serde-update", features = ["erased"] }
+rimecraft-serde-update = { path = "../../util/serde-update", features = [
+    "erased",
+] }
+component = { path = "../component", package = "rimecraft-component" }
 
 [features]
 

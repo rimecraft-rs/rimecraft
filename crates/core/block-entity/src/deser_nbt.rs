@@ -8,7 +8,7 @@ use rimecraft_registry::ProvideRegistry;
 use rimecraft_voxel_math::BlockPos;
 use serde::{de::DeserializeSeed, Deserialize, Deserializer};
 
-use crate::{BlockEntity, ProvideBlockEntity, RawBlockEntityTypeDyn};
+use crate::{BlockEntity, DynRawBlockEntityType, ProvideBlockEntity};
 
 /// The dummy value for block entity types.
 pub const DUMMY: &str = "DUMMY";
@@ -46,7 +46,7 @@ where
 impl<'w, 'de, Cx> DeserializeSeed<'de> for CreateFromNbt<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy
-        + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>
+        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>
         + ProvideNbtTy,
     Cx::Id: Deserialize<'de> + Hash + Eq,
     Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
@@ -64,7 +64,7 @@ where
         impl<'de, 'w, Cx> serde::de::Visitor<'de> for Visitor<'w, Cx>
         where
             Cx: ProvideBlockStateExtTy
-                + ProvideRegistry<'w, Cx::Id, RawBlockEntityTypeDyn<'w, Cx>>
+                + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>
                 + ProvideNbtTy,
             Cx::Id: Deserialize<'de> + Hash + Eq,
             Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
@@ -205,7 +205,7 @@ where
                     res
                 } else {
                     let id = id.ok_or_else(|| serde::de::Error::missing_field("id"))?;
-                    let registry: &rimecraft_registry::Registry<_, RawBlockEntityTypeDyn<'w, Cx>> =
+                    let registry: &rimecraft_registry::Registry<_, DynRawBlockEntityType<'w, Cx>> =
                         Cx::registry();
                     let ty = registry.get(&id).ok_or_else(|| {
                         serde::de::Error::custom(format!("unknown block entity type: {}", id))

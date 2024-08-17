@@ -97,6 +97,14 @@ where
         }
     }
 
+    /// Returns a builder for creating a simple component map with given capacity.
+    #[inline]
+    pub fn builder_with_capacity(capacity: usize) -> Builder<'a, Cx> {
+        Builder {
+            map: AHashMap::with_capacity(capacity),
+        }
+    }
+
     /// Gets the component with given type.
     ///
     /// # Safety
@@ -108,8 +116,10 @@ where
             .and_then(|val| unsafe { val.downcast_ref() })
     }
 
-    #[inline]
-    fn get_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&Object<'a>> {
+    /// Gets the component with given type.
+    ///
+    /// This function is similar to `get`, but it returns the raw object instead of the reference.
+    pub fn get_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&Object<'a>> {
         match &self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => changes
@@ -134,8 +144,10 @@ where
             .and_then(|(k, v)| v.downcast_ref().map(|v| (k, v)))
     }
 
-    #[inline]
-    fn get_key_value_raw(
+    /// Gets the component and its type registration with given type.
+    ///
+    /// This function is similar to `get_key_value`, but it returns the raw object instead of the reference.
+    pub fn get_key_value_raw(
         &self,
         ty: &RawErasedComponentType<'a, Cx>,
     ) -> Option<(ErasedComponentType<'a, Cx>, &Object<'a>)> {
@@ -154,8 +166,10 @@ where
         self.contains_raw(&RawErasedComponentType::from(ty))
     }
 
-    #[inline]
-    fn contains_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> bool {
+    /// Returns whether a component with given type exist.
+    ///
+    /// This function is similar to `contains`, but it receives the raw component type instead of the typed one.
+    pub fn contains_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> bool {
         match &self.0 {
             MapInner::Empty => false,
             MapInner::Patched { base, changes, .. } => changes
@@ -177,11 +191,10 @@ where
             .and_then(|val| unsafe { val.downcast_mut() })
     }
 
-    #[inline]
-    unsafe fn get_mut_raw(
-        &mut self,
-        ty: &RawErasedComponentType<'a, Cx>,
-    ) -> Option<&mut Object<'a>> {
+    /// Gets the component with given type, with mutable access.
+    ///
+    /// This function is similar to `get_mut`, but it returns the raw object instead of the reference.
+    pub fn get_mut_raw(&mut self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&mut Object<'a>> {
         match &mut self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => {
@@ -547,8 +560,7 @@ where
     ///
     /// This function panics when the given component type's type information does not match with
     /// the given static type.
-    #[inline]
-    pub fn insert<T>(mut self, ty: ErasedComponentType<'a, Cx>, val: T) -> Self
+    pub fn insert<T>(&mut self, ty: ErasedComponentType<'a, Cx>, val: T)
     where
         T: Send + Sync + 'a,
     {
@@ -558,7 +570,24 @@ where
             "the component type should matches the type of given value"
         );
         self.map.insert(CompTyCell(ty), Box::new(val));
-        self
+    }
+
+    /// Inserts a component into this map.
+    ///
+    /// This function is similar to `insert`, but it receives the raw component type instead of the typed one.
+    ///
+    /// # Panics
+    ///
+    /// This function panics when the given component type's type information does not match with
+    /// the type of given value.
+    #[inline]
+    pub fn insert_raw(&mut self, ty: ErasedComponentType<'a, Cx>, val: Box<Object<'a>>) {
+        assert_eq!(
+            ty.ty,
+            (*val).type_id(),
+            "the component type should matches the type of given value"
+        );
+        self.map.insert(CompTyCell(ty), val);
     }
 
     /// Builds the component map.
@@ -568,6 +597,35 @@ where
         } else {
             ComponentMap(MapInner::Simple(self.map))
         }
+    }
+}
+
+impl<'a, Cx> Extend<(ErasedComponentType<'a, Cx>, Box<Object<'a>>)> for Builder<'a, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    fn extend<T: IntoIterator<Item = (ErasedComponentType<'a, Cx>, Box<Object<'a>>)>>(
+        &mut self,
+        iter: T,
+    ) {
+        self.map.extend(
+            iter.into_iter()
+                .filter(|(k, v)| k.ty == (**v).type_id())
+                .map(|(k, v)| (CompTyCell(k), v)),
+        );
+    }
+}
+
+impl<'a, 's, Cx> Extend<(ErasedComponentType<'a, Cx>, &'s Object<'a>)> for Builder<'a, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    #[inline]
+    fn extend<T: IntoIterator<Item = (ErasedComponentType<'a, Cx>, &'s Object<'a>)>>(
+        &mut self,
+        iter: T,
+    ) {
+        self.extend(iter.into_iter().map(|(k, v)| (k, (k.f.util.clone)(v))));
     }
 }
 
