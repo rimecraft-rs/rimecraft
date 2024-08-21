@@ -29,6 +29,7 @@ where
 {
     /// Parent advancement.
     pub parent: Option<Cx::Id>,
+    /// See [`DisplayInfo`].
     pub display: Option<DisplayInfo<'r, Cx>>,
 }
 
