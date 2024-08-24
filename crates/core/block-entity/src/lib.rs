@@ -2,10 +2,10 @@
 
 use std::{any::TypeId, fmt::Debug};
 
-use ahash::AHashSet;
-use component::{
+use ::component::{
     changes::ComponentChanges, map::ComponentMap, ErasedComponentType, RawErasedComponentType,
 };
+use ahash::AHashSet;
 use erased_serde::{serialize_trait_object, Serialize as ErasedSerialize};
 
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
@@ -18,6 +18,11 @@ mod components_util;
 pub mod serde;
 
 pub use components_util::ComponentsAccess;
+
+/// Re-export of `rimecraft-component`
+pub mod component {
+    pub use ::component::*;
+}
 
 /// A trait for providing fundamental built-in component types.
 pub trait ProvideBuiltInComponentTypes<'r>: ProvideIdTy {
