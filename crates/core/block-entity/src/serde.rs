@@ -246,7 +246,7 @@ where
                 }
 
                 let id = id.ok_or_else(|| serde::de::Error::missing_field("id"))?;
-                let components = components.unwrap_or_else(|| ComponentMap::EMPTY);
+                let components = components.unwrap_or(ComponentMap::EMPTY);
 
                 let ty = <Cx as ProvideRegistry<'_, _, DynRawBlockEntityType<'_, _>>>::registry()
                     .get(&id)
