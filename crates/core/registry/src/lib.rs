@@ -582,7 +582,7 @@ mod serde {
             S: serde::Serializer,
         {
             let entry: &RefEntry<_, _> = self.as_ref();
-            entry.key.value().serialize(serializer)
+            entry.serialize(serializer)
         }
     }
 
