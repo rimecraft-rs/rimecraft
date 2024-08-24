@@ -28,7 +28,6 @@ where
 
 impl<'r, 'de, Cx, B> Decode<'de, B> for ItemStack<'r, Cx>
 where
-    'r: 'de,
     Cx: ItemStackCx<Id: for<'b> Decode<'de, &'b mut B>>
         + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>
         + ProvideRegistry<'r, Cx::Id, RawErasedComponentType<'r, Cx>>,

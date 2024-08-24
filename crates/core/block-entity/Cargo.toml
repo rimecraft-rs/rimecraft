@@ -24,6 +24,7 @@ rimecraft-serde-update = { path = "../../util/serde-update", features = [
     "erased",
 ] }
 component = { path = "../component", package = "rimecraft-component" }
+bitflags = "2.6"
 
 [features]
 

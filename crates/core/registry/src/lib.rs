@@ -581,12 +581,8 @@ mod serde {
         where
             S: serde::Serializer,
         {
-            if serializer.is_human_readable() {
-                let entry: &RefEntry<_, _> = self.as_ref();
-                entry.key.value().serialize(serializer)
-            } else {
-                serializer.serialize_i32(self.raw as i32)
-            }
+            let entry: &RefEntry<_, _> = self.as_ref();
+            entry.key.value().serialize(serializer)
         }
     }
 
@@ -599,17 +595,10 @@ mod serde {
         where
             D: serde::Deserializer<'de>,
         {
-            if deserializer.is_human_readable() {
-                let key = K::deserialize(deserializer)?;
-                T::registry()
-                    .get(&key)
-                    .ok_or_else(|| serde::de::Error::custom("key not found"))
-            } else {
-                let raw = i32::deserialize(deserializer)? as usize;
-                T::registry()
-                    .of_raw(raw)
-                    .ok_or_else(|| serde::de::Error::custom(format!("raw id {} not found", raw)))
-            }
+            let key = K::deserialize(deserializer)?;
+            T::registry()
+                .get(&key)
+                .ok_or_else(|| serde::de::Error::custom("key not found"))
         }
     }
 }

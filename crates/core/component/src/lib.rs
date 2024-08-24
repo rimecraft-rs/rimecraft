@@ -43,6 +43,18 @@ impl<T> ComponentType<'_, T> {
     }
 }
 
+impl<'a, T> ComponentType<'a, T> {
+    /// Creates a builder of component type.
+    #[inline]
+    pub const fn builder<Cx>() -> TypeBuilder<'a, T, Cx> {
+        TypeBuilder {
+            serde_codec: None,
+            packet_codec: None,
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<'a, T> ComponentType<'a, T>
 where
     T: Clone + Eq + Hash + Send + Sync + 'a,
@@ -62,7 +74,11 @@ where
 /// Creates a new [`PacketCodec`] by encoding and decoding through `edcode2`.
 pub const fn packet_codec_edcode<'a, T>() -> PacketCodec<'a, T>
 where
-    T: for<'b> Encode<&'b mut dyn BufMut> + for<'b> Decode<'a, &'b mut dyn Buf> + Send + Sync + 'a,
+    T: for<'b> Encode<&'b mut dyn BufMut>
+        + for<'b> Decode<'static, &'b mut dyn Buf>
+        + Send
+        + Sync
+        + 'a,
 {
     PacketCodec {
         codec: UnsafePacketCodec {
@@ -242,7 +258,7 @@ pub struct PacketCodec<'a, T> {
 #[allow(dead_code)]
 struct UnsafePacketCodec<'a> {
     encode: fn(&'_ Object<'a>, &'_ mut dyn BufMut) -> Result<(), edcode2::BoxedError<'static>>,
-    decode: fn(&'_ mut dyn Buf) -> Result<Box<Object<'a>>, edcode2::BoxedError<'a>>,
+    decode: fn(&'_ mut dyn Buf) -> Result<Box<Object<'a>>, edcode2::BoxedError<'static>>,
     upd: fn(&'_ mut Object<'a>, &'_ mut dyn Buf) -> Result<(), edcode2::BoxedError<'a>>,
 }
 

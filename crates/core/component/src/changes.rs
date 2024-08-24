@@ -273,7 +273,7 @@ where
     }
 }
 
-impl<'a: 'de, 'de, Cx, B> Decode<'de, B> for ComponentChanges<'a, '_, Cx>
+impl<'a, 'de, Cx, B> Decode<'de, B> for ComponentChanges<'a, '_, Cx>
 where
     Cx: ProvideIdTy<Id: for<'b> Decode<'de, &'b mut B>>
         + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,

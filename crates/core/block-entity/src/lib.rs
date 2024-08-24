@@ -13,12 +13,9 @@ use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{entry::RefEntry, Reg};
 use rimecraft_serde_update::erased::ErasedUpdate;
 use rimecraft_voxel_math::BlockPos;
-use serde::{Deserializer, Serialize};
-
-//pub use rimecraft_downcast::ToStatic;
 
 mod components_util;
-pub mod deser_nbt;
+pub mod serde;
 
 pub use components_util::ComponentsAccess;
 
@@ -335,40 +332,6 @@ where
     #[inline]
     pub fn matches_type<T>(&self) -> bool {
         self.data.type_id() == typeid::of::<T>()
-    }
-}
-
-impl<T, Cx> Serialize for RawBlockEntity<'_, T, Cx>
-where
-    Cx: ProvideBlockStateExtTy,
-    T: ?Sized + Serialize,
-    Cx::Id: Serialize,
-{
-    /// Serializes this block entity's data and type id.
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeMap;
-        let mut map = serializer.serialize_map(None)?;
-        map.serialize_entry("id", &<&RefEntry<_, _>>::from(self.ty))?;
-        self.data
-            .serialize(serde::__private::ser::FlatMapSerializer(&mut map))?;
-        map.end()
-    }
-}
-
-impl<'de, T, Cx> rimecraft_serde_update::Update<'de> for RawBlockEntity<'_, T, Cx>
-where
-    Cx: ProvideBlockStateExtTy,
-    T: rimecraft_serde_update::Update<'de> + ?Sized,
-{
-    #[inline]
-    fn update<D>(&mut self, deserializer: D) -> Result<(), <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        self.data.update(deserializer)
     }
 }
 

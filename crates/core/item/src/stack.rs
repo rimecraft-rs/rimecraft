@@ -210,7 +210,6 @@ mod _serde {
 
     impl<'r, 'de, Cx> Deserialize<'de> for ItemStack<'r, Cx>
     where
-        'r: 'de,
         Cx: ItemStackCx
             + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>
             + ProvideRegistry<'r, Cx::Id, RawErasedComponentType<'r, Cx>>,
@@ -227,7 +226,6 @@ mod _serde {
 
             impl<'r, 'de, Cx> serde::de::Visitor<'de> for Visitor<'r, Cx>
             where
-                'r: 'de,
                 Cx: ItemStackCx
                     + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>
                     + ProvideRegistry<'r, Cx::Id, RawErasedComponentType<'r, Cx>>,
