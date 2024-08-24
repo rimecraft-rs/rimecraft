@@ -184,6 +184,10 @@ where
     T: Clone + Eq + Hash + Send + Sync + 'a,
 {
     /// Builds a new [`ComponentType`] with the given codecs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the packet codec is not set.
     pub const fn build(self) -> ComponentType<'a, T> {
         ComponentType {
             f: Funcs {
