@@ -236,7 +236,7 @@ where
 /// A trait for providing block entities.
 ///
 /// This should be implemented for [`ProvideBlockStateExtTy::BlockStateExt`]s.
-pub trait ProvideBlockEntity<'w, Cx>
+pub trait ProvideBlockEntity<'w, Cx>: 'w
 where
     Cx: ProvideBlockStateExtTy<BlockStateExt = Self>,
 {

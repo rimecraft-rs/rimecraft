@@ -5,7 +5,8 @@
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::{Debug, Display},
-    sync::{Arc, OnceLock, Weak},
+    ptr::NonNull,
+    sync::OnceLock,
 };
 
 use property::{BiIndex, ErasedProperty, Property, Wrap};
@@ -14,16 +15,13 @@ use property::{BiIndex, ErasedProperty, Property, Wrap};
 use regex::Regex;
 #[cfg(not(feature = "regex"))]
 use regex_lite::Regex;
-use rimecraft_maybe::Maybe;
 
 use crate::property::ErasedWrap;
 
 pub mod property;
 
 // <property> -> <<value> -> <state>>
-type Table<'a, T> = HashMap<ErasedProperty<'a>, HashMap<isize, Weak<T>>>;
-
-type MaybeArc<'a, T> = Maybe<'a, T, Arc<T>>;
+type Table<'a, T> = HashMap<ErasedProperty<'a>, HashMap<isize, NonNull<T>>>;
 
 /// State of an object.
 pub struct State<'a, T> {
@@ -54,7 +52,7 @@ impl<T> State<'_, T> {
     ///
     /// - Panics if the target state was dropped.
     /// - Panics if this state is not fully initialized.
-    pub fn cycle<V, W>(&self, prop: &Property<'_, W>) -> Result<MaybeArc<'_, Self>, Error>
+    pub fn cycle<V, W>(&self, prop: &Property<'_, W>) -> Result<&Self, Error>
     where
         W: BiIndex<V>,
         for<'w> &'w W: IntoIterator<Item = V>,
@@ -69,10 +67,10 @@ impl<T> State<'_, T> {
                 .into_iter()
                 .filter_map(|value| prop.wrap.index_of(&value)),
         ) else {
-            return Ok(MaybeArc::Borrowed(self));
+            return Ok(self);
         };
         if next == index {
-            Ok(MaybeArc::Borrowed(self))
+            Ok(self)
         } else {
             self.table
                 .get()
@@ -80,7 +78,7 @@ impl<T> State<'_, T> {
                 .get(prop.name())
                 .ok_or_else(|| Error::PropertyNotFound(prop.name().to_owned()))
                 .and_then(|map| map.get(&next).ok_or(Error::ValueNotFound(index)))
-                .map(|weak| MaybeArc::Owned(weak.upgrade().expect("state was dropped")))
+                .map(|ptr| unsafe { ptr.as_ref() })
         }
     }
 
@@ -95,7 +93,7 @@ impl<T> State<'_, T> {
     ///
     /// - Panics if the target state was dropped.
     /// - Panics if this state is not fully initialized.
-    pub fn with<V, W>(&self, prop: &Property<'_, W>, value: V) -> Result<MaybeArc<'_, Self>, Error>
+    pub fn with<V, W>(&self, prop: &Property<'_, W>, value: V) -> Result<&Self, Error>
     where
         W: BiIndex<V>,
     {
@@ -105,7 +103,7 @@ impl<T> State<'_, T> {
             .ok_or_else(|| Error::PropertyNotFound(prop.name().to_owned()))?;
         let value = prop.wrap.index_of(&value).ok_or(Error::InvalidValue)?;
         if value == index {
-            Ok(MaybeArc::Borrowed(self))
+            Ok(self)
         } else {
             self.table
                 .get()
@@ -113,7 +111,7 @@ impl<T> State<'_, T> {
                 .get(prop.name())
                 .ok_or_else(|| Error::PropertyNotFound(prop.name().to_owned()))
                 .and_then(|map| map.get(&value).ok_or(Error::ValueNotFound(index)))
-                .map(|weak| MaybeArc::Owned(weak.upgrade().expect("state was dropped")))
+                .map(|ptr| unsafe { ptr.as_ref() })
         }
     }
 
@@ -157,9 +155,8 @@ impl<T: Debug> Debug for State<'_, T> {
 /// See [`StatesMut`] for creating a new instance.
 #[derive(Debug)]
 #[doc(alias = "StateManager")]
-#[doc(alias = "StateDefinition")]
 pub struct States<'a, T> {
-    states: Vec<Arc<State<'a, T>>>,
+    states: Vec<NonNull<State<'a, T>>>,
     #[allow(unused)]
     props: BTreeMap<&'a str, ErasedProperty<'a>>,
 }
@@ -193,21 +190,24 @@ where
             .into_iter()
             .map(|vec| vec.into_iter().collect::<HashMap<_, _>>())
             .map(|entries| {
-                Arc::new(State {
+                NonNull::new(Box::into_raw(Box::new(State {
                     entries,
                     table: OnceLock::new(),
                     data: data.clone(),
-                })
+                })))
+                .expect("failed to allocate state")
             })
             .collect::<Vec<_>>();
 
         // Initialize tables
         for state in list.iter() {
+            let state = unsafe { state.as_ref() };
             let mut table: Table<'a, State<'a, T>> = Table::new();
             for (prop, s_val) in state.entries.iter() {
                 let mut row = HashMap::new();
                 for val in prop.wrap.erased_iter().filter(|v| v != s_val) {
                     let Some(s) = list.iter().find(|s| {
+                        let s = unsafe { s.as_ref() };
                         s.entries.iter().all(|(p, v)| {
                             if p == prop {
                                 *v == val
@@ -218,7 +218,7 @@ where
                     }) else {
                         continue;
                     };
-                    row.insert(val, Arc::downgrade(s));
+                    row.insert(val, *s);
                 }
                 table.insert(prop.clone(), row);
             }
@@ -235,7 +235,7 @@ where
 impl<'a, T> States<'a, T> {
     /// Gets all states of this state.
     #[inline]
-    pub fn states(&self) -> &[Arc<State<'a, T>>] {
+    pub fn states(&self) -> &[NonNull<State<'a, T>>] {
         &self.states
     }
 
@@ -245,8 +245,8 @@ impl<'a, T> States<'a, T> {
     ///
     /// Panics if no state is available.
     #[inline]
-    pub fn default_state(&self) -> &Arc<State<'a, T>> {
-        self.states.first().expect("no state available")
+    pub fn default_state(&self) -> &State<'a, T> {
+        unsafe { self.states.first().expect("no state available").as_ref() }
     }
 
     /// Gets the length of states.
@@ -259,6 +259,14 @@ impl<'a, T> States<'a, T> {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.states.is_empty()
+    }
+}
+
+impl<T> Drop for States<'_, T> {
+    fn drop(&mut self) {
+        for state in self.states.iter() {
+            drop(unsafe { Box::from_raw(state.as_ptr()) });
+        }
     }
 }
 
@@ -391,11 +399,8 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
-/// Serde support for `State`s.
 #[cfg(feature = "serde")]
-pub mod serde {
-    use std::sync::Arc;
-
+mod _serde {
     use rimecraft_serde_update::Update;
     use serde::{ser::SerializeMap, Serialize};
 
@@ -422,21 +427,7 @@ pub mod serde {
         }
     }
 
-    /// Updatable state newtype wrapper.
-    #[derive(Debug)]
-    pub struct Upd<'a, T>(pub Arc<State<'a, T>>);
-
-    impl<T> Serialize for Upd<'_, T> {
-        #[inline]
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            self.0.serialize(serializer)
-        }
-    }
-
-    impl<'de, T> Update<'de> for Upd<'_, T> {
+    impl<'de, T> Update<'de> for &State<'_, T> {
         #[inline]
         fn update<D>(
             &mut self,
@@ -445,10 +436,10 @@ pub mod serde {
         where
             D: serde::Deserializer<'de>,
         {
-            struct Visitor<'a, T>(Arc<State<'a, T>>);
+            struct Visitor<'a, T>(*const State<'a, T>);
 
             impl<'de, 'a, T> serde::de::Visitor<'de> for Visitor<'a, T> {
-                type Value = Arc<State<'a, T>>;
+                type Value = *const State<'a, T>;
 
                 fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     formatter.write_str("a map")
@@ -459,8 +450,7 @@ pub mod serde {
                     A: serde::de::MapAccess<'de>,
                 {
                     while let Some((prop, val)) = map.next_entry::<String, isize>()? {
-                        self.0 = self
-                            .0
+                        self.0 = unsafe { &*self.0 }
                             .table
                             .get()
                             .expect("state not initialized")
@@ -474,16 +464,16 @@ pub mod serde {
                                     "value {val} not found in property {prop}"
                                 ))
                             })?
-                            .upgrade()
-                            .expect("state was dropped");
+                            .as_ptr()
+                            .cast_const();
                     }
                     Ok(self.0)
                 }
             }
 
             deserializer
-                .deserialize_map(Visitor(self.0.clone()))
-                .map(|state| self.0 = state)
+                .deserialize_map(Visitor(*self))
+                .map(|state| *self = unsafe { &*state })
         }
     }
 }
