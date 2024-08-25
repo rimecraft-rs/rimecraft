@@ -182,7 +182,7 @@ where
 
 /// Global context for text.
 ///
-/// The associated types [`Texts::T`] and [`Texts::StyleExt`] should be applied to [`Text`] when used.
+/// The associated type `Content` and `StyleExt` should be applied to [`Text`] when used.
 pub trait ProvideTextTy: GlobalContext {
     /// Generic `T` that should be applied to [`Text`].
     type Content: Plain;
