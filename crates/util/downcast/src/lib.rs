@@ -76,7 +76,7 @@ impl<T: ?Sized> Downcast<T> {
     #[inline]
     pub unsafe fn downcast_ref<V: ToStatic>(&self) -> Option<&V> {
         if self.is_safe::<V>() {
-            unsafe { Some(&*(&self.value as *const T as *const V)) }
+            unsafe { Some(&*(core::ptr::from_ref::<T>(&self.value) as *const V)) }
         } else {
             None
         }
@@ -90,7 +90,7 @@ impl<T: ?Sized> Downcast<T> {
     #[inline]
     pub unsafe fn downcast_mut<V: ToStatic>(&mut self) -> Option<&mut V> {
         if self.is_safe::<V>() {
-            unsafe { Some(&mut *(&mut self.value as *mut T as *mut V)) }
+            unsafe { Some(&mut *(core::ptr::from_mut::<T>(&mut self.value) as *mut V)) }
         } else {
             None
         }

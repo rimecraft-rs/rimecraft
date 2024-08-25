@@ -183,6 +183,6 @@ where
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.block.hash(state);
-        (self.state as *const State<'_, Cx::BlockStateExt>).hash(state);
+        std::ptr::from_ref(self.state).hash(state);
     }
 }

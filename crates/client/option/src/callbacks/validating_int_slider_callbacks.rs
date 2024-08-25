@@ -18,16 +18,7 @@ where
     }
 
     fn i32_validate(&self, value: Option<i32>) -> Option<i32> {
-        match value {
-            Some(value) => {
-                if value >= self.min && value <= self.max {
-                    Some(value)
-                } else {
-                    None
-                }
-            }
-            None => None,
-        }
+        value.filter(|&value| value >= self.min && value <= self.max)
     }
 }
 
