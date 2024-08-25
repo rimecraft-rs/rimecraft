@@ -1,9 +1,19 @@
 //! Global context for testing purposes.
 
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicU64, LazyLock},
+    thread::ThreadId,
+};
+
 use global_cx::{
     nbt::{ReadNbt, UpdateNbt, WriteNbt},
     GlobalContext, ProvideIdTy, ProvideNbtTy, ProvideVersionTy,
 };
+use parking_lot::Mutex;
+
+pub mod pool;
+mod reg;
 
 /// The global context.
 #[derive(Debug)]
@@ -104,5 +114,39 @@ where
             &mut fastnbt::de::Deserializer::from_reader(reader, fastnbt::DeOpts::new()),
         )
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+}
+
+/// An unique identifier for an unit test.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct TestId(u64);
+
+static TEST_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+static TESTS: LazyLock<Mutex<HashMap<ThreadId, TestId>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+impl TestId {
+    /// Get the test ID of the current thread.
+    ///
+    /// If the test ID is not set for this thread, a new one will be generated.
+    /// See [`announce`] for setting the test ID manually.
+    pub fn current() -> Self {
+        let thread_id = std::thread::current().id();
+        let mut tests = TESTS.lock();
+        if let Some(test_id) = tests.get(&thread_id) {
+            *test_id
+        } else {
+            let test_id = TestId(TEST_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
+            tests.insert(thread_id, test_id);
+            test_id
+        }
+    }
+
+    /// Announce the test of the current thread.
+    pub fn capture(self) {
+        let thread_id = std::thread::current().id();
+        let mut tests = TESTS.lock();
+        tests.insert(thread_id, self);
     }
 }
