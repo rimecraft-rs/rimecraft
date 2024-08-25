@@ -16,11 +16,11 @@ bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct Flags: u8 {
         /// Serializes the registration identifier.
-        const ID = 0b00000001;
+        const ID = 1u8 << 0;
         /// Serializes the position.
-        const POS = 0b00000010;
+        const POS = 1u8 << 1;
         /// Serializes the component map.
-        const COMPONENTS = 0b00000100;
+        const COMPONENTS = 1u8 << 2;
     }
 }
 
