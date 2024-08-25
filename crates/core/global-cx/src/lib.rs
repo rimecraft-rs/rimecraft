@@ -30,6 +30,12 @@ pub trait ProvideIdTy: GlobalContext {
     type Id: Display + Hash + Eq;
 }
 
+/// Marker trait for global contexts that provide a version type.
+pub trait ProvideVersionTy: GlobalContext {
+    /// Version type.
+    type Version: Display + Hash + Eq;
+}
+
 /// Marker trait for global contexts that provide a `NbtCompound` type and friends.
 #[cfg(feature = "nbt")]
 pub trait ProvideNbtTy: GlobalContext {
@@ -42,7 +48,7 @@ pub trait ProvideNbtTy: GlobalContext {
     /// [`i64`] array type.
     type LongArray: Into<alloc::boxed::Box<[i64]>> + From<alloc::boxed::Box<[i32]>>;
 
-    /// Function that converts a `Compound` to a [`Deserializer`].
+    /// Function that converts a `Compound` to a `Deserializer`.
     fn compound_to_deserializer(compound: &Self::Compound) -> impl serde::Deserializer<'_>;
 }
 
