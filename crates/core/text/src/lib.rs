@@ -182,10 +182,11 @@ where
 
 /// Global context for text.
 ///
-/// The associated types [`Texts::T`] and [`Texts::StyleExt`] should be applied to [`Text`] when used.
+/// The associated type `Content` and `StyleExt` should be applied to [`Text`] when used.
 pub trait ProvideTextTy: GlobalContext {
     /// Generic `T` that should be applied to [`Text`].
-    type Content;
+    type Content: Plain;
+
     /// Generic `StyleExt` that should be applied to [`Text`].
     type StyleExt;
 }
@@ -194,10 +195,14 @@ pub trait ProvideTextTy: GlobalContext {
 pub type Text<Cx> = RawText<<Cx as ProvideTextTy>::Content, <Cx as ProvideTextTy>::StyleExt>;
 
 /// A localizable value.
-pub trait Localizable {
+pub trait Localize {
     /// Returns the localization key of this value.
     fn localization_key(&self) -> Cow<'_, str>;
 }
+
+/// A seed for encoding and decoding [`Text`] through `edcode2` crate.
+#[cfg(feature = "edcode")]
+pub type EdcodeSeed<Cx> = rimecraft_global_cx::edcode::Nbt<Text<Cx>, Cx>;
 
 #[cfg(test)]
 mod tests;

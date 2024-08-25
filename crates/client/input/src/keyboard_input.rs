@@ -16,12 +16,10 @@ impl Input<KeyboardInput> {
     pub fn get_movement_modifier(positive: bool, negative: bool) -> f32 {
         if positive == negative {
             0.0
+        } else if positive {
+            1.0
         } else {
-            if positive {
-                1.0
-            } else {
-                -1.0
-            }
+            -1.0
         }
     }
 }

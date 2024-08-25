@@ -5,7 +5,7 @@ use std::{any::TypeId, cell::UnsafeCell, fmt::Debug, hash::Hash, marker::Phantom
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use rimecraft_global_cx::{
-    nbt_edcode::{ReadNbt, UpdateNbt, WriteNbt},
+    nbt::{ReadNbt, UpdateNbt, WriteNbt},
     ProvideIdTy,
 };
 use rimecraft_registry::{ProvideRegistry, Reg};
@@ -60,12 +60,15 @@ where
     T: Clone + Eq + Hash + Send + Sync + 'a,
 {
     const UTIL: DynUtil<'a> = DynUtil {
-        clone: |obj| Box::new(unsafe { &*(obj as *const Object<'_> as *const T) }.clone()),
+        clone: |obj| {
+            Box::new(unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) }.clone())
+        },
         eq: |a, b| unsafe {
-            *(a as *const Object<'_> as *const T) == *(b as *const Object<'_> as *const T)
+            *(std::ptr::from_ref::<Object<'_>>(a) as *const T)
+                == *(std::ptr::from_ref::<Object<'_>>(b) as *const T)
         },
         hash: |obj, mut state| {
-            let obj = unsafe { &*(obj as *const Object<'_> as *const T) };
+            let obj = unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) };
             obj.hash(&mut state);
         },
     };
@@ -82,7 +85,9 @@ where
 {
     PacketCodec {
         codec: UnsafePacketCodec {
-            encode: |obj, buf| unsafe { &*(obj as *const Object<'_> as *const T) }.encode(buf),
+            encode: |obj, buf| {
+                unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) }.encode(buf)
+            },
             decode: {
                 assert!(
                     <T as Decode<'_, _>>::SUPPORT_NON_IN_PLACE,
@@ -91,7 +96,8 @@ where
                 |buf| Ok(Box::new(T::decode(buf)?))
             },
             upd: |obj, buf| {
-                unsafe { &mut *(obj as *mut Object<'_> as *mut T) }.decode_in_place(buf)
+                unsafe { &mut *(std::ptr::from_mut::<Object<'_>>(obj) as *mut T) }
+                    .decode_in_place(buf)
             },
         },
         _marker: PhantomData,
@@ -108,7 +114,7 @@ where
         codec: UnsafePacketCodec {
             encode: |obj, buf| {
                 Cx::write_nbt(
-                    unsafe { &*(obj as *const Object<'_> as *const T) },
+                    unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) },
                     buf.writer(),
                 )
                 .map_err(Into::into)
@@ -116,7 +122,7 @@ where
             decode: |buf| Ok(Box::new(Cx::read_nbt(buf.reader())?)),
             upd: |obj, buf| {
                 Cx::update_nbt(
-                    unsafe { &mut *(obj as *mut Object<'_> as *mut T) },
+                    unsafe { &mut *(std::ptr::from_mut::<Object<'_>>(obj) as *mut T) },
                     buf.reader(),
                 )
                 .map_err(Into::into)
@@ -134,7 +140,7 @@ where
     SerdeCodec {
         codec: UnsafeSerdeCodec {
             ser: |obj| unsafe {
-                &*(obj as *const Object<'_> as *const T
+                &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T
                     as *const (dyn erased_serde::Serialize + 'a))
             },
             de: |deserializer| {
@@ -144,7 +150,7 @@ where
                 })
             },
             upd: |obj, deserializer| {
-                *unsafe { &mut *(obj as *mut Object<'_> as *mut T) } =
+                *unsafe { &mut *(std::ptr::from_mut::<Object<'_>>(obj) as *mut T) } =
                     erased_serde::deserialize::<T>(deserializer)?;
                 Ok(())
             },

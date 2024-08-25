@@ -3,7 +3,7 @@
 use std::{borrow::Cow, fmt::Display};
 
 use enum_iterator::Sequence;
-use rimecraft_text::{format_localization_key, Localizable};
+use rimecraft_text::{format_localization_key, Localize};
 
 use super::ByUSizeId;
 
@@ -39,7 +39,7 @@ impl Display for ParticlesMode {
     }
 }
 
-impl Localizable for ParticlesMode {
+impl Localize for ParticlesMode {
     fn localization_key(&self) -> Cow<'_, str> {
         Cow::Owned(format_localization_key!(
             "options",

@@ -26,7 +26,7 @@ impl Namespace {
     where
         T: Into<Arc<str>>,
     {
-        let value = value.into();
+        let value = Into::<Arc<str>>::into(value);
         validate_namespace(&value).unwrap();
         Self(ArcCowStr::Arc(value))
     }
@@ -103,7 +103,7 @@ impl Path {
     where
         T: Into<Arc<str>>,
     {
-        let value = value.into();
+        let value = Into::<Arc<str>>::into(value);
         validate_path(&value)?;
         Ok(Self(ArcCowStr::Arc(value)))
     }

@@ -26,12 +26,10 @@ pub trait ByUSizeId: Sequence {
         if wraps {
             let id = id % size;
             Some(all.remove(id))
+        } else if id < size {
+            Some(all.remove(id))
         } else {
-            if id < size {
-                Some(all.remove(id))
-            } else {
-                None
-            }
+            None
         }
     }
 }

@@ -13,7 +13,7 @@ use std::{
 pub(crate) struct ErasedProperty<'a> {
     pub name: &'a str,
     pub ty: TypeId,
-    pub wrap: &'a (dyn ErasedWrap + Send + Sync),
+    pub wrap: &'a (dyn ErasedWrap + Send + Sync + 'a),
 }
 
 impl Debug for ErasedProperty<'_> {
@@ -83,13 +83,13 @@ impl<'a, W> Property<'a, W> {
 
 impl<'a, 'p, W> From<&'a Property<'p, W>> for ErasedProperty<'a>
 where
-    W: ErasedWrap + Send + Sync + 'static,
+    W: ErasedWrap + Send + Sync + 'p,
 {
     #[inline]
     fn from(prop: &'a Property<'p, W>) -> Self {
         ErasedProperty {
             name: &prop.name,
-            ty: TypeId::of::<W>(),
+            ty: typeid::of::<W>(),
             wrap: &prop.wrap,
         }
     }
@@ -111,27 +111,20 @@ pub(crate) trait ErasedWrap {
     #[allow(dead_code)]
     fn erased_parse_name(&self, name: &str) -> Option<isize>;
     fn erased_to_name(&self, index: isize) -> Option<Cow<'_, str>>;
-    fn erased_iter<'a>(&'a self) -> Box<dyn Iterator<Item = isize> + 'a>;
+    fn erased_iter(&self) -> Box<dyn Iterator<Item = isize> + '_>;
 }
 
-impl<T, G> ErasedWrap for T
+pub(crate) trait UnObjSafeErasedWrap {
+    fn erased_iter_typed(&self) -> impl Iterator<Item = isize> + '_;
+}
+
+impl<T, G> UnObjSafeErasedWrap for T
 where
     T: Wrap<G> + BiIndex<G>,
     for<'a> &'a T: IntoIterator<Item = G>,
 {
     #[inline]
-    fn erased_parse_name(&self, name: &str) -> Option<isize> {
-        self.parse_name(name)
-            .and_then(|value| self.index_of(&value))
-    }
-
-    #[inline]
-    fn erased_to_name(&self, index: isize) -> Option<Cow<'_, str>> {
-        BiIndex::index(self, index).and_then(|val| self.to_name(&val))
-    }
-
-    #[inline]
-    fn erased_iter<'a>(&'a self) -> Box<dyn Iterator<Item = isize> + 'a> {
+    fn erased_iter_typed(&self) -> impl Iterator<Item = isize> + '_ {
         struct Iter<I>
         where
             I: IntoIterator,
@@ -158,10 +151,32 @@ where
             }
         }
 
-        Box::new(Iter {
+        Iter {
             iter: self.into_iter(),
             wrap: self,
-        })
+        }
+    }
+}
+
+impl<T, G> ErasedWrap for T
+where
+    T: Wrap<G> + BiIndex<G>,
+    for<'a> &'a T: IntoIterator<Item = G>,
+{
+    #[inline]
+    fn erased_parse_name(&self, name: &str) -> Option<isize> {
+        self.parse_name(name)
+            .and_then(|value| self.index_of(&value))
+    }
+
+    #[inline]
+    fn erased_to_name(&self, index: isize) -> Option<Cow<'_, str>> {
+        BiIndex::index(self, index).and_then(|val| self.to_name(&val))
+    }
+
+    #[inline]
+    fn erased_iter(&self) -> Box<dyn Iterator<Item = isize> + '_> {
+        Box::new(self.erased_iter_typed())
     }
 }
 

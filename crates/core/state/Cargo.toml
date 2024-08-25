@@ -17,6 +17,8 @@ regex-lite = "0.1"
 regex = { version = "1.10", optional = true }
 serde = { version = "1.0", optional = true }
 rimecraft-serde-update = { path = "../../util/serde-update", optional = true }
+ahash = "0.8"
+typeid = "1.0"
 
 [features]
 default = ["serde"]

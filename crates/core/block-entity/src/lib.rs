@@ -307,7 +307,10 @@ where
     pub unsafe fn downcast_ref<T>(&self) -> Option<&RawBlockEntity<'w, T, Cx>> {
         if self.matches_type::<T>() {
             unsafe {
-                Some(&*(self as *const BlockEntity<'w, Cx> as *const RawBlockEntity<'w, T, Cx>))
+                Some(
+                    &*(std::ptr::from_ref::<BlockEntity<'w, Cx>>(self)
+                        as *const RawBlockEntity<'w, T, Cx>),
+                )
             }
         } else {
             None
@@ -325,7 +328,10 @@ where
     pub unsafe fn downcast_mut<T>(&mut self) -> Option<&mut RawBlockEntity<'w, T, Cx>> {
         if self.matches_type::<T>() {
             unsafe {
-                Some(&mut *(self as *mut BlockEntity<'w, Cx> as *mut RawBlockEntity<'w, T, Cx>))
+                Some(
+                    &mut *(std::ptr::from_mut::<BlockEntity<'w, Cx>>(self)
+                        as *mut RawBlockEntity<'w, T, Cx>),
+                )
             }
         } else {
             None
@@ -343,7 +349,7 @@ where
 /// A trait for providing block entities.
 ///
 /// This should be implemented for [`ProvideBlockStateExtTy::BlockStateExt`]s.
-pub trait ProvideBlockEntity<'w, Cx>
+pub trait ProvideBlockEntity<'w, Cx>: 'w
 where
     Cx: ProvideBlockStateExtTy<BlockStateExt = Self>,
 {

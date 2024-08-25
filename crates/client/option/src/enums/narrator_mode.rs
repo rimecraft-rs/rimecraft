@@ -3,7 +3,7 @@
 use std::{borrow::Cow, fmt::Display};
 
 use enum_iterator::Sequence;
-use rimecraft_text::{format_localization_key, Localizable};
+use rimecraft_text::{format_localization_key, Localize};
 
 use super::ByUSizeId;
 
@@ -57,7 +57,7 @@ impl NarratorMode {
     }
 }
 
-impl Localizable for NarratorMode {
+impl Localize for NarratorMode {
     fn localization_key(&self) -> Cow<'_, str> {
         Cow::Owned(format_localization_key!(
             "options",

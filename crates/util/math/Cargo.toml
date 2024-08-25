@@ -12,7 +12,7 @@ categories = ["game-development"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-glam = "0.25"
+glam = "0.29"
 
 [lints]
 workspace = true
