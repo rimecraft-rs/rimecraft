@@ -13,12 +13,14 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 serde = { version = "1.0", default-features = false, optional = true }
+edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 
 [features]
 default = ["std"]
 std = []
 serde = ["dep:serde"]
 nbt = ["serde"]
+edcode = ["dep:edcode2", "std"]
 
 [lints]
 workspace = true

@@ -3,7 +3,7 @@
 use std::{borrow::Cow, fmt::Display};
 
 use enum_iterator::Sequence;
-use rimecraft_text::{format_localization_key, Localizable};
+use rimecraft_text::{format_localization_key, Localize};
 
 use super::ByUSizeId;
 
@@ -38,7 +38,7 @@ impl Display for AttackIndicator {
     }
 }
 
-impl Localizable for AttackIndicator {
+impl Localize for AttackIndicator {
     fn localization_key(&self) -> Cow<'_, str> {
         Cow::Owned(format_localization_key!(
             "options",

@@ -5,7 +5,7 @@ use std::{any::TypeId, cell::UnsafeCell, fmt::Debug, hash::Hash, marker::Phantom
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use rimecraft_global_cx::{
-    nbt_edcode::{ReadNbt, UpdateNbt, WriteNbt},
+    nbt::{ReadNbt, UpdateNbt, WriteNbt},
     ProvideIdTy,
 };
 use rimecraft_registry::{ProvideRegistry, Reg};
