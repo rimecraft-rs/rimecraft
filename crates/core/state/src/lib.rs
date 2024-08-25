@@ -479,5 +479,11 @@ mod _serde {
     }
 }
 
+unsafe impl<T: Send> Send for State<'_, T> {}
+unsafe impl<T: Sync> Sync for State<'_, T> {}
+
+unsafe impl<T: Send> Send for States<'_, T> {}
+unsafe impl<T: Sync> Sync for States<'_, T> {}
+
 #[cfg(test)]
 mod tests;
