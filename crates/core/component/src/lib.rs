@@ -108,7 +108,7 @@ where
 pub const fn packet_codec_nbt<'a, T, Cx>() -> PacketCodec<'a, T>
 where
     T: Send + Sync + 'a,
-    Cx: ReadNbt<T> + for<'t> WriteNbt<&'t T>,
+    Cx: ReadNbt<T> + for<'t> WriteNbt<&'t T> + UpdateNbt<T>,
 {
     PacketCodec {
         codec: UnsafePacketCodec {
