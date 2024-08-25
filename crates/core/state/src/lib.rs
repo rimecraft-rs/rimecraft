@@ -3,13 +3,14 @@
 //! This corresponds to `net.minecraft.state` in `yarn`.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fmt::{Debug, Display},
     ptr::NonNull,
     sync::OnceLock,
 };
 
-use property::{BiIndex, ErasedProperty, Property, Wrap};
+use ahash::AHashMap;
+use property::{BiIndex, ErasedProperty, Property, UnObjSafeErasedWrap as _, Wrap};
 
 #[cfg(feature = "regex")]
 use regex::Regex;
@@ -21,11 +22,11 @@ use crate::property::ErasedWrap;
 pub mod property;
 
 // <property> -> <<value> -> <state>>
-type Table<'a, T> = HashMap<ErasedProperty<'a>, HashMap<isize, NonNull<T>>>;
+type Table<'a, T> = AHashMap<ErasedProperty<'a>, AHashMap<isize, NonNull<T>>>;
 
 /// State of an object.
 pub struct State<'a, T> {
-    pub(crate) entries: HashMap<ErasedProperty<'a>, isize>,
+    pub(crate) entries: AHashMap<ErasedProperty<'a>, isize>,
     table: OnceLock<Table<'a, Self>>,
     data: T,
 }
@@ -188,7 +189,7 @@ where
         }
         let list = iter
             .into_iter()
-            .map(|vec| vec.into_iter().collect::<HashMap<_, _>>())
+            .map(|vec| vec.into_iter().collect::<AHashMap<_, _>>())
             .map(|entries| {
                 NonNull::new(Box::into_raw(Box::new(State {
                     entries,
@@ -204,7 +205,7 @@ where
             let state = unsafe { state.as_ref() };
             let mut table: Table<'a, State<'a, T>> = Table::new();
             for (prop, s_val) in state.entries.iter() {
-                let mut row = HashMap::new();
+                let mut row = AHashMap::new();
                 for val in prop.wrap.erased_iter().filter(|v| v != s_val) {
                     let Some(s) = list.iter().find(|s| {
                         let s = unsafe { s.as_ref() };
@@ -296,9 +297,9 @@ impl<'a, T> StatesMut<'a, T> {
     /// - Errors if the states contains duplicated properties.
     /// - Errors if any of the value name is invalid.
     #[allow(clippy::missing_panics_doc)]
-    pub fn add<W, G>(&mut self, prop: &'a Property<'_, W>) -> Result<(), Error>
+    pub fn add<'p, W, G>(&mut self, prop: &'a Property<'p, W>) -> Result<(), Error>
     where
-        W: Wrap<G> + BiIndex<G> + Eq + Send + Sync + 'static,
+        W: Wrap<G> + BiIndex<G> + Eq + Send + Sync + 'p,
         for<'w> &'w W: IntoIterator<Item = G>,
     {
         static NAME_PAT: OnceLock<Regex> = OnceLock::new();
@@ -307,7 +308,7 @@ impl<'a, T> StatesMut<'a, T> {
             return Err(Error::InvalidPropertyName(prop.name().to_owned()));
         }
         let mut len = 0;
-        for val in prop.wrap.erased_iter() {
+        for val in prop.wrap.erased_iter_typed() {
             len += 1;
             let name = prop.wrap.erased_to_name(val).expect("invalid value");
             if !reg.is_match(&name) {
