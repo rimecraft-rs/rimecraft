@@ -235,13 +235,13 @@ where
     ///
     /// Panics if the biome registry doesn't contains a default entry.
     fn from(registry: &'w Registry<Cx::Id, Cx::Biome>) -> Self {
-        let default_block = Block::default();
+        let default_block = Block::<'w, Cx>::default();
         Self {
             bsc: PalettedContainer::of_single(
                 Cx::state_ids(),
                 BlockState {
                     block: default_block,
-                    state: default_block.states().default_state().clone(),
+                    state: Block::into_inner(default_block).states().default_state(),
                 },
             ),
             bic: PalettedContainer::of_single(

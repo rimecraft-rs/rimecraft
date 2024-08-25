@@ -410,7 +410,7 @@ where
 
         if bs
             .as_ref()
-            .map_or(false, |s| Arc::ptr_eq(&s.state, &state.state))
+            .map_or(false, |s| std::ptr::eq(s.state, state.state))
         {
             return None;
         }
