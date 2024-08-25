@@ -5,7 +5,7 @@ use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
 use rimecraft_registry::{ProvideRegistry, Reg};
 use rimecraft_state::{State, States, StatesMut};
 
-use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 pub mod behave;
 
@@ -123,7 +123,7 @@ where
     pub block: Block<'w, Cx>,
 
     /// The state.
-    pub state: Arc<State<'w, Cx::BlockStateExt>>,
+    pub state: &'w State<'w, Cx::BlockStateExt>,
 }
 
 impl<Cx> BlockState<'_, Cx>
@@ -134,7 +134,7 @@ where
     /// Returns the luminance level of this block state.
     #[inline]
     pub fn luminance(&self) -> u32 {
-        self.state.data().luminance(&self.state)
+        self.state.data().luminance(self.state)
     }
 }
 
@@ -160,7 +160,7 @@ where
     fn clone(&self) -> Self {
         Self {
             block: self.block,
-            state: self.state.clone(),
+            state: self.state,
         }
     }
 }
@@ -171,7 +171,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.block == other.block && Arc::ptr_eq(&self.state, &other.state)
+        self.block == other.block && std::ptr::eq(self.state, other.state)
     }
 }
 
@@ -183,6 +183,6 @@ where
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.block.hash(state);
-        Arc::as_ptr(&self.state).hash(state);
+        (self.state as *const State<'_, Cx::BlockStateExt>).hash(state);
     }
 }
