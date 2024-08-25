@@ -1,43 +1,50 @@
+use component::{changes::ComponentChanges, map::ComponentMap, RawErasedComponentType};
 use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
-use rimecraft_global_cx::nbt_edcode::{ReadNbt, WriteNbt};
 use rimecraft_registry::{ProvideRegistry, Reg};
 
-use crate::{stack::ItemStackCx, ItemStack, RawItem};
+use crate::{stack::ItemStackCx, Item, ItemSettings, ItemStack, RawItem};
 
-impl<Cx, B> Encode<B> for ItemStack<'_, Cx>
+impl<'r, Cx, B> Encode<B> for ItemStack<'r, Cx>
 where
-    Cx: ItemStackCx + for<'a> WriteNbt<Option<&'a Cx::Compound>>,
+    Cx: ItemStackCx + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>,
     B: BufMut,
 {
     fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
-        if self.count() == 0 {
-            buf.put_bool(false);
+        if self.is_empty() {
+            buf.put_variable(0u32);
+            Ok(())
         } else {
-            buf.put_bool(true);
+            buf.put_variable(self.count());
             let item = self.item();
             item.encode(&mut buf)?;
             self.count().encode(&mut buf)?;
-            if item.settings().max_damage.is_some() || item.settings().sync_nbt {
-                Cx::write_nbt(self.nbt(), buf.writer())?
-            }
+            self.components()
+                .changes()
+                .ok_or("components not patched")?
+                .encode(buf)
         }
-        Ok(())
     }
 }
 
 impl<'r, 'de, Cx, B> Decode<'de, B> for ItemStack<'r, Cx>
 where
-    Cx: ItemStackCx + ReadNbt<Option<Cx::Compound>> + ProvideRegistry<'r, Cx::Id, RawItem<Cx>>,
+    Cx: ItemStackCx<Id: for<'b> Decode<'de, &'b mut B>>
+        + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>
+        + ProvideRegistry<'r, Cx::Id, RawErasedComponentType<'r, Cx>>,
     B: Buf,
 {
     fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
-        if buf.get_bool() {
-            let item = Reg::<'r, Cx::Id, RawItem<Cx>>::decode(&mut buf)?;
-            let count = buf.get_u8();
-            let nbt = Cx::read_nbt(buf.reader())?;
-            Ok(ItemStack::with_nbt(item, count, nbt))
-        } else {
+        let count: u32 = buf.get_variable();
+        if count == 0 {
             Ok(ItemStack::empty())
+        } else {
+            let item = Item::<'r, Cx>::decode(&mut buf)?;
+            let changes = ComponentChanges::<'r, 'r, Cx>::decode(buf)?;
+            Ok(ItemStack::with_component(
+                item,
+                count,
+                ComponentMap::with_changes(Reg::into_inner(item).settings().components(), changes),
+            ))
         }
     }
 }

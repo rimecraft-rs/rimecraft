@@ -2,7 +2,7 @@
 
 use std::{cell::UnsafeCell, fmt::Debug, marker::PhantomData, str::FromStr, sync::OnceLock};
 
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use bytes::{Buf, BufMut};
 use edcode2::{BufExt as _, BufMutExt as _, Decode, Encode};
 use rimecraft_global_cx::ProvideIdTy;
@@ -11,8 +11,9 @@ use rimecraft_registry::{ProvideRegistry, Reg};
 use serde::{de::DeserializeSeed, ser::SerializeMap, Deserialize, Serialize};
 
 use crate::{
-    map::CompTyCell, ComponentType, ErasedComponentType, Object, RawErasedComponentType,
-    UnsafeDebugIter, UnsafeSerdeCodec,
+    map::{CompTyCell, ComponentMap},
+    ComponentType, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
+    UnsafeSerdeCodec,
 };
 
 /// Changes of components.
@@ -67,6 +68,57 @@ where
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.changed.is_empty()
+    }
+
+    /// Retains only the components specified by the predicate.
+    pub fn retain<'cow, F>(self, mut f: F) -> ComponentChanges<'a, 'cow, Cx>
+    where
+        F: FnMut(ErasedComponentType<'a, Cx>) -> bool,
+    {
+        let mut this = self.into_owned();
+        let Maybe::Owned(SimpleOwned(map)) = &mut this.changed else {
+            unreachable!()
+        };
+        map.retain(|k, _| f(k.0));
+        this
+    }
+
+    /// Converts the changes into owned version.
+    pub fn into_owned<'cow>(self) -> ComponentChanges<'a, 'cow, Cx> {
+        ComponentChanges {
+            changed: match self.changed {
+                Maybe::Borrowed(borrowed) => Maybe::Owned(SimpleOwned(
+                    borrowed
+                        .iter()
+                        .map(|(CompTyCell(k), v)| {
+                            (CompTyCell(*k), v.as_deref().map(k.f.util.clone))
+                        })
+                        .collect(),
+                )),
+                Maybe::Owned(owned) => Maybe::Owned(owned),
+            },
+            ser_count: self.ser_count,
+        }
+    }
+
+    /// Converts the changes into a pair of added components and removed component types.
+    pub fn into_added_removed_pair(
+        self,
+    ) -> (ComponentMap<'a, Cx>, AHashSet<ErasedComponentType<'a, Cx>>) {
+        if self.is_empty() {
+            (ComponentMap::EMPTY, AHashSet::new())
+        } else {
+            let mut builder = ComponentMap::builder();
+            let mut set = AHashSet::new();
+            for (CompTyCell(ty), obj) in self.changed.iter() {
+                if let Some(obj) = obj {
+                    builder.insert_raw(*ty, (ty.f.util.clone)(&**obj));
+                } else {
+                    set.insert(*ty);
+                }
+            }
+            (builder.build(), set)
+        }
     }
 }
 
@@ -221,7 +273,7 @@ where
     }
 }
 
-impl<'a: 'de, 'de, Cx, B> Decode<'de, B> for ComponentChanges<'a, '_, Cx>
+impl<'a, 'de, Cx, B> Decode<'de, B> for ComponentChanges<'a, '_, Cx>
 where
     Cx: ProvideIdTy<Id: for<'b> Decode<'de, &'b mut B>>
         + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,

@@ -4,6 +4,7 @@
 
 use crate::*;
 
+// Part of the public API.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __internal_update_from_erased {
