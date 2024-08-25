@@ -14,7 +14,7 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 serde = { version = "1.0", optional = true }
-glam = "0.28.0"
+glam = "0.29"
 
 [features]
 default = ["serde", "edcode"]
