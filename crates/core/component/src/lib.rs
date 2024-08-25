@@ -20,6 +20,8 @@ mod dyn_any;
 
 use dyn_any::Any;
 
+pub use ahash::{AHashMap, AHashSet};
+
 /// Type of a component data.
 ///
 /// The type `T` should be unique for each component, as it's used to identify the component.
@@ -41,14 +43,30 @@ impl<T> ComponentType<'_, T> {
     }
 }
 
+impl<'a, T> ComponentType<'a, T> {
+    /// Creates a builder of component type.
+    #[inline]
+    pub const fn builder<Cx>() -> TypeBuilder<'a, T, Cx> {
+        TypeBuilder {
+            serde_codec: None,
+            packet_codec: None,
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<'a, T> ComponentType<'a, T>
 where
-    T: Clone + Eq + Send + Sync + 'a,
+    T: Clone + Eq + Hash + Send + Sync + 'a,
 {
     const UTIL: DynUtil<'a> = DynUtil {
         clone: |obj| Box::new(unsafe { &*(obj as *const Object<'_> as *const T) }.clone()),
         eq: |a, b| unsafe {
             *(a as *const Object<'_> as *const T) == *(b as *const Object<'_> as *const T)
+        },
+        hash: |obj, mut state| {
+            let obj = unsafe { &*(obj as *const Object<'_> as *const T) };
+            obj.hash(&mut state);
         },
     };
 }
@@ -56,7 +74,11 @@ where
 /// Creates a new [`PacketCodec`] by encoding and decoding through `edcode2`.
 pub const fn packet_codec_edcode<'a, T>() -> PacketCodec<'a, T>
 where
-    T: for<'b> Encode<&'b mut dyn BufMut> + for<'b> Decode<'a, &'b mut dyn Buf> + Send + Sync + 'a,
+    T: for<'b> Encode<&'b mut dyn BufMut>
+        + for<'b> Decode<'static, &'b mut dyn Buf>
+        + Send
+        + Sync
+        + 'a,
 {
     PacketCodec {
         codec: UnsafePacketCodec {
@@ -111,7 +133,10 @@ where
 {
     SerdeCodec {
         codec: UnsafeSerdeCodec {
-            ser: |obj| unsafe { &*(obj as *const Object<'_> as *const T) },
+            ser: |obj| unsafe {
+                &*(obj as *const Object<'_> as *const T
+                    as *const (dyn erased_serde::Serialize + 'a))
+            },
             de: |deserializer| {
                 erased_serde::deserialize::<T>(deserializer).map(|v| {
                     let v: Box<Object<'_>> = Box::new(v);
@@ -156,9 +181,13 @@ impl<'a, T, Cx> TypeBuilder<'a, T, Cx> {
 
 impl<'a, T, Cx> TypeBuilder<'a, T, Cx>
 where
-    T: Clone + Eq + Send + Sync + 'a,
+    T: Clone + Eq + Hash + Send + Sync + 'a,
 {
     /// Builds a new [`ComponentType`] with the given codecs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the packet codec is not set.
     pub const fn build(self) -> ComponentType<'a, T> {
         ComponentType {
             f: Funcs {
@@ -217,7 +246,7 @@ pub struct SerdeCodec<'a, T> {
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 struct UnsafeSerdeCodec<'a> {
-    ser: for<'s> fn(&'s Object<'a>) -> &'s dyn erased_serde::Serialize,
+    ser: for<'s> fn(&'s Object<'a>) -> &'s (dyn erased_serde::Serialize + 'a),
     de: fn(&mut dyn erased_serde::Deserializer<'_>) -> erased_serde::Result<Box<Object<'a>>>,
     upd: fn(&mut Object<'a>, &mut dyn erased_serde::Deserializer<'a>) -> erased_serde::Result<()>,
 }
@@ -233,14 +262,15 @@ pub struct PacketCodec<'a, T> {
 #[allow(dead_code)]
 struct UnsafePacketCodec<'a> {
     encode: fn(&'_ Object<'a>, &'_ mut dyn BufMut) -> Result<(), edcode2::BoxedError<'static>>,
-    decode: fn(&'_ mut dyn Buf) -> Result<Box<Object<'a>>, edcode2::BoxedError<'a>>,
+    decode: fn(&'_ mut dyn Buf) -> Result<Box<Object<'a>>, edcode2::BoxedError<'static>>,
     upd: fn(&'_ mut Object<'a>, &'_ mut dyn Buf) -> Result<(), edcode2::BoxedError<'a>>,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct DynUtil<'a> {
     clone: fn(&Object<'a>) -> Box<Object<'a>>,
-    eq: fn(&Object<'a>, &Object<'a>) -> bool,
+    eq: fn(&'_ Object<'a>, &'_ Object<'a>) -> bool,
+    hash: fn(&'_ Object<'a>, &'_ mut dyn std::hash::Hasher),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -324,6 +354,13 @@ where
     #[inline]
     fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
         Cx::registry()
+    }
+}
+
+impl<Cx> Copy for RawErasedComponentType<'_, Cx> {}
+impl<Cx> Clone for RawErasedComponentType<'_, Cx> {
+    fn clone(&self) -> Self {
+        *self
     }
 }
 

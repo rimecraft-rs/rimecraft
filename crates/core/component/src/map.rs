@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     changes::ComponentChanges, dyn_any, ComponentType, ErasedComponentType, Object,
-    RawErasedComponentType, UnsafeSerdeCodec, UnsafeDebugIter,
+    RawErasedComponentType, UnsafeDebugIter, UnsafeSerdeCodec,
 };
 
 #[repr(transparent)]
@@ -43,7 +43,7 @@ where
 {
     #[inline]
     fn default() -> Self {
-        Self::empty()
+        Self::EMPTY
     }
 }
 
@@ -51,10 +51,14 @@ impl<'a, Cx> ComponentMap<'a, Cx>
 where
     Cx: ProvideIdTy,
 {
+    /// An empty component map.
+    pub const EMPTY: Self = Self(MapInner::Empty);
+
     /// Creates an empty component map.
+    #[deprecated = "use `ComponentMap::EMPTY` instead"]
     #[inline]
     pub const fn empty() -> Self {
-        Self(MapInner::Empty)
+        Self::EMPTY
     }
 
     /// Creates a **patched** component map with given base map.
@@ -67,11 +71,37 @@ where
         })
     }
 
+    /// Creates a **patched** component map with given base map and changes.
+    pub fn with_changes(
+        base: &'a ComponentMap<'a, Cx>,
+        changes: ComponentChanges<'a, '_, Cx>,
+    ) -> Self {
+        Self(MapInner::Patched {
+            base,
+            changes_count: changes.changed.values().map(|v| v.is_some() as isize).sum(),
+            changes: match changes.changed {
+                Maybe::Borrowed(c) => c
+                    .iter()
+                    .map(|(k, v)| (CompTyCell(k.0), v.as_deref().map(k.0.f.util.clone)))
+                    .collect(),
+                Maybe::Owned(c) => c.0,
+            },
+        })
+    }
+
     /// Returns a builder for creating a simple component map.
     #[inline]
     pub fn builder() -> Builder<'a, Cx> {
         Builder {
             map: AHashMap::new(),
+        }
+    }
+
+    /// Returns a builder for creating a simple component map with given capacity.
+    #[inline]
+    pub fn builder_with_capacity(capacity: usize) -> Builder<'a, Cx> {
+        Builder {
+            map: AHashMap::with_capacity(capacity),
         }
     }
 
@@ -86,8 +116,10 @@ where
             .and_then(|val| unsafe { val.downcast_ref() })
     }
 
-    #[inline]
-    fn get_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&Object<'_>> {
+    /// Gets the component with given type.
+    ///
+    /// This function is similar to `get`, but it returns the raw object instead of the reference.
+    pub fn get_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&Object<'a>> {
         match &self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => changes
@@ -112,8 +144,10 @@ where
             .and_then(|(k, v)| v.downcast_ref().map(|v| (k, v)))
     }
 
-    #[inline]
-    fn get_key_value_raw(
+    /// Gets the component and its type registration with given type.
+    ///
+    /// This function is similar to `get_key_value`, but it returns the raw object instead of the reference.
+    pub fn get_key_value_raw(
         &self,
         ty: &RawErasedComponentType<'a, Cx>,
     ) -> Option<(ErasedComponentType<'a, Cx>, &Object<'a>)> {
@@ -132,8 +166,10 @@ where
         self.contains_raw(&RawErasedComponentType::from(ty))
     }
 
-    #[inline]
-    fn contains_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> bool {
+    /// Returns whether a component with given type exist.
+    ///
+    /// This function is similar to `contains`, but it receives the raw component type instead of the typed one.
+    pub fn contains_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> bool {
         match &self.0 {
             MapInner::Empty => false,
             MapInner::Patched { base, changes, .. } => changes
@@ -155,11 +191,10 @@ where
             .and_then(|val| unsafe { val.downcast_mut() })
     }
 
-    #[inline]
-    unsafe fn get_mut_raw(
-        &mut self,
-        ty: &RawErasedComponentType<'a, Cx>,
-    ) -> Option<&mut Object<'a>> {
+    /// Gets the component with given type, with mutable access.
+    ///
+    /// This function is similar to `get_mut`, but it returns the raw object instead of the reference.
+    pub fn get_mut_raw(&mut self, ty: &RawErasedComponentType<'a, Cx>) -> Option<&mut Object<'a>> {
         match &mut self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => {
@@ -333,8 +368,8 @@ where
             Some(ComponentChanges {
                 changed: Maybe::Borrowed(changes),
                 ser_count: changes
-                    .iter()
-                    .filter(|(cell, _)| cell.0.is_serializable())
+                    .keys()
+                    .filter(|cell| cell.0.is_serializable())
                     .count(),
             })
         } else {
@@ -448,6 +483,65 @@ where
     }
 }
 
+impl<Cx> PartialEq for ComponentMap<'_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    fn eq(&self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        self.iter().all(move |(ty, obj)| {
+            other
+                .get_raw(&*ty)
+                .map_or(false, |o| (ty.f.util.eq)(obj, o))
+        })
+    }
+}
+
+impl<Cx> Eq for ComponentMap<'_, Cx> where Cx: ProvideIdTy {}
+
+impl<Cx> Hash for ComponentMap<'_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        for (ty, obj) in self.iter() {
+            ty.hash(state);
+            (ty.f.util.hash)(obj, state);
+        }
+    }
+}
+
+impl<Cx> Clone for ComponentMap<'_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    fn clone(&self) -> Self {
+        match &self.0 {
+            MapInner::Empty => Self::EMPTY,
+            MapInner::Patched {
+                base,
+                changes,
+                changes_count,
+            } => Self(MapInner::Patched {
+                base,
+                changes: changes
+                    .iter()
+                    .map(|(k, v)| (CompTyCell(k.0), v.as_deref().map(k.0.f.util.clone)))
+                    .collect(),
+                changes_count: *changes_count,
+            }),
+            MapInner::Simple(map) => Self(MapInner::Simple(
+                map.iter()
+                    .map(|(k, v)| (CompTyCell(k.0), (k.0.f.util.clone)(&**v)))
+                    .collect(),
+            )),
+        }
+    }
+}
+
 /// A builder for creating a simple component map.
 pub struct Builder<'a, Cx>
 where
@@ -466,8 +560,7 @@ where
     ///
     /// This function panics when the given component type's type information does not match with
     /// the given static type.
-    #[inline]
-    pub fn insert<T>(mut self, ty: ErasedComponentType<'a, Cx>, val: T) -> Self
+    pub fn insert<T>(&mut self, ty: ErasedComponentType<'a, Cx>, val: T)
     where
         T: Send + Sync + 'a,
     {
@@ -477,7 +570,24 @@ where
             "the component type should matches the type of given value"
         );
         self.map.insert(CompTyCell(ty), Box::new(val));
-        self
+    }
+
+    /// Inserts a component into this map.
+    ///
+    /// This function is similar to `insert`, but it receives the raw component type instead of the typed one.
+    ///
+    /// # Panics
+    ///
+    /// This function panics when the given component type's type information does not match with
+    /// the type of given value.
+    #[inline]
+    pub fn insert_raw(&mut self, ty: ErasedComponentType<'a, Cx>, val: Box<Object<'a>>) {
+        assert_eq!(
+            ty.ty,
+            (*val).type_id(),
+            "the component type should matches the type of given value"
+        );
+        self.map.insert(CompTyCell(ty), val);
     }
 
     /// Builds the component map.
@@ -487,6 +597,35 @@ where
         } else {
             ComponentMap(MapInner::Simple(self.map))
         }
+    }
+}
+
+impl<'a, Cx> Extend<(ErasedComponentType<'a, Cx>, Box<Object<'a>>)> for Builder<'a, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    fn extend<T: IntoIterator<Item = (ErasedComponentType<'a, Cx>, Box<Object<'a>>)>>(
+        &mut self,
+        iter: T,
+    ) {
+        self.map.extend(
+            iter.into_iter()
+                .filter(|(k, v)| k.ty == (**v).type_id())
+                .map(|(k, v)| (CompTyCell(k), v)),
+        );
+    }
+}
+
+impl<'a, 's, Cx> Extend<(ErasedComponentType<'a, Cx>, &'s Object<'a>)> for Builder<'a, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    #[inline]
+    fn extend<T: IntoIterator<Item = (ErasedComponentType<'a, Cx>, &'s Object<'a>)>>(
+        &mut self,
+        iter: T,
+    ) {
+        self.extend(iter.into_iter().map(|(k, v)| (k, (k.f.util.clone)(v))));
     }
 }
 
