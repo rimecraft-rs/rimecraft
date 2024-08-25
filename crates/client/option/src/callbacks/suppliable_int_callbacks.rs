@@ -18,7 +18,7 @@ impl<Txt> CyclingCallbacks<i32, Txt> for SuppliableIntCallbacks
 where
     Txt: ProvideTextTy,
 {
-    fn get_values(&self) -> () {
+    fn get_values(&self) {
         todo!()
     }
 }
@@ -36,14 +36,11 @@ where
     }
 
     fn i32_validate(&self, value: Option<i32>) -> Option<i32> {
-        match value {
-            Some(value) => Some(rimecraft_math::clamp(
+        value.map(|value| rimecraft_math::clamp(
                 value as f32,
                 <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::min_inclusive(self) as f32,
                 <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::max_inclusive(self) as f32,
-            ) as i32),
-            None => None,
-        }
+            ) as i32)
     }
 }
 

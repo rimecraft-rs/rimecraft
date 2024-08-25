@@ -8,7 +8,7 @@ impl<T, Txt> CyclingCallbacks<T, Txt> for PotentialValuesBasedCallbacks<T>
 where
     Txt: ProvideTextTy,
 {
-    fn get_values(&self) -> () {
+    fn get_values(&self) {
         todo!()
     }
 }

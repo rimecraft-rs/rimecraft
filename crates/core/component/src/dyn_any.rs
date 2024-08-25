@@ -12,7 +12,7 @@ impl<T: ?Sized> Any for T {}
 impl dyn Any + Send + Sync + '_ {
     pub unsafe fn downcast_ref<T>(&self) -> Option<&T> {
         if (*self).type_id() == typeid::of::<T>() {
-            unsafe { Some(&*(self as *const dyn Any as *const T)) }
+            unsafe { Some(&*(std::ptr::from_ref::<dyn Any + Send + Sync + '_>(self) as *const T)) }
         } else {
             None
         }
@@ -20,7 +20,9 @@ impl dyn Any + Send + Sync + '_ {
 
     pub unsafe fn downcast_mut<T>(&mut self) -> Option<&mut T> {
         if (*self).type_id() == typeid::of::<T>() {
-            unsafe { Some(&mut *(self as *mut dyn Any as *mut T)) }
+            unsafe {
+                Some(&mut *(std::ptr::from_mut::<dyn Any + Send + Sync + '_>(self) as *mut T))
+            }
         } else {
             None
         }
