@@ -157,11 +157,7 @@ mod serde {
 
 #[cfg(feature = "edcode")]
 mod edcode {
-    use std::{
-        fmt::Display,
-        io::{self, ErrorKind},
-        str::FromStr,
-    };
+    use std::{fmt::Display, str::FromStr};
 
     use rimecraft_edcode2::{Buf, BufMut, Decode, Encode};
 
