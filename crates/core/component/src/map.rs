@@ -367,10 +367,7 @@ where
         if let MapInner::Patched { changes, .. } = &self.0 {
             Some(ComponentChanges {
                 changed: Maybe::Borrowed(changes),
-                ser_count: changes
-                    .keys()
-                    .filter(|cell| cell.0.is_serializable())
-                    .count(),
+                ser_count: changes.keys().filter(|cell| !cell.0.is_transient()).count(),
             })
         } else {
             None
@@ -405,7 +402,7 @@ where
 impl<Cx: ProvideIdTy> PartialEq for CompTyCell<'_, Cx> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        *self.0 == *other.0
     }
 }
 
@@ -463,10 +460,7 @@ where
                 for (k, v) in base_it {
                     let patched = changes.get(&CompTyCell(k));
                     match patched {
-                        Some(Some(opt)) => {
-                            return Some((k, &**opt));
-                        }
-                        Some(None) => continue,
+                        Some(_) => continue,
                         None => return Some((k, v)),
                     }
                 }
@@ -665,7 +659,12 @@ where
             } => f
                 .debug_struct("PatchedComponentMap")
                 .field("base", base)
-                .field("changes", &UnsafeDebugIter(UnsafeCell::new(changes.keys())))
+                .field(
+                    "changes",
+                    &UnsafeDebugIter(UnsafeCell::new(
+                        changes.iter().map(|(k, v)| (k, v.as_ref().map(|_| ()))),
+                    )),
+                )
                 .field("changes_count", changes_count)
                 .finish(),
             MapInner::Simple(map) => f

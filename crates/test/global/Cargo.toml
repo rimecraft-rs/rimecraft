@@ -17,18 +17,17 @@ global-cx = { path = "../../core/global-cx", package = "rimecraft-global-cx", fe
 ] }
 identifier = { path = "../../util/identifier", package = "rimecraft-identifier", features = [
     "vanilla",
+    "serde",
 ] }
 fastnbt = "2.5"
 serde = "1.0"
 serde-update = { path = "../../util/serde-update", package = "rimecraft-serde-update" }
 registry = { path = "../../core/registry", package = "rimecraft-registry", optional = true }
-component = { path = "../../core/component", package = "rimecraft-component", optional = true }
 parking_lot = "0.12"
 freezer = { path = "../../util/freezer", package = "rimecraft-freezer" }
 
 [features]
 registry = ["dep:registry"]
-component = ["dep:component", "registry"]
 
 [lints]
 workspace = true

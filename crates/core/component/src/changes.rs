@@ -131,7 +131,7 @@ where
         S: serde::Serializer,
     {
         let mut map = serializer.serialize_map(Some(self.ser_count))?;
-        for (&CompTyCell(ty), obj) in self.changed.iter().filter(|(k, _)| k.0.is_serializable()) {
+        for (&CompTyCell(ty), obj) in self.changed.iter().filter(|(k, _)| !k.0.is_transient()) {
             struct Ser<'a, 's> {
                 obj: &'s Object<'a>,
                 codec: &'a UnsafeSerdeCodec<'a>,
@@ -296,7 +296,7 @@ where
         }
 
         Ok(ComponentChanges {
-            ser_count: changed.keys().filter(|k| k.0.is_serializable()).count(),
+            ser_count: changed.keys().filter(|k| !k.0.is_transient()).count(),
             changed: Maybe::Owned(SimpleOwned(changed)),
         })
     }
@@ -332,7 +332,7 @@ where
             std::any::type_name::<T>()
         );
         self.changes.insert(CompTyCell(ty), Some(Box::new(value)));
-        if ty.is_serializable() {
+        if !ty.is_transient() {
             self.ser_count += 1;
         }
     }
@@ -436,7 +436,7 @@ where
                     E::custom(format!("unable to find the component type {}", id))
                 })?;
 
-                if !ty.is_serializable() {
+                if ty.is_transient() {
                     return Err(E::custom(format!(
                         "the component type {} is not serializable",
                         id

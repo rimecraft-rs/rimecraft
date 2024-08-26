@@ -18,6 +18,8 @@ pub mod map;
 
 mod dyn_any;
 
+pub mod test_global_integration;
+
 use dyn_any::Any;
 
 pub use ahash::{AHashMap, AHashSet};
@@ -213,13 +215,14 @@ impl<T> Hash for ComponentType<'_, T> {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         typeid::of::<T>().hash(state);
+        self.is_transient().hash(state);
     }
 }
 
 impl<T> PartialEq for ComponentType<'_, T> {
     #[inline]
-    fn eq(&self, _other: &Self) -> bool {
-        true
+    fn eq(&self, other: &Self) -> bool {
+        self.is_transient() == other.is_transient()
     }
 }
 
@@ -321,8 +324,15 @@ impl<'a, Cx> RawErasedComponentType<'a, Cx> {
 
     /// Returns whether the component is serializable.
     #[inline]
+    #[deprecated = "use `is_transient` instead"]
     pub fn is_serializable(&self) -> bool {
         self.f.serde_codec.is_some()
+    }
+
+    /// Returns whether the component is transient.
+    #[inline]
+    pub fn is_transient(&self) -> bool {
+        self.f.serde_codec.is_none()
     }
 }
 
@@ -341,13 +351,14 @@ impl<Cx> Hash for RawErasedComponentType<'_, Cx> {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.ty.hash(state);
+        self.is_transient().hash(state);
     }
 }
 
 impl<Cx> PartialEq for RawErasedComponentType<'_, Cx> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.ty == other.ty
+        self.ty == other.ty && self.is_transient() == other.is_transient()
     }
 }
 
@@ -389,5 +400,5 @@ where
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "test"))]
 mod tests;
