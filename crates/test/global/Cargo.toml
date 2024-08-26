@@ -24,6 +24,7 @@ serde-update = { path = "../../util/serde-update", package = "rimecraft-serde-up
 registry = { path = "../../core/registry", package = "rimecraft-registry", optional = true }
 component = { path = "../../core/component", package = "rimecraft-component", optional = true }
 parking_lot = "0.12"
+freezer = { path = "../../util/freezer", package = "rimecraft-freezer" }
 
 [features]
 registry = ["dep:registry"]

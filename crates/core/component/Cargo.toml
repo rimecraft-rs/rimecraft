@@ -22,6 +22,11 @@ rimecraft-global-cx = { path = "../global-cx", features = ["nbt", "std"] }
 rimecraft-maybe = { path = "../../util/maybe" }
 typeid = "1.0"
 
+[dev-dependencies]
+test-global = { path = "../../test/global", features = [
+    "component",
+], package = "rimecraft-test-global" }
+
 [features]
 
 [lints]

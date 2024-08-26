@@ -364,6 +364,7 @@ where
 }
 
 impl<Cx> Copy for RawErasedComponentType<'_, Cx> {}
+
 impl<Cx> Clone for RawErasedComponentType<'_, Cx> {
     fn clone(&self) -> Self {
         *self
@@ -387,3 +388,6 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

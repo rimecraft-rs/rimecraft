@@ -12,8 +12,16 @@ use global_cx::{
 };
 use parking_lot::Mutex;
 
+mod identifier;
 pub mod pool;
-mod reg;
+
+/// Integration with several Rimecraft crates.
+pub mod integration {
+    pub mod component;
+    mod registry;
+}
+
+pub use identifier::Id;
 
 /// The global context.
 #[derive(Debug)]
@@ -23,7 +31,7 @@ pub enum TestContext {}
 unsafe impl GlobalContext for TestContext {}
 
 impl ProvideIdTy for TestContext {
-    type Id = identifier::vanilla::Identifier;
+    type Id = Id;
 }
 
 impl ProvideVersionTy for TestContext {
@@ -150,3 +158,6 @@ impl TestId {
         tests.insert(thread_id, self);
     }
 }
+
+#[cfg(test)]
+mod tests;
