@@ -10,16 +10,12 @@ macro_rules! directions {
         vec: ($x:literal, $y:literal, $z:literal),
         axis: $axis:ident,
         axis_dir: $axis_dir:ident,
+        name: $name:literal,
         $(,)?
     }),*$(,)?) => {
         #[doc = "An enum representing 6 cardinal directions."]
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[allow(clippy::exhaustive_enums)]
-        #[cfg_attr(
-            feature = "serde",
-            derive(serde::Serialize, serde::Deserialize),
-            serde(rename_all = "lowercase")
-        )]
         #[repr(u8)]
         pub enum Direction {
             $(
@@ -97,6 +93,48 @@ macro_rules! directions {
                 }
             }
         }
+
+        #[cfg(feature = "serde")]
+        impl serde::Serialize for Direction {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                match self {
+                    $(Self::$dir => serializer.serialize_str($name)),*
+                }
+            }
+        }
+
+        #[cfg(feature = "serde")]
+        impl<'de> serde::Deserialize<'de> for Direction {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct Visitor;
+
+                impl serde::de::Visitor<'_> for Visitor {
+                    type Value = Direction;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "a direction name")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            $($name => Ok(Direction::$dir),)*
+                            _ => Err(serde::de::Error::unknown_variant(value, &[$($name),*])),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_str(Visitor)
+            }
+        }
     };
 }
 
@@ -106,36 +144,42 @@ directions! {
         vec: (0, -1, 0),
         axis: Y,
         axis_dir: Negative,
+        name: "down",
     },
     1 => Up: "The positive Y direction." {
         opposite: Down,
         vec: (0, 1, 0),
         axis: Y,
         axis_dir: Positive,
+        name: "up",
     },
     2 => North: "The negative Z direction." {
         opposite: South,
         vec: (0, 0, -1),
         axis: Z,
         axis_dir: Negative,
+        name: "north",
     },
     3 => South: "The positive Z direction." {
         opposite: North,
         vec: (0, 0, 1),
         axis: Z,
         axis_dir: Positive,
+        name: "south",
     },
     4 => West: "The negative X direction." {
         opposite: East,
         vec: (-1, 0, 0),
         axis: X,
         axis_dir: Negative,
+        name: "west",
     },
     5 => East: "The positive X direction." {
         opposite: West,
         vec: (1, 0, 0),
         axis: X,
         axis_dir: Positive,
+        name: "east",
     },
 }
 
