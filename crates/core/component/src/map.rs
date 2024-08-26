@@ -477,6 +477,16 @@ where
     }
 }
 
+impl<Cx> ExactSizeIterator for Iter<'_, '_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.1.len()
+    }
+}
+
 impl<Cx> PartialEq for ComponentMap<'_, Cx>
 where
     Cx: ProvideIdTy,

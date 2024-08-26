@@ -188,6 +188,7 @@ fn iter_map() {
     let mut count = 0;
     let iter = map.iter();
     assert_eq!(iter.size_hint(), (2, Some(2)));
+    assert_eq!(iter.len(), 2);
     for (ty, obj) in iter {
         let obj = unsafe { obj.downcast_ref::<Foo>() }.expect("downcast failed");
         if ty == edcode_ty {
@@ -218,6 +219,7 @@ fn iter_map() {
         let mut count = 0;
         let iter = patched.iter();
         assert_eq!(iter.size_hint(), (2, Some(2)));
+        assert_eq!(iter.len(), 2);
         for (ty, obj) in iter {
             let obj = obj.downcast_ref::<Foo>().expect("downcast failed");
             if ty == edcode_ty {
