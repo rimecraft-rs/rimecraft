@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use rimecraft_global_cx::ProvideIdTy;
@@ -202,8 +204,8 @@ fn iter_map() {
     }
     assert_eq!(count, 2);
 
-    let leaked = Box::leak(Box::new(map));
-    let mut patched = ComponentMap::new(leaked);
+    let arc = Arc::new(map);
+    let mut patched = ComponentMap::arc_new(arc);
     unsafe {
         patched
             .remove(&TYPE_PERSISTENT)
