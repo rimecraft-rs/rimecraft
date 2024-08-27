@@ -59,7 +59,7 @@ impl<'a, T> ComponentType<'a, T> {
 
 impl<'a, T> ComponentType<'a, T>
 where
-    T: Clone + Eq + Hash + Send + Sync + 'a,
+    T: Clone + Eq + Hash + Debug + Send + Sync + 'a,
 {
     const UTIL: DynUtil<'a> = DynUtil {
         clone: |obj| {
@@ -72,6 +72,9 @@ where
         hash: |obj, mut state| {
             let obj = unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) };
             obj.hash(&mut state);
+        },
+        dbg: |obj| unsafe {
+            &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T as *const (dyn Debug + 'a))
         },
     };
 }
@@ -189,7 +192,7 @@ impl<'a, T, Cx> TypeBuilder<'a, T, Cx> {
 
 impl<'a, T, Cx> TypeBuilder<'a, T, Cx>
 where
-    T: Clone + Eq + Hash + Send + Sync + 'a,
+    T: Clone + Eq + Hash + Debug + Send + Sync + 'a,
 {
     /// Builds a new [`ComponentType`] with the given codecs.
     ///
@@ -280,6 +283,7 @@ struct DynUtil<'a> {
     clone: fn(&Object<'a>) -> Box<Object<'a>>,
     eq: fn(&'_ Object<'a>, &'_ Object<'a>) -> bool,
     hash: fn(&'_ Object<'a>, &'_ mut dyn std::hash::Hasher),
+    dbg: for<'s> fn(&'s Object<'a>) -> &'s (dyn Debug + 'a),
 }
 
 #[derive(Debug, Clone, Copy)]

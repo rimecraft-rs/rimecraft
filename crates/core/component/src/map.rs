@@ -703,14 +703,18 @@ where
                 .field(
                     "changes",
                     &UnsafeDebugIter(UnsafeCell::new(
-                        changes.iter().map(|(k, v)| (k, v.as_ref().map(|_| ()))),
+                        changes
+                            .iter()
+                            .map(|(k, v)| (k, v.as_ref().map(|obj| (k.0.f.util.dbg)(obj)))),
                     )),
                 )
                 .field("changes_count", changes_count)
                 .finish(),
             MapInner::Simple(map) => f
                 .debug_tuple("SimpleComponentMap")
-                .field(&UnsafeDebugIter(UnsafeCell::new(map.keys())))
+                .field(&UnsafeDebugIter(UnsafeCell::new(
+                    map.iter().map(|(k, v)| (k, (k.0.f.util.dbg)(v))),
+                )))
                 .finish(),
         }
     }
