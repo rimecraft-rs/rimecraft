@@ -11,6 +11,7 @@ use rimecraft_registry::{ProvideRegistry, Reg};
 mod edcode;
 pub mod stack;
 
+pub use component;
 pub use stack::ItemStack;
 
 /// Provides settings type for items.
