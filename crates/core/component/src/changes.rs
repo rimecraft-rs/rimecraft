@@ -323,7 +323,7 @@ where
     #[inline]
     pub fn insert<T>(&mut self, ty: ErasedComponentType<'a, Cx>, value: T)
     where
-        T: Send + Sync + Debug + 'a,
+        T: Send + Sync + 'a,
     {
         assert_eq!(
             ty.ty,

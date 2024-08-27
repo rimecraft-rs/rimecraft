@@ -256,7 +256,7 @@ where
         val: T,
     ) -> Option<Maybe<'_, T>>
     where
-        T: Send + Sync + Debug + 'a,
+        T: Send + Sync + 'a,
     {
         let ptr = self as *mut Self;
         let value = unsafe { self.insert_untracked(ty, val) };
@@ -274,7 +274,7 @@ where
         val: T,
     ) -> Option<Maybe<'_, T>>
     where
-        T: Send + Sync + Debug + 'a,
+        T: Send + Sync + 'a,
     {
         assert_eq! {
             ty.ty,
@@ -597,7 +597,7 @@ where
     /// the given static type.
     pub fn insert<T>(&mut self, ty: ErasedComponentType<'a, Cx>, val: T)
     where
-        T: Send + Sync + Debug + 'a,
+        T: Send + Sync + 'a,
     {
         assert_eq!(
             ty.ty,
@@ -703,14 +703,14 @@ where
                 .field(
                     "changes",
                     &UnsafeDebugIter(UnsafeCell::new(
-                        changes.iter().map(|(k, v)| (k, v.as_ref())),
+                        changes.iter().map(|(k, v)| (k, v.as_ref().map(|_| ()))),
                     )),
                 )
                 .field("changes_count", changes_count)
                 .finish(),
             MapInner::Simple(map) => f
                 .debug_tuple("SimpleComponentMap")
-                .field(&UnsafeDebugIter(UnsafeCell::new(map.iter())))
+                .field(&UnsafeDebugIter(UnsafeCell::new(map.keys())))
                 .finish(),
         }
     }
