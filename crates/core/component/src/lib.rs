@@ -59,7 +59,7 @@ impl<'a, T> ComponentType<'a, T> {
 
 impl<'a, T> ComponentType<'a, T>
 where
-    T: Clone + Eq + Hash + Send + Sync + 'a,
+    T: Clone + Eq + Debug + Hash + Send + Sync + 'a,
 {
     const UTIL: DynUtil<'a> = DynUtil {
         clone: |obj| {
@@ -83,6 +83,7 @@ where
         + for<'b> Decode<'static, &'b mut dyn Buf>
         + Send
         + Sync
+        + Debug
         + 'a,
 {
     PacketCodec {
@@ -109,7 +110,7 @@ where
 /// Creates a new [`PacketCodec`] by NBT serialization.
 pub const fn packet_codec_nbt<'a, T, Cx>() -> PacketCodec<'a, T>
 where
-    T: Send + Sync + 'a,
+    T: Send + Sync + Debug + 'a,
     Cx: ReadNbt<T> + for<'t> WriteNbt<&'t T> + UpdateNbt<T>,
 {
     PacketCodec {
@@ -137,7 +138,7 @@ where
 /// Creates a new [`SerdeCodec`] by using `erased_serde`.
 pub const fn serde_codec<'a, T>() -> SerdeCodec<'a, T>
 where
-    T: Serialize + DeserializeOwned + Send + Sync + 'a,
+    T: Serialize + DeserializeOwned + Send + Sync + Debug + 'a,
 {
     SerdeCodec {
         codec: UnsafeSerdeCodec {
@@ -189,7 +190,7 @@ impl<'a, T, Cx> TypeBuilder<'a, T, Cx> {
 
 impl<'a, T, Cx> TypeBuilder<'a, T, Cx>
 where
-    T: Clone + Eq + Hash + Send + Sync + 'a,
+    T: Clone + Eq + Hash + Send + Sync + Debug + 'a,
 {
     /// Builds a new [`ComponentType`] with the given codecs.
     ///

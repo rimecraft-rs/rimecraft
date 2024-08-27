@@ -1,13 +1,13 @@
-use std::any::TypeId;
+use std::{any::TypeId, fmt::Debug};
 
-pub trait Any {
+pub trait Any: Debug {
     #[inline(always)]
     fn type_id(&self) -> TypeId {
         typeid::of::<Self>()
     }
 }
 
-impl<T: ?Sized> Any for T {}
+impl<T: Debug + ?Sized> Any for T {}
 
 impl dyn Any + Send + Sync + '_ {
     pub unsafe fn downcast_ref<T>(&self) -> Option<&T> {
