@@ -6,7 +6,10 @@ use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::RegistryKey;
 use serde::{Deserialize, Serialize};
 
-use crate::{map::ComponentMap, ComponentType, PacketCodec, RawErasedComponentType, SerdeCodec};
+use crate::{
+    changes::ComponentChanges, map::ComponentMap, ComponentType, PacketCodec,
+    RawErasedComponentType, SerdeCodec,
+};
 
 type Context = test_global::TestContext;
 type Id = <Context as ProvideIdTy>::Id;
@@ -282,4 +285,100 @@ fn patched_changes() {
     assert_eq!(changes.len(), 2);
     let new_patched = ComponentMap::arc_with_changes(map.clone(), changes);
     assert_eq!(new_patched.len(), 1);
+}
+
+#[test]
+fn map_serde() {
+    init_registry();
+    let reg = crate::test_global_integration::registry();
+    let edcode_ty = reg
+        .get(&TYPE_TRANSIENT_EDCODE_KEY)
+        .expect("invalid registry");
+    let persistent_ty = reg.get(&TYPE_PERSISTENT_KEY).expect("invalid registry");
+
+    let mut builder = ComponentMap::builder();
+    builder.insert(
+        edcode_ty,
+        Foo {
+            value: 114,
+            info: "hello".to_owned(),
+        },
+    );
+    builder.insert(
+        persistent_ty,
+        Foo {
+            value: 514,
+            info: "world".to_owned(),
+        },
+    );
+    let map = builder.build();
+
+    let buf = fastnbt::to_bytes(&map).expect("serialize failed");
+    let new_map =
+        fastnbt::from_bytes::<ComponentMap<'_, Context>>(&buf).expect("deserialize failed");
+    assert_eq!(new_map.len(), 1, "map length not intended");
+    let obj = unsafe { new_map.get(&TYPE_PERSISTENT) }.expect("missing persistent_ty");
+    assert_eq!(
+        obj,
+        &Foo {
+            value: 514,
+            info: "world".to_owned()
+        }
+    );
+}
+
+#[test]
+fn changes_serde() {
+    init_registry();
+    let reg = crate::test_global_integration::registry();
+    let edcode_ty = reg
+        .get(&TYPE_TRANSIENT_EDCODE_KEY)
+        .expect("invalid registry");
+    let persistent_ty = reg.get(&TYPE_PERSISTENT_KEY).expect("invalid registry");
+
+    let mut builder = ComponentMap::builder();
+    builder.insert(
+        edcode_ty,
+        Foo {
+            value: 114,
+            info: "hello".to_owned(),
+        },
+    );
+    builder.insert(
+        persistent_ty,
+        Foo {
+            value: 514,
+            info: "world".to_owned(),
+        },
+    );
+    let map = Arc::new(builder.build());
+
+    let mut patched = ComponentMap::arc_new(map.clone());
+    unsafe {
+        patched
+            .remove(&TYPE_TRANSIENT_EDCODE)
+            .expect("remove transient component failed");
+        patched.insert(
+            persistent_ty,
+            Foo {
+                value: 1919,
+                info: "wlg".to_owned(),
+            },
+        );
+        assert_eq!(patched.len(), 1);
+    }
+
+    let changes = patched.changes().expect("no changes");
+
+    let buf = fastnbt::to_bytes(&changes).expect("serialize failed");
+    let new_changes = fastnbt::from_bytes::<ComponentChanges<'_, 'static, Context>>(&buf)
+        .expect("deserialize failed");
+    assert_eq!(new_changes.len(), 1, "changes length not intended");
+    assert_eq!(
+        unsafe { new_changes.get(&TYPE_PERSISTENT) }
+            .expect("missing persistent_ty")
+            .expect("persistent_ty is not removal")
+            .value,
+        1919
+    );
 }

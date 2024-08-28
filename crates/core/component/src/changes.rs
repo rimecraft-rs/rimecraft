@@ -154,14 +154,14 @@ where
             };
 
             map.serialize_key(&ty)?;
-            if obj.is_none() {
-                // Dummy value. fastnbt does not support Unit values.
-                map.serialize_value(&0u8)?;
-            } else {
+            if let Some(obj) = obj.as_deref() {
                 map.serialize_value(&Ser {
-                    obj: obj.as_ref().unwrap(),
+                    obj,
                     codec: ty.ty.f.serde_codec.expect("missing serde codec"),
                 })?;
+            } else {
+                // Dummy value. fastnbt does not support Unit values.
+                map.serialize_value(&0u8)?;
             }
         }
         map.end()
@@ -464,7 +464,14 @@ where
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&UnsafeDebugIter(UnsafeCell::new(self.changed.keys())), f)
+        Debug::fmt(
+            &UnsafeDebugIter(UnsafeCell::new(
+                self.changed
+                    .iter()
+                    .map(|(k, v)| (k.0, v.as_ref().map(|v| (k.0.f.util.dbg)(&**v)))),
+            )),
+            f,
+        )
     }
 }
 
