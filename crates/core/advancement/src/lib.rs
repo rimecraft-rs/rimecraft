@@ -58,31 +58,6 @@ impl<'r, Cx> DisplayInfo<'r, Cx>
 where
     Cx: AdvancementCx,
 {
-    /// Create a new [`DisplayInfo`].
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        title: Text<Cx>,
-        description: Text<Cx>,
-        icon: ItemStack<'r, Cx>,
-        background: Option<Cx::Id>,
-        frame: Frame,
-        show_toast: bool,
-        announce_to_chat: bool,
-        hidden: bool,
-    ) -> Self {
-        Self {
-            title,
-            description,
-            icon,
-            background,
-            frame,
-            show_toast,
-            announce_to_chat,
-            hidden,
-            pos: (0., 0.),
-        }
-    }
-
     /// Sets advancement's position.
     pub fn set_pos(&mut self, x: f32, y: f32) {
         self.pos = (x, y);

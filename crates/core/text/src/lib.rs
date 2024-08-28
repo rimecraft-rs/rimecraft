@@ -200,10 +200,6 @@ pub trait Localize {
     fn localization_key(&self) -> Cow<'_, str>;
 }
 
-/// A seed for encoding and decoding [`Text`] through `edcode2` crate.
-#[cfg(feature = "edcode")]
-pub type EdcodeSeed<Cx> = rimecraft_global_cx::edcode::Nbt<Text<Cx>, Cx>;
-
 #[cfg(test)]
 mod tests;
 

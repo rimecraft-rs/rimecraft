@@ -1,12 +1,12 @@
 use crate::{Advancement, AdvancementCx, DisplayInfo};
 use std::fmt::Debug;
 
-impl<Cx> Debug for DisplayInfo<'_, Cx>
+impl<'r, Cx> Debug for DisplayInfo<'r, Cx>
 where
     Cx: AdvancementCx + Debug,
     Cx::Content: Debug,
     Cx::Id: Debug,
-    Cx::Compound: Debug,
+    Cx::Settings<'r>: Debug,
     Cx::StyleExt: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -24,12 +24,12 @@ where
     }
 }
 
-impl<Cx> Debug for Advancement<'_, Cx>
+impl<'r, Cx> Debug for Advancement<'r, Cx>
 where
     Cx: AdvancementCx + Debug,
     Cx::Content: Debug,
     Cx::Id: Debug,
-    Cx::Compound: Debug,
+    Cx::Settings<'r>: Debug,
     Cx::StyleExt: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

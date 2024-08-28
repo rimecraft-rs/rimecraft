@@ -25,4 +25,8 @@ workspace = true
 
 [features]
 default = ["edcode"]
-edcode = ['dep:rimecraft-edcode2', "dep:rimecraft-registry"]
+edcode = [
+    'dep:rimecraft-edcode2',
+    "dep:rimecraft-registry",
+    "rimecraft-text/edcode",
+]

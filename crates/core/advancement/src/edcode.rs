@@ -1,30 +1,31 @@
 use rimecraft_edcode2::{Buf, BufMut, Decode, Encode};
-use rimecraft_global_cx::nbt_edcode::{ReadNbt, WriteNbt};
-use rimecraft_item::{ItemStack, RawItem};
+use rimecraft_global_cx::{
+    edcode::Nbt,
+    nbt::{ReadNbt, WriteNbt},
+};
+use rimecraft_item::{component::RawErasedComponentType, ItemStack, RawItem};
 use rimecraft_registry::ProvideRegistry;
+use rimecraft_text::Text;
 
 use crate::{AdvancementCx, DisplayInfo, Frame};
 
 /// Additional requirements when enabling `edcode` on [`Advancement`].
-pub trait AdvancementEdcodeCx:
-    AdvancementCx
-    + for<'a> WriteNbt<Option<&'a Self::Compound>>
-    + ReadNbt<Option<Self::Compound>>
-    + for<'r> ProvideRegistry<'r, Self::Id, RawItem<Self>>
-{
+pub trait AdvancementEdcodeCx: AdvancementCx {
     /// Given [`FrameData::name`], returns corresponding [`Frame`].
     fn frame_fmt(name: &str) -> Frame;
 }
 
-impl<Cx, B> Encode<B> for DisplayInfo<'_, Cx>
+impl<'r, Cx, B> Encode<B> for DisplayInfo<'r, Cx>
 where
-    Cx: AdvancementEdcodeCx,
+    Cx: AdvancementEdcodeCx
+        + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>
+        + for<'a, 'b> WriteNbt<&'a &'b Text<Cx>>,
     B: BufMut,
     Cx::Id: for<'a> Encode<&'a mut B>,
 {
     fn encode(&self, mut buf: B) -> Result<(), rimecraft_edcode2::BoxedError<'static>> {
-        // TODO: `RawText` doesn't implement edcode.
-        // TODO: Encode `title` and `description`.
+        Nbt::<&Text<Cx>, Cx>::new(&self.title).encode(&mut buf)?;
+        Nbt::<&Text<Cx>, Cx>::new(&self.description).encode(&mut buf)?;
         self.icon.encode(&mut buf)?;
         self.frame.encode(&mut buf)?;
         let mut i = 0_i32;
@@ -49,14 +50,18 @@ where
 
 impl<'de, 'r, Cx, B> Decode<'de, B> for DisplayInfo<'r, Cx>
 where
-    Cx: AdvancementEdcodeCx,
+    Cx: AdvancementEdcodeCx
+        + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>
+        + ProvideRegistry<'r, Cx::Id, RawErasedComponentType<'r, Cx>>
+        + ReadNbt<Text<Cx>>,
     B: Buf,
-    Cx::Id: for<'a> Decode<'de, &'a mut B>,
+    Cx::Id: for<'a, 'b> Decode<'de, &'a mut &'b mut B> + for<'a> Decode<'de, &'a mut B>,
 {
     #[allow(unused_variables)]
     fn decode(mut buf: B) -> Result<Self, rimecraft_edcode2::BoxedError<'de>> {
-        // TODO: Decode `title` and `description`.
-        let stack: ItemStack<'r, Cx> = Decode::decode(&mut buf)?;
+        let title = Nbt::<Text<Cx>, Cx>::decode(&mut buf)?.into_inner();
+        let description = Nbt::<Text<Cx>, Cx>::decode(&mut buf)?.into_inner();
+        let icon: ItemStack<'r, Cx> = Decode::decode(&mut buf)?;
         let frame: Frame = Decode::decode(&mut buf)?;
         let i: i32 = Decode::decode(&mut buf)?;
         let background: Option<Cx::Id> = ((i & 1) != 0)
@@ -66,7 +71,16 @@ where
         let hidden = (i & 4) != 0;
         let x: f32 = Decode::decode(&mut buf)?;
         let y: f32 = Decode::decode(&mut buf)?;
-        // TODO: Construct the object with [`Self::new`].
-        todo!()
+        Ok(Self {
+            title,
+            description,
+            icon,
+            background,
+            frame,
+            show_toast,
+            announce_to_chat: false,
+            hidden,
+            pos: (x, y),
+        })
     }
 }
