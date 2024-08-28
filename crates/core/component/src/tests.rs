@@ -11,7 +11,8 @@ use crate::{
     RawErasedComponentType, SerdeCodec,
 };
 
-type Context = test_global::TestContext;
+use test_global::TestContext as Context;
+
 type Id = <Context as ProvideIdTy>::Id;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -353,6 +354,87 @@ fn changes_serde() {
     );
     let map = Arc::new(builder.build());
 
+    // Additions and modifications
+    {
+        let mut patched = ComponentMap::arc_new(map.clone());
+        unsafe {
+            patched
+                .remove(&TYPE_TRANSIENT_EDCODE)
+                .expect("remove transient component failed");
+            patched.insert(
+                persistent_ty,
+                Foo {
+                    value: 1919,
+                    info: "wlg".to_owned(),
+                },
+            );
+        }
+
+        let changes = patched.changes().expect("no changes");
+
+        let buf = fastnbt::to_bytes(&changes).expect("serialize failed");
+        let new_changes = fastnbt::from_bytes::<ComponentChanges<'_, 'static, Context>>(&buf)
+            .expect("deserialize failed");
+        assert_eq!(new_changes.len(), 1, "changes length not intended");
+        assert_eq!(
+            unsafe { new_changes.get(&TYPE_PERSISTENT) }
+                .expect("missing persistent_ty")
+                .expect("persistent_ty is not removed")
+                .value,
+            1919
+        );
+    }
+
+    // Removals
+    {
+        let mut patched = ComponentMap::arc_new(map.clone());
+        unsafe {
+            patched
+                .remove(&TYPE_PERSISTENT)
+                .expect("remove persistent component failed");
+        }
+
+        let changes = patched.changes().expect("no changes");
+
+        let buf = fastnbt::to_bytes(&changes).expect("serialize failed");
+        let new_changes = fastnbt::from_bytes::<ComponentChanges<'_, 'static, Context>>(&buf)
+            .expect("deserialize failed");
+        assert_eq!(new_changes.len(), 1, "changes length not intended");
+        assert!(
+            unsafe { new_changes.get(&TYPE_PERSISTENT) }
+                .expect("missing persistent_ty")
+                .is_none(),
+            "persistent_ty should be removed"
+        );
+    }
+}
+
+#[test]
+fn changes_edcode() {
+    init_registry();
+    let reg = crate::test_global_integration::registry();
+    let edcode_ty = reg
+        .get(&TYPE_TRANSIENT_EDCODE_KEY)
+        .expect("invalid registry");
+    let persistent_ty = reg.get(&TYPE_PERSISTENT_KEY).expect("invalid registry");
+
+    let mut builder = ComponentMap::builder();
+    builder.insert(
+        edcode_ty,
+        Foo {
+            value: 114,
+            info: "hello".to_owned(),
+        },
+    );
+    builder.insert(
+        persistent_ty,
+        Foo {
+            value: 514,
+            info: "world".to_owned(),
+        },
+    );
+    let map = Arc::new(builder.build());
+
     let mut patched = ComponentMap::arc_new(map.clone());
     unsafe {
         patched
@@ -365,19 +447,25 @@ fn changes_serde() {
                 info: "wlg".to_owned(),
             },
         );
-        assert_eq!(patched.len(), 1);
     }
 
     let changes = patched.changes().expect("no changes");
 
-    let buf = fastnbt::to_bytes(&changes).expect("serialize failed");
-    let new_changes = fastnbt::from_bytes::<ComponentChanges<'_, 'static, Context>>(&buf)
-        .expect("deserialize failed");
-    assert_eq!(new_changes.len(), 1, "changes length not intended");
+    let mut buf = Vec::new();
+    changes.encode(&mut buf).expect("serialize failed");
+    let new_changes =
+        ComponentChanges::<'_, 'static, Context>::decode(&buf[..]).expect("deserialize failed");
+    assert_eq!(new_changes.len(), 2, "changes length not intended");
+    assert!(
+        unsafe { new_changes.get(&TYPE_TRANSIENT_EDCODE) }
+            .expect("missing edcode_ty")
+            .is_none(),
+        "edcode_ty is removed"
+    );
     assert_eq!(
         unsafe { new_changes.get(&TYPE_PERSISTENT) }
             .expect("missing persistent_ty")
-            .expect("persistent_ty is not removal")
+            .expect("persistent_ty is not removed")
             .value,
         1919
     );

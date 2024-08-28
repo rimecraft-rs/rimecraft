@@ -258,7 +258,6 @@ where
 
         for (&CompTyCell(ty), val) in self.changed.iter() {
             if let Some(val) = val {
-                buf.put_variable(1);
                 ty.encode(&mut buf)?;
                 (ty.f.packet_codec.encode)(&**val, &mut buf)?;
             }
@@ -275,8 +274,7 @@ where
 
 impl<'a, 'de, Cx, B> Decode<'de, B> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: ProvideIdTy<Id: for<'b> Decode<'de, &'b mut B>>
-        + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
+    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
     B: Buf,
 {
     fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {

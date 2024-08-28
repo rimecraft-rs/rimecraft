@@ -14,7 +14,7 @@ pub struct Variable<T>(pub T);
 
 /// A byte array.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ByteArray<T>(T);
+pub struct ByteArray<T>(pub T);
 
 macro_rules! primitives {
     ($($t:ty => $p:ident, $g:ident),*$(,)?) => {
@@ -234,8 +234,9 @@ where
 {
     #[inline]
     fn encode(&self, mut buf: B) -> Result<(), BoxedError<'static>> {
-        buf.put_variable(self.0.as_ref().len() as u32);
-        buf.put_slice(self.0.as_ref());
+        let s = self.0.as_ref();
+        buf.put_variable(s.len() as u32);
+        buf.put_slice(s);
         Ok(())
     }
 }
@@ -253,7 +254,7 @@ impl<'de, B: Buf> Decode<'de, B> for ByteArray<Vec<u8>> {
 impl<'de, B: Buf> Decode<'de, B> for ByteArray<Box<[u8]>> {
     #[inline]
     fn decode(buf: B) -> Result<Self, BoxedError<'de>> {
-        ByteArray::<Vec<u8>>::decode(buf).map(|ByteArray(vec)| ByteArray(vec.into_boxed_slice()))
+        ByteArray::<Vec<u8>>::decode(buf).map(|ByteArray(vec)| Self(vec.into_boxed_slice()))
     }
 }
 
