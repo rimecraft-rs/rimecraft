@@ -14,7 +14,7 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 serde = "1.0"
 erased-serde = "0.4"
-bytes = "1.6"
+bytes = "1.7"
 ahash = "0.8"
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2" }
 rimecraft-registry = { path = "../registry", features = ["serde", "edcode"] }
