@@ -2,7 +2,7 @@
 
 use std::{
     borrow::Borrow, cell::UnsafeCell, collections::hash_map, fmt::Debug, hash::Hash,
-    marker::PhantomData,
+    marker::PhantomData, sync::Arc,
 };
 
 use ahash::AHashMap;
@@ -30,7 +30,7 @@ where
 {
     Empty,
     Patched {
-        base: &'a ComponentMap<'a, Cx>,
+        base: Maybe<'a, ComponentMap<'a, Cx>, Arc<ComponentMap<'a, Cx>>>,
         changes: AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
         changes_count: isize,
     },
@@ -65,20 +65,64 @@ where
     #[inline]
     pub fn new(base: &'a ComponentMap<'a, Cx>) -> Self {
         Self(MapInner::Patched {
-            base,
+            base: Maybe::Borrowed(base),
+            changes: AHashMap::new(),
+            changes_count: 0,
+        })
+    }
+
+    /// Creates a **patched** component map with given base map.
+    #[inline]
+    pub fn arc_new(base: Arc<ComponentMap<'a, Cx>>) -> Self {
+        Self(MapInner::Patched {
+            base: Maybe::Owned(base),
             changes: AHashMap::new(),
             changes_count: 0,
         })
     }
 
     /// Creates a **patched** component map with given base map and changes.
+    #[inline]
     pub fn with_changes(
         base: &'a ComponentMap<'a, Cx>,
         changes: ComponentChanges<'a, '_, Cx>,
     ) -> Self {
+        Self::with_changes_raw(Maybe::Borrowed(base), changes)
+    }
+
+    /// Creates a **patched** component map with given base map and changes.
+    #[inline]
+    pub fn arc_with_changes(
+        base: Arc<ComponentMap<'a, Cx>>,
+        changes: ComponentChanges<'a, '_, Cx>,
+    ) -> Self {
+        Self::with_changes_raw(Maybe::Owned(base), changes)
+    }
+
+    fn with_changes_raw(
+        base: Maybe<'a, ComponentMap<'a, Cx>, Arc<ComponentMap<'a, Cx>>>,
+        changes: ComponentChanges<'a, '_, Cx>,
+    ) -> Self {
         Self(MapInner::Patched {
+            changes_count: changes
+                .changed
+                .iter()
+                .map(|(&CompTyCell(k), v)| {
+                    let occupied = base.contains_raw(&k);
+                    if v.is_some() {
+                        if occupied {
+                            0
+                        } else {
+                            1
+                        }
+                    } else if occupied {
+                        -1
+                    } else {
+                        0
+                    }
+                })
+                .sum(),
             base,
-            changes_count: changes.changed.values().map(|v| v.is_some() as isize).sum(),
             changes: match changes.changed {
                 Maybe::Borrowed(c) => c
                     .iter()
@@ -227,13 +271,15 @@ where
         &mut self,
         ty: ErasedComponentType<'a, Cx>,
         val: T,
-    ) -> Option<Maybe<'a, T>>
+    ) -> Option<Maybe<'_, T>>
     where
         T: Send + Sync + 'a,
     {
+        let ptr = self as *mut Self;
         let value = unsafe { self.insert_untracked(ty, val) };
         if value.is_none() {
-            self.track_add()
+            //SAFETY: this does not affect the lifetime of the value.
+            unsafe { (*ptr).track_add() }
         }
         value
     }
@@ -243,7 +289,7 @@ where
         &mut self,
         ty: ErasedComponentType<'a, Cx>,
         val: T,
-    ) -> Option<Maybe<'a, T>>
+    ) -> Option<Maybe<'_, T>>
     where
         T: Send + Sync + 'a,
     {
@@ -280,16 +326,18 @@ where
     ///
     /// This function could not guarantee lifetime of type `T` is sound.
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
-    pub unsafe fn remove<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'a, T>> {
+    pub unsafe fn remove<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'_, T>> {
+        let ptr = self as *mut Self;
         let value = unsafe { self.remove_untracked(ty) };
         if value.is_some() {
-            self.track_rm()
+            //SAFETY: this does not affect the lifetime of the value.
+            unsafe { (*ptr).track_rm() }
         }
         value
     }
 
     #[inline]
-    unsafe fn remove_untracked<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'a, T>> {
+    unsafe fn remove_untracked<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'_, T>> {
         match &mut self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => {
@@ -367,10 +415,7 @@ where
         if let MapInner::Patched { changes, .. } = &self.0 {
             Some(ComponentChanges {
                 changed: Maybe::Borrowed(changes),
-                ser_count: changes
-                    .keys()
-                    .filter(|cell| cell.0.is_serializable())
-                    .count(),
+                ser_count: changes.keys().filter(|cell| !cell.0.is_transient()).count(),
             })
         } else {
             None
@@ -405,7 +450,7 @@ where
 impl<Cx: ProvideIdTy> PartialEq for CompTyCell<'_, Cx> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        *self.0 == *other.0
     }
 }
 
@@ -463,10 +508,7 @@ where
                 for (k, v) in base_it {
                     let patched = changes.get(&CompTyCell(k));
                     match patched {
-                        Some(Some(opt)) => {
-                            return Some((k, &**opt));
-                        }
-                        Some(None) => continue,
+                        Some(_) => continue,
                         None => return Some((k, v)),
                     }
                 }
@@ -480,6 +522,16 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.1.len();
         (len, Some(len))
+    }
+}
+
+impl<Cx> ExactSizeIterator for Iter<'_, '_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.1.len()
     }
 }
 
@@ -526,7 +578,7 @@ where
                 changes,
                 changes_count,
             } => Self(MapInner::Patched {
-                base,
+                base: base.clone(),
                 changes: changes
                     .iter()
                     .map(|(k, v)| (CompTyCell(k.0), v.as_deref().map(k.0.f.util.clone)))
@@ -665,12 +717,21 @@ where
             } => f
                 .debug_struct("PatchedComponentMap")
                 .field("base", base)
-                .field("changes", &UnsafeDebugIter(UnsafeCell::new(changes.keys())))
+                .field(
+                    "changes",
+                    &UnsafeDebugIter(UnsafeCell::new(
+                        changes
+                            .iter()
+                            .map(|(k, v)| (k, v.as_ref().map(|obj| (k.0.f.util.dbg)(obj)))),
+                    )),
+                )
                 .field("changes_count", changes_count)
                 .finish(),
             MapInner::Simple(map) => f
                 .debug_tuple("SimpleComponentMap")
-                .field(&UnsafeDebugIter(UnsafeCell::new(map.keys())))
+                .field(&UnsafeDebugIter(UnsafeCell::new(
+                    map.iter().map(|(k, v)| (k, (k.0.f.util.dbg)(v))),
+                )))
                 .finish(),
         }
     }

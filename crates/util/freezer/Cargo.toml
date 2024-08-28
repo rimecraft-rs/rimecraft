@@ -12,6 +12,7 @@ categories = ["rust-patterns"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+parking_lot = "0.12"
 
 [lints]
 workspace = true

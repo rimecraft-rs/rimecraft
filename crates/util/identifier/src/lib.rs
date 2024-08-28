@@ -1,13 +1,16 @@
 //! Rust implementation of Minecraft resource location.
 
 use core::str;
-use std::{fmt::Display, str::FromStr};
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
 #[cfg(feature = "vanilla")]
 pub mod vanilla;
 
 /// An identifier used to identify things.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[doc(alias = "ResourceLocation")]
 pub struct Identifier<N, P> {
     namespace: N,
@@ -57,6 +60,17 @@ where
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}{}", self.namespace, N::SEPARATOR, self.path)
+    }
+}
+
+impl<N, P> Debug for Identifier<N, P>
+where
+    N: Display + Separate,
+    P: Display,
+{
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 

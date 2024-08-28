@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/util/*", "crates/client/*", "crates/core/*"]
+members = ["crates/util/*", "crates/client/*", "crates/core/*", "crates/test/*"]
 
 [workspace.lints.rust]
 missing-docs = "warn"
@@ -33,3 +33,7 @@ use-debug = "warn"
 iter-without-into-iter = "warn"
 decimal-literal-representation = "warn"
 ref-as-ptr = "warn"
+
+[patch.crates-io.fastnbt]
+git = "https://github.com/owengage/fastnbt.git"
+rev = "e2a5d8a7001d4f074ae99fd21bb485667934baeb"

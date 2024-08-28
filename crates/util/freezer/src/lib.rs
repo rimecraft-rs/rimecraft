@@ -16,8 +16,9 @@
 use std::{
     ops::{Deref, DerefMut},
     sync::OnceLock,
-    sync::{Mutex, MutexGuard},
 };
+
+use parking_lot::{Mutex, MutexGuard};
 
 /// A cell that contains either mutable value or immutable value,
 /// where the mutable one can be freezed into the immutable one.
@@ -51,7 +52,7 @@ where
 
         let _result = self
             .immutable
-            .set(self.mutable.lock().unwrap().take().unwrap().freeze(opts));
+            .set(self.mutable.lock().take().unwrap().freeze(opts));
     }
 
     /// Whether this instance has been already freezed.
@@ -74,7 +75,7 @@ where
             None
         } else {
             Some(Guard {
-                inner: self.mutable.lock().unwrap(),
+                inner: self.mutable.lock(),
             })
         }
     }

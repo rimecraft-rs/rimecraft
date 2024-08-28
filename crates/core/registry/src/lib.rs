@@ -180,13 +180,9 @@ where
     }
 }
 
-impl<K: std::fmt::Debug, T: std::fmt::Debug> std::fmt::Debug for Reg<'_, K, T> {
+impl<K: std::fmt::Debug, T> std::fmt::Debug for Reg<'_, K, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RegRef")
-            .field("raw", &self.raw)
-            .field("registry", &self.registry.key)
-            .field("value", &self.value)
-            .finish()
+        write!(f, "{:?}", <&RefEntry<_, _>>::from(*self).key().value())
     }
 }
 
