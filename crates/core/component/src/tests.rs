@@ -236,3 +236,50 @@ fn iter_map() {
         assert_eq!(count, 2);
     }
 }
+
+#[test]
+fn patched_changes() {
+    init_registry();
+    let reg = crate::test_global_integration::registry();
+    let edcode_ty = reg
+        .get(&TYPE_TRANSIENT_EDCODE_KEY)
+        .expect("invalid registry");
+    let persistent_ty = reg.get(&TYPE_PERSISTENT_KEY).expect("invalid registry");
+
+    let mut builder = ComponentMap::builder();
+    builder.insert(
+        edcode_ty,
+        Foo {
+            value: 114,
+            info: "hello".to_owned(),
+        },
+    );
+    builder.insert(
+        persistent_ty,
+        Foo {
+            value: 514,
+            info: "world".to_owned(),
+        },
+    );
+    let map = Arc::new(builder.build());
+
+    let mut patched = ComponentMap::arc_new(map.clone());
+    unsafe {
+        patched
+            .remove(&TYPE_TRANSIENT_EDCODE)
+            .expect("remove transient component failed");
+        patched.insert(
+            persistent_ty,
+            Foo {
+                value: 1919,
+                info: "wlg".to_owned(),
+            },
+        );
+        assert_eq!(patched.len(), 1);
+    }
+
+    let changes = patched.changes().expect("no changes");
+    assert_eq!(changes.len(), 2);
+    let new_patched = ComponentMap::arc_with_changes(map.clone(), changes);
+    assert_eq!(new_patched.len(), 1);
+}

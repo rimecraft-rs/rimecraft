@@ -104,8 +104,25 @@ where
         changes: ComponentChanges<'a, '_, Cx>,
     ) -> Self {
         Self(MapInner::Patched {
+            changes_count: changes
+                .changed
+                .iter()
+                .map(|(&CompTyCell(k), v)| {
+                    let occupied = base.contains_raw(&k);
+                    if v.is_some() {
+                        if occupied {
+                            0
+                        } else {
+                            1
+                        }
+                    } else if occupied {
+                        -1
+                    } else {
+                        0
+                    }
+                })
+                .sum(),
             base,
-            changes_count: changes.changed.values().map(|v| v.is_some() as isize).sum(),
             changes: match changes.changed {
                 Maybe::Borrowed(c) => c
                     .iter()
