@@ -1,0 +1,28 @@
+[package]
+name = "rimecraft-local-cx"
+version = "0.1.0"
+edition = "2021"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Rimecraft local context traits"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+global-cx = { path = "../global-cx", package = "rimecraft-global-cx" }
+serde = { version = "1.0", default-features = false, optional = true }
+erased-serde = { version = "0.4", optional = true }
+serde-update = { path = "../../util/serde-update", package = "rimecraft-serde-update", optional = true }
+edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
+
+[features]
+std = []
+serde = ["dep:serde", "dep:serde-update"]
+erased-serde = ["dep:erased-serde", "serde-update/erased"]
+edcode = ["dep:edcode2"]
+
+[lints]
+workspace = true
