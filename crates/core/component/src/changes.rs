@@ -131,7 +131,7 @@ where
         S: serde::Serializer,
     {
         let mut map = serializer.serialize_map(Some(self.ser_count))?;
-        for (&CompTyCell(ty), obj) in self.changed.iter().filter(|(k, _)| k.0.is_serializable()) {
+        for (&CompTyCell(ty), obj) in self.changed.iter().filter(|(k, _)| !k.0.is_transient()) {
             struct Ser<'a, 's> {
                 obj: &'s Object<'a>,
                 codec: &'a UnsafeSerdeCodec<'a>,
@@ -154,14 +154,14 @@ where
             };
 
             map.serialize_key(&ty)?;
-            if obj.is_none() {
-                // Dummy value. fastnbt does not support Unit values.
-                map.serialize_value(&0u8)?;
-            } else {
+            if let Some(obj) = obj.as_deref() {
                 map.serialize_value(&Ser {
-                    obj: obj.as_ref().unwrap(),
+                    obj,
                     codec: ty.ty.f.serde_codec.expect("missing serde codec"),
                 })?;
+            } else {
+                // Dummy value. fastnbt does not support Unit values.
+                map.serialize_value(&0u8)?;
             }
         }
         map.end()
@@ -258,7 +258,6 @@ where
 
         for (&CompTyCell(ty), val) in self.changed.iter() {
             if let Some(val) = val {
-                buf.put_variable(1);
                 ty.encode(&mut buf)?;
                 (ty.f.packet_codec.encode)(&**val, &mut buf)?;
             }
@@ -275,8 +274,7 @@ where
 
 impl<'a, 'de, Cx, B> Decode<'de, B> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: ProvideIdTy<Id: for<'b> Decode<'de, &'b mut B>>
-        + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
+    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
     B: Buf,
 {
     fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
@@ -296,7 +294,7 @@ where
         }
 
         Ok(ComponentChanges {
-            ser_count: changed.keys().filter(|k| k.0.is_serializable()).count(),
+            ser_count: changed.keys().filter(|k| !k.0.is_transient()).count(),
             changed: Maybe::Owned(SimpleOwned(changed)),
         })
     }
@@ -332,7 +330,7 @@ where
             std::any::type_name::<T>()
         );
         self.changes.insert(CompTyCell(ty), Some(Box::new(value)));
-        if ty.is_serializable() {
+        if !ty.is_transient() {
             self.ser_count += 1;
         }
     }
@@ -436,7 +434,7 @@ where
                     E::custom(format!("unable to find the component type {}", id))
                 })?;
 
-                if !ty.is_serializable() {
+                if ty.is_transient() {
                     return Err(E::custom(format!(
                         "the component type {} is not serializable",
                         id
@@ -464,7 +462,14 @@ where
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&UnsafeDebugIter(UnsafeCell::new(self.changed.keys())), f)
+        Debug::fmt(
+            &UnsafeDebugIter(UnsafeCell::new(
+                self.changed
+                    .iter()
+                    .map(|(k, v)| (k.0, v.as_ref().map(|v| (k.0.f.util.dbg)(&**v)))),
+            )),
+            f,
+        )
     }
 }
 

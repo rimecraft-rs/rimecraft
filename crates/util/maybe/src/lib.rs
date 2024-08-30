@@ -63,6 +63,19 @@ where
     }
 }
 
+impl<T: ?Sized, Owned> Clone for Maybe<'_, T, Owned>
+where
+    Owned: Clone,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        match self {
+            Maybe::Borrowed(val) => Maybe::Borrowed(val),
+            Maybe::Owned(owned) => Maybe::Owned(owned.clone()),
+        }
+    }
+}
+
 /// A cell that simply owns a value.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 #[repr(transparent)]

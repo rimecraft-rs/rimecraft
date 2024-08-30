@@ -99,11 +99,12 @@ where
     pub fn to_slice(&self) -> Self {
         Self::of_single(
             self.list.clone(),
-            self.data
+            (*self
+                .data
                 .palette
                 .get(0)
-                .expect("Palette should not be empty")
-                .clone(),
+                .expect("Palette should not be empty"))
+            .clone(),
         )
     }
 }

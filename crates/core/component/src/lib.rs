@@ -18,6 +18,8 @@ pub mod map;
 
 mod dyn_any;
 
+pub mod test_global_integration;
+
 use dyn_any::Any;
 
 pub use ahash::{AHashMap, AHashSet};
@@ -57,7 +59,7 @@ impl<'a, T> ComponentType<'a, T> {
 
 impl<'a, T> ComponentType<'a, T>
 where
-    T: Clone + Eq + Hash + Send + Sync + 'a,
+    T: Clone + Eq + Hash + Debug + Send + Sync + 'a,
 {
     const UTIL: DynUtil<'a> = DynUtil {
         clone: |obj| {
@@ -70,6 +72,9 @@ where
         hash: |obj, mut state| {
             let obj = unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) };
             obj.hash(&mut state);
+        },
+        dbg: |obj| unsafe {
+            &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T as *const (dyn Debug + 'a))
         },
     };
 }
@@ -108,7 +113,7 @@ where
 pub const fn packet_codec_nbt<'a, T, Cx>() -> PacketCodec<'a, T>
 where
     T: Send + Sync + 'a,
-    Cx: ReadNbt<T> + for<'t> WriteNbt<&'t T>,
+    Cx: ReadNbt<T> + for<'t> WriteNbt<&'t T> + UpdateNbt<T>,
 {
     PacketCodec {
         codec: UnsafePacketCodec {
@@ -187,7 +192,7 @@ impl<'a, T, Cx> TypeBuilder<'a, T, Cx> {
 
 impl<'a, T, Cx> TypeBuilder<'a, T, Cx>
 where
-    T: Clone + Eq + Hash + Send + Sync + 'a,
+    T: Clone + Eq + Hash + Debug + Send + Sync + 'a,
 {
     /// Builds a new [`ComponentType`] with the given codecs.
     ///
@@ -213,13 +218,14 @@ impl<T> Hash for ComponentType<'_, T> {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         typeid::of::<T>().hash(state);
+        self.is_transient().hash(state);
     }
 }
 
 impl<T> PartialEq for ComponentType<'_, T> {
     #[inline]
-    fn eq(&self, _other: &Self) -> bool {
-        true
+    fn eq(&self, other: &Self) -> bool {
+        self.is_transient() == other.is_transient()
     }
 }
 
@@ -277,6 +283,7 @@ struct DynUtil<'a> {
     clone: fn(&Object<'a>) -> Box<Object<'a>>,
     eq: fn(&'_ Object<'a>, &'_ Object<'a>) -> bool,
     hash: fn(&'_ Object<'a>, &'_ mut dyn std::hash::Hasher),
+    dbg: for<'s> fn(&'s Object<'a>) -> &'s (dyn Debug + 'a),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -321,8 +328,15 @@ impl<'a, Cx> RawErasedComponentType<'a, Cx> {
 
     /// Returns whether the component is serializable.
     #[inline]
+    #[deprecated = "use `is_transient` instead"]
     pub fn is_serializable(&self) -> bool {
         self.f.serde_codec.is_some()
+    }
+
+    /// Returns whether the component is transient.
+    #[inline]
+    pub fn is_transient(&self) -> bool {
+        self.f.serde_codec.is_none()
     }
 }
 
@@ -341,13 +355,14 @@ impl<Cx> Hash for RawErasedComponentType<'_, Cx> {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.ty.hash(state);
+        self.is_transient().hash(state);
     }
 }
 
 impl<Cx> PartialEq for RawErasedComponentType<'_, Cx> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.ty == other.ty
+        self.ty == other.ty && self.is_transient() == other.is_transient()
     }
 }
 
@@ -364,6 +379,7 @@ where
 }
 
 impl<Cx> Copy for RawErasedComponentType<'_, Cx> {}
+
 impl<Cx> Clone for RawErasedComponentType<'_, Cx> {
     fn clone(&self) -> Self {
         *self
@@ -387,3 +403,6 @@ where
         }
     }
 }
+
+#[cfg(all(test, feature = "test"))]
+mod tests;
