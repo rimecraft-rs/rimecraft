@@ -15,13 +15,11 @@ maintenance = { status = "passively-maintained" }
 global-cx = { path = "../global-cx", package = "rimecraft-global-cx" }
 serde = { version = "1.0", default-features = false, optional = true }
 erased-serde = { version = "0.4", optional = true }
-serde-update = { path = "../../util/serde-update", package = "rimecraft-serde-update", optional = true }
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 
 [features]
-std = []
-serde = ["dep:serde", "dep:serde-update"]
-erased-serde = ["dep:erased-serde", "serde-update/erased"]
+serde = ["dep:serde"]
+erased-serde = ["dep:erased-serde"]
 edcode = ["dep:edcode2"]
 
 [lints]
