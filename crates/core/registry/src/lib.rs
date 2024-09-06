@@ -17,6 +17,7 @@ use key::Key;
 use parking_lot::RwLock;
 use tag::Tags;
 
+mod dyn_manager;
 pub mod entry;
 pub mod key;
 pub mod tag;
@@ -26,6 +27,8 @@ pub use entry::Entry as RegistryEntry;
 #[doc(alias = "ResourceKey")]
 pub use key::Key as RegistryKey;
 pub use tag::TagKey;
+
+pub use dyn_manager::*;
 
 /// Immutable registry of various in-game components.
 #[derive(Debug)]
