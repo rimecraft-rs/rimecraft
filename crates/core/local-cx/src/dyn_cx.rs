@@ -8,14 +8,10 @@ use ahash::AHashMap;
 
 use crate::{BaseLocalContext, LocalContext};
 
-trait Any {}
-
-impl<T: ?Sized> Any for T {}
-
 /// Function table for getting contexts.
 #[derive(Debug)]
 pub struct ContextTable<LocalCx> {
-    map: AHashMap<TypeId, fn(LocalCx, &mut (dyn FnMut(&'_ (dyn Any + '_)) + '_))>,
+    map: AHashMap<TypeId, fn(LocalCx, &mut (dyn FnMut(*const ()) + '_))>,
 }
 
 impl<Cx> ContextTable<Cx> {
@@ -35,7 +31,7 @@ impl<Cx> ContextTable<Cx> {
         let ty = typeid::of::<T>();
         self.map.insert(ty, |cx, f| {
             let val = <Cx as LocalContext<T>>::acquire(cx);
-            f(&val)
+            f(std::ptr::from_ref(&val).cast::<()>())
         });
     }
 }
@@ -111,7 +107,7 @@ where
 }
 
 trait ErasedDynCx {
-    fn erased_acquire(&self, ty: TypeId, f: &mut (dyn FnMut(&'_ (dyn Any + '_)) + '_));
+    fn erased_acquire(&self, ty: TypeId, f: &mut (dyn FnMut(*const ()) + '_));
 }
 
 impl<Cx> ErasedDynCx for DynamicContext<'_, Cx>
@@ -119,7 +115,7 @@ where
     Cx: BaseLocalContext,
 {
     #[inline]
-    fn erased_acquire(&self, ty: TypeId, f: &mut (dyn FnMut(&'_ (dyn Any + '_)) + '_)) {
+    fn erased_acquire(&self, ty: TypeId, f: &mut (dyn FnMut(*const ()) + '_)) {
         if let Some(g) = self.table.map.get(&ty) {
             g(self.cx, f)
         }
@@ -140,7 +136,7 @@ where
     fn acquire(self) -> T {
         let mut val = None;
         self.0.erased_acquire(typeid::of::<T>(), &mut |obj| {
-            val = Some(unsafe { *std::ptr::from_ref(obj).cast::<T>() })
+            val = Some(unsafe { *obj.cast::<T>() })
         });
         val.unwrap_or_else(|| {
             panic!(
