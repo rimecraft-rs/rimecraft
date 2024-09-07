@@ -1,5 +1,7 @@
 //! Dynamic context providers.
 
+#![cfg(feature = "dyn-cx")]
+
 use std::{any::TypeId, borrow::Cow, fmt::Debug};
 
 use ahash::AHashMap;
@@ -17,6 +19,14 @@ pub struct ContextTable<LocalCx> {
 }
 
 impl<Cx> ContextTable<Cx> {
+    /// Creates a new context table.
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            map: AHashMap::new(),
+        }
+    }
+
     /// Enables dynamic fetching of a type.
     pub fn enable<T>(&mut self)
     where
@@ -24,9 +34,16 @@ impl<Cx> ContextTable<Cx> {
     {
         let ty = typeid::of::<T>();
         self.map.insert(ty, |cx, f| {
-            let val = <Cx as LocalContext<T>>::acquire(&cx);
+            let val = <Cx as LocalContext<T>>::acquire(cx);
             f(&val)
         });
+    }
+}
+
+impl<Cx> Default for ContextTable<Cx> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -88,7 +105,7 @@ where
     Cx: LocalContext<T>,
 {
     #[inline]
-    fn acquire(&self) -> T {
+    fn acquire(self) -> T {
         self.cx.acquire()
     }
 }
@@ -111,15 +128,16 @@ where
 
 /// A dynamic context provider that is **unsafe to exist**.
 #[repr(transparent)]
+#[derive(Clone, Copy)]
 pub struct UnsafeDynamicContext<'a>(&'a (dyn ErasedDynCx + 'a));
 
-impl BaseLocalContext for &UnsafeDynamicContext<'_> {}
+impl BaseLocalContext for UnsafeDynamicContext<'_> {}
 
-impl<T> LocalContext<T> for &UnsafeDynamicContext<'_>
+impl<T> LocalContext<T> for UnsafeDynamicContext<'_>
 where
     T: Copy,
 {
-    fn acquire(&self) -> T {
+    fn acquire(self) -> T {
         let mut val = None;
         self.0.erased_acquire(typeid::of::<T>(), &mut |obj| {
             val = Some(unsafe { *std::ptr::from_ref(obj).cast::<T>() })

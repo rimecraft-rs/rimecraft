@@ -8,12 +8,12 @@ pub mod dyn_cx;
 pub mod serde;
 
 /// A base local context.
-pub trait BaseLocalContext: Copy {}
+pub trait BaseLocalContext: Sized + Copy {}
 
 /// A local context provides data to the global context.
 pub trait LocalContext<T>: BaseLocalContext {
     /// Acquire the data from the local context.
-    fn acquire(&self) -> T;
+    fn acquire(self) -> T;
 }
 
 /// Global context types that provides implicit local context type.
@@ -57,3 +57,5 @@ pub trait LocalContextExt {
 }
 
 impl<Cx> LocalContextExt for Cx where Cx: BaseLocalContext {}
+
+mod tests;
