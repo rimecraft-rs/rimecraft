@@ -7,6 +7,9 @@ pub use codecs::Variable;
 
 pub mod codecs;
 
+#[doc(hidden)]
+pub use bytes::buf::UninitSlice;
+
 #[cfg(feature = "derive")]
 pub use rimecraft_edcode2_derive::{Decode, Encode};
 

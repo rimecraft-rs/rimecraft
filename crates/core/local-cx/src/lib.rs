@@ -5,6 +5,8 @@ use std::fmt::Debug;
 use global_cx::GlobalContext;
 
 pub mod dyn_cx;
+
+mod edcode;
 pub mod serde;
 
 /// A base local context.
