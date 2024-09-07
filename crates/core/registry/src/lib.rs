@@ -526,6 +526,7 @@ where
 }
 
 /// Trait for providing a registry.
+#[deprecated = "use local-cx to obtain registry instead"]
 pub trait ProvideRegistry<'r, K, T> {
     /// Gets the registry.
     fn registry() -> &'r Registry<K, T>;
