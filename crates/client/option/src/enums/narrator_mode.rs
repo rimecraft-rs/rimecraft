@@ -13,6 +13,7 @@ use super::ByUSizeId;
 ///
 /// This type represents `net.minecraft.client.option.NarratorMode` (yarn).
 #[derive(Debug, Sequence)]
+#[non_exhaustive]
 pub enum NarratorMode {
     /// Narrator off.
     Off,

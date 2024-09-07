@@ -12,6 +12,7 @@ use super::ByUSizeId;
 ///
 /// This type represents `net.minecraft.client.option.CloudRenderMode` (yarn).
 #[derive(Debug, Sequence)]
+#[non_exhaustive]
 pub enum CloudRenderMode {
     /// Doesn't render clouds.
     Off,

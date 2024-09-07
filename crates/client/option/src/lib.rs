@@ -1,6 +1,6 @@
 //! Minecraft game options
 
-pub(crate) mod callbacks;
+//pub(crate) mod callbacks;
 pub mod enums;
 pub mod tooltip_factory;
 

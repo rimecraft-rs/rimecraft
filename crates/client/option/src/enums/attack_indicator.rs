@@ -13,6 +13,7 @@ use super::ByUSizeId;
 ///
 /// This type represents `net.minecraft.client.option.AttackIndicator` (yarn).
 #[derive(Debug, Sequence)]
+#[non_exhaustive]
 pub enum AttackIndicator {
     /// Attack indicator off.
     Off,

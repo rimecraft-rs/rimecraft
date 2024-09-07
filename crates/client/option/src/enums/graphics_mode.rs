@@ -13,6 +13,7 @@ use super::ByUSizeId;
 ///
 /// This type represents `net.minecraft.client.option.GraphicsMode` (yarn).
 #[derive(Debug, Sequence)]
+#[non_exhaustive]
 pub enum GraphicsMode {
     /// The fastest rendering speed with the worst picture.
     Fast,

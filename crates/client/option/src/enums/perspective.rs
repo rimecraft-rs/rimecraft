@@ -12,6 +12,7 @@ use super::ByUSizeId;
 ///
 /// This type represents `net.minecraft.client.option.Perspective` (yarn).
 #[derive(Debug, Sequence, PartialEq)]
+#[non_exhaustive]
 pub enum Perspective {
     /// 1st person perspective.
     FirstPerson,
