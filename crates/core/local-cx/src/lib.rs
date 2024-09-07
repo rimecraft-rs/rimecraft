@@ -4,6 +4,7 @@ use std::fmt::Debug;
 
 use global_cx::GlobalContext;
 
+pub mod dyn_cx;
 pub mod serde;
 
 /// A base local context.
@@ -37,18 +38,6 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", &self.inner)
-    }
-}
-
-impl<Cx> BaseLocalContext for &Cx where Cx: BaseLocalContext {}
-
-impl<T, Cx> LocalContext<T> for &Cx
-where
-    Cx: LocalContext<T>,
-{
-    #[inline(always)]
-    fn acquire(&self) -> T {
-        Cx::acquire(*self)
     }
 }
 
