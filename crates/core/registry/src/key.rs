@@ -36,6 +36,22 @@ impl<K, T> Key<K, T> {
     pub fn registry(&self) -> &K {
         &self.registry
     }
+
+    #[doc(hidden)]
+    #[inline]
+    pub fn cast<V>(self) -> Key<K, V> {
+        Key {
+            registry: self.registry,
+            value: self.value,
+            _marker: PhantomData,
+        }
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    pub fn cast_ref<V>(&self) -> &Key<K, V> {
+        unsafe { &*std::ptr::from_ref(self).cast::<Key<K, V>>() }
+    }
 }
 
 impl<K, T> Key<K, T>
