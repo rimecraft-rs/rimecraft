@@ -5,6 +5,9 @@ use std::hash::Hash;
 pub mod container;
 mod iter;
 
+#[cfg(test)]
+mod tests;
+
 use ahash::AHashMap;
 pub use iter::Iter;
 use iter::IterImpl;
@@ -289,7 +292,6 @@ where
 
 #[cfg(feature = "edcode")]
 mod _edcode {
-
     use std::io::{self, ErrorKind};
 
     use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
@@ -352,7 +354,7 @@ mod _edcode {
 
         #[inline]
         fn decode(_buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
-            Err("palettes does not support non-in-place decoding".into())
+            Err("palettes do not support non-in-place decoding".into())
         }
 
         const SUPPORT_NON_IN_PLACE: bool = false;
