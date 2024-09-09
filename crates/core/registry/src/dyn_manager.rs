@@ -87,7 +87,8 @@ where
     ///
     /// # Safety
     ///
-    /// The type `T` is not
+    /// This function could not guarantee lifetime of type `T` is sound.
+    /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get<T>(&self, key: &Key<K, Registry<K, T>>) -> Option<&Registry<K, T>> {
         self.map
             .get(key.cast_ref::<()>())
