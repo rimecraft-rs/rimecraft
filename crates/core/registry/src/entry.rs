@@ -174,7 +174,7 @@ mod edcode {
         B: BufMut,
     {
         fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
-            let id = Reg::raw_id(T::registry().get(self.key()).ok_or_else(|| {
+            let id = Reg::to_raw_id(T::registry().get(self.key()).ok_or_else(|| {
                 edcode2::BoxedError::<'static>::from(format!(
                     "unknown registry id {}",
                     self.key().value()

@@ -38,7 +38,7 @@ pub trait DeserializeWithCx<'de, LocalCx>: Sized {
 
 impl<Cx, T> SerializeWithCx<Cx> for T
 where
-    T: serde::Serialize,
+    T: serde::Serialize + ?Sized,
 {
     #[inline]
     fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, &Cx>) -> Result<S::Ok, S::Error>

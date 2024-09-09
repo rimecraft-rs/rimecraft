@@ -43,7 +43,7 @@ where
             Ok(ItemStack::with_component(
                 item,
                 count,
-                ComponentMap::with_changes(Reg::into_inner(item).settings().components(), changes),
+                ComponentMap::with_changes(Reg::to_value(item).settings().components(), changes),
             ))
         }
     }

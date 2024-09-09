@@ -382,7 +382,7 @@ where
         S: serde::Serializer,
     {
         serializer.serialize_str(self.cached_ser.get_or_init(|| {
-            let id = Reg::id(self.ty);
+            let id = Reg::to_id(self.ty);
             if self.rm {
                 format!("{}{}", REMOVED_PREFIX, id)
             } else {

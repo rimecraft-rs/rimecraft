@@ -36,7 +36,7 @@ where
         Self::with_component(
             item,
             count,
-            ComponentMap::new(Reg::into_inner(item).settings().components()),
+            ComponentMap::new(Reg::to_value(item).settings().components()),
         )
     }
 
@@ -313,7 +313,7 @@ mod _serde {
                         item,
                         count,
                         components: ComponentMap::with_changes(
-                            Reg::into_inner(item).settings().components(),
+                            Reg::to_value(item).settings().components(),
                             components
                                 .ok_or_else(|| serde::de::Error::missing_field("components"))?,
                         ),

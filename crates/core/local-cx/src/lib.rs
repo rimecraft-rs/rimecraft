@@ -18,11 +18,16 @@ pub trait LocalContext<T>: BaseLocalContext {
     fn acquire(self) -> T;
 }
 
-/// Global context types that provides implicit local context type.
-pub trait ProvideLocalCxTy: GlobalContext {
+/// A general type that provides explicit local context type.
+pub trait ProvideLocalCxTy {
     /// The local context type.
     type Context<'cx>: BaseLocalContext;
 }
+
+/// Global context types that provides explicit local context type.
+///
+/// See [`ProvideLocalCxTy`].
+pub trait GlobalProvideLocalCxTy: ProvideLocalCxTy + GlobalContext {}
 
 /// A type that carries a local context.
 ///

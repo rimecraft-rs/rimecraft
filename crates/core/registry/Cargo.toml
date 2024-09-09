@@ -17,6 +17,7 @@ serde = { version = "1.0", optional = true }
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 ahash = "0.8.11"
 typeid = "1.0"
+local-cx = { path = "../local-cx", package = "rimecraft-local-cx" }
 
 [features]
 serde = ["dep:serde"]

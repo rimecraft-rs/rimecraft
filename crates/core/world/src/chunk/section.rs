@@ -241,7 +241,7 @@ where
                 Cx::state_ids(),
                 BlockState {
                     block: default_block,
-                    state: Block::into_inner(default_block).states().default_state(),
+                    state: Block::to_value(default_block).states().default_state(),
                 },
             ),
             bic: PalettedContainer::of_single(
