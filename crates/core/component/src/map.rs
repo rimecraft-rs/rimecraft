@@ -6,10 +6,14 @@ use std::{
 };
 
 use ahash::AHashMap;
-use local_cx::serde::DeserializeWithCx;
+use local_cx::{
+    dyn_cx::{AsDynamicContext, UnsafeDynamicContext},
+    serde::{DeserializeWithCx, SerializeWithCx},
+    LocalContext, LocalContextExt as _, WithLocalCx,
+};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
-use rimecraft_registry::ProvideRegistry;
+use rimecraft_registry::Registry;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -772,32 +776,39 @@ where
     }
 }
 
-impl<Cx> Serialize for ComponentMap<'_, Cx>
+impl<Cx, L> SerializeWithCx<L> for ComponentMap<'_, Cx>
 where
     Cx: ProvideIdTy,
     Cx::Id: Serialize,
+    L: AsDynamicContext,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         use serde::ser::SerializeMap;
-        let mut map = serializer.serialize_map(None)?;
+        let cx = serializer.local_cx;
+        let mut map = serializer.inner.serialize_map(None)?;
+
+        let dyn_cx = cx.as_dynamic_context();
+        let unsafe_cx = unsafe { dyn_cx.as_unsafe_cx() };
+
         for (ty, val) in self.iter() {
             if let Some(codec) = ty.f.serde_codec {
-                map.serialize_entry(&ty, (codec.ser)(val))?;
+                map.serialize_entry(&ty, (codec.ser)(&unsafe_cx.with(val)))?;
             }
         }
         map.end()
     }
 }
 
-impl<'a, 'de, Cx> Deserialize<'de> for ComponentMap<'a, Cx>
+impl<'a, 'de, Cx, LocalCx> DeserializeWithCx<'de, LocalCx> for ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
+    Cx: ProvideIdTy,
     Cx::Id: Deserialize<'de> + Hash + Eq,
+    LocalCx: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>> + AsDynamicContext,
 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, LocalCx>) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -807,6 +818,8 @@ where
         where
             Cx: ProvideIdTy,
             Cx::Id: DeserializeWithCx<'de, L> + Hash + Eq,
+            L: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
+                + AsDynamicContext,
         {
             type Value = ComponentMap<'a, Cx>;
 
@@ -820,13 +833,13 @@ where
                 } else {
                     AHashMap::new()
                 };
-                struct DeSeed<'a, Cx>(&'a UnsafeSerdeCodec<'a>, PhantomData<Cx>);
+                struct DeSeed<'a, 'cx, Cx>(
+                    &'a UnsafeSerdeCodec<'a>,
+                    PhantomData<Cx>,
+                    UnsafeDynamicContext<'cx>,
+                );
 
-                impl<'a, 'de, Cx> serde::de::DeserializeSeed<'de> for DeSeed<'a, Cx>
-                where
-                    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
-                    Cx::Id: Deserialize<'de> + Hash + Eq,
-                {
+                impl<'a, 'de, Cx> serde::de::DeserializeSeed<'de> for DeSeed<'a, '_, Cx> {
                     type Value = Box<Object<'a>>;
 
                     #[inline]
@@ -834,13 +847,21 @@ where
                     where
                         D: serde::Deserializer<'de>,
                     {
-                        (self.0.de)(&mut <dyn erased_serde::Deserializer<'de>>::erase(
-                            deserializer,
-                        ))
+                        (self.0.de)(
+                            &mut <dyn erased_serde::Deserializer<'de>>::erase(deserializer),
+                            self.2,
+                        )
                         .map_err(serde::de::Error::custom)
                     }
                 }
-                while let Some(k) = map.next_key::<ErasedComponentType<'a, Cx>>()? {
+
+                let dyn_cx = self.1.as_dynamic_context();
+                let unsafe_cx = unsafe { dyn_cx.as_unsafe_cx() };
+
+                while let Some(k) = map.next_key_seed(WithLocalCx {
+                    inner: PhantomData::<ErasedComponentType<'a, Cx>>,
+                    local_cx: self.1,
+                })? {
                     let codec = k.f.serde_codec.as_ref().ok_or_else(|| {
                         serde::de::Error::invalid_type(
                             serde::de::Unexpected::Other("transient component type"),
@@ -849,7 +870,7 @@ where
                     })?;
                     m.insert(
                         CompTyCell(k),
-                        map.next_value_seed(DeSeed(codec, PhantomData::<Cx>))?,
+                        map.next_value_seed(DeSeed(codec, PhantomData::<Cx>, unsafe_cx))?,
                     );
                 }
                 m.shrink_to_fit();
@@ -861,6 +882,7 @@ where
             }
         }
 
-        deserializer.deserialize_map(Visitor(PhantomData))
+        let cx = deserializer.local_cx;
+        deserializer.inner.deserialize_map(Visitor(PhantomData, cx))
     }
 }

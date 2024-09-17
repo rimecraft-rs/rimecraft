@@ -115,33 +115,35 @@ mod erased {
 
     use crate::{BaseLocalContext, WithLocalCx};
 
+    use super::SerializeWithCx;
+
     /// Serialize the value with a local context, with serializer type-erased.
     pub trait ErasedSerializeWithCx<LocalCx> {
         /// Serialize the value with the given serializer and the local context.
         fn erased_serialize_with_cx(
             &self,
-            serializer: WithLocalCx<&mut dyn erased_serde::Serializer, &LocalCx>,
+            serializer: WithLocalCx<&mut dyn erased_serde::Serializer, LocalCx>,
         ) -> Result<(), erased_serde::Error>;
+    }
+
+    thread_local! {
+        static CONTEXT: Cell<*const ()> = const{ Cell::new(std::ptr::null()) };
     }
 
     impl<T, Cx> ErasedSerializeWithCx<Cx> for T
     where
-        T: super::SerializeWithCx<Cx> + ?Sized,
+        T: SerializeWithCx<Cx> + ?Sized,
         Cx: BaseLocalContext,
     {
         fn erased_serialize_with_cx(
             &self,
-            serializer: WithLocalCx<&mut dyn erased_serde::Serializer, &Cx>,
+            serializer: WithLocalCx<&mut dyn erased_serde::Serializer, Cx>,
         ) -> Result<(), erased_serde::Error> {
-            thread_local! {
-                static CONTEXT: Cell<*const ()> = const{ Cell::new(std::ptr::null()) };
-            }
-
             struct SerHelper<'a, T: ?Sized, Cx>(&'a T, PhantomData<Cx>);
 
             impl<T, Cx> serde::Serialize for SerHelper<'_, T, Cx>
             where
-                T: super::SerializeWithCx<Cx> + ?Sized,
+                T: SerializeWithCx<Cx> + ?Sized,
                 Cx: BaseLocalContext,
             {
                 #[inline]
@@ -158,7 +160,8 @@ mod erased {
                 }
             }
 
-            let ptr = std::ptr::from_ref(serializer.local_cx);
+            let cx = &serializer.local_cx;
+            let ptr = std::ptr::from_ref(cx);
             CONTEXT.set(ptr.cast());
             erased_serde::Serialize::erased_serialize(
                 &SerHelper(self, PhantomData::<Cx>),

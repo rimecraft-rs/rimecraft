@@ -325,9 +325,7 @@ impl<'a, K, T> Iterator for Entries<'a, K, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match &mut self.inner {
-            EntriesInner::Direct { iter } => iter
-                .next()
-                .and_then(|(raw, entry)| Some(Reg { raw, entry })),
+            EntriesInner::Direct { iter } => iter.next().map(|(raw, entry)| Reg { raw, entry }),
             EntriesInner::Raw { registry, iter } => {
                 iter.next().and_then(|raw| registry.of_raw(*raw))
             }
