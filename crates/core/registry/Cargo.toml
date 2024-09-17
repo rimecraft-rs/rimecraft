@@ -20,8 +20,8 @@ typeid = "1.0"
 local-cx = { path = "../local-cx", package = "rimecraft-local-cx" }
 
 [features]
-serde = ["dep:serde"]
-edcode = ["dep:edcode2"]
+serde = ["dep:serde", "local-cx/serde"]
+edcode = ["dep:edcode2", "local-cx/edcode"]
 
 [lints]
 workspace = true

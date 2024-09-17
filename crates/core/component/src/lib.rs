@@ -8,7 +8,7 @@ use rimecraft_global_cx::{
     nbt::{ReadNbt, UpdateNbt, WriteNbt},
     ProvideIdTy,
 };
-use rimecraft_registry::{ProvideRegistry, Reg};
+use rimecraft_registry::Reg;
 use serde::{de::DeserializeOwned, Serialize};
 
 type Object<'a> = dyn Any + Send + Sync + 'a;
@@ -367,16 +367,6 @@ impl<Cx> PartialEq for RawErasedComponentType<'_, Cx> {
 }
 
 impl<Cx> Eq for RawErasedComponentType<'_, Cx> {}
-
-impl<'r, K, Cx> ProvideRegistry<'r, K, Self> for RawErasedComponentType<'_, Cx>
-where
-    Cx: ProvideRegistry<'r, K, Self>,
-{
-    #[inline]
-    fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
-        Cx::registry()
-    }
-}
 
 impl<Cx> Copy for RawErasedComponentType<'_, Cx> {}
 

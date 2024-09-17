@@ -126,7 +126,6 @@ impl<K, T> Registry<K, T> {
     pub fn entries(&self) -> Entries<'_, K, T> {
         Entries {
             inner: EntriesInner::Direct {
-                registry: self,
                 iter: self.entries.iter().enumerate(),
             },
         }
@@ -313,7 +312,6 @@ pub struct Entries<'a, K, T> {
 #[derive(Debug)]
 enum EntriesInner<'a, K, T> {
     Direct {
-        registry: &'a Registry<K, T>,
         iter: std::iter::Enumerate<std::slice::Iter<'a, RefEntry<K, T>>>,
     },
     Raw {
@@ -327,7 +325,7 @@ impl<'a, K, T> Iterator for Entries<'a, K, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match &mut self.inner {
-            EntriesInner::Direct { registry: _, iter } => iter
+            EntriesInner::Direct { iter } => iter
                 .next()
                 .and_then(|(raw, entry)| Some(Reg { raw, entry })),
             EntriesInner::Raw { registry, iter } => {
@@ -568,7 +566,7 @@ mod serde {
         Cx: LocalContext<&'a Registry<K, T>>,
     {
         fn deserialize_with_cx<D>(
-            deserializer: local_cx::WithLocalCx<D, &Cx>,
+            deserializer: local_cx::WithLocalCx<D, Cx>,
         ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,

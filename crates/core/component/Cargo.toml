@@ -20,6 +20,7 @@ edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2" }
 rimecraft-registry = { path = "../registry", features = ["serde", "edcode"] }
 rimecraft-global-cx = { path = "../global-cx", features = ["nbt", "std"] }
 rimecraft-maybe = { path = "../../util/maybe" }
+local-cx = { path = "../local-cx", features = ["serde", "edcode"], package = "rimecraft-local-cx" }
 typeid = "1.0"
 test-global = { path = "../../test/global", features = [
     "registry",

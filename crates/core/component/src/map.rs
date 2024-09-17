@@ -6,6 +6,7 @@ use std::{
 };
 
 use ahash::AHashMap;
+use local_cx::serde::DeserializeWithCx;
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
 use rimecraft_registry::ProvideRegistry;
@@ -800,12 +801,12 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        struct Visitor<'a, Cx>(PhantomData<&'a Cx>);
+        struct Visitor<'a, Cx, LCx>(PhantomData<&'a Cx>, LCx);
 
-        impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
+        impl<'a, 'de, Cx, L> serde::de::Visitor<'de> for Visitor<'a, Cx, L>
         where
-            Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
-            Cx::Id: Deserialize<'de> + Hash + Eq,
+            Cx: ProvideIdTy,
+            Cx::Id: DeserializeWithCx<'de, L> + Hash + Eq,
         {
             type Value = ComponentMap<'a, Cx>;
 

@@ -5,12 +5,12 @@
 
 use std::marker::PhantomData;
 
-use crate::WithLocalCx;
+use crate::{BaseLocalContext, WithLocalCx};
 
 /// Serialize the value with a local context.
 pub trait SerializeWithCx<LocalCx> {
     /// Serialize the value with the given serializer and the local context.
-    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, &LocalCx>) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, LocalCx>) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer;
 }
@@ -18,7 +18,7 @@ pub trait SerializeWithCx<LocalCx> {
 /// Deserialize the value with a local context.
 pub trait DeserializeWithCx<'de, LocalCx>: Sized {
     /// Deserialize the value with the given deserializer and the local context.
-    fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, &LocalCx>) -> Result<Self, D::Error>
+    fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, LocalCx>) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>;
 
@@ -26,7 +26,7 @@ pub trait DeserializeWithCx<'de, LocalCx>: Sized {
     #[inline]
     fn deserialize_in_place_with_cx<D>(
         this: &mut Self,
-        deserializer: WithLocalCx<D, &LocalCx>,
+        deserializer: WithLocalCx<D, LocalCx>,
     ) -> Result<(), D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -41,7 +41,7 @@ where
     T: serde::Serialize + ?Sized,
 {
     #[inline]
-    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, &Cx>) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, Cx>) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -54,7 +54,7 @@ where
     T: serde::Deserialize<'de>,
 {
     #[inline]
-    fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, &Cx>) -> Result<Self, D::Error>
+    fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, Cx>) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -64,7 +64,7 @@ where
     #[inline]
     fn deserialize_in_place_with_cx<D>(
         this: &mut Self,
-        deserializer: WithLocalCx<D, &Cx>,
+        deserializer: WithLocalCx<D, Cx>,
     ) -> Result<(), D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -76,6 +76,7 @@ where
 impl<T, Cx> serde::Serialize for WithLocalCx<T, Cx>
 where
     T: SerializeWithCx<Cx>,
+    Cx: BaseLocalContext,
 {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -84,7 +85,7 @@ where
     {
         self.inner.serialize_with_cx(WithLocalCx {
             inner: serializer,
-            local_cx: &self.local_cx,
+            local_cx: self.local_cx,
         })
     }
 }
@@ -92,6 +93,7 @@ where
 impl<'de, T, Cx> serde::de::DeserializeSeed<'de> for WithLocalCx<PhantomData<T>, Cx>
 where
     T: DeserializeWithCx<'de, Cx>,
+    Cx: BaseLocalContext,
 {
     type Value = T;
 
@@ -102,7 +104,7 @@ where
     {
         T::deserialize_with_cx(WithLocalCx {
             inner: deserializer,
-            local_cx: &self.local_cx,
+            local_cx: self.local_cx,
         })
     }
 }
@@ -111,7 +113,7 @@ where
 mod erased {
     use std::{cell::Cell, marker::PhantomData};
 
-    use crate::WithLocalCx;
+    use crate::{BaseLocalContext, WithLocalCx};
 
     /// Serialize the value with a local context, with serializer type-erased.
     pub trait ErasedSerializeWithCx<LocalCx> {
@@ -125,6 +127,7 @@ mod erased {
     impl<T, Cx> ErasedSerializeWithCx<Cx> for T
     where
         T: super::SerializeWithCx<Cx> + ?Sized,
+        Cx: BaseLocalContext,
     {
         fn erased_serialize_with_cx(
             &self,
@@ -139,6 +142,7 @@ mod erased {
             impl<T, Cx> serde::Serialize for SerHelper<'_, T, Cx>
             where
                 T: super::SerializeWithCx<Cx> + ?Sized,
+                Cx: BaseLocalContext,
             {
                 #[inline]
                 fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -146,7 +150,7 @@ mod erased {
                     S: serde::Serializer,
                 {
                     let ptr: *const Cx = CONTEXT.get().cast();
-                    let context = unsafe { &*ptr };
+                    let context = unsafe { *ptr };
                     self.0.serialize_with_cx(WithLocalCx {
                         inner: serializer,
                         local_cx: context,
