@@ -49,17 +49,18 @@ fn singular() {
     assert!(matches!(palette.get(0), Some(Maybe::Borrowed(&36))));
     let mut iter = palette.iter();
     assert!(matches!(iter.next(), Some(36)));
-    assert!(matches!(iter.next(), None));
+    assert!(iter.next().is_none());
     assert_eq!(palette.len(), 1);
     assert_eq!(palette.config(), (Strategy::Singular, 0));
 }
 
 macro_rules! helper {
-    ($pascal:ident, $snake:ident, $list_ty:ident) => {
+    ($pascal:ident, $snake:ident) => {
         #[test]
         fn $snake() {
             let mut palette = Palette::new(Strategy::$pascal, 2, List, vec![36u8, 39u8]);
 
+            // For easier diagnosis.
             assert_eq!(palette.len(), 2, "initial length failed");
             assert_eq!(
                 palette.index_or_insert(140),
@@ -91,8 +92,8 @@ macro_rules! helper {
     };
 }
 
-helper!(Array, array, BlankListImpl);
-helper!(BiMap, bi_map, BlankListImpl);
+helper!(Array, array);
+helper!(BiMap, bi_map);
 
 #[test]
 fn direct() {
