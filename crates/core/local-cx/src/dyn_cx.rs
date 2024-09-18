@@ -11,7 +11,7 @@ use crate::{BaseLocalContext, LocalContext};
 type Caller<Cx> = fn(Cx, &mut (dyn FnMut(*const ()) + '_));
 
 /// Local context that can be converted to a dynamic context.
-pub trait AsDynamicContext {
+pub trait AsDynamicContext: BaseLocalContext {
     /// The inner local context type.
     type InnerContext: BaseLocalContext;
 

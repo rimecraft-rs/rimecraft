@@ -7,6 +7,8 @@ use std::marker::PhantomData;
 
 use crate::{BaseLocalContext, WithLocalCx};
 
+pub mod codecs;
+
 /// Serialize the value with a local context.
 pub trait SerializeWithCx<LocalCx> {
     /// Serialize the value with the given serializer and the local context.

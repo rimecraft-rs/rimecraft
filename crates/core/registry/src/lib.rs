@@ -433,7 +433,17 @@ where
     ///
     /// Returns back the given key and value if registration with the key already exists.
     #[allow(clippy::missing_panics_doc)]
+    #[inline]
     pub fn register(&mut self, key: Key<K, T>, value: T) -> Result<usize, (Key<K, T>, T)> {
+        self.register_raw(key, value, false)
+    }
+
+    fn register_raw(
+        &mut self,
+        key: Key<K, T>,
+        value: T,
+        is_default: bool,
+    ) -> Result<usize, (Key<K, T>, T)> {
         if self.keys.get_mut().is_none() {
             self.keys = HashSet::new().into();
         }
@@ -450,6 +460,7 @@ where
                 key,
                 value: None,
                 tags: RwLock::new(HashSet::new()),
+                is_default,
             },
         ));
         Ok(raw)
@@ -463,7 +474,7 @@ where
         if self.default.is_some() {
             return Err((key, value));
         }
-        let id = self.register(key, value)?;
+        let id = self.register_raw(key, value, true)?;
         self.default = Some(id);
         Ok(id)
     }

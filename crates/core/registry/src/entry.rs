@@ -66,6 +66,7 @@ pub struct RefEntry<K, T> {
     pub(crate) key: Key<K, T>,
     pub(crate) value: Option<T>,
     pub(crate) tags: RwLock<HashSet<TagKey<K, T>>>,
+    pub(crate) is_default: bool,
 }
 
 impl<K, T> RefEntry<K, T> {
@@ -93,6 +94,12 @@ impl<K, T> RefEntry<K, T> {
         TagsGuard {
             inner: self.tags.read(),
         }
+    }
+
+    /// Whether this entry is the default entry.
+    #[inline]
+    pub fn is_default(&self) -> bool {
+        self.is_default
     }
 }
 
