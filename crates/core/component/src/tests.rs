@@ -139,6 +139,7 @@ impl AsDynamicContext for &LocalCx {
 
 fn init_context() -> &'static LocalCx {
     let component_ty_registry = init_registry();
+    todo!("do not use leak function here");
     Box::leak(Box::new(LocalCx {
         component_ty_registry,
     }))
