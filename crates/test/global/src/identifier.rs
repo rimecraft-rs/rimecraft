@@ -1,9 +1,13 @@
+//! Identifier wrappers.
+
 use std::{
     fmt::{Debug, Display},
     str::FromStr,
 };
 
 use serde::Serialize;
+
+pub use identifier as raw;
 
 /// An identifier.
 #[derive(PartialEq, Eq, Clone, Hash)]

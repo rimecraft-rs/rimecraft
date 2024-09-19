@@ -26,16 +26,15 @@ local-cx = { path = "../local-cx", features = [
     "dyn-cx",
 ], package = "rimecraft-local-cx" }
 typeid = "1.0"
-test-global = { path = "../../test/global", features = [
-    "registry",
-], optional = true, package = "rimecraft-test-global" }
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }
 fastnbt = "2.5"
+test-global = { path = "../../test/global", features = [
+    "registry",
+], package = "rimecraft-test-global" }
 
 [features]
-test = ["dep:test-global"]
 
 [lints]
 workspace = true

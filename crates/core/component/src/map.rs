@@ -802,6 +802,21 @@ where
     }
 }
 
+impl<Cx, L> SerializeWithCx<L> for &ComponentMap<'_, Cx>
+where
+    Cx: ProvideIdTy,
+    Cx::Id: Serialize,
+    L: AsDynamicContext,
+{
+    #[inline]
+    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        (**self).serialize_with_cx(serializer)
+    }
+}
+
 impl<'a, 'de, Cx, LocalCx> DeserializeWithCx<'de, LocalCx> for ComponentMap<'a, Cx>
 where
     Cx: ProvideIdTy,

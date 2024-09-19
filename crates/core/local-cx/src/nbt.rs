@@ -2,10 +2,7 @@
 
 use std::io;
 
-use global_cx::{
-    nbt::{ReadNbt, UpdateNbt, WriteNbt},
-    GlobalContext,
-};
+use global_cx::GlobalContext;
 
 use crate::WithLocalCx;
 

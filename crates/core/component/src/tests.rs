@@ -1,9 +1,13 @@
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, OnceLock};
 
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
+use local_cx::{
+    dyn_cx::{AsDynamicContext, ContextTable, DynamicContext},
+    BaseLocalContext, LocalContext,
+};
 use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::RegistryKey;
+use rimecraft_registry::{Registry, RegistryKey, RegistryMut};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -67,6 +71,8 @@ fn type_transient_check() {
     assert!(!ty.is_transient());
 }
 
+const REGISTRY_ID: Id = unsafe { test_global::integration::registry::id("data_component_types") };
+
 const TYPE_TRANSIENT_EDCODE: ComponentType<'static, Foo> =
     ComponentType::<'static, Foo>::builder::<Context>()
         .packet_codec(&PACKET_CODEC_EDCODE)
@@ -85,21 +91,47 @@ const TYPE_PERSISTENT_KEY: RegistryKey<Id, RawErasedComponentType<'static, Conte
 const fn registry_key(
     name: &'static str,
 ) -> RegistryKey<Id, RawErasedComponentType<'static, Context>> {
-    RegistryKey::new(crate::test_global_integration::REGISTRY_ID, unsafe {
-        Id::const_new("test", name)
-    })
+    RegistryKey::new(REGISTRY_ID, unsafe { Id::const_new("test", name) })
 }
 
-fn init_registry() {
-    crate::test_global_integration::peek_registry_mut(|registry| {
-        registry
-            .register(TYPE_TRANSIENT_EDCODE_KEY, (&TYPE_TRANSIENT_EDCODE).into())
-            .expect("register failed");
-        registry
-            .register(TYPE_PERSISTENT_KEY, (&TYPE_PERSISTENT).into())
-            .expect("register failed");
-    });
-    crate::test_global_integration::init_registry();
+fn init_registry() -> Registry<Id, RawErasedComponentType<'static, Context>> {
+    let mut registry = RegistryMut::new(RegistryKey::with_root(REGISTRY_ID));
+    registry
+        .register(TYPE_TRANSIENT_EDCODE_KEY, (&TYPE_TRANSIENT_EDCODE).into())
+        .expect("register failed");
+    registry
+        .register(TYPE_PERSISTENT_KEY, (&TYPE_PERSISTENT).into())
+        .expect("register failed");
+
+    registry.into()
+}
+
+struct LocalCx {
+    component_registry: Registry<Id, RawErasedComponentType<'static, Context>>,
+}
+
+impl BaseLocalContext for &LocalCx {}
+
+impl<'a> LocalContext<&'a Registry<Id, RawErasedComponentType<'static, Context>>> for &'a LocalCx {
+    fn acquire(self) -> &'a Registry<Id, RawErasedComponentType<'static, Context>> {
+        &self.component_registry
+    }
+}
+
+impl AsDynamicContext for &LocalCx {
+    type InnerContext = Self;
+
+    fn as_dynamic_context(&self) -> DynamicContext<'_, Self::InnerContext> {
+        static TABLE: LazyLock<ContextTable<&'static LocalCx>> = LazyLock::new(|| {
+            let mut table = ContextTable::new();
+            table.enable::<&Registry<Id, RawErasedComponentType<'static, Context>>>();
+            table
+        });
+
+        DynamicContext::from_borrowed_table(*self, unsafe {
+            &*(std::ptr::from_ref(&*TABLE) as *const ContextTable<&'_ LocalCx>)
+        })
+    }
 }
 
 #[test]

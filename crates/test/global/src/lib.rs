@@ -17,17 +17,8 @@ use local_cx::{
 };
 use parking_lot::Mutex;
 
-mod identifier;
+pub mod identifier;
 pub mod pool;
-
-#[doc(hidden)]
-pub use ::freezer as __priv_freezer;
-#[doc(hidden)]
-pub use ::identifier as __priv_identifier;
-
-#[cfg(feature = "registry")]
-#[doc(hidden)]
-pub use ::registry as __priv_registry;
 
 /// Integration with several Rimecraft crates.
 pub mod integration {

@@ -20,8 +20,6 @@ pub mod map;
 
 mod dyn_any;
 
-pub mod test_global_integration;
-
 use dyn_any::Any;
 
 pub use ahash::{AHashMap, AHashSet};
@@ -394,5 +392,5 @@ where
     }
 }
 
-#[cfg(all(test, feature = "test"))]
+#[cfg(test)]
 mod tests;
