@@ -18,7 +18,7 @@ pub const ROOT_ID: Id = Id(identifier::vanilla::Identifier::new(
 
 /// Generates a registry key for testing.
 #[allow(clippy::missing_safety_doc)]
-pub const unsafe fn id(value: &'static str) -> Id {
+pub const unsafe fn id_unchecked(value: &'static str) -> Id {
     unsafe {
         Id(identifier::vanilla::Identifier::new(
             identifier::vanilla::Namespace::new_unchecked("test"),

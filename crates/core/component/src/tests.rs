@@ -1,10 +1,12 @@
-use std::sync::{Arc, LazyLock, OnceLock};
+use std::sync::{Arc, LazyLock};
 
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
+use fastnbt::DeOpts;
 use local_cx::{
     dyn_cx::{AsDynamicContext, ContextTable, DynamicContext},
-    BaseLocalContext, LocalContext,
+    serde::DeserializeWithCx,
+    BaseLocalContext, LocalContext, LocalContextExt,
 };
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{Registry, RegistryKey, RegistryMut};
@@ -71,7 +73,8 @@ fn type_transient_check() {
     assert!(!ty.is_transient());
 }
 
-const REGISTRY_ID: Id = unsafe { test_global::integration::registry::id("data_component_types") };
+const REGISTRY_ID: Id =
+    unsafe { test_global::integration::registry::id_unchecked("data_component_types") };
 
 const TYPE_TRANSIENT_EDCODE: ComponentType<'static, Foo> =
     ComponentType::<'static, Foo>::builder::<Context>()
@@ -107,14 +110,14 @@ fn init_registry() -> Registry<Id, RawErasedComponentType<'static, Context>> {
 }
 
 struct LocalCx {
-    component_registry: Registry<Id, RawErasedComponentType<'static, Context>>,
+    component_ty_registry: Registry<Id, RawErasedComponentType<'static, Context>>,
 }
 
 impl BaseLocalContext for &LocalCx {}
 
 impl<'a> LocalContext<&'a Registry<Id, RawErasedComponentType<'static, Context>>> for &'a LocalCx {
     fn acquire(self) -> &'a Registry<Id, RawErasedComponentType<'static, Context>> {
-        &self.component_registry
+        &self.component_ty_registry
     }
 }
 
@@ -134,10 +137,18 @@ impl AsDynamicContext for &LocalCx {
     }
 }
 
+fn init_context() -> &'static LocalCx {
+    let component_ty_registry = init_registry();
+    Box::leak(Box::new(LocalCx {
+        component_ty_registry,
+    }))
+}
+
 #[test]
 fn built_map() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.component_ty_registry;
+
     let edcode_ty = reg
         .get(&TYPE_TRANSIENT_EDCODE_KEY)
         .expect("invalid registry");
@@ -199,8 +210,9 @@ fn built_map() {
 
 #[test]
 fn iter_map() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.component_ty_registry;
+
     let edcode_ty = reg
         .get(&TYPE_TRANSIENT_EDCODE_KEY)
         .expect("invalid registry");
@@ -275,8 +287,9 @@ fn iter_map() {
 
 #[test]
 fn patched_changes() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.component_ty_registry;
+
     let edcode_ty = reg
         .get(&TYPE_TRANSIENT_EDCODE_KEY)
         .expect("invalid registry");
@@ -322,8 +335,9 @@ fn patched_changes() {
 
 #[test]
 fn map_serde() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.component_ty_registry;
+
     let edcode_ty = reg
         .get(&TYPE_TRANSIENT_EDCODE_KEY)
         .expect("invalid registry");
@@ -346,9 +360,11 @@ fn map_serde() {
     );
     let map = builder.build();
 
-    let buf = fastnbt::to_bytes(&map).expect("serialize failed");
-    let new_map =
-        fastnbt::from_bytes::<ComponentMap<'_, Context>>(&buf).expect("deserialize failed");
+    let buf = fastnbt::to_bytes(&cx.with(&map)).expect("serialize failed");
+    let new_map = ComponentMap::deserialize_with_cx(cx.with(
+        &mut fastnbt::de::Deserializer::from_bytes(&buf, DeOpts::new()),
+    ))
+    .expect("deserialize failed");
     assert_eq!(new_map.len(), 1, "map length not intended");
     let obj = unsafe { new_map.get(&TYPE_PERSISTENT) }.expect("missing persistent_ty");
     assert_eq!(
@@ -362,8 +378,9 @@ fn map_serde() {
 
 #[test]
 fn changes_serde() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.component_ty_registry;
+
     let edcode_ty = reg
         .get(&TYPE_TRANSIENT_EDCODE_KEY)
         .expect("invalid registry");
@@ -404,9 +421,11 @@ fn changes_serde() {
 
         let changes = patched.changes().expect("no changes");
 
-        let buf = fastnbt::to_bytes(&changes).expect("serialize failed");
-        let new_changes = fastnbt::from_bytes::<ComponentChanges<'_, 'static, Context>>(&buf)
-            .expect("deserialize failed");
+        let buf = fastnbt::to_bytes(&cx.with(&changes)).expect("serialize failed");
+        let new_changes = ComponentChanges::deserialize_with_cx(cx.with(
+            &mut fastnbt::de::Deserializer::from_bytes(&buf, DeOpts::new()),
+        ))
+        .expect("deserialize failed");
         assert_eq!(new_changes.len(), 1, "changes length not intended");
         assert_eq!(
             unsafe { new_changes.get(&TYPE_PERSISTENT) }
@@ -428,9 +447,11 @@ fn changes_serde() {
 
         let changes = patched.changes().expect("no changes");
 
-        let buf = fastnbt::to_bytes(&changes).expect("serialize failed");
-        let new_changes = fastnbt::from_bytes::<ComponentChanges<'_, 'static, Context>>(&buf)
-            .expect("deserialize failed");
+        let buf = fastnbt::to_bytes(&cx.with(&changes)).expect("serialize failed");
+        let new_changes = ComponentChanges::deserialize_with_cx(cx.with(
+            &mut fastnbt::de::Deserializer::from_bytes(&buf, DeOpts::new()),
+        ))
+        .expect("deserialize failed");
         assert_eq!(new_changes.len(), 1, "changes length not intended");
         assert!(
             unsafe { new_changes.get(&TYPE_PERSISTENT) }
@@ -443,8 +464,9 @@ fn changes_serde() {
 
 #[test]
 fn changes_edcode() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.component_ty_registry;
+
     let edcode_ty = reg
         .get(&TYPE_TRANSIENT_EDCODE_KEY)
         .expect("invalid registry");
@@ -484,9 +506,9 @@ fn changes_edcode() {
     let changes = patched.changes().expect("no changes");
 
     let mut buf = Vec::new();
-    changes.encode(&mut buf).expect("serialize failed");
-    let new_changes =
-        ComponentChanges::<'_, 'static, Context>::decode(&buf[..]).expect("deserialize failed");
+    changes.encode(cx.with(&mut buf)).expect("serialize failed");
+    let new_changes = ComponentChanges::<'_, 'static, Context>::decode(cx.with(&buf[..]))
+        .expect("deserialize failed");
     assert_eq!(new_changes.len(), 2, "changes length not intended");
     assert!(
         unsafe { new_changes.get(&TYPE_TRANSIENT_EDCODE) }

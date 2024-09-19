@@ -181,6 +181,20 @@ where
     }
 }
 
+impl<Cx, L> SerializeWithCx<L> for &ComponentChanges<'_, '_, Cx>
+where
+    Cx: ProvideIdTy,
+    L: AsDynamicContext,
+{
+    #[inline]
+    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        (**self).serialize_with_cx(serializer)
+    }
+}
+
 impl<'a, 'de, Cx, L> DeserializeWithCx<'de, L> for ComponentChanges<'a, '_, Cx>
 where
     Cx: ProvideIdTy<Id: FromStr>,
