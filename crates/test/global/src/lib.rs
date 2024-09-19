@@ -10,6 +10,11 @@ use global_cx::{
     nbt::{ReadNbt, UpdateNbt, WriteNbt},
     GlobalContext, ProvideIdTy, ProvideNbtTy, ProvideVersionTy,
 };
+use local_cx::{
+    nbt::{ReadNbtWithCx, UpdateNbtWithCx, WriteNbtWithCx},
+    serde::{DeserializeWithCx, SerializeWithCx},
+    BaseLocalContext, LocalContextExt as _, WithLocalCx,
+};
 use parking_lot::Mutex;
 
 mod identifier;
@@ -105,6 +110,27 @@ where
     }
 }
 
+impl<T, Cx> WriteNbtWithCx<T, Cx> for TestContext
+where
+    T: SerializeWithCx<Cx>,
+    Cx: BaseLocalContext,
+{
+    fn write_nbt<W>(value: T, writer: WithLocalCx<W, Cx>) -> Result<(), std::io::Error>
+    where
+        W: std::io::Write,
+    {
+        let cx = writer.local_cx;
+        fastnbt::to_writer(
+            writer.inner,
+            &WithLocalCx {
+                inner: value,
+                local_cx: cx,
+            },
+        )
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+}
+
 impl<T> ReadNbt<T> for TestContext
 where
     T: serde::de::DeserializeOwned,
@@ -114,6 +140,24 @@ where
         R: std::io::Read,
     {
         fastnbt::from_reader(reader).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+}
+
+impl<T, Cx> ReadNbtWithCx<T, Cx> for TestContext
+where
+    T: for<'de> DeserializeWithCx<'de, Cx>,
+    Cx: BaseLocalContext,
+{
+    fn read_nbt<R>(reader: WithLocalCx<R, Cx>) -> Result<T, std::io::Error>
+    where
+        R: std::io::Read,
+    {
+        let cx = reader.local_cx;
+        T::deserialize_with_cx(cx.with(&mut fastnbt::de::Deserializer::from_reader(
+            reader.inner,
+            fastnbt::DeOpts::new(),
+        )))
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 }
 
@@ -128,6 +172,27 @@ where
         serde_update::Update::update(
             value,
             &mut fastnbt::de::Deserializer::from_reader(reader, fastnbt::DeOpts::new()),
+        )
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+}
+
+impl<T, Cx> UpdateNbtWithCx<T, Cx> for TestContext
+where
+    T: for<'de> DeserializeWithCx<'de, Cx>,
+    Cx: BaseLocalContext,
+{
+    fn update_nbt<R>(value: &mut T, reader: WithLocalCx<R, Cx>) -> Result<(), std::io::Error>
+    where
+        R: std::io::Read,
+    {
+        let cx = reader.local_cx;
+        T::deserialize_in_place_with_cx(
+            value,
+            cx.with(&mut fastnbt::de::Deserializer::from_reader(
+                reader.inner,
+                fastnbt::DeOpts::new(),
+            )),
         )
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
