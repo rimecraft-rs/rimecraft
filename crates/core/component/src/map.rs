@@ -848,13 +848,13 @@ where
                 } else {
                     AHashMap::new()
                 };
-                struct DeSeed<'a, 'cx, Cx>(
-                    &'a UnsafeSerdeCodec<'a>,
+                struct DeSeed<'a, 's, 'cx, Cx>(
+                    &'s UnsafeSerdeCodec<'a>,
                     PhantomData<Cx>,
                     UnsafeDynamicContext<'cx>,
                 );
 
-                impl<'a, 'de, Cx> serde::de::DeserializeSeed<'de> for DeSeed<'a, '_, Cx> {
+                impl<'a, 'de, Cx> serde::de::DeserializeSeed<'de> for DeSeed<'a, '_, '_, Cx> {
                     type Value = Box<Object<'a>>;
 
                     #[inline]

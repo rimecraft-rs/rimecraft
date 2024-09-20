@@ -145,7 +145,7 @@ where
         for (&CompTyCell(ty), obj) in self.changed.iter().filter(|(k, _)| !k.0.is_transient()) {
             struct Ser<'a, 's> {
                 obj: &'s Object<'a>,
-                codec: &'a UnsafeSerdeCodec<'a>,
+                codec: &'s UnsafeSerdeCodec<'a>,
                 cx: UnsafeDynamicContext<'s>,
             }
 
@@ -169,7 +169,7 @@ where
             if let Some(obj) = obj.as_deref() {
                 map.serialize_value(&Ser {
                     obj,
-                    codec: ty.ty.f.serde_codec.expect("missing serde codec"),
+                    codec: ty.ty.f.serde_codec.as_ref().expect("missing serde codec"),
                     cx: unsafe_cx,
                 })?;
             } else {
@@ -242,8 +242,11 @@ where
                         let _: () = map.next_value()?;
                         changes.insert(CompTyCell(ty.ty), None);
                     } else {
-                        struct Seed<'a, 'cx>(&'a UnsafeSerdeCodec<'a>, UnsafeDynamicContext<'cx>);
-                        impl<'de, 'a> DeserializeSeed<'de> for Seed<'a, '_> {
+                        struct Seed<'a, 'cx, 's>(
+                            &'s UnsafeSerdeCodec<'a>,
+                            UnsafeDynamicContext<'cx>,
+                        );
+                        impl<'de, 'a> DeserializeSeed<'de> for Seed<'a, '_, '_> {
                             type Value = Box<Object<'a>>;
 
                             fn deserialize<D>(
@@ -263,7 +266,7 @@ where
                         changes.insert(
                             CompTyCell(ty.ty),
                             Some(map.next_value_seed(Seed(
-                                ty.ty.f.serde_codec.expect("missing serde codec"),
+                                ty.ty.f.serde_codec.as_ref().expect("missing serde codec"),
                                 unsafe_cx,
                             ))?),
                         );

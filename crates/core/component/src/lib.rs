@@ -155,24 +155,24 @@ where
 /// Builder for creating a new [`ComponentType`].
 #[derive(Debug)]
 pub struct TypeBuilder<'a, T, Cx> {
-    serde_codec: Option<&'a UnsafeSerdeCodec<'a>>,
-    packet_codec: Option<&'a UnsafePacketCodec<'a>>,
+    serde_codec: Option<UnsafeSerdeCodec<'a>>,
+    packet_codec: Option<UnsafePacketCodec<'a>>,
     _marker: PhantomData<(T, Cx)>,
 }
 
 impl<'a, T, Cx> TypeBuilder<'a, T, Cx> {
     /// Applies the given serialization and deserialization codec.
-    pub const fn serde_codec(self, codec: &'a SerdeCodec<'a, T>) -> Self {
+    pub const fn serde_codec(self, codec: SerdeCodec<'a, T>) -> Self {
         Self {
-            serde_codec: Some(&codec.codec),
+            serde_codec: Some(codec.codec),
             ..self
         }
     }
 
     /// Applies the given packet encoding and decoding codec.
-    pub const fn packet_codec(self, codec: &'a PacketCodec<'a, T>) -> Self {
+    pub const fn packet_codec(self, codec: PacketCodec<'a, T>) -> Self {
         Self {
-            packet_codec: Some(&codec.codec),
+            packet_codec: Some(codec.codec),
             ..self
         }
     }
@@ -195,7 +195,7 @@ where
                     Some(codec) => codec,
                     None => panic!("packet codec is required"),
                 },
-                util: &ComponentType::<T>::UTIL,
+                util: ComponentType::<T>::UTIL,
             },
             _marker: PhantomData,
         }
@@ -287,9 +287,9 @@ struct DynUtil<'a> {
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 struct Funcs<'a> {
-    serde_codec: Option<&'a UnsafeSerdeCodec<'a>>,
-    packet_codec: &'a UnsafePacketCodec<'a>,
-    util: &'a DynUtil<'a>,
+    serde_codec: Option<UnsafeSerdeCodec<'a>>,
+    packet_codec: UnsafePacketCodec<'a>,
+    util: DynUtil<'a>,
 }
 
 impl<'a, Cx> RawErasedComponentType<'a, Cx> {
