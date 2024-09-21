@@ -141,6 +141,7 @@ impl<'a, 'c> LocalContext<&'a Registry<Id, RawErasedComponentType<'c, Context>>>
 impl AsDynamicContext for &LocalCx<'_> {
     type InnerContext = Self;
 
+    #[allow(clippy::unnecessary_cast)]
     fn as_dynamic_context(&self) -> DynamicContext<'_, Self::InnerContext> {
         static TABLE: LazyLock<ContextTable<&'static LocalCx<'static>>> = LazyLock::new(|| {
             let mut table = ContextTable::new();

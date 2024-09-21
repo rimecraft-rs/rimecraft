@@ -53,6 +53,7 @@ where
         Cx::Id: Deserialize<'de>,
         Cx::IntArray: Deserialize<'de>,
     {
+        //TODO: Refactor
         #[derive(Deserialize)]
         #[serde(bound(deserialize = r#"
                 Cx: ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>
