@@ -3,17 +3,22 @@ use std::marker::PhantomData;
 use crate::{IndexFromRaw, IndexToRaw, Palette, Strategy};
 use rimecraft_maybe::Maybe;
 
-struct List;
+struct List<const N: usize>;
 
 // Just blanket impl.
-impl IndexToRaw<&u8> for List {
-    fn raw_id(&self, _entry: &u8) -> Option<usize> {
+impl<const N: usize> IndexToRaw<&u8> for List<N> {
+    fn raw_id(&self, entry: &u8) -> Option<usize> {
+        (entry == &36).then_some(N)
+    }
+}
+impl<'a, 'b, const N: usize> IndexFromRaw<'a, Maybe<'b, u8>> for List<N> {
+    fn of_raw(&'a self, _id: usize) -> Option<Maybe<'b, u8>> {
         None
     }
 }
-impl<'a, 'b> IndexFromRaw<'a, Maybe<'b, u8>> for List {
-    fn of_raw(&'a self, _id: usize) -> Option<Maybe<'b, u8>> {
-        None
+impl<const N: usize> IndexFromRaw<'_, u8> for List<N> {
+    fn of_raw(&self, id: usize) -> Option<u8> {
+        (id == N).then_some(36)
     }
 }
 
@@ -31,7 +36,7 @@ impl ExactSizeIterator for Iter<'_> {
         0
     }
 }
-impl<'a> IntoIterator for &'a List {
+impl<'a, const N: usize> IntoIterator for &'a List<N> {
     type Item = &'a u8;
     type IntoIter = Iter<'a>;
 
@@ -42,7 +47,7 @@ impl<'a> IntoIterator for &'a List {
 
 #[test]
 fn singular() {
-    let mut palette = Palette::new(Strategy::Singular, 0, List, Vec::<u8>::new());
+    let mut palette = Palette::new(Strategy::Singular, 0, List::<0>, Vec::<u8>::new());
 
     assert_eq!(palette.len(), 0);
     assert_eq!(palette.index_or_insert(36), Ok(0));
@@ -58,7 +63,7 @@ macro_rules! helper {
     ($pascal:ident, $snake:ident) => {
         #[test]
         fn $snake() {
-            let mut palette = Palette::new(Strategy::$pascal, 2, List, vec![36u8, 39u8]);
+            let mut palette = Palette::new(Strategy::$pascal, 2, List::<0>, vec![36u8, 39u8]);
 
             // For easier diagnosis.
             assert_eq!(palette.len(), 2, "initial length failed");
@@ -152,4 +157,33 @@ fn direct() {
         vec![&36, &39, &140, &4]
     );
     assert_eq!(palette.config(), (Strategy::Direct, 0));
+}
+
+#[cfg(feature = "edcode")]
+mod edcode {
+    use super::List;
+    use crate::{Palette, Strategy};
+    use edcode2::{Decode, Encode};
+    use rimecraft_maybe::Maybe;
+
+    macro_rules! helper {
+        ($pascal:ident,$snake:ident,$num:literal) => {
+            #[test]
+            fn $snake() {
+                let src = Palette::new(Strategy::$pascal, 0, List::<$num>, vec![36u8]);
+                let mut buf = Vec::<u8>::new();
+                src.encode(&mut buf).expect("encode failed");
+                let mut dest = Palette::new(Strategy::Singular, 0, List::<$num>, vec![114u8]);
+                dest.decode_in_place(buf.as_ref()).expect("decode failed");
+                assert!(
+                    matches!(dest.get(0), Some(Maybe::Borrowed(&36))),
+                    "edcode consistency check failed"
+                );
+            }
+        };
+    }
+
+    helper!(Singular, singular, 0);
+    helper!(Array, array, 1);
+    helper!(BiMap, bi_map, 1);
 }
