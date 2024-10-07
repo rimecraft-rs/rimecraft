@@ -583,7 +583,7 @@ where
                 changes,
                 changes_count,
             } => Self(MapInner::Patched {
-                base: base.clone(),
+                base: Maybe::clone(base),
                 changes: changes
                     .iter()
                     .map(|(k, v)| (CompTyCell(k.0), v.as_deref().map(k.0.f.util.clone)))
