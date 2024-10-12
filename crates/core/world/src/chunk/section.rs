@@ -1,12 +1,13 @@
 use std::fmt::Debug;
 
+use local_cx::LocalContext;
 use rimecraft_block::{Block, BlockState, ProvideStateIds, RawBlock};
 use rimecraft_chunk_palette::{
     container::{PalettedContainer, ProvidePalette},
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
 };
 use rimecraft_fluid::{BlockStateExt as _, BsToFs};
-use rimecraft_registry::{ProvideRegistry, Registry};
+use rimecraft_registry::Registry;
 
 use super::{internal_types::*, ChunkCx};
 
@@ -212,13 +213,12 @@ where
     }
 }
 
-impl<'w, Cx> From<&'w Registry<Cx::Id, Cx::Biome>> for ChunkSection<'w, Cx>
+impl<'w, Cx> ChunkSection<'w, Cx>
 where
     Cx: ChunkCx<'w>
         + ProvideStateIds<List = Cx::BlockStateList>
         + ProvidePalette<Cx::BlockStateList, BlockState<'w, Cx>>
-        + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>
-        + ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>,
+        + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
 
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
@@ -229,13 +229,21 @@ where
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
         + Clone,
 {
-    /// Creates a [`ChunkSection`] for the given `Biome` registry/
+    /// Creates a [`ChunkSection`] for the given `Biome` registry
     ///
     /// # Panics
     ///
     /// Panics if the biome registry doesn't contains a default entry.
-    fn from(registry: &'w Registry<Cx::Id, Cx::Biome>) -> Self {
-        let default_block = Block::<'w, Cx>::default();
+    pub fn from_registries<Local>(cx: Local) -> Self
+    where
+        Local: LocalContext<&'w Registry<Cx::Id, Cx::Biome>>
+            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>,
+    {
+        let default_block = std::convert::identity::<&Registry<_, RawBlock<'_, _>>>(cx.acquire())
+            .default_entry()
+            .expect("no default block found for registry");
+        let registry = std::convert::identity::<&Registry<_, Cx::Biome>>(cx.acquire());
+
         Self {
             bsc: PalettedContainer::of_single(
                 Cx::state_ids(),
