@@ -1,12 +1,15 @@
-use std::{collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use local_cx::serde::DeserializeWithCx;
 use rimecraft_block::RawBlock;
 use rimecraft_fluid::RawFluid;
-use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::{ProvideRegistry, Reg};
+use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
+use rimecraft_registry::Reg;
 use rimecraft_voxel_math::direction::EightWayDirection;
-use serde::Deserialize;
+use serde::{
+    de::{DeserializeOwned, DeserializeSeed},
+    Deserialize,
+};
 
 use crate::view::HeightLimit;
 
@@ -38,7 +41,7 @@ where
 {
     /// Creates a new upgrade data from given *serialized NBT data* and the height limit.
     ///
-    /// The NBT data should be any `fastnbt` deserializer.
+    /// The NBT data should be any NBT deserializer.
     ///
     /// # Errors
     ///
@@ -56,14 +59,7 @@ where
         where
             Cx: ChunkCx<'w>,
         {
-            // `Indices`, defaulted.
-            indices: HashMap<String, Cx::IntArray>,
-
-            // `Sides`, defaulted.
-            sides: i32,
-
-            neighbor_block_ticks: Vec<TickedBlock<'w, Cx>>,
-            neighbor_fluid_ticks: Vec<TickedFluid<'w, Cx>>,
+            data: UpgradeData<'w, Cx>,
         }
 
         impl<'w, 'de, Cx, L> DeserializeWithCx<'de, L> for Serialized<'w, Cx>
@@ -82,6 +78,8 @@ where
 
                     NBlockTicks,
                     NFluidTicks,
+
+                    Other,
                 }
 
                 struct FieldVisitor;
@@ -105,17 +103,7 @@ where
                             "Sides" => Field::Sides,
                             "neighbor_block_ticks" => Field::NBlockTicks,
                             "neighbor_fluid_ticks" => Field::NFluidTicks,
-                            _ => {
-                                return Err(serde::de::Error::unknown_field(
-                                    v,
-                                    &[
-                                        "Indices",
-                                        "Sides",
-                                        "neighbor_block_ticks",
-                                        "neighbor_fluid_ticks",
-                                    ],
-                                ))
-                            }
+                            _ => Field::Other,
                         })
                     }
                 }
@@ -130,11 +118,11 @@ where
                     }
                 }
 
-                struct Visitor<'w, L, Cx>(L, PhantomData<&'w Cx>);
+                struct Visitor<'w, L, Cx>(L, PhantomData<&'w Cx>, usize);
 
                 impl<'w, 'de, L, Cx> serde::de::Visitor<'de> for Visitor<'w, L, Cx>
                 where
-                    Cx: ChunkCx<'w>,
+                    Cx: ChunkCx<'w, IntArray: DeserializeOwned>,
                 {
                     type Value = Serialized<'w, Cx>;
 
@@ -148,55 +136,142 @@ where
                         )
                     }
 
-                    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+                    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
                     where
                         A: serde::de::MapAccess<'de>,
                     {
+                        let mut indices =
+                            vec![std::convert::identity::<Box<[i32]>>(Box::new([])); self.2]
+                                .into_boxed_slice();
+                        let mut sides = 0usize;
+
+                        // let mut block_ticks = None;
+                        // let mut fluid_ticks = None;
+
+                        while let Some(field) = map.next_key::<Field>()? {
+                            match field {
+                                Field::Indices => map.next_value_seed(IndicesSeed(
+                                    &mut indices,
+                                    PhantomData::<Cx>,
+                                ))?,
+                                Field::Sides => sides = map.next_value::<u32>()? as usize,
+                                Field::NBlockTicks => todo!(),
+                                Field::NFluidTicks => todo!(),
+                                Field::Other => {}
+                            }
+                        }
+
                         todo!()
                     }
                 }
 
-                struct IndicesVisitori {}
+                struct IndexSeed;
+
+                impl serde::de::Visitor<'_> for IndexSeed {
+                    type Value = isize;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "a number")
+                    }
+
+                    #[inline]
+                    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        v.parse().map_err(serde::de::Error::custom)
+                    }
+
+                    #[inline]
+                    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        Ok(v as isize)
+                    }
+
+                    #[inline]
+                    fn visit_i32<E>(self, v: i32) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        Ok(v as isize)
+                    }
+
+                    #[inline]
+                    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        Ok(v as isize)
+                    }
+                }
+
+                impl<'de> DeserializeSeed<'de> for IndexSeed {
+                    type Value = isize;
+
+                    #[inline]
+                    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+                    where
+                        D: serde::Deserializer<'de>,
+                    {
+                        deserializer.deserialize_any(Self)
+                    }
+                }
+
+                struct IndicesSeed<'a, Cx>(&'a mut [Box<[i32]>], PhantomData<Cx>);
+
+                impl<'de, Cx> serde::de::Visitor<'de> for IndicesSeed<'_, Cx>
+                where
+                    Cx: ProvideNbtTy<IntArray: DeserializeOwned>,
+                {
+                    type Value = ();
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "indices")
+                    }
+
+                    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+                    where
+                        A: serde::de::MapAccess<'de>,
+                    {
+                        while let Some(index) = map.next_key_seed(IndexSeed)? {
+                            let index = index as usize;
+                            if let Some(buf) = self.0.get_mut(index) {
+                                let array: Cx::IntArray = map.next_value()?;
+                                *buf = array.into();
+                            }
+                        }
+                        Ok(())
+                    }
+                }
+
+                impl<'de, Cx> DeserializeSeed<'de> for IndicesSeed<'_, Cx>
+                where
+                    Cx: ProvideNbtTy<IntArray: DeserializeOwned>,
+                {
+                    type Value = ();
+
+                    #[inline]
+                    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+                    where
+                        D: serde::Deserializer<'de>,
+                    {
+                        deserializer.deserialize_map(self)
+                    }
+                }
 
                 let cx = deserializer.local_cx;
                 todo!()
             }
         }
-
-        let Serialized {
-            indices,
-            sides,
-            neighbor_block_ticks: block_ticks,
-            neighbor_fluid_ticks: fluid_ticks,
-        } = Serialized::<'w, Cx>::deserialize(nbt)?;
-
-        Ok(Self {
-            sides_to_upgrade: {
-                let mut dirs = Vec::with_capacity(EightWayDirection::COUNT);
-                for dir in EightWayDirection::ALL {
-                    if (sides & 1 << dir as u8) != 0 {
-                        dirs.push(dir);
-                    }
-                }
-                dirs.shrink_to_fit();
-                dirs
-            },
-            center_indices_upgrade: {
-                let len = height_limit.count_vertical_sections() as usize;
-                let mut center_indices_upgrade: Box<[Box<[i32]>]> =
-                    vec![vec![].into_boxed_slice(); len].into_boxed_slice();
-                for (section, indices) in indices
-                    .into_iter()
-                    .filter_map(|(k, v)| k.parse::<usize>().ok().map(|k| (k, v)))
-                    .filter(|(k, _)| *k < len)
-                {
-                    center_indices_upgrade[section] = indices.into();
-                }
-                center_indices_upgrade
-            },
-            block_ticks,
-            fluid_ticks,
-        })
+        todo!()
     }
 }
 
@@ -220,7 +295,7 @@ where
 
 mod _serde {
     use local_cx::{serde::DeserializeWithCx, LocalContext};
-    use rimecraft_registry::{entry::RefEntry, Registry};
+    use rimecraft_registry::Registry;
     use serde::Serialize;
 
     use super::*;
