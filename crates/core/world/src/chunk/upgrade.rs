@@ -1,10 +1,10 @@
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
-use local_cx::serde::DeserializeWithCx;
+use local_cx::{serde::DeserializeWithCx, LocalContext, LocalContextExt};
 use rimecraft_block::RawBlock;
 use rimecraft_fluid::RawFluid;
 use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
-use rimecraft_registry::Reg;
+use rimecraft_registry::{Reg, Registry};
 use rimecraft_voxel_math::direction::EightWayDirection;
 use serde::{
     de::{DeserializeOwned, DeserializeSeed},
@@ -46,15 +46,21 @@ where
     /// # Errors
     ///
     /// This method can fail if the given NBT data is invalid.
-    pub fn new<'de, D>(
+    pub fn new<'de, D, Local>(
         nbt: D,
         height_limit: HeightLimit,
+        cx: Local,
     ) -> Result<Self, <D as serde::Deserializer<'de>>::Error>
     where
         D: serde::Deserializer<'de>,
         Cx::Id: Deserialize<'de>,
         Cx::IntArray: Deserialize<'de>,
+
+        Local: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+            + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
     {
+        let indices_len = height_limit.count_vertical_sections() as usize;
+
         struct Serialized<'w, Cx>
         where
             Cx: ChunkCx<'w>,
@@ -145,8 +151,8 @@ where
                                 .into_boxed_slice();
                         let mut sides = 0usize;
 
-                        // let mut block_ticks = None;
-                        // let mut fluid_ticks = None;
+                        let mut block_ticks: Vec<TickedBlock<'w, Cx>> = vec![];
+                        let mut fluid_ticks: Vec<TickedFluid<'w, Cx>> = vec![];
 
                         while let Some(field) = map.next_key::<Field>()? {
                             match field {
@@ -268,10 +274,11 @@ where
                 }
 
                 let cx = deserializer.local_cx;
-                todo!()
+                deserializer.inner.deserialize_map(Visitor(cx,PhantomData::<&'w Cx>,in))
             }
         }
-        todo!()
+
+        Serialized::deserialize_with_cx(cx.with(nbt)).map(|ser| ser.data)
     }
 }
 
@@ -309,7 +316,7 @@ mod _serde {
         where
             S: serde::Serializer,
         {
-            Reg::to_id(self.0);
+            Reg::to_id(self.0).serialize(serializer)
         }
     }
 

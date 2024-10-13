@@ -24,7 +24,7 @@ rimecraft-voxel-math = { path = "../../util/voxel-math" }
 rimecraft-packed-int-array = { path = "../../util/packed-int-array" }
 local-cx = { path = "../local-cx", package = "rimecraft-local-cx", features = ["dyn-cx"] }
 # External utils
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 parking_lot = "0.12"
