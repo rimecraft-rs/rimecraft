@@ -1,4 +1,4 @@
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{cell::Cell, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use local_cx::{serde::DeserializeWithCx, LocalContext, LocalContextExt};
 use rimecraft_block::RawBlock;
@@ -54,12 +54,18 @@ where
     where
         D: serde::Deserializer<'de>,
         Cx::Id: Deserialize<'de>,
-        Cx::IntArray: Deserialize<'de>,
+        Cx::IntArray: DeserializeOwned,
 
         Local: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
             + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
     {
         let indices_len = height_limit.count_vertical_sections() as usize;
+
+        thread_local! {
+            static LENGTH: Cell<usize> = Cell::new(0);
+        }
+
+        LENGTH.set(indices_len);
 
         struct Serialized<'w, Cx>
         where
@@ -70,7 +76,7 @@ where
 
         impl<'w, 'de, Cx, L> DeserializeWithCx<'de, L> for Serialized<'w, Cx>
         where
-            Cx: ChunkCx<'w>,
+            Cx: ChunkCx<'w, IntArray: DeserializeOwned>,
         {
             fn deserialize_with_cx<D>(
                 deserializer: local_cx::WithLocalCx<D, L>,
@@ -274,7 +280,7 @@ where
                 }
 
                 let cx = deserializer.local_cx;
-                deserializer.inner.deserialize_map(Visitor(cx,PhantomData::<&'w Cx>,in))
+                deserializer.inner.deserialize_map(Visitor(cx,PhantomData::<&'w Cx>,LENGTH.get()))
             }
         }
 
