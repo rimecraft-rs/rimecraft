@@ -21,11 +21,14 @@ rimecraft-fmt = { path = "../../util/fmt" }
 serde = { version = "1.0", optional = true }
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 component = { path = "../component", package = "rimecraft-component" }
+local-cx = { path = "../local-cx", features = [
+    "dyn-cx",
+], package = "rimecraft-local-cx" }
 
 [features]
 default = ["serde", "edcode"]
-serde = ["dep:serde", "rimecraft-registry/serde"]
-edcode = ["dep:edcode2", "rimecraft-registry/edcode"]
+serde = ["dep:serde", "rimecraft-registry/serde", "local-cx/serde"]
+edcode = ["dep:edcode2", "rimecraft-registry/edcode", "local-cx/edcode"]
 
 [lints]
 workspace = true

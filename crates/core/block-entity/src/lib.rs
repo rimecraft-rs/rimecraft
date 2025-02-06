@@ -10,7 +10,7 @@ use erased_serde::{serialize_trait_object, Serialize as ErasedSerialize};
 
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::{entry::RefEntry, Reg};
+use rimecraft_registry::Reg;
 use rimecraft_serde_update::erased::ErasedUpdate;
 use rimecraft_voxel_math::BlockPos;
 
@@ -193,7 +193,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BlockEntity")
-            .field("type", &<&RefEntry<_, _>>::from(self.ty).key().value())
+            .field("type", &Reg::to_id(self.ty))
             .field("pos", &self.pos)
             .field("removed", &self.removed)
             .field("cached_state", &self.cached_state)
@@ -360,7 +360,7 @@ where
     }
 
     /// Gets the block entity constructor of this block.
-    fn block_entity_constructor<'s>(
-        &'s self,
-    ) -> Option<impl FnOnce(BlockPos) -> Box<BlockEntity<'w, Cx>> + 's>;
+    fn block_entity_constructor(
+        &self,
+    ) -> Option<impl FnOnce(BlockPos) -> Box<BlockEntity<'w, Cx>> + '_>;
 }

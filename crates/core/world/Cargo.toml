@@ -22,6 +22,7 @@ rimecraft-fluid = { path = "../fluid" }
 rimecraft-block-entity = { path = "../block-entity" }
 rimecraft-voxel-math = { path = "../../util/voxel-math" }
 rimecraft-packed-int-array = { path = "../../util/packed-int-array" }
+local-cx = { path = "../local-cx", package = "rimecraft-local-cx", features = ["dyn-cx"] }
 # External utils
 serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"

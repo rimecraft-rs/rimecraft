@@ -8,10 +8,21 @@ use ahash::AHashMap;
 
 use crate::{BaseLocalContext, LocalContext};
 
+type Caller<Cx> = fn(Cx, &mut (dyn FnMut(*const ()) + '_));
+
+/// Local context that can be converted to a dynamic context.
+pub trait AsDynamicContext: BaseLocalContext {
+    /// The inner local context type.
+    type InnerContext: BaseLocalContext;
+
+    /// Converts this context to a dynamic context.
+    fn as_dynamic_context(&self) -> DynamicContext<'_, Self::InnerContext>;
+}
+
 /// Function table for getting contexts.
 #[derive(Debug)]
 pub struct ContextTable<LocalCx> {
-    map: AHashMap<TypeId, fn(LocalCx, &mut (dyn FnMut(*const ()) + '_))>,
+    map: AHashMap<TypeId, Caller<LocalCx>>,
 }
 
 impl<Cx> ContextTable<Cx> {

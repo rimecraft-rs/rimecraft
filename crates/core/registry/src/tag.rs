@@ -112,9 +112,11 @@ impl<'a, K, T> Iterator for Iter<'a, K, T> {
 /// Helper module for `serde` support.
 #[cfg(feature = "serde")]
 pub mod serde {
-    use std::str::FromStr;
+    use std::{marker::PhantomData, str::FromStr};
 
-    use crate::ProvideRegistry;
+    use local_cx::{serde::DeserializeWithCx, LocalContext};
+
+    use crate::Registry;
 
     use super::TagKey;
 
@@ -149,18 +151,21 @@ pub mod serde {
         }
     }
 
-    impl<'de, 'r, K, T> serde::Deserialize<'de> for Unprefixed<TagKey<K, T>>
+    impl<'de, 'r, K, T: 'r, Cx> DeserializeWithCx<'de, Cx> for Unprefixed<TagKey<K, T>>
     where
-        K: serde::Deserialize<'de> + Clone + 'r,
-        T: ProvideRegistry<'r, K, T> + 'r,
+        K: DeserializeWithCx<'de, Cx> + Clone + 'r,
+        Cx: LocalContext<&'r Registry<K, T>>,
     {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        fn deserialize_with_cx<D>(
+            deserializer: local_cx::WithLocalCx<D, Cx>,
+        ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
+            let registry = deserializer.local_cx.acquire();
             Ok(Unprefixed(TagKey {
-                registry: T::registry().key.clone(),
-                id: K::deserialize(deserializer)?,
+                registry: registry.key.clone(),
+                id: K::deserialize_with_cx(deserializer)?,
             }))
         }
     }
@@ -178,24 +183,48 @@ pub mod serde {
         }
     }
 
-    impl<'de, 'r, K, T> serde::Deserialize<'de> for TagKey<K, T>
+    impl<'de, 'r, K, T: 'r, Cx> DeserializeWithCx<'de, Cx> for TagKey<K, T>
     where
         K: FromStr + Clone + 'r,
-        T: ProvideRegistry<'r, K, T> + 'r,
         <K as FromStr>::Err: std::fmt::Display,
+        Cx: LocalContext<&'r Registry<K, T>>,
     {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        fn deserialize_with_cx<D>(
+            deserializer: local_cx::WithLocalCx<D, Cx>,
+        ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
-            let value = String::deserialize(deserializer)?;
-            let id = value
-                .strip_prefix('#')
-                .ok_or_else(|| serde::de::Error::custom("not a tag key"))?
-                .parse::<K>()
-                .map_err(serde::de::Error::custom)?;
+            struct Visitor<K>(PhantomData<K>);
+
+            impl<K> serde::de::Visitor<'_> for Visitor<K>
+            where
+                K: FromStr + Clone,
+                <K as FromStr>::Err: std::fmt::Display,
+            {
+                type Value = K;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(formatter, "a string")
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    v.strip_prefix('#')
+                        .ok_or_else(|| serde::de::Error::custom("not a tag key"))?
+                        .parse::<K>()
+                        .map_err(serde::de::Error::custom)
+                }
+            }
+
+            let registry = deserializer.local_cx.acquire();
+            let id = deserializer
+                .inner
+                .deserialize_str(Visitor(PhantomData::<K>))?;
             Ok(Self {
-                registry: T::registry().key.clone(),
+                registry: registry.key.clone(),
                 id,
             })
         }

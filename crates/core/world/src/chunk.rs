@@ -5,6 +5,7 @@
 use std::{fmt::Debug, hash::Hash};
 
 use ahash::AHashMap;
+use local_cx::LocalContext;
 use parking_lot::{Mutex, RwLock};
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
 use rimecraft_chunk_palette::{
@@ -12,7 +13,7 @@ use rimecraft_chunk_palette::{
 };
 use rimecraft_fluid::ProvideFluidStateExtTy;
 use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
-use rimecraft_registry::{ProvideRegistry, Registry};
+use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
 
 use crate::{
@@ -82,11 +83,11 @@ where
     /// Height limit of this chunk.
     pub height_limit: HeightLimit,
     /// Map of block positions to block entities.
-    pub block_entities: RwLock<AHashMap<BlockPos, BlockEntityCell<'w, Cx>>>,
+    pub block_entities: Mutex<AHashMap<BlockPos, BlockEntityCell<'w, Cx>>>,
     /// Map of block positions to block entities.
     pub block_entity_nbts: Mutex<AHashMap<BlockPos, Cx::Compound>>,
     /// The internal chunk sections.
-    pub section_array: Box<[RwLock<ChunkSection<'w, Cx>>]>,
+    pub section_array: Box<[Mutex<ChunkSection<'w, Cx>>]>,
     /// Increases for each tick a player spends with the chunk loaded.
     /// This is a cumulative measure of time.
     pub inhabited_time: u64,
@@ -121,8 +122,7 @@ where
     Cx: ChunkCx<'w>
         + ProvideStateIds<List = Cx::BlockStateList>
         + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
-        + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>
-        + ProvideRegistry<'w, Cx::Id, RawBlock<'w, Cx>>,
+        + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
 
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>
@@ -141,16 +141,18 @@ where
     /// chunk sections of given `height_limit`.
     ///
     /// See [`HeightLimit::count_vertical_sections`].
-    pub fn new<I>(
+    pub fn new<I, Local>(
         pos: ChunkPos,
         upgrade_data: UpgradeData<'w, Cx>,
         height_limit: HeightLimit,
-        biome_registry: &'w Registry<Cx::Id, Cx::Biome>,
         inhabited_time: u64,
         section_array: Option<I>,
+        cx: Local,
     ) -> Self
     where
         I: Iterator<Item = Option<ChunkSection<'w, Cx>>> + ExactSizeIterator,
+        Local: LocalContext<&'w Registry<Cx::Id, Cx::Biome>>
+            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>,
     {
         Self {
             pos,
@@ -159,7 +161,7 @@ where
             upgrade_data,
             height_limit,
             heightmaps: RwLock::new(AHashMap::new()),
-            block_entities: RwLock::new(AHashMap::new()),
+            block_entities: Mutex::new(AHashMap::new()),
             block_entity_nbts: Mutex::new(AHashMap::new()),
             section_array: {
                 let len = height_limit.count_vertical_sections() as usize;
@@ -167,12 +169,12 @@ where
                     assert_eq!(section_array.len(), len, "length of given section array should be the count of vertical sections of the chunk");
                     section_array
                         .map(|opt| {
-                            RwLock::new(opt.unwrap_or_else(|| ChunkSection::from(biome_registry)))
+                            Mutex::new(opt.unwrap_or_else(|| ChunkSection::from_registries(cx)))
                         })
                         .collect()
                 } else {
                     (0..len)
-                        .map(|_| RwLock::new(ChunkSection::from(biome_registry)))
+                        .map(|_| Mutex::new(ChunkSection::from_registries(cx)))
                         .collect()
                 }
             },
@@ -206,13 +208,13 @@ where
 {
     /// Returns the array of chunk sections of this chunk.
     #[inline]
-    fn sections(&self) -> &[RwLock<ChunkSection<'w, Cx>>] {
+    fn sections(&self) -> &[Mutex<ChunkSection<'w, Cx>>] {
         &self.as_base_chunk().0.section_array
     }
 
     /// Gets the [`ChunkSection`] at the given Y index of this chunk.
     #[inline]
-    fn section(&self, index: usize) -> Option<&RwLock<ChunkSection<'w, Cx>>> {
+    fn section(&self, index: usize) -> Option<&Mutex<ChunkSection<'w, Cx>>> {
         self.sections().get(index)
     }
 
@@ -226,7 +228,7 @@ where
     ///
     /// See [`ChunkSection::is_empty`].
     fn highest_non_empty_section(&self) -> Option<usize> {
-        self.sections().iter().rposition(|s| !s.read().is_empty())
+        self.sections().iter().rposition(|s| !s.lock().is_empty())
     }
 
     /// Peeks the heightmaps of this chunk.
@@ -264,13 +266,13 @@ where
 {
     /// Returns the array of chunk sections of this chunk.
     #[inline]
-    fn sections_mut(&mut self) -> &mut [RwLock<ChunkSection<'w, Cx>>] {
+    fn sections_mut(&mut self) -> &mut [Mutex<ChunkSection<'w, Cx>>] {
         &mut self.as_base_chunk_mut().0.section_array
     }
 
     /// Gets the [`ChunkSection`] at the given Y index of this chunk.
     #[inline]
-    fn section_mut(&mut self, index: usize) -> Option<&mut RwLock<ChunkSection<'w, Cx>>> {
+    fn section_mut(&mut self, index: usize) -> Option<&mut Mutex<ChunkSection<'w, Cx>>> {
         self.sections_mut().get_mut(index)
     }
 

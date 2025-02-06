@@ -7,6 +7,7 @@ use global_cx::GlobalContext;
 pub mod dyn_cx;
 
 mod edcode;
+pub mod nbt;
 pub mod serde;
 
 /// A base local context.
@@ -18,25 +19,44 @@ pub trait LocalContext<T>: BaseLocalContext {
     fn acquire(self) -> T;
 }
 
-/// Global context types that provides implicit local context type.
-pub trait ProvideLocalCxTy: GlobalContext {
+/// A general type that provides explicit local context type.
+pub trait ProvideLocalCxTy {
     /// The local context type.
     type Context<'cx>: BaseLocalContext;
 }
 
+/// Global context types that provides explicit local context type.
+///
+/// See [`ProvideLocalCxTy`].
+pub trait GlobalProvideLocalCxTy: ProvideLocalCxTy + GlobalContext {}
+
 /// A type that carries a local context.
 ///
 /// This type is used to carry a local context along with the data.
-pub struct WithLocalCx<T, LocalCx> {
-    /// The data.
-    pub inner: T,
+pub struct WithLocalCx<T: ?Sized, LocalCx> {
     /// The local context.
     pub local_cx: LocalCx,
+    /// The data.
+    pub inner: T,
+}
+
+impl<T: ?Sized, Cx> WithLocalCx<T, Cx>
+where
+    Cx: BaseLocalContext,
+{
+    /// Borrows the inner data.
+    #[inline]
+    pub fn as_mut(&mut self) -> WithLocalCx<&mut T, Cx> {
+        WithLocalCx {
+            inner: &mut self.inner,
+            local_cx: self.local_cx,
+        }
+    }
 }
 
 impl<T, Cx> Debug for WithLocalCx<T, Cx>
 where
-    T: Debug,
+    T: Debug + ?Sized,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", &self.inner)

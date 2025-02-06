@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use component::map::ComponentMap;
 use rimecraft_fmt::Formatting;
 use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::{ProvideRegistry, Reg};
+use rimecraft_registry::Reg;
 
 #[cfg(feature = "edcode")]
 mod edcode;
@@ -56,16 +56,6 @@ where
     #[inline]
     pub fn settings(&self) -> &Cx::Settings<'a> {
         &self.settings
-    }
-}
-
-impl<'r, K, Cx> ProvideRegistry<'r, K, Self> for RawItem<'r, Cx>
-where
-    Cx: ProvideRegistry<'r, K, Self> + ProvideSettingsTy,
-{
-    #[inline]
-    fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
-        Cx::registry()
     }
 }
 

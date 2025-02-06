@@ -15,6 +15,9 @@ maintenance = { status = "passively-maintained" }
 global-cx = { path = "../../core/global-cx", package = "rimecraft-global-cx", features = [
     "nbt",
 ] }
+local-cx = { path = "../../core/local-cx", features = [
+    "serde",
+], package = "rimecraft-local-cx" }
 identifier = { path = "../../util/identifier", package = "rimecraft-identifier", features = [
     "vanilla",
     "serde",
