@@ -549,11 +549,8 @@ where
             return false;
         }
 
-        self.iter().all(move |(ty, obj)| {
-            other
-                .get_raw(&*ty)
-                .map_or(false, |o| (ty.f.util.eq)(obj, o))
-        })
+        self.iter()
+            .all(move |(ty, obj)| other.get_raw(&*ty).is_some_and(|o| (ty.f.util.eq)(obj, o)))
     }
 }
 

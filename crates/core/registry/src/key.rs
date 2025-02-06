@@ -214,9 +214,9 @@ pub mod edcode {
         }
     }
 
-    impl<'r, 'de, K, T, B> Decode<'de, B> for RegRef<Key<K, T>>
+    impl<'de, K, T, B> Decode<'de, B> for RegRef<Key<K, T>>
     where
-        K: Decode<'de, B> + Clone + Root + 'r,
+        K: Decode<'de, B> + Clone + Root,
     {
         #[inline]
         fn decode(buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
