@@ -23,6 +23,7 @@ pub mod pool;
 /// Integration with several Rimecraft crates.
 pub mod integration {
     pub mod registry;
+    pub mod text;
 }
 
 pub use identifier::Id;

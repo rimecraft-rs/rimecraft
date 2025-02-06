@@ -23,14 +23,17 @@ identifier = { path = "../../util/identifier", package = "rimecraft-identifier",
     "serde",
 ] }
 fastnbt = "2.5"
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde-update = { path = "../../util/serde-update", package = "rimecraft-serde-update" }
-registry = { path = "../../core/registry", package = "rimecraft-registry", optional = true }
 parking_lot = "0.12"
 freezer = { path = "../../util/freezer", package = "rimecraft-freezer" }
+# core components
+registry = { path = "../../core/registry", package = "rimecraft-registry", optional = true }
+text = { path = "../../core/text", package = "rimecraft-text", optional = true }
 
 [features]
 registry = ["dep:registry"]
+text = ["dep:text"]
 
 [lints]
 workspace = true
