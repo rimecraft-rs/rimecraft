@@ -76,7 +76,9 @@ where
 
         impl<'w, 'de, Cx, L> DeserializeWithCx<'de, L> for Serialized<'w, Cx>
         where
-            Cx: ChunkCx<'w, IntArray: DeserializeOwned>,
+            Cx: ChunkCx<'w, IntArray: DeserializeOwned, Id: Deserialize<'de>>,
+            L: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+                + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
         {
             fn deserialize_with_cx<D>(
                 deserializer: local_cx::WithLocalCx<D, L>,
@@ -134,7 +136,9 @@ where
 
                 impl<'w, 'de, L, Cx> serde::de::Visitor<'de> for Visitor<'w, L, Cx>
                 where
-                    Cx: ChunkCx<'w, IntArray: DeserializeOwned>,
+                    Cx: ChunkCx<'w, IntArray: DeserializeOwned, Id: Deserialize<'de>>,
+                    L: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+                        + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
                 {
                     type Value = Serialized<'w, Cx>;
 
@@ -155,7 +159,7 @@ where
                         let mut indices =
                             vec![std::convert::identity::<Box<[i32]>>(Box::new([])); self.2]
                                 .into_boxed_slice();
-                        let mut sides = 0usize;
+                        let mut sides_key = 0usize;
 
                         let mut block_ticks: Vec<TickedBlock<'w, Cx>> = vec![];
                         let mut fluid_ticks: Vec<TickedFluid<'w, Cx>> = vec![];
@@ -166,14 +170,36 @@ where
                                     &mut indices,
                                     PhantomData::<Cx>,
                                 ))?,
-                                Field::Sides => sides = map.next_value::<u32>()? as usize,
-                                Field::NBlockTicks => todo!(),
-                                Field::NFluidTicks => todo!(),
+                                Field::Sides => sides_key = map.next_value::<u32>()? as usize,
+                                Field::NBlockTicks => {
+                                    map.next_value_seed(TicksSeed::<Cx, RawBlock<'w, Cx>, L>(
+                                        &mut block_ticks,
+                                        self.0,
+                                    ))?
+                                }
+                                Field::NFluidTicks => {
+                                    map.next_value_seed(TicksSeed::<Cx, RawFluid<'w, Cx>, L>(
+                                        &mut fluid_ticks,
+                                        self.0,
+                                    ))?
+                                }
                                 Field::Other => {}
                             }
                         }
 
-                        todo!()
+                        let sides: Vec<_> = EightWayDirection::ALL
+                            .into_iter()
+                            .filter(|dir| (sides_key & 1 << (*dir as u8)) != 0)
+                            .collect();
+
+                        Ok(Serialized {
+                            data: UpgradeData {
+                                sides_to_upgrade: sides,
+                                center_indices_upgrade: indices,
+                                block_ticks,
+                                fluid_ticks,
+                            },
+                        })
                     }
                 }
 
@@ -279,8 +305,60 @@ where
                     }
                 }
 
+                struct TicksSeed<'a, 'w, Cx, T, L>(&'a mut Vec<TickedReg<'w, T, Cx::Id>>, L)
+                where
+                    Cx: ChunkCx<'w>;
+
+                impl<'de, 'w, Cx, T, L> serde::de::Visitor<'de> for TicksSeed<'_, 'w, Cx, T, L>
+                where
+                    Cx: ChunkCx<'w, Id: Deserialize<'de>>,
+                    L: LocalContext<&'w Registry<Cx::Id, T>>,
+                {
+                    type Value = ();
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "a sequence containing ticked registries")
+                    }
+
+                    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                    where
+                        A: serde::de::SeqAccess<'de>,
+                    {
+                        if let Some(len) = seq.size_hint() {
+                            self.0.reserve(len);
+                        }
+                        while let Some(reg) = seq.next_element_seed(
+                            self.1.with(PhantomData::<TickedReg<'w, T, Cx::Id>>),
+                        )? {
+                            self.0.push(reg);
+                        }
+                        Ok(())
+                    }
+                }
+
+                impl<'de, 'w, Cx, T, L> DeserializeSeed<'de> for TicksSeed<'_, 'w, Cx, T, L>
+                where
+                    Cx: ChunkCx<'w, Id: Deserialize<'de>>,
+                    L: LocalContext<&'w Registry<Cx::Id, T>>,
+                {
+                    type Value = ();
+
+                    #[inline]
+                    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+                    where
+                        D: serde::Deserializer<'de>,
+                    {
+                        deserializer.deserialize_seq(self)
+                    }
+                }
+
                 let cx = deserializer.local_cx;
-                deserializer.inner.deserialize_map(Visitor(cx,PhantomData::<&'w Cx>,LENGTH.get()))
+                deserializer
+                    .inner
+                    .deserialize_map(Visitor(cx, PhantomData::<&'w Cx>, LENGTH.get()))
             }
         }
 
