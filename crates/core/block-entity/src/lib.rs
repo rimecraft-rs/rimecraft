@@ -360,7 +360,7 @@ where
     }
 
     /// Gets the block entity constructor of this block.
-    fn block_entity_constructor<'s>(
-        &'s self,
-    ) -> Option<impl FnOnce(BlockPos) -> Box<BlockEntity<'w, Cx>> + 's>;
+    fn block_entity_constructor(
+        &self,
+    ) -> Option<impl FnOnce(BlockPos) -> Box<BlockEntity<'w, Cx>> + '_>;
 }
