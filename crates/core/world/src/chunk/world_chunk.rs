@@ -414,7 +414,7 @@ where
 
         if bs
             .as_ref()
-            .map_or(false, |s| std::ptr::eq(s.state, state.state))
+            .is_some_and(|s| std::ptr::eq(s.state, state.state))
         {
             return None;
         }

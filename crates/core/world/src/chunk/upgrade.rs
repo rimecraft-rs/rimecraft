@@ -62,7 +62,7 @@ where
         let indices_len = height_limit.count_vertical_sections() as usize;
 
         thread_local! {
-            static LENGTH: Cell<usize> = Cell::new(0);
+            static LENGTH: Cell<usize> = const { Cell::new(0) };
         }
 
         LENGTH.set(indices_len);
