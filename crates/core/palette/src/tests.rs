@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use crate::{IndexFromRaw, IndexToRaw, Palette, Strategy};
 use rimecraft_maybe::Maybe;
 
+#[derive(Clone)]
 struct List<const N: usize>;
 
 // Just blanket impl.
@@ -186,4 +187,23 @@ mod edcode {
     helper!(Singular, singular, 0);
     helper!(Array, array, 1);
     helper!(BiMap, bi_map, 1);
+}
+
+mod container {
+    #[cfg(feature = "edcode")]
+    #[test]
+    fn edcode() {
+        use crate::{
+            container::{PalettedContainer, Storage},
+            tests::List,
+            Strategy,
+        };
+
+        let palette: PalettedContainer<List<0>, u8, ()> = PalettedContainer::new(
+            List::<0>,
+            (Strategy::Singular, 0),
+            Storage::Empty(1),
+            vec![36u8],
+        );
+    }
 }
