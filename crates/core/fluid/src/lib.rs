@@ -3,7 +3,7 @@
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::Maybe;
-use rimecraft_registry::{ProvideRegistry, Reg};
+use rimecraft_registry::Reg;
 use rimecraft_state::{State, States};
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
@@ -45,16 +45,6 @@ where
     #[inline]
     pub fn settings(&self) -> &Settings {
         &self.settings
-    }
-}
-
-impl<'r, K, Cx> ProvideRegistry<'r, K, Self> for RawFluid<'r, Cx>
-where
-    Cx: ProvideFluidStateExtTy + ProvideRegistry<'r, K, Self>,
-{
-    #[inline(always)]
-    fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
-        Cx::registry()
     }
 }
 

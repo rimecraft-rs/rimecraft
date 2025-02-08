@@ -149,9 +149,7 @@ where
     /// Returns the ID of an object in the palette.
     pub fn index(&self, object: &T) -> Option<usize> {
         match &self.internal {
-            PaletteImpl::Singular(value) => {
-                value.as_ref().map_or(false, |v| v == object).then_some(0)
-            }
+            PaletteImpl::Singular(value) => (value.as_ref() == Some(object)).then_some(0),
             PaletteImpl::Array(array) => array.iter().position(|val| val == object),
             PaletteImpl::BiMap { reverse, .. } => reverse.get(object).copied(),
             PaletteImpl::Direct => Some(self.list.raw_id(object).unwrap_or(0)),
@@ -247,7 +245,7 @@ impl<L, T> Palette<L, T> {
     }
 
     /// Returns an iterator over the palette.
-    pub fn iter<'a, I>(&'a self) -> Iter<'_, I, T>
+    pub fn iter<'a, I>(&'a self) -> Iter<'a, I, T>
     where
         &'a L: IntoIterator<Item = &'a T, IntoIter = I>,
     {

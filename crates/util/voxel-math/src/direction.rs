@@ -252,7 +252,7 @@ impl AxisDirection {
 #[repr(u8)]
 pub enum EightWayDirection {
     /// Represents [`Direction::North`].
-    North,
+    North = 0,
     /// Represents [`Direction::South`] and [`Direction::East`].
     NorthEast,
     /// Represents [`Direction::East`].

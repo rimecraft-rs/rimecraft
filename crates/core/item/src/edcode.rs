@@ -1,15 +1,17 @@
 use component::{changes::ComponentChanges, map::ComponentMap, RawErasedComponentType};
 use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
-use rimecraft_registry::{ProvideRegistry, Reg};
+use local_cx::{dyn_cx::AsDynamicContext, LocalContext, WithLocalCx};
+use rimecraft_registry::{Reg, Registry};
 
 use crate::{stack::ItemStackCx, Item, ItemSettings, ItemStack, RawItem};
 
-impl<'r, Cx, B> Encode<B> for ItemStack<'r, Cx>
+impl<Cx, B, L> Encode<WithLocalCx<B, L>> for ItemStack<'_, Cx>
 where
-    Cx: ItemStackCx + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>,
+    Cx: ItemStackCx,
     B: BufMut,
+    L: AsDynamicContext,
 {
-    fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
+    fn encode(&self, mut buf: WithLocalCx<B, L>) -> Result<(), edcode2::BoxedError<'static>> {
         if self.is_empty() {
             buf.put_variable(0u32);
             Ok(())
@@ -26,24 +28,25 @@ where
     }
 }
 
-impl<'r, 'de, Cx, B> Decode<'de, B> for ItemStack<'r, Cx>
+impl<'r, 'de, Cx, B, L> Decode<'de, WithLocalCx<B, L>> for ItemStack<'r, Cx>
 where
-    Cx: ItemStackCx<Id: for<'b> Decode<'de, &'b mut B>>
-        + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>
-        + ProvideRegistry<'r, Cx::Id, RawErasedComponentType<'r, Cx>>,
+    Cx: ItemStackCx<Id: for<'b> Decode<'de, WithLocalCx<&'b mut B, L>>>,
     B: Buf,
+    L: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
+        + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>
+        + AsDynamicContext,
 {
-    fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+    fn decode(mut buf: WithLocalCx<B, L>) -> Result<Self, edcode2::BoxedError<'de>> {
         let count: u32 = buf.get_variable();
         if count == 0 {
-            Ok(ItemStack::empty())
+            Ok(ItemStack::empty(buf.local_cx))
         } else {
-            let item = Item::<'r, Cx>::decode(&mut buf)?;
+            let item = Item::<'r, Cx>::decode(buf.as_mut())?;
             let changes = ComponentChanges::<'r, 'r, Cx>::decode(buf)?;
             Ok(ItemStack::with_component(
                 item,
                 count,
-                ComponentMap::with_changes(Reg::into_inner(item).settings().components(), changes),
+                ComponentMap::with_changes(Reg::to_value(item).settings().components(), changes),
             ))
         }
     }

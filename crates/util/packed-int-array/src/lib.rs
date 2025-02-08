@@ -87,7 +87,7 @@ impl PackedIntArray {
         let index_scale = INDEX_PARAMS[i] as isize;
         let index_offset = INDEX_PARAMS[i + 1] as isize;
         let index_shift = INDEX_PARAMS[i + 2] as isize;
-        let j = (len + elements_per_long - 1) / elements_per_long;
+        let j = len.div_ceil(elements_per_long);
 
         if raw.is_some_and(|d| d.len() != j) {
             return Err(Error::InvalidLength {
