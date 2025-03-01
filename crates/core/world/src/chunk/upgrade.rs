@@ -1,14 +1,14 @@
 use std::{cell::Cell, fmt::Debug, hash::Hash, marker::PhantomData};
 
-use local_cx::{serde::DeserializeWithCx, LocalContext, LocalContextExt};
+use local_cx::{LocalContext, LocalContextExt, serde::DeserializeWithCx};
 use rimecraft_block::RawBlock;
 use rimecraft_fluid::RawFluid;
 use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
 use rimecraft_registry::{Reg, Registry};
 use rimecraft_voxel_math::direction::EightWayDirection;
 use serde::{
-    de::{DeserializeOwned, DeserializeSeed},
     Deserialize,
+    de::{DeserializeOwned, DeserializeSeed},
 };
 
 use crate::view::HeightLimit;
@@ -55,7 +55,6 @@ where
         D: serde::Deserializer<'de>,
         Cx::Id: Deserialize<'de>,
         Cx::IntArray: DeserializeOwned,
-
         Local: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
             + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
     {
@@ -385,7 +384,7 @@ where
 }
 
 mod _serde {
-    use local_cx::{serde::DeserializeWithCx, LocalContext};
+    use local_cx::{LocalContext, serde::DeserializeWithCx};
     use rimecraft_registry::Registry;
     use serde::Serialize;
 

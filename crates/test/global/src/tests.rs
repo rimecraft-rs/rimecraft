@@ -1,4 +1,4 @@
-use crate::{pool::Pool, TestId};
+use crate::{TestId, pool::Pool};
 
 #[test]
 fn test_id_single_thread() {

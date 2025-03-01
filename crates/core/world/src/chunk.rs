@@ -9,7 +9,7 @@ use local_cx::LocalContext;
 use parking_lot::{Mutex, RwLock};
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
 use rimecraft_chunk_palette::{
-    container::ProvidePalette, IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
+    IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe, container::ProvidePalette,
 };
 use rimecraft_fluid::ProvideFluidStateExtTy;
 use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
@@ -17,12 +17,12 @@ use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
 
 use crate::{
+    BlockEntityCell, Sealed,
     heightmap::{self, Heightmap},
     view::{
-        block::{BlockLuminanceView, BlockView, LockedBlockViewMut},
         HeightLimit,
+        block::{BlockLuminanceView, BlockView, LockedBlockViewMut},
     },
-    BlockEntityCell, Sealed,
 };
 
 mod internal_types;
@@ -123,11 +123,9 @@ where
         + ProvideStateIds<List = Cx::BlockStateList>
         + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
-
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>
         + Clone,
-
     &'w Registry<Cx::Id, Cx::Biome>: Into<Cx::BiomeList>,
     Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
@@ -166,7 +164,11 @@ where
             section_array: {
                 let len = height_limit.count_vertical_sections() as usize;
                 if let Some(section_array) = section_array {
-                    assert_eq!(section_array.len(), len, "length of given section array should be the count of vertical sections of the chunk");
+                    assert_eq!(
+                        section_array.len(),
+                        len,
+                        "length of given section array should be the count of vertical sections of the chunk"
+                    );
                     section_array
                         .map(|opt| {
                             Mutex::new(opt.unwrap_or_else(|| ChunkSection::from_registries(cx)))

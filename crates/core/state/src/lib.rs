@@ -403,7 +403,7 @@ impl std::error::Error for Error {}
 #[cfg(feature = "serde")]
 mod _serde {
     use rimecraft_serde_update::Update;
-    use serde::{ser::SerializeMap, Serialize};
+    use serde::{Serialize, ser::SerializeMap};
 
     use crate::State;
 

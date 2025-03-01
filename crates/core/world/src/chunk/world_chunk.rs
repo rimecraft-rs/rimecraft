@@ -1,28 +1,27 @@
 //! World chunks.
 
-use local_cx::{dyn_cx::AsDynamicContext, LocalContext};
+use local_cx::{LocalContext, dyn_cx::AsDynamicContext};
 use parking_lot::Mutex;
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
-    component::RawErasedComponentType, BlockEntity, DynRawBlockEntityType, ProvideBlockEntity,
+    BlockEntity, DynRawBlockEntityType, ProvideBlockEntity, component::RawErasedComponentType,
 };
 use rimecraft_chunk_palette::{Maybe, SimpleOwned};
 use rimecraft_fluid::{BsToFs, FluidState};
 use rimecraft_registry::Registry;
 use rimecraft_voxel_math::{BlockPos, IVec3};
-use serde::{de::DeserializeSeed, Deserialize};
+use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{
-    heightmap,
+    Sealed, heightmap,
     view::block::{
         BlockLuminanceView, BlockView, BlockViewMut, LockFreeBlockView, LockedBlockViewMut,
     },
-    Sealed,
 };
 
 use super::{
-    section::ComputeIndex, AsBaseChunk, AsBaseChunkMut, BaseChunk, BlockEntityCell, Chunk, ChunkCx,
-    ChunkMut, BORDER_LEN,
+    AsBaseChunk, AsBaseChunkMut, BORDER_LEN, BaseChunk, BlockEntityCell, Chunk, ChunkCx, ChunkMut,
+    section::ComputeIndex,
 };
 
 use std::{fmt::Debug, sync::Arc};
@@ -86,7 +85,6 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
-
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
         + AsDynamicContext,
@@ -265,7 +263,6 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
-
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
         + AsDynamicContext,

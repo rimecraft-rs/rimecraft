@@ -6,19 +6,19 @@ use ahash::{AHashMap, AHashSet};
 use bytes::{Buf, BufMut};
 use edcode2::{BufExt as _, BufMutExt as _, Decode, Encode};
 use local_cx::{
+    LocalContext, LocalContextExt, WithLocalCx,
     dyn_cx::{AsDynamicContext, UnsafeDynamicContext},
     serde::{DeserializeWithCx, SerializeWithCx},
-    LocalContext, LocalContextExt, WithLocalCx,
 };
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
 use rimecraft_registry::{Reg, Registry};
-use serde::{de::DeserializeSeed, ser::SerializeMap, Serialize};
+use serde::{Serialize, de::DeserializeSeed, ser::SerializeMap};
 
 use crate::{
-    map::{CompTyCell, ComponentMap},
     ComponentType, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
     UnsafeSerdeCodec,
+    map::{CompTyCell, ComponentMap},
 };
 
 /// Changes of components.
@@ -48,15 +48,17 @@ where
     ///
     /// This function could not guarantee lifetime of type `T` is sound.
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
-    pub unsafe fn get<T: 'a>(&self, ty: &ComponentType<'a, T>) -> Option<Option<&T>> { unsafe {
-        let val = self.get_raw(&RawErasedComponentType::from(ty))?;
-        if let Some(val) = val {
-            let downcasted = val.downcast_ref::<T>()?;
-            Some(Some(downcasted))
-        } else {
-            Some(None)
+    pub unsafe fn get<T: 'a>(&self, ty: &ComponentType<'a, T>) -> Option<Option<&T>> {
+        unsafe {
+            let val = self.get_raw(&RawErasedComponentType::from(ty))?;
+            if let Some(val) = val {
+                let downcasted = val.downcast_ref::<T>()?;
+                Some(Some(downcasted))
+            } else {
+                Some(None)
+            }
         }
-    }}
+    }
 
     #[inline]
     fn get_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> Option<Option<&Object<'_>>> {

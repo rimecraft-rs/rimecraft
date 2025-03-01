@@ -39,9 +39,9 @@ where
     }
 
     #[inline(always)]
-    unsafe fn advance_mut(&mut self, cnt: usize) { unsafe {
-        self.inner.advance_mut(cnt)
-    }}
+    unsafe fn advance_mut(&mut self, cnt: usize) {
+        unsafe { self.inner.advance_mut(cnt) }
+    }
 
     #[inline(always)]
     fn chunk_mut(&mut self) -> &mut edcode2::UninitSlice {

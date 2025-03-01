@@ -3,15 +3,15 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use bitflags::bitflags;
-use component::{map::ComponentMap, RawErasedComponentType};
+use component::{RawErasedComponentType, map::ComponentMap};
 use local_cx::{
-    dyn_cx::AsDynamicContext, serde::SerializeWithCx, LocalContext, LocalContextExt as _,
-    WithLocalCx,
+    LocalContext, LocalContextExt as _, WithLocalCx, dyn_cx::AsDynamicContext,
+    serde::SerializeWithCx,
 };
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
-use serde::{de::DeserializeSeed, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeSeed};
 
 use crate::{BlockEntity, DynRawBlockEntityType, RawBlockEntity};
 

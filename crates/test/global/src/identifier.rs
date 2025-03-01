@@ -19,12 +19,14 @@ impl Id {
     /// # Safety
     ///
     /// The namespace and path should be valid in vanilla minecraft.
-    pub const unsafe fn const_new(namespace: &'static str, path: &'static str) -> Self { unsafe {
-        Self(identifier::vanilla::Identifier::new(
-            identifier::vanilla::Namespace::new_unchecked(namespace),
-            identifier::vanilla::Path::new_unchecked(path),
-        ))
-    }}
+    pub const unsafe fn const_new(namespace: &'static str, path: &'static str) -> Self {
+        unsafe {
+            Self(identifier::vanilla::Identifier::new(
+                identifier::vanilla::Namespace::new_unchecked(namespace),
+                identifier::vanilla::Path::new_unchecked(path),
+            ))
+        }
+    }
 }
 
 impl Display for Id {

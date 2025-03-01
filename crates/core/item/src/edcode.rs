@@ -1,9 +1,9 @@
-use component::{changes::ComponentChanges, map::ComponentMap, RawErasedComponentType};
+use component::{RawErasedComponentType, changes::ComponentChanges, map::ComponentMap};
 use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
-use local_cx::{dyn_cx::AsDynamicContext, LocalContext, WithLocalCx};
+use local_cx::{LocalContext, WithLocalCx, dyn_cx::AsDynamicContext};
 use rimecraft_registry::{Reg, Registry};
 
-use crate::{stack::ItemStackCx, Item, ItemSettings, ItemStack, RawItem};
+use crate::{Item, ItemSettings, ItemStack, RawItem, stack::ItemStackCx};
 
 impl<Cx, B, L> Encode<WithLocalCx<B, L>> for ItemStack<'_, Cx>
 where

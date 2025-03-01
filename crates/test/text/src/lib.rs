@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 #![cfg(test)]
 
-use test_global::{integration::text::TextContent, TestContext};
-use text::{style::Formatting, Text};
+use test_global::{TestContext, integration::text::TextContent};
+use text::{Text, style::Formatting};
 
 #[test]
 fn serde() {
