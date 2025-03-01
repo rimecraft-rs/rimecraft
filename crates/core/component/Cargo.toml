@@ -1,7 +1,7 @@
 [package]
 name = "rimecraft-component"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Minecraft Component implementation"
 repository = "https://github.com/rimecraft-rs/rimecraft/"

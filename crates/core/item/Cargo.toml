@@ -1,7 +1,7 @@
 [package]
 name = "rimecraft-item"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = [
     "JieningYu <jiening.yu@outlook.com>",
     "C191239 <zhushunzhong2025@i.pkuschool.edu.cn>",
