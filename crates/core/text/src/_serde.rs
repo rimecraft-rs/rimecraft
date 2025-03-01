@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{style::Style, Plain, RawText};
+use crate::{Plain, RawText, style::Style};
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]

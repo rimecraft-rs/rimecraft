@@ -1,7 +1,7 @@
 [package]
 name = "rimecraft-test-text"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "essential tests for rimecraft-text that require a context"
 repository = "https://github.com/rimecraft-rs/rimecraft/"

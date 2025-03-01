@@ -136,8 +136,8 @@ impl PackedIntArray {
         let l = &mut self.data[i];
         let lo = *l;
         let j = (index - i * self.elements_per_long) * self.element_bits as usize;
-        *l = *l & !(self.max << j) | (value as u64 & self.max) << j;
-        Some((lo >> j & self.max) as u32)
+        *l = *l & !(self.max << j) | ((value as u64 & self.max) << j);
+        Some(((lo >> j) & self.max) as u32)
     }
 
     /// Sets the data at given `index` with given value.
@@ -159,7 +159,7 @@ impl PackedIntArray {
 
         let i = self.storage_index(index);
         let j = (index - i * self.elements_per_long) * self.element_bits as usize;
-        self.data[i] &= !(self.max << j) | (value as u64 & self.max) << j;
+        self.data[i] &= !(self.max << j) | ((value as u64 & self.max) << j);
     }
 
     /// Gets the value at target index.
@@ -170,7 +170,7 @@ impl PackedIntArray {
         let i = self.storage_index(index);
         let l = self.data[i];
         let j = (index - i * self.elements_per_long) * self.element_bits as usize;
-        Some((l >> j & self.max) as u32)
+        Some(((l >> j) & self.max) as u32)
     }
 
     /// Gets the inner packed data of this array.

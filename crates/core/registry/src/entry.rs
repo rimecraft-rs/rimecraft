@@ -127,7 +127,7 @@ impl<K: std::fmt::Debug, T> std::fmt::Debug for TagsGuard<'_, K, T> {
 mod serde {
     use std::hash::Hash;
 
-    use local_cx::{serde::DeserializeWithCx, LocalContext};
+    use local_cx::{LocalContext, serde::DeserializeWithCx};
 
     use crate::{Reg, Registry};
 

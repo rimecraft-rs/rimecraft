@@ -2,18 +2,18 @@
 
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicU64, LazyLock},
+    sync::{LazyLock, atomic::AtomicU64},
     thread::ThreadId,
 };
 
 use global_cx::{
-    nbt::{ReadNbt, UpdateNbt, WriteNbt},
     GlobalContext, ProvideIdTy, ProvideNbtTy, ProvideVersionTy,
+    nbt::{ReadNbt, UpdateNbt, WriteNbt},
 };
 use local_cx::{
+    BaseLocalContext, LocalContextExt as _, WithLocalCx,
     nbt::{ReadNbtWithCx, UpdateNbtWithCx, WriteNbtWithCx},
     serde::{DeserializeWithCx, SerializeWithCx},
-    BaseLocalContext, LocalContextExt as _, WithLocalCx,
 };
 use parking_lot::Mutex;
 

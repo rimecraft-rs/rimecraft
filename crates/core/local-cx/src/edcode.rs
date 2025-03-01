@@ -40,7 +40,7 @@ where
 
     #[inline(always)]
     unsafe fn advance_mut(&mut self, cnt: usize) {
-        self.inner.advance_mut(cnt)
+        unsafe { self.inner.advance_mut(cnt) }
     }
 
     #[inline(always)]

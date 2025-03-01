@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, hash::Hash};
 
-use crate::{key::Key, Registry};
+use crate::{Registry, key::Key};
 
 /// Key of a tag.
 pub struct TagKey<K, T> {
@@ -114,7 +114,7 @@ impl<'a, K, T> Iterator for Iter<'a, K, T> {
 pub mod serde {
     use std::{marker::PhantomData, str::FromStr};
 
-    use local_cx::{serde::DeserializeWithCx, LocalContext};
+    use local_cx::{LocalContext, serde::DeserializeWithCx};
 
     use crate::Registry;
 

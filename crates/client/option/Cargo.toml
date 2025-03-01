@@ -1,7 +1,7 @@
 [package]
 name = "rimecraft-option"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["KrLite"]
 description = "Minecraft game options"
 repository = "https://github.com/rimecraft-rs/rimecraft/"

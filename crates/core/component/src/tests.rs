@@ -4,17 +4,17 @@ use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use fastnbt::DeOpts;
 use local_cx::{
+    BaseLocalContext, LocalContext, LocalContextExt,
     dyn_cx::{AsDynamicContext, ContextTable, DynamicContext},
     serde::DeserializeWithCx,
-    BaseLocalContext, LocalContext, LocalContextExt,
 };
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{Registry, RegistryKey, RegistryMut};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    changes::ComponentChanges, map::ComponentMap, ComponentType, PacketCodec,
-    RawErasedComponentType, SerdeCodec,
+    ComponentType, PacketCodec, RawErasedComponentType, SerdeCodec, changes::ComponentChanges,
+    map::ComponentMap,
 };
 
 use test_global::TestContext as Context;
