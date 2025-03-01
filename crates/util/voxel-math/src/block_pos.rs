@@ -114,7 +114,7 @@ impl From<BlockPos> for i64 {
         let mut l = 0i64;
         l |= (x as i64 & BITS_X) << BIT_SHIFT_X;
         l |= y as i64 & BITS_Y;
-        l | (z as i64 & BITS_Z) << BIT_SHIFT_Z
+        l | ((z as i64 & BITS_Z) << BIT_SHIFT_Z)
     }
 }
 

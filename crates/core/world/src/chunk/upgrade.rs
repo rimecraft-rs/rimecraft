@@ -189,7 +189,7 @@ where
 
                         let sides: Vec<_> = EightWayDirection::ALL
                             .into_iter()
-                            .filter(|dir| (sides_key & 1 << (*dir as u8)) != 0)
+                            .filter(|dir| (sides_key & (1 << (*dir as u8))) != 0)
                             .collect();
 
                         Ok(Serialized {

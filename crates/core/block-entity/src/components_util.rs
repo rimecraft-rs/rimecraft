@@ -23,10 +23,10 @@ where
     ///
     /// This function could not guarantee lifetime of type `T` is sound.
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
-    pub unsafe fn get<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<&T> {
+    pub unsafe fn get<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<&T> { unsafe {
         self.set.insert(RawErasedComponentType::from(ty));
         self.map.get(ty)
-    }
+    }}
 
     /// Reborrow this access.
     pub fn reborrow(&mut self) -> ComponentsAccess<'_, 'a, Cx> {

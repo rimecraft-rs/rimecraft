@@ -188,10 +188,10 @@ where
     pub unsafe fn get_key_value<T>(
         &self,
         ty: &ComponentType<'a, T>,
-    ) -> Option<(ErasedComponentType<'a, Cx>, &T)> {
+    ) -> Option<(ErasedComponentType<'a, Cx>, &T)> { unsafe {
         self.get_key_value_raw(&RawErasedComponentType::from(ty))
             .and_then(|(k, v)| v.downcast_ref().map(|v| (k, v)))
-    }
+    }}
 
     /// Gets the component and its type registration with given type.
     ///
@@ -342,7 +342,7 @@ where
     }
 
     #[inline]
-    unsafe fn remove_untracked<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'_, T>> {
+    unsafe fn remove_untracked<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'_, T>> { unsafe {
         match &mut self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => {
@@ -370,7 +370,7 @@ where
                 .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
                 .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
         }
-    }
+    }}
 
     #[inline]
     fn track_add(&mut self) {

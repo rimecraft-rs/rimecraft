@@ -141,8 +141,7 @@ where
     /// Returns the block state at the given position.
     #[inline]
     pub fn block_state(&self, x: u32, y: u32, z: u32) -> Option<Maybe<'_, BlockState<'w, Cx>>> {
-        self.bsc.get(Cx::compute_index(x, y, z)).map(From::from)
-    }
+        self.bsc.get(Cx::compute_index(x, y, z))}
 
     /// Returns the fluid state at the given position.
     #[inline]
@@ -292,7 +291,7 @@ pub trait ComputeIndex<L, T>: ProvidePalette<L, T> {
     /// The number type is unsigned because the index will overflow when it's negative.
     #[inline]
     fn compute_index(x: u32, y: u32, z: u32) -> usize {
-        ((y << Self::EDGE_BITS | z) << Self::EDGE_BITS | x) as usize
+        ((((y << Self::EDGE_BITS) | z) << Self::EDGE_BITS) | x) as usize
     }
 }
 

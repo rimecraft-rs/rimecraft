@@ -48,7 +48,7 @@ where
     ///
     /// This function could not guarantee lifetime of type `T` is sound.
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
-    pub unsafe fn get<T: 'a>(&self, ty: &ComponentType<'a, T>) -> Option<Option<&T>> {
+    pub unsafe fn get<T: 'a>(&self, ty: &ComponentType<'a, T>) -> Option<Option<&T>> { unsafe {
         let val = self.get_raw(&RawErasedComponentType::from(ty))?;
         if let Some(val) = val {
             let downcasted = val.downcast_ref::<T>()?;
@@ -56,7 +56,7 @@ where
         } else {
             Some(None)
         }
-    }
+    }}
 
     #[inline]
     fn get_raw(&self, ty: &RawErasedComponentType<'a, Cx>) -> Option<Option<&Object<'_>>> {
