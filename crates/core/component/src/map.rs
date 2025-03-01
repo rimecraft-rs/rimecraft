@@ -341,34 +341,32 @@ where
 
     #[inline]
     unsafe fn remove_untracked<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'_, T>> {
-        unsafe {
-            match &mut self.0 {
-                MapInner::Empty => None,
-                MapInner::Patched { base, changes, .. } => {
-                    let era_ty = &RawErasedComponentType::from(ty);
-                    let old = base.get_key_value_raw(era_ty);
-                    let now = changes.get_mut(era_ty);
-                    match (old, now) {
-                        (Some((k, v)), None) => {
-                            changes.insert(CompTyCell(k), None);
-                            v.downcast_ref::<T>().map(Maybe::Borrowed)
-                        }
-                        (Some(_), Some(now)) => now
-                            .take()
-                            .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
-                            .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
-                        (None, Some(_)) => changes
-                            .remove(era_ty)?
-                            .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
-                            .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
-                        (None, None) => None,
+        match &mut self.0 {
+            MapInner::Empty => None,
+            MapInner::Patched { base, changes, .. } => {
+                let era_ty = &RawErasedComponentType::from(ty);
+                let old = base.get_key_value_raw(era_ty);
+                let now = changes.get_mut(era_ty);
+                match (old, now) {
+                    (Some((k, v)), None) => {
+                        changes.insert(CompTyCell(k), None);
+                        unsafe { v.downcast_ref::<T>().map(Maybe::Borrowed) }
                     }
+                    (Some(_), Some(now)) => now
+                        .take()
+                        .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
+                        .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
+                    (None, Some(_)) => changes
+                        .remove(era_ty)?
+                        .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
+                        .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
+                    (None, None) => None,
                 }
-                MapInner::Simple(map) => map
-                    .remove(&RawErasedComponentType::from(ty))
-                    .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
-                    .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
             }
+            MapInner::Simple(map) => map
+                .remove(&RawErasedComponentType::from(ty))
+                .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
+                .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
         }
     }
 
