@@ -1,6 +1,6 @@
 //! Types and traits for working with chunks in a world.
 //!
-//! A chunk represents a scoped, mutable view of `Biome`s, [`BlockState`]s, [`FluidState`]s and [`BlockEntity`]s.
+//! A chunk represents a scoped, mutable view of `Biome`s, `BlockState`s, `FluidState`s and `BlockEntity`s.
 
 use std::{fmt::Debug, hash::Hash};
 

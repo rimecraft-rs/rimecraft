@@ -43,7 +43,7 @@ impl Default for Flags {
     }
 }
 
-/// Data flagged by [`SerializeFlags`], for serialization.
+/// Data flagged by [`Flags`], for serialization.
 #[derive(Debug)]
 pub struct Flagged<T>(pub T, pub Flags);
 
@@ -178,7 +178,7 @@ impl<'de> Deserialize<'de> for Field<'de> {
     }
 }
 
-/// This serializes the block entity using default value of [`SerializeFlags`].
+/// This serializes the block entity using default value of [`Flags`].
 impl<T, Cx, L> SerializeWithCx<L> for RawBlockEntity<'_, T, Cx>
 where
     Cx: ProvideBlockStateExtTy,

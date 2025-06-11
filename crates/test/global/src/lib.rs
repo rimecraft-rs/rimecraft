@@ -203,7 +203,7 @@ impl TestId {
     /// Get the test ID of the current thread.
     ///
     /// If the test ID is not set for this thread, a new one will be generated.
-    /// See [`capture`] for setting the test ID manually.
+    /// See [`Self::capture`] for setting the test ID manually.
     pub fn current() -> Self {
         let thread_id = std::thread::current().id();
         let mut tests = TESTS.lock();
