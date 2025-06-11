@@ -38,3 +38,15 @@ impl<T> From<T> for Sealed<T> {
 
 /// Boxed block entity cell with internal mutability and reference-counting.
 pub type BlockEntityCell<'w, Cx> = Arc<Mutex<Box<BlockEntity<'w, Cx>>>>;
+
+// PLACEHOLDERS
+
+/// Placeholder of type `ServerWorld`.
+pub type ServerWorld<'w, Cx> = placeholder::ServerWorld<'w, Cx>;
+
+#[allow(missing_docs, missing_debug_implementations)]
+mod placeholder {
+    use std::marker::PhantomData;
+
+    pub struct ServerWorld<'w, Cx>(PhantomData<&'w Cx>);
+}
