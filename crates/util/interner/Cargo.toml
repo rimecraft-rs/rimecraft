@@ -12,7 +12,7 @@ categories = ["data-structure"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-dashmap = "5.5"
+dashmap = "6.1"
 
 [lints]
 workspace = true
