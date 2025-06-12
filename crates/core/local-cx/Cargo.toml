@@ -21,9 +21,10 @@ ahash = { version = "0.8", optional = true }
 
 [features]
 serde = ["dep:serde"]
-erased-serde = ["dep:erased-serde"]
+erased-serde = ["dep:erased-serde", "serde"]
 edcode = ["dep:edcode2"]
 dyn-cx = ["dep:typeid", "dep:ahash"]
+dyn-codecs = ["erased-serde", "edcode", "dyn-cx"]
 
 [lints]
 workspace = true

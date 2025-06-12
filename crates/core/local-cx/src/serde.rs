@@ -115,7 +115,7 @@ where
 mod erased {
     use std::{cell::Cell, marker::PhantomData};
 
-    use crate::{BaseLocalContext, WithLocalCx};
+    use crate::{BaseLocalContext, WithLocalCx, dyn_cx::UnsafeDynamicContext};
 
     use super::SerializeWithCx;
 

@@ -402,7 +402,7 @@ where
         {
             let IVec3 { x, y, z } = pos_alt;
             bs = section
-                .set_block_state(x as u32, y as u32, z as u32, state.clone())
+                .set_block_state(x as u32, y as u32, z as u32, state)
                 .map(|maybe| match maybe {
                     Maybe::Borrowed(bs) => bs.clone(),
                     Maybe::Owned(SimpleOwned(bs)) => bs,

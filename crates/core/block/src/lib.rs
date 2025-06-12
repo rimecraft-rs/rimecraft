@@ -142,16 +142,15 @@ where
     }
 }
 
+impl<Cx> Copy for BlockState<'_, Cx> where Cx: ProvideBlockStateExtTy {}
+
 impl<Cx> Clone for BlockState<'_, Cx>
 where
     Cx: ProvideBlockStateExtTy,
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            block: self.block,
-            state: self.state,
-        }
+        *self
     }
 }
 
