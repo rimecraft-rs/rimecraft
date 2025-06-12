@@ -4,14 +4,16 @@
 
 use std::fmt::Debug;
 
-use glam::Vec3;
+use ahash::AHashSet;
+use glam::DVec3;
 use local_cx::dyn_codecs::{EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
 use maybe::Maybe;
+use parking_lot::Mutex;
 use rimecraft_block::BlockState;
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
 
-use crate::{Entity, ServerWorld, World, chunk::ChunkCx};
+use crate::{Entity, World, chunk::ChunkCx};
 
 /// Raw type of a [`GameEvent`], consisting of its notification radius.
 #[derive(Debug)]
@@ -60,10 +62,10 @@ where
     /// Listens to an incoming game event.
     fn listen(
         &mut self,
-        world: &ServerWorld<'w, Cx>,
+        world: &World<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
-        emitter_pos: Vec3,
+        emitter_pos: DVec3,
     ) -> ListenResult;
 
     /// Gets the range of this listener, in blocks.
@@ -87,17 +89,17 @@ where
 {
     fn _erased_listen(
         &mut self,
-        world: &ServerWorld<'w, Cx>,
+        world: &World<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
-        emitter_pos: Vec3,
+        emitter_pos: DVec3,
     ) -> ListenResult;
     fn _erased_range(&self) -> u32;
     fn _erased_position_source(&self) -> &dyn PositionSource<'w, Cx>;
     fn _erased_trigger_order(&self) -> TriggerOrder;
 
     // Flatten position source
-    fn _erased_ps_pos(&self, world: &World<'w, Cx>) -> Option<Vec3>;
+    fn _erased_ps_pos(&self, world: &World<'w, Cx>) -> Option<DVec3>;
     fn _erased_ps_ty(&self) -> PositionSourceType<'w, Cx>;
 }
 
@@ -115,30 +117,25 @@ where
 {
     fn _erased_listen(
         &mut self,
-        world: &ServerWorld<'w, Cx>,
+        world: &World<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
-        emitter_pos: Vec3,
+        emitter_pos: DVec3,
     ) -> ListenResult {
         self.listen(world, event, emitter, emitter_pos)
     }
-
     fn _erased_range(&self) -> u32 {
         self.range()
     }
-
     fn _erased_position_source(&self) -> &dyn PositionSource<'w, Cx> {
         self.position_source()
     }
-
     fn _erased_trigger_order(&self) -> TriggerOrder {
         self.trigger_order()
     }
-
-    fn _erased_ps_pos(&self, world: &World<'w, Cx>) -> Option<Vec3> {
+    fn _erased_ps_pos(&self, world: &World<'w, Cx>) -> Option<DVec3> {
         self.position_source().pos(world)
     }
-
     fn _erased_ps_ty(&self) -> PositionSourceType<'w, Cx> {
         self.position_source().ty()
     }
@@ -246,13 +243,147 @@ where
     }
 }
 
+type BoxedListener<'w, Cx> = Box<dyn ErasedListener<'w, Cx> + Send + Sync + 'w>;
+
+/// Dispatcher of game events and their listeners.
+///
+/// This dispatcher comes with internal mutability and multi-thread support,
+/// as like the one in vanilla Minecraft.
+pub struct Dispatcher<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    listeners: Mutex<Vec<BoxedListener<'w, Cx>>>,
+    buf: Mutex<DispatcherBuf<'w, Cx>>,
+}
+
+/// Key of a dispatched listener.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct ListenerKey(*const ());
+
+unsafe impl Send for ListenerKey {}
+unsafe impl Sync for ListenerKey {}
+
+struct DispatcherBuf<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    push: Vec<BoxedListener<'w, Cx>>,
+    pop: AHashSet<ListenerKey>,
+}
+
+impl<'w, Cx> Dispatcher<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    /// Creates a new dispatcher.
+    pub fn new() -> Self {
+        Self {
+            listeners: Mutex::new(Vec::new()),
+            buf: Mutex::new(DispatcherBuf {
+                push: Vec::new(),
+                pop: AHashSet::new(),
+            }),
+        }
+    }
+
+    /// Whether this dispatcher is empty.
+    pub fn is_empty(&self) -> bool {
+        self.listeners.lock().is_empty()
+    }
+
+    /// Pushes a listener to this dispatcher.
+    pub fn push<T>(&self, listener: T) -> ListenerKey
+    where
+        T: Listener<'w, Cx> + Send + Sync + 'w,
+    {
+        let boxed = Box::new(listener);
+        let ptr = &*boxed as *const T as *const ();
+        if let Some(mut guard) = self.listeners.try_lock() {
+            guard.push(boxed);
+        } else {
+            self.buf.lock().push.push(boxed);
+        }
+        ListenerKey(ptr)
+    }
+
+    /// Removes a listener from this dispatcher if present.
+    pub fn remove(&self, key: ListenerKey) {
+        if let Some(mut guard) = self.listeners.try_lock() {
+            // maybe we can switch to thing like hashmap to reduce complexity?
+            if let Some(i) = guard
+                .iter()
+                .enumerate()
+                .find(|(_, l)| &***l as *const _ as *const () == key.0)
+                .map(|(i, _)| i)
+            {
+                guard.swap_remove(i);
+            }
+        } else {
+            self.buf.lock().pop.insert(key);
+        }
+        //TODO: garbage collection if empty
+    }
+
+    /// Dispatches an event to all the listeners in this dispatcher.
+    /// Firing event to any listener should be done by given `callback`, who receives listener and its position.
+    ///
+    /// Returns whether at least one callback was triggered.
+    pub fn dispatch<F>(&self, world: &World<'w, Cx>, pos: DVec3, mut callback: F) -> bool
+    where
+        F: for<'env> FnMut(&'env mut dyn ErasedListener<'w, Cx>, DVec3),
+    {
+        let mut vg = self.listeners.lock();
+        let mut visited = false;
+        for listener in &mut *vg {
+            if let Some(sp) = listener._erased_ps_pos(world) {
+                let d = sp.floor().distance_squared(pos.floor());
+                let i = listener._erased_range().pow(2) as f64;
+                if d <= i {
+                    callback(&mut **listener, sp);
+                    visited = true;
+                }
+            }
+        }
+
+        let mut buf = self.buf.lock();
+        vg.extend(std::mem::take(&mut buf.push));
+        vg.retain(|l| {
+            !buf.pop
+                .contains(&ListenerKey(&**l as *const _ as *const ()))
+        });
+        buf.pop.clear();
+
+        visited
+    }
+}
+
+impl<'w, Cx> Debug for Dispatcher<'w, Cx>
+where
+    Cx: ChunkCx<'w, Id: Debug>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Dispatcher")
+            .field(
+                "listeners",
+                &self
+                    .listeners
+                    .lock()
+                    .iter()
+                    .map(|l| l._erased_ps_ty())
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
+    }
+}
+
 /// A property of a game event listener which provides position of an in-game object.
 pub trait PositionSource<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
     /// Gets position of this source.
-    fn pos(&self, world: &World<'w, Cx>) -> Option<Vec3>;
+    fn pos(&self, world: &World<'w, Cx>) -> Option<DVec3>;
 
     /// Gets the type of this position source.
     fn ty(&self) -> PositionSourceType<'w, Cx>;

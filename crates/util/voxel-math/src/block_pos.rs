@@ -1,6 +1,6 @@
 //! Position types.
 
-use glam::IVec3;
+use glam::{DVec3, IVec3};
 
 /// A position of a block in a three-dimensional volume.
 ///
@@ -55,6 +55,13 @@ impl From<BlockPos> for IVec3 {
     #[inline]
     fn from(pos: BlockPos) -> Self {
         pos.0
+    }
+}
+
+impl From<BlockPos> for DVec3 {
+    #[inline]
+    fn from(value: BlockPos) -> Self {
+        IVec3::from(value).into()
     }
 }
 
