@@ -4,12 +4,14 @@
 
 use std::fmt::Debug;
 
+use glam::Vec3;
+use local_cx::dyn_codecs::{EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
 use maybe::Maybe;
 use rimecraft_block::BlockState;
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
 
-use crate::{Entity, ServerWorld, chunk::ChunkCx};
+use crate::{Entity, ServerWorld, World, chunk::ChunkCx};
 
 /// Raw type of a [`GameEvent`], consisting of its notification radius.
 #[derive(Debug)]
@@ -46,26 +48,99 @@ impl Default for RawGameEvent {
 pub type GameEvent<'w, Cx> = Reg<'w, <Cx as ProvideIdTy>::Id, RawGameEvent>;
 
 /// A game event listener listens to [`GameEvent`]s from dispatchers.
+///
+/// See [`ErasedListener`] for type-erasure.
 pub trait Listener<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
+    /// Type of this listener's [`PositionSource`].
+    type PositionSource: PositionSource<'w, Cx>;
+
     /// Listens to an incoming game event.
     fn listen(
         &mut self,
         world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
-        //TODO vec3d emitter position
+        emitter_pos: Vec3,
     ) -> ListenResult;
 
     /// Gets the range of this listener, in blocks.
     fn range(&self) -> u32;
 
+    /// Gets this listener's position source.
+    fn position_source(&self) -> &Self::PositionSource;
+
     /// Gets this listener's trigger order.
     #[inline(always)]
     fn trigger_order(&self) -> TriggerOrder {
         Default::default()
+    }
+}
+
+/// Dyn-compatible [`Listener`].
+#[allow(missing_docs)]
+pub trait ErasedListener<'w, Cx>: sealed::Sealed<Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    fn _erased_listen(
+        &mut self,
+        world: &ServerWorld<'w, Cx>,
+        event: GameEvent<'w, Cx>,
+        emitter: Emitter<'_, 'w, Cx>,
+        emitter_pos: Vec3,
+    ) -> ListenResult;
+    fn _erased_range(&self) -> u32;
+    fn _erased_position_source(&self) -> &dyn PositionSource<'w, Cx>;
+    fn _erased_trigger_order(&self) -> TriggerOrder;
+
+    // Flatten position source
+    fn _erased_ps_pos(&self, world: &World<'w, Cx>) -> Option<Vec3>;
+    fn _erased_ps_ty(&self) -> PositionSourceType<'w, Cx>;
+}
+
+impl<'w, T, Cx> sealed::Sealed<Cx> for T
+where
+    T: Listener<'w, Cx>,
+    Cx: ChunkCx<'w>,
+{
+}
+
+impl<'w, T, Cx> ErasedListener<'w, Cx> for T
+where
+    T: Listener<'w, Cx>,
+    Cx: ChunkCx<'w>,
+{
+    fn _erased_listen(
+        &mut self,
+        world: &ServerWorld<'w, Cx>,
+        event: GameEvent<'w, Cx>,
+        emitter: Emitter<'_, 'w, Cx>,
+        emitter_pos: Vec3,
+    ) -> ListenResult {
+        self.listen(world, event, emitter, emitter_pos)
+    }
+
+    fn _erased_range(&self) -> u32 {
+        self.range()
+    }
+
+    fn _erased_position_source(&self) -> &dyn PositionSource<'w, Cx> {
+        self.position_source()
+    }
+
+    fn _erased_trigger_order(&self) -> TriggerOrder {
+        self.trigger_order()
+    }
+
+    fn _erased_ps_pos(&self, world: &World<'w, Cx>) -> Option<Vec3> {
+        self.position_source().pos(world)
+    }
+
+    fn _erased_ps_ty(&self) -> PositionSourceType<'w, Cx> {
+        self.position_source().ty()
     }
 }
 
@@ -169,4 +244,42 @@ where
             .field(&self.dst)
             .finish()
     }
+}
+
+/// A property of a game event listener which provides position of an in-game object.
+pub trait PositionSource<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    /// Gets position of this source.
+    fn pos(&self, world: &World<'w, Cx>) -> Option<Vec3>;
+
+    /// Gets the type of this position source.
+    fn ty(&self) -> PositionSourceType<'w, Cx>;
+}
+
+/// Raw type of a `PositionSource` with its type erased, consisting of codecs.
+#[derive(Debug)]
+pub struct RawPositionSourceType<'a> {
+    serde: UnsafeSerdeCodec<'a>,
+    packet: UnsafeEdcodeCodec<'a>,
+}
+
+/// Registry entry of [`RawPositionSourceType`].
+pub type PositionSourceType<'a, Cx> = Reg<'a, <Cx as ProvideIdTy>::Id, RawPositionSourceType<'a>>;
+
+impl<'a> RawPositionSourceType<'a> {
+    /// Creates a new position source type from codecs.
+    #[inline]
+    pub const fn new<T>(serde_codec: SerdeCodec<'a, T>, packet_codec: EdcodeCodec<'a, T>) -> Self {
+        Self {
+            serde: serde_codec.to_unsafe(),
+            packet: packet_codec.to_unsafe(),
+        }
+    }
+}
+
+#[allow(missing_docs)]
+mod sealed {
+    pub trait Sealed<Cx> {}
 }

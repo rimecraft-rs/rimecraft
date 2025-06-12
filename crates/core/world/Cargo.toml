@@ -33,6 +33,7 @@ serde_repr = "0.1"
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 parking_lot = "0.12"
 ahash = "0.8"
+glam = "0.30"
 
 [features]
 default = ["edcode"]
