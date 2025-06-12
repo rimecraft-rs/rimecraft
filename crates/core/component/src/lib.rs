@@ -241,7 +241,7 @@ pub struct RawErasedComponentType<'a, Cx> {
 }
 
 /// Codec for serialization and deserialization.
-#[deprecated]
+#[deprecated = "use local-cx-provided instead"]
 #[derive(Debug, Clone, Copy)]
 pub struct SerdeCodec<'a, T> {
     codec: UnsafeSerdeCodec<'a>,
@@ -250,7 +250,7 @@ pub struct SerdeCodec<'a, T> {
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
-#[deprecated]
+#[deprecated = "use local-cx-provided instead"]
 struct UnsafeSerdeCodec<'a> {
     ser: for<'s, 'o> fn(
         &'s WithLocalCx<&'o Object<'a>, UnsafeDynamicContext<'_>>,
@@ -263,7 +263,7 @@ struct UnsafeSerdeCodec<'a> {
 
 /// Codec for packet encoding and decoding.
 #[derive(Debug, Clone, Copy)]
-#[deprecated]
+#[deprecated = "use local-cx-provided instead"]
 pub struct PacketCodec<'a, T> {
     codec: UnsafePacketCodec<'a>,
     _marker: PhantomData<T>,
@@ -271,7 +271,7 @@ pub struct PacketCodec<'a, T> {
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
-#[deprecated]
+#[deprecated = "use local-cx-provided instead"]
 struct UnsafePacketCodec<'a> {
     encode: fn(
         &'_ Object<'a>,
