@@ -2,6 +2,8 @@
 //!
 //! This is completely different from `rimecraft-event` as the former one is way more generalized.
 
+//TODO: funtion of dispatch manager, which requires interacting with a world instance.
+
 use std::fmt::Debug;
 
 use ahash::AHashSet;
@@ -322,13 +324,12 @@ where
         } else {
             self.buf.lock().pop.insert(key);
         }
-        //TODO: garbage collection if empty
     }
 
-    /// Dispatches an event to all the listeners in this dispatcher.
+    /// Dispatches all the listeners in this dispatcher.
     /// Firing event to any listener should be done by given `callback`, who receives listener and its position.
     ///
-    /// Returns whether at least one callback was triggered.
+    /// Returns whether the callback was triggered.
     pub fn dispatch<F>(&self, world: &World<'w, Cx>, pos: DVec3, mut callback: F) -> bool
     where
         F: for<'env> FnMut(&'env mut dyn ErasedListener<'w, Cx>, DVec3),
