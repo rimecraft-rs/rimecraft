@@ -3,15 +3,16 @@
 
 #![cfg(feature = "dyn-codecs")]
 
-use std::{any::TypeId, marker::PhantomData};
+use std::{any::TypeId, fmt::Debug, marker::PhantomData};
 
-use edcode2::{Buf, BufMut, Decode, Encode};
+use edcode2::{Buf, BufMut};
 
-use crate::{
-    LocalContextExt, WithLocalCx,
-    dyn_cx::UnsafeDynamicContext,
-    serde::{DeserializeWithCx, SerializeWithCx},
-};
+use crate::{WithLocalCx, dyn_cx::UnsafeDynamicContext};
+
+#[doc(hidden)]
+pub use edcode2::{Decode, Encode};
+#[doc(hidden)]
+pub use erased_serde::Serialize;
 
 /// An 'any' trait without any type restriction.
 pub trait Any {
@@ -24,7 +25,7 @@ pub trait Any {
 
 impl<T: ?Sized> Any for T {}
 
-impl dyn Any + Send + Sync + '_ {
+impl dyn Any + '_ {
     /// Downcast [`Any`] type with type checked.
     ///
     /// # Safety
@@ -32,7 +33,7 @@ impl dyn Any + Send + Sync + '_ {
     /// Lifetime not guaranteed.
     pub unsafe fn downcast_ref<T>(&self) -> Option<&T> {
         if (*self).type_id() == typeid::of::<T>() {
-            unsafe { Some(&*(std::ptr::from_ref::<dyn Any + Send + Sync + '_>(self) as *const T)) }
+            unsafe { Some(&*(std::ptr::from_ref::<dyn Any + '_>(self) as *const T)) }
         } else {
             None
         }
@@ -45,9 +46,7 @@ impl dyn Any + Send + Sync + '_ {
     /// Lifetime not guaranteed.
     pub unsafe fn downcast_mut<T>(&mut self) -> Option<&mut T> {
         if (*self).type_id() == typeid::of::<T>() {
-            unsafe {
-                Some(&mut *(std::ptr::from_mut::<dyn Any + Send + Sync + '_>(self) as *mut T))
-            }
+            unsafe { Some(&mut *(std::ptr::from_mut::<dyn Any + '_>(self) as *mut T)) }
         } else {
             None
         }
@@ -59,9 +58,7 @@ impl dyn Any + Send + Sync + '_ {
 /// # Safety
 ///
 /// Lifetime not guaranteed.
-pub unsafe fn downcast_boxed<'a, T>(
-    any: Box<dyn Any + Send + Sync + 'a>,
-) -> Result<Box<T>, Box<dyn Any + Send + Sync + 'a>> {
+pub unsafe fn downcast_boxed<'a, T>(any: Box<dyn Any + 'a>) -> Result<Box<T>, Box<dyn Any + 'a>> {
     if (*any).type_id() == typeid::of::<T>() {
         unsafe { Ok(Box::from_raw(Box::into_raw(any) as *mut T)) }
     } else {
@@ -69,44 +66,40 @@ pub unsafe fn downcast_boxed<'a, T>(
     }
 }
 
-type Object<'a> = dyn Any + Send + Sync + 'a;
-
 /// Codec for serialization and deserialization.
-#[derive(Debug, Clone, Copy)]
-pub struct SerdeCodec<'a, T> {
-    codec: UnsafeSerdeCodec<'a>,
-    _marker: PhantomData<T>,
+pub struct SerdeCodec<T, DynS: ?Sized, Dyn: ?Sized = DynS> {
+    /// Underlying unsafe codec.
+    pub codec: UnsafeSerdeCodec<DynS, Dyn>,
+    #[doc(hidden)]
+    pub _marker: PhantomData<T>,
 }
 
 /// Unsafe veriant of [`SerdeCodec`].
-#[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
-pub struct UnsafeSerdeCodec<'a> {
+pub struct UnsafeSerdeCodec<DynS: ?Sized, Dyn: ?Sized = DynS> {
     /// Serialize function.
     pub ser: for<'s, 'o> fn(
-        &'s WithLocalCx<&'o Object<'a>, UnsafeDynamicContext<'_>>,
-    ) -> &'s (dyn erased_serde::Serialize + 'o),
+        &'s WithLocalCx<&'o Dyn, UnsafeDynamicContext<'_>>,
+    ) -> &'s (dyn Serialize + 'o),
     /// Deserialize function.
     pub de: fn(
         &mut dyn erased_serde::Deserializer<'_>,
         UnsafeDynamicContext<'_>,
-    ) -> erased_serde::Result<Box<Object<'a>>>,
+    ) -> erased_serde::Result<Box<DynS>>,
 }
 
 /// Codec for packet encoding and decoding.
-#[derive(Debug, Clone, Copy)]
-pub struct EdcodeCodec<'a, T> {
-    codec: UnsafeEdcodeCodec<'a>,
-    _marker: PhantomData<T>,
+pub struct EdcodeCodec<T, DynS: ?Sized, Dyn: ?Sized = DynS> {
+    /// Underlying unsafe codec.
+    pub codec: UnsafeEdcodeCodec<DynS, Dyn>,
+    #[doc(hidden)]
+    pub _marker: PhantomData<T>,
 }
 
 /// Unsafe variant of [`EdcodeCodec`].
-#[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
-pub struct UnsafeEdcodeCodec<'a> {
+pub struct UnsafeEdcodeCodec<DynS: ?Sized, Dyn: ?Sized = DynS> {
     /// Encode function.
     pub encode: fn(
-        &'_ Object<'a>,
+        &'_ Dyn,
         &'_ mut dyn BufMut,
         UnsafeDynamicContext<'_>,
     ) -> Result<(), edcode2::BoxedError<'static>>,
@@ -114,92 +107,156 @@ pub struct UnsafeEdcodeCodec<'a> {
     pub decode: fn(
         &'_ mut dyn Buf,
         UnsafeDynamicContext<'_>,
-    ) -> Result<Box<Object<'a>>, edcode2::BoxedError<'static>>,
+    ) -> Result<Box<DynS>, edcode2::BoxedError<'static>>,
 }
 
-impl<'a, T> SerdeCodec<'a, T>
-where
-    for<'t, 'cx> &'t T: SerializeWithCx<UnsafeDynamicContext<'cx>>,
-    T: for<'de, 'cx> DeserializeWithCx<'de, UnsafeDynamicContext<'cx>> + Send + Sync + 'a,
-{
-    /// Creates a new [`SerdeCodec`] by using `erased_serde`.
-    #[inline]
-    pub const fn new() -> Self {
-        Self {
-            codec: UnsafeSerdeCodec {
+/// Generates a [`SerdeCodec`].
+///
+/// Syntax: `Type: Trait + 'lifetime`
+#[macro_export]
+macro_rules! serde_codec {
+    ($t:ty:$tr:ident+$l:lifetime) => {
+        $crate::dyn_codecs::SerdeCodec {
+            codec: $crate::dyn_codecs::UnsafeSerdeCodec {
                 ser: |obj| unsafe {
-                    &*(std::ptr::from_ref::<WithLocalCx<&Object<'_>, UnsafeDynamicContext<'_>>>(obj)
-                        as *const WithLocalCx<&T, UnsafeDynamicContext<'_>>
-                        as *const (dyn erased_serde::Serialize + 'a))
+                    &*(::std::ptr::from_ref::<$crate::WithLocalCx<&dyn $tr + '_, $crate::dyn_cx::UnsafeDynamicContext<'_>>>(obj)
+                        as *const $crate::WithLocalCx<&$t, $crate::dyn_cx::UnsafeDynamicContext<'_>>
+                        as *const (dyn $crate::dyn_codecs::Serialize + $l))
                 },
                 de: |deserializer, cx| {
-                    T::deserialize_with_cx(cx.with(deserializer)).map(|v| {
-                        let v: Box<Object<'_>> = Box::new(v);
+                    <$t as $crate::serde::DeserializeWithCx<'_, $crate::dyn_cx::UnsafeDynamicContext<'_>>>::deserialize_with_cx($crate::LocalCxExt::with(cx, deserializer)).map(|v| {
+                        let v: ::std::boxed::Box<dyn $tr + ::std::marker::Send + ::std::marker::Sync + $l> = ::std::boxed::Box::new(v);
                         v
                     })
                 },
             },
-            _marker: PhantomData,
+            _marker: ::std::marker::PhantomData,
         }
-    }
+    };
 }
 
-impl<'a, T> SerdeCodec<'a, T> {
-    /// Gets the unsafe variant of this codec.
-    #[inline]
-    pub const fn to_unsafe(self) -> UnsafeSerdeCodec<'a> {
-        self.codec
-    }
-}
-
-impl<'a, T> EdcodeCodec<'a, T> {
-    /// [`Self::new`] but wrapped by two helper types.
-    pub const fn new_wrapped<E, D>() -> Self
-    where
-        D: Into<T>,
-        &'a T: Into<E>,
-        E: for<'b, 'cx> Encode<WithLocalCx<&'b mut dyn BufMut, UnsafeDynamicContext<'cx>>>,
-        D: for<'b, 'cx> Decode<'static, WithLocalCx<&'b mut dyn Buf, UnsafeDynamicContext<'cx>>>,
-        T: Send + Sync + 'a,
-    {
-        Self {
-            codec: UnsafeEdcodeCodec {
+/// Generates an [`EdcodeCodec`].
+///
+/// Syntax: `Type: Trait + 'lifetime`
+///
+/// Wrapped syntax: `Wrapper wrap Type: Trait + 'lifetime`: wrap the `Type` when encoding and decoding
+/// through `Wrapper<&Type>` and `Wrapper<Type>`.
+#[macro_export]
+macro_rules! edcode_codec {
+    ($wt:ident wrap $t:ty:$tr:ident+$l:lifetime) => {
+        $crate::dyn_codecs::EdcodeCodec {
+            codec: $crate::dyn_codecs::UnsafeEdcodeCodec {
                 encode: |obj, buf, cx| {
-                    Into::<E>::into(unsafe {
-                        &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T)
-                    })
-                    .encode(cx.with(buf))
+                    ::edcode2::Encode::encode(
+                        &::std::convert::Into::<$wt<&$t>>::into(unsafe {
+                            &*(::std::ptr::from_ref::<dyn $tr + '_>(obj) as *const $t)
+                        }),
+                        $crate::LocalContextExt::with(cx, buf),
+                    )
                 },
                 decode: {
-                    assert!(
-                        <D as Decode<'_, _>>::SUPPORT_NON_IN_PLACE,
+                    ::std::assert!(
+                        <$wt<$t> as $crate::dyn_codecs::Decode<
+                            '_,
+                            $crate::WithLocalCx<_, $crate::dyn_cx::UnsafeDynamicContext<'_>>,
+                        >>::SUPPORT_NON_IN_PLACE,
                         "non-in-place decoding is not supported for this type",
                     );
-                    |buf, cx| Ok(Box::new(D::decode(cx.with(buf))?.into()))
+                    |buf, cx| {
+                        ::std::result::Result::Ok(::std::boxed::Box::new(
+                            ::std::convert::Into::<$t>::into(
+                                <$wt<$t> as $crate::dyn_codecs::Decode<
+                                    '_,
+                                    $crate::WithLocalCx<
+                                        _,
+                                        $crate::dyn_cx::UnsafeDynamicContext<'_>,
+                                    >,
+                                >>::decode(
+                                    $crate::LocalContextExt::with(cx, buf)
+                                )?,
+                            ),
+                        ))
+                    }
                 },
             },
-            _marker: PhantomData,
+            _marker: ::std::marker::PhantomData,
         }
-    }
-
-    /// Gets the unsafe variant of this codec.
-    #[inline]
-    pub const fn to_unsafe(self) -> UnsafeEdcodeCodec<'a> {
-        self.codec
-    }
+    };
+    ($t:ty:$tr:ident+$l:lifetime) => {
+        $crate::dyn_codecs::EdcodeCodec {
+            codec: $crate::dyn_codecs::UnsafeEdcodeCodec {
+                encode: |obj, buf, cx| {
+                    ::edcode2::Encode::encode(
+                        &*(::std::ptr::from_ref::<dyn $tr + '_>(obj) as *const $t),
+                        $crate::LocalContextExt::with(cx, buf),
+                    )
+                },
+                decode: {
+                    ::std::assert!(
+                        <$t as $crate::dyn_codecs::Decode<
+                            '_,
+                            $crate::WithLocalCx<_, $crate::dyn_cx::UnsafeDynamicContext<'_>>,
+                        >>::SUPPORT_NON_IN_PLACE,
+                        "non-in-place decoding is not supported for this type",
+                    );
+                    |buf, cx| {
+                        ::std::result::Result::Ok(::std::boxed::Box::new(
+                            <$t as $crate::dyn_codecs::Decode<
+                                '_,
+                                $crate::WithLocalCx<_, $crate::dyn_cx::UnsafeDynamicContext<'_>>,
+                            >>::decode($crate::LocalContextExt::with(
+                                cx, buf,
+                            ))?,
+                        ))
+                    }
+                },
+            },
+            _marker: ::std::marker::PhantomData,
+        }
+    };
 }
 
-impl<'a, T> EdcodeCodec<'a, T>
-where
-    T: for<'b, 'cx> Encode<WithLocalCx<&'b mut dyn BufMut, UnsafeDynamicContext<'cx>>>
-        + for<'b, 'cx> Decode<'static, WithLocalCx<&'b mut dyn Buf, UnsafeDynamicContext<'cx>>>
-        + Send
-        + Sync
-        + 'a,
-{
-    /// Creates a new [`EdcodeCodec`] by encoding and decoding through `edcode2`.
-    #[inline(always)]
-    pub const fn new() -> Self {
-        Self::new_wrapped::<&'a T, T>()
+impl<A: ?Sized, B: ?Sized> Debug for UnsafeSerdeCodec<A, B> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UnsafeSerdeCodec").finish()
+    }
+}
+impl<A: ?Sized, B: ?Sized> Debug for UnsafeEdcodeCodec<A, B> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UnsafeEdcodeCodec").finish()
+    }
+}
+impl<T, A: ?Sized, B: ?Sized> Debug for SerdeCodec<T, A, B> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SerdeCodec").finish()
+    }
+}
+impl<T, A: ?Sized, B: ?Sized> Debug for EdcodeCodec<T, A, B> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EdcodeCodec").finish()
+    }
+}
+impl<A: ?Sized, B: ?Sized> Copy for UnsafeSerdeCodec<A, B> {}
+impl<A: ?Sized, B: ?Sized> Copy for UnsafeEdcodeCodec<A, B> {}
+impl<T, A: ?Sized, B: ?Sized> Copy for SerdeCodec<T, A, B> {}
+impl<T, A: ?Sized, B: ?Sized> Copy for EdcodeCodec<T, A, B> {}
+impl<A: ?Sized, B: ?Sized> Clone for UnsafeSerdeCodec<A, B> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<A: ?Sized, B: ?Sized> Clone for UnsafeEdcodeCodec<A, B> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<T, A: ?Sized, B: ?Sized> Clone for SerdeCodec<T, A, B> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<T, A: ?Sized, B: ?Sized> Clone for EdcodeCodec<T, A, B> {
+    fn clone(&self) -> Self {
+        *self
     }
 }

@@ -9,6 +9,9 @@ use crate::{BaseLocalContext, WithLocalCx};
 
 pub mod codecs;
 
+/// The key name of type in Mojang serialization's default implementation of `Codec.dispatch`.
+pub const TYPE_KEY: &str = "type";
+
 /// Serialize the value with a local context.
 pub trait SerializeWithCx<LocalCx> {
     /// Serialize the value with the given serializer and the local context.
@@ -115,7 +118,7 @@ where
 mod erased {
     use std::{cell::Cell, marker::PhantomData};
 
-    use crate::{BaseLocalContext, WithLocalCx, dyn_cx::UnsafeDynamicContext};
+    use crate::{BaseLocalContext, WithLocalCx};
 
     use super::SerializeWithCx;
 

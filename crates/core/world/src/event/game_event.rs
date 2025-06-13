@@ -8,7 +8,7 @@ use std::fmt::Debug;
 
 use ahash::AHashSet;
 use glam::DVec3;
-use local_cx::dyn_codecs::{EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
+use local_cx::dyn_codecs::{Any, EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
 use maybe::Maybe;
 use parking_lot::Mutex;
 use rimecraft_block::BlockState;
@@ -379,7 +379,7 @@ where
 }
 
 /// A property of a game event listener which provides position of an in-game object.
-pub trait PositionSource<'w, Cx>
+pub trait PositionSource<'w, Cx>: Any
 where
     Cx: ChunkCx<'w>,
 {
@@ -392,21 +392,45 @@ where
 
 /// Raw type of a `PositionSource` with its type erased, consisting of codecs.
 #[derive(Debug)]
-pub struct RawPositionSourceType<'a> {
-    serde: UnsafeSerdeCodec<'a>,
-    packet: UnsafeEdcodeCodec<'a>,
+pub struct RawPositionSourceType<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    serde: UnsafeSerdeCodec<
+        dyn PositionSource<'w, Cx> + Send + Sync + 'w,
+        dyn PositionSource<'w, Cx> + 'w,
+    >,
+    packet: UnsafeEdcodeCodec<
+        dyn PositionSource<'w, Cx> + Send + Sync + 'w,
+        dyn PositionSource<'w, Cx> + 'w,
+    >,
 }
 
 /// Registry entry of [`RawPositionSourceType`].
-pub type PositionSourceType<'a, Cx> = Reg<'a, <Cx as ProvideIdTy>::Id, RawPositionSourceType<'a>>;
+pub type PositionSourceType<'a, Cx> =
+    Reg<'a, <Cx as ProvideIdTy>::Id, RawPositionSourceType<'a, Cx>>;
 
-impl<'a> RawPositionSourceType<'a> {
+impl<'a, Cx> RawPositionSourceType<'a, Cx>
+where
+    Cx: ChunkCx<'a>,
+{
     /// Creates a new position source type from codecs.
     #[inline]
-    pub const fn new<T>(serde_codec: SerdeCodec<'a, T>, packet_codec: EdcodeCodec<'a, T>) -> Self {
+    pub const fn new<T>(
+        serde_codec: SerdeCodec<
+            T,
+            dyn PositionSource<'a, Cx> + Send + Sync + 'a,
+            dyn PositionSource<'a, Cx> + 'a,
+        >,
+        packet_codec: EdcodeCodec<
+            T,
+            dyn PositionSource<'a, Cx> + Send + Sync + 'a,
+            dyn PositionSource<'a, Cx> + 'a,
+        >,
+    ) -> Self {
         Self {
-            serde: serde_codec.to_unsafe(),
-            packet: packet_codec.to_unsafe(),
+            serde: serde_codec.codec,
+            packet: packet_codec.codec,
         }
     }
 }
@@ -414,4 +438,157 @@ impl<'a> RawPositionSourceType<'a> {
 #[allow(missing_docs)]
 mod sealed {
     pub trait Sealed<Cx> {}
+}
+
+mod _edcode {
+    use edcode2::{Buf, BufMut, Decode, Encode};
+    use local_cx::{LocalContext, LocalContextExt, WithLocalCx, dyn_cx::AsDynamicContext};
+    use rimecraft_registry::Registry;
+
+    use crate::chunk::ChunkCx;
+
+    use super::{PositionSource, PositionSourceType, RawPositionSourceType};
+
+    impl<'w, Cx, B, L> Encode<WithLocalCx<B, L>> for dyn PositionSource<'w, Cx> + 'w
+    where
+        Cx: ChunkCx<'w>,
+        L: AsDynamicContext,
+        B: BufMut,
+    {
+        fn encode(&self, buf: WithLocalCx<B, L>) -> Result<(), edcode2::BoxedError<'static>> {
+            let WithLocalCx {
+                local_cx,
+                mut inner,
+            } = buf;
+            let ty = self.ty();
+            ty.encode(&mut inner)?;
+            let dyn_cx = local_cx.as_dynamic_context();
+            (ty.packet.encode)(self, &mut inner, unsafe { dyn_cx.as_unsafe_cx() })
+        }
+    }
+
+    impl<'de, 'w, Cx, B, L> Decode<'de, WithLocalCx<B, L>>
+        for Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>
+    where
+        Cx: ChunkCx<'w>,
+        L: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
+        B: Buf,
+    {
+        fn decode(buf: WithLocalCx<B, L>) -> Result<Self, edcode2::BoxedError<'de>> {
+            let WithLocalCx {
+                local_cx,
+                mut inner,
+            } = buf;
+            let ty = PositionSourceType::decode(local_cx.with(&mut inner))?;
+            let cx = local_cx.as_dynamic_context();
+            (ty.packet.decode)(&mut inner, unsafe { cx.as_unsafe_cx() })
+        }
+    }
+}
+
+mod _serde {
+    use std::marker::PhantomData;
+
+    use local_cx::{
+        LocalContext, LocalContextExt, WithLocalCx,
+        dyn_cx::AsDynamicContext,
+        serde::{DeserializeWithCx, SerializeWithCx, TYPE_KEY},
+    };
+    use rimecraft_registry::Registry;
+    use serde::{Deserialize, Serialize, ser::SerializeMap};
+
+    use crate::{chunk::ChunkCx, event::game_event::PositionSourceType};
+
+    use super::{PositionSource, RawPositionSourceType};
+
+    impl<'w, Cx, L> SerializeWithCx<L> for dyn PositionSource<'w, Cx> + 'w
+    where
+        Cx: ChunkCx<'w, Id: Serialize>,
+        L: AsDynamicContext,
+    {
+        fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            let WithLocalCx { local_cx, inner } = serializer;
+            let mut map = inner.serialize_map(None)?;
+            let ty = self.ty();
+            map.serialize_entry(TYPE_KEY, &ty)?;
+            let cx = local_cx.as_dynamic_context();
+            erased_serde::serialize(
+                (ty.serde.ser)(&unsafe { cx.as_unsafe_cx() }.with(self)),
+                serde::__private::ser::FlatMapSerializer(&mut map),
+            )?;
+            map.end()
+        }
+    }
+
+    struct Visitor<'w, L, Cx>(L, PhantomData<&'w Cx>);
+
+    impl<'de, 'w, L, Cx> serde::de::Visitor<'de> for Visitor<'w, L, Cx>
+    where
+        L: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
+        Cx: ChunkCx<'w, Id: Deserialize<'de>>,
+    {
+        type Value = Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(formatter, "position source with a type key dispatched")
+        }
+
+        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::MapAccess<'de>,
+        {
+            use serde::__private::de::Content;
+            use serde::de::Error;
+            let mut buf: Vec<(Content<'de>, Content<'de>)> =
+                map.size_hint().map_or_else(Vec::new, Vec::with_capacity);
+            let mut ty: Option<PositionSourceType<'w, Cx>> = None;
+            while let Some(key) = map.next_key::<Content<'de>>()? {
+                match &key {
+                    Content::String(val) => {
+                        if val == TYPE_KEY {
+                            ty = Some(map.next_value_seed(self.0.with(PhantomData))?);
+                            continue;
+                        }
+                    }
+                    Content::Str(val) => {
+                        if *val == TYPE_KEY {
+                            ty = Some(map.next_value_seed(self.0.with(PhantomData))?);
+                            continue;
+                        }
+                    }
+                    _ => {}
+                }
+                buf.push((key, map.next_value()?))
+            }
+            let ty = ty.ok_or_else(|| A::Error::missing_field("type"))?;
+            let cx = self.0.as_dynamic_context();
+            (ty.serde.de)(
+                &mut <dyn erased_serde::Deserializer<'de>>::erase(
+                    serde::__private::de::ContentDeserializer::<'de, A::Error>::new(Content::Map(
+                        buf,
+                    )),
+                ),
+                unsafe { cx.as_unsafe_cx() },
+            )
+            .map_err(|e| A::Error::custom(e))
+        }
+    }
+
+    impl<'de, 'w, Cx, L> DeserializeWithCx<'de, L>
+        for Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>
+    where
+        L: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
+        Cx: ChunkCx<'w, Id: Deserialize<'de>>,
+    {
+        fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, L>) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let WithLocalCx { local_cx, inner } = deserializer;
+            inner.deserialize_map(Visitor(local_cx, PhantomData))
+        }
+    }
 }
