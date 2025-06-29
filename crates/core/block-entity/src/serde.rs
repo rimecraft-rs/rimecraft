@@ -286,7 +286,7 @@ where
             }
         }
 
-        deserializer.deserialize_map(Visitor(self.pos, self.state.clone(), self.local_cx))
+        deserializer.deserialize_map(Visitor(self.pos, self.state, self.local_cx))
     }
 }
 

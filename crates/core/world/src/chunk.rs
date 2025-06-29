@@ -2,7 +2,7 @@
 //!
 //! A chunk represents a scoped, mutable view of `Biome`s, `BlockState`s, `FluidState`s and `BlockEntity`s.
 
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 use ahash::AHashMap;
 use local_cx::LocalContext;
@@ -18,6 +18,7 @@ use rimecraft_voxel_math::BlockPos;
 
 use crate::{
     BlockEntityCell, Sealed,
+    event::game_event,
     heightmap::{self, Heightmap},
     view::{
         HeightLimit,
@@ -258,6 +259,26 @@ where
     fn pos(&self) -> ChunkPos {
         self.as_base_chunk().0.pos
     }
+
+    /// Peeks the [`game_event::Dispatcher`] of given Y section corrdinate.
+    #[inline]
+    fn peek_game_event_dispatcher<F, T>(&self, y_section_coord: i32, f: F) -> Option<T>
+    where
+        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
+    {
+        let _ = y_section_coord;
+        drop(f);
+        None
+    }
+
+    /// Gets the [`game_event::Dispatcher`] of given Y section corrdinate.
+    #[inline]
+    fn game_event_dispatcher(
+        &self,
+        y_section_coord: i32,
+    ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
+        self.peek_game_event_dispatcher(y_section_coord, Arc::clone)
+    }
 }
 
 /// Mutable chunk behaviors.
@@ -296,5 +317,29 @@ where
         self.sections_mut()
             .iter_mut()
             .rposition(|s| !s.get_mut().is_empty())
+    }
+
+    /// Peeks the [`game_event::Dispatcher`] of given Y section corrdinate.
+    ///
+    /// This method is the same as [`Chunk::peek_game_event_dispatcher`] but lock-free.
+    #[inline]
+    fn peek_game_event_dispatcher_lf<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>
+    where
+        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
+    {
+        let _ = y_section_coord;
+        drop(f);
+        None
+    }
+
+    /// Gets the [`game_event::Dispatcher`] of given Y section corrdinate.
+    ///
+    /// This method is the same as [`Chunk::game_event_dispatcher`] but lock-free.
+    #[inline]
+    fn game_event_dispatcher_lf(
+        &mut self,
+        y_section_coord: i32,
+    ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
+        self.peek_game_event_dispatcher_lf(y_section_coord, Arc::clone)
     }
 }

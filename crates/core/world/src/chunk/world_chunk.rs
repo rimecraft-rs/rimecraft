@@ -1,5 +1,6 @@
 //! World chunks.
 
+use ahash::AHashMap;
 use local_cx::{LocalContext, dyn_cx::AsDynamicContext};
 use parking_lot::Mutex;
 use rimecraft_block::BlockState;
@@ -13,7 +14,9 @@ use rimecraft_voxel_math::{BlockPos, IVec3};
 use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{
-    Sealed, heightmap,
+    Sealed,
+    event::game_event,
+    heightmap,
     view::block::{
         BlockLuminanceView, BlockView, BlockViewMut, LockFreeBlockView, LockedBlockViewMut,
     },
@@ -31,11 +34,12 @@ pub struct WorldChunk<'w, Cx, Local>
 where
     Cx: ChunkCx<'w>,
 {
-    /// The [`BaseChunk`].
+    /// The `BaseChunk`.
     pub base: BaseChunk<'w, Cx>,
 
     is_client: bool,
     loaded_to_world: bool,
+    game_event_dispatchers: Mutex<AHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>,
 
     local_cx: Local,
 }
@@ -73,9 +77,8 @@ impl<'w, Cx, L> WorldChunk<'w, Cx, L>
 where
     Cx: ChunkCx<'w>,
 {
-    /// Whether this chunk can tick [`BlockEntity`]s.
-    #[inline(always)]
-    fn can_tick_be_glob(&self) -> bool {
+    #[inline]
+    fn can_tick_block_entities(&self) -> bool {
         self.loaded_to_world || self.is_client
     }
 }
@@ -402,7 +405,7 @@ where
         {
             let IVec3 { x, y, z } = pos_alt;
             bs = section
-                .set_block_state(x as u32, y as u32, z as u32, state.clone())
+                .set_block_state(x as u32, y as u32, z as u32, state)
                 .map(|maybe| match maybe {
                     Maybe::Borrowed(bs) => bs.clone(),
                     Maybe::Owned(SimpleOwned(bs)) => bs,
@@ -456,7 +459,6 @@ where
             .peek_block_state_lf(block_entity.pos(), |bs| bs.state.data().has_block_entity())
             .unwrap_or_default()
         {
-            //TODO: set world for block entity if necessary.
             block_entity.cancel_removal();
             let mut be2 = self
                 .base
@@ -474,7 +476,7 @@ where
     }
 
     fn remove_block_entity(&mut self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>> {
-        if self.can_tick_be_glob() {
+        if self.can_tick_block_entities() {
             let mut be = self.base.block_entities.get_mut().remove(&pos);
             if let Some(be) = &mut be {
                 //TODO: remove game event listener
@@ -511,7 +513,6 @@ where
     }
 
     fn set_block_entity_locked(&self, mut block_entity: Box<BlockEntity<'w, Cx>>) {
-        //TODO: set world for block entity if necessary.
         block_entity.cancel_removal();
         let mut be2 = self
             .base
@@ -551,6 +552,24 @@ where
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
         + AsDynamicContext,
 {
+    fn peek_game_event_dispatcher<F, T>(&self, y_section_coord: i32, f: F) -> Option<T>
+    where
+        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
+    {
+        if self.is_client {
+            None
+        } else {
+            let mut g = self.game_event_dispatchers.lock();
+            if let Some(d) = g.get(&y_section_coord) {
+                Some(f(d))
+            } else {
+                let d = Arc::new(game_event::Dispatcher::new());
+                let result = f(&d);
+                g.insert(y_section_coord, d);
+                Some(result)
+            }
+        }
+    }
 }
 
 impl<'w, Cx, L> ChunkMut<'w, Cx> for WorldChunk<'w, Cx, L>
@@ -562,4 +581,22 @@ where
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
         + AsDynamicContext,
 {
+    fn peek_game_event_dispatcher_lf<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>
+    where
+        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
+    {
+        if self.is_client {
+            None
+        } else {
+            let g = self.game_event_dispatchers.get_mut();
+            if let Some(d) = g.get(&y_section_coord) {
+                Some(f(d))
+            } else {
+                let d = Arc::new(game_event::Dispatcher::new());
+                let result = f(&d);
+                g.insert(y_section_coord, d);
+                Some(result)
+            }
+        }
+    }
 }
