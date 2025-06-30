@@ -118,8 +118,7 @@ where
     pub fn get(&self, index: usize) -> Option<Maybe<'_, T>> {
         self.data
             .storage
-            .as_array()
-            .and_then(|array| array.get(index))
+            .get(index)
             .and_then(|i| self.data.palette.get(i as usize))
     }
 
@@ -252,6 +251,15 @@ impl Storage {
         match self {
             Storage::PackedArray(array) => Some(array),
             _ => None,
+        }
+    }
+
+    #[inline]
+    fn get(&self, index: usize) -> Option<u32> {
+        if let Some(array) = self.as_array() {
+            array.get(index)
+        } else {
+            Some(0)
         }
     }
 

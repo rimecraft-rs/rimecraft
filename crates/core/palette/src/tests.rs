@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::{IndexFromRaw, IndexToRaw, Palette, Strategy};
 use rimecraft_maybe::Maybe;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct List<const N: usize>;
 
 // Just blanket impl.
@@ -189,21 +189,79 @@ mod edcode {
     helper!(BiMap, bi_map, 1);
 }
 
+#[cfg(feature = "serde")]
+mod serde {
+    #[test]
+    fn singular() {}
+}
+
 mod container {
     #[cfg(feature = "edcode")]
-    #[test]
-    fn edcode() {
+    mod edcode {
         use crate::{
-            container::{PalettedContainer, Storage},
+            container::{PalettedContainer, ProvidePalette, Storage},
             tests::List,
             Strategy,
         };
+        use edcode2::{Decode, Encode};
 
-        let palette: PalettedContainer<List<0>, u8, ()> = PalettedContainer::new(
-            List::<0>,
-            (Strategy::Singular, 0),
-            Storage::Empty(1),
-            vec![36u8],
-        );
+        macro_rules! helper_base {
+            ($pascal:ident, $snake:ident) => {{
+                struct Cx;
+                impl ProvidePalette<List<0>, u8> for Cx {
+                    const EDGE_BITS: u32 = 0;
+
+                    fn provide_palette_config(_list: &List<0>, _bits: u32) -> (Strategy, u32) {
+                        (Strategy::$pascal, 0)
+                    }
+                }
+
+                let palette: PalettedContainer<List<0>, u8, Cx> = PalettedContainer::new(
+                    List,
+                    (Strategy::$pascal, 0),
+                    Storage::Empty(0),
+                    vec![36],
+                );
+                let mut dest: PalettedContainer<List<0>, u8, Cx> = PalettedContainer::new(
+                    List,
+                    (Strategy::$pascal, 0),
+                    Storage::Empty(0),
+                    vec![114],
+                );
+                let mut buf: Vec<u8> = Vec::new();
+                palette.encode(&mut buf).expect("encode failed");
+                dest.decode_in_place(buf.as_ref()).expect("decode failed");
+                dest
+            }};
+        }
+        macro_rules! helper {
+            (Direct, $snake:ident) => {
+                #[test]
+                fn $snake() {
+                    let dest = helper_base!(Direct, direct);
+                    assert_eq!(
+                        dest.get(0).map(|m| *m),
+                        None,
+                        "edcode consistency check failed"
+                    );
+                }
+            };
+            ($pascal:ident, $snake:ident) => {
+                #[test]
+                fn $snake() {
+                    let dest = helper_base!($pascal, $snake);
+                    assert_eq!(
+                        dest.get(0).map(|m| *m),
+                        Some(36),
+                        "edcode consistency check failed"
+                    );
+                }
+            };
+        }
+
+        helper!(Singular, singular);
+        helper!(Array, array);
+        helper!(BiMap, bi_map);
+        helper!(Direct, direct);
     }
 }
