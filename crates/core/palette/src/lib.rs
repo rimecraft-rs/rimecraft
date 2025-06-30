@@ -82,8 +82,7 @@ where
             Strategy::Singular => {
                 debug_assert_eq!(
                     bits_size, 0,
-                    "illegal index bits for SingularPalette: {}",
-                    bits_size
+                    "illegal index bits for SingularPalette: {bits_size}"
                 );
                 assert!(
                     entries.len() <= 1,
@@ -408,7 +407,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::Uninitialized => write!(f, "use of an uninitialized palette"),
             Error::UnknownEntry => write!(f, "unknown entry"),
-            Error::UnknownId(id) => write!(f, "unknown id: {}", id),
+            Error::UnknownId(id) => write!(f, "unknown id: {id}"),
         }
     }
 }
