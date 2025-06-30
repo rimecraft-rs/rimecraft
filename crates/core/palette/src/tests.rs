@@ -206,56 +206,47 @@ mod container {
         use edcode2::{Decode, Encode};
 
         macro_rules! helper_base {
-            ($pascal:ident, $snake:ident) => {{
-                struct Cx;
-                impl ProvidePalette<List<0>, u8> for Cx {
-                    const EDGE_BITS: u32 = 0;
-
-                    fn provide_palette_config(_list: &List<0>, _bits: u32) -> (Strategy, u32) {
-                        (Strategy::$pascal, 0)
-                    }
-                }
-
-                let palette: PalettedContainer<List<0>, u8, Cx> = PalettedContainer::new(
-                    List,
-                    (Strategy::$pascal, 0),
-                    Storage::Empty(0),
-                    vec![36],
-                );
-                let mut dest: PalettedContainer<List<0>, u8, Cx> = PalettedContainer::new(
-                    List,
-                    (Strategy::$pascal, 0),
-                    Storage::Empty(0),
-                    vec![114],
-                );
-                let mut buf: Vec<u8> = Vec::new();
-                palette.encode(&mut buf).expect("encode failed");
-                dest.decode_in_place(buf.as_ref()).expect("decode failed");
-                dest
-            }};
-        }
-        macro_rules! helper {
-            (Direct, $snake:ident) => {
+            ($pascal:ident, $snake:ident, $expect:expr) => {
                 #[test]
                 fn $snake() {
-                    let dest = helper_base!(Direct, direct);
+                    struct Cx;
+                    impl ProvidePalette<List<0>, u8> for Cx {
+                        const EDGE_BITS: u32 = 0;
+
+                        fn provide_palette_config(_list: &List<0>, _bits: u32) -> (Strategy, u32) {
+                            (Strategy::$pascal, 0)
+                        }
+                    }
+
+                    let palette: PalettedContainer<List<0>, u8, Cx> = PalettedContainer::new(
+                        List,
+                        (Strategy::$pascal, 0),
+                        Storage::Empty(0),
+                        vec![36],
+                    );
+                    let mut dest: PalettedContainer<List<0>, u8, Cx> = PalettedContainer::new(
+                        List,
+                        (Strategy::$pascal, 0),
+                        Storage::Empty(0),
+                        vec![114],
+                    );
+                    let mut buf: Vec<u8> = Vec::new();
+                    palette.encode(&mut buf).expect("encode failed");
+                    dest.decode_in_place(buf.as_ref()).expect("decode failed");
                     assert_eq!(
                         dest.get(0).map(|m| *m),
-                        None,
+                        $expect,
                         "edcode consistency check failed"
                     );
                 }
             };
+        }
+        macro_rules! helper {
+            (Direct, $snake:ident) => {
+                helper_base!(Direct, $snake, None);
+            };
             ($pascal:ident, $snake:ident) => {
-                #[test]
-                fn $snake() {
-                    let dest = helper_base!($pascal, $snake);
-                    assert_eq!(
-                        dest.get(0).map(|m| *m),
-                        Some(36),
-                        "edcode consistency check failed"
-                    );
-                }
+                helper_base!($pascal, $snake, Some(36));
             };
         }
 
