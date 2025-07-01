@@ -6,6 +6,7 @@ use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use local_cx::{
     LocalContextExt, WithLocalCx,
+    dyn_codecs::Any,
     dyn_cx::UnsafeDynamicContext,
     nbt::{ReadNbtWithCx, WriteNbtWithCx},
     serde::{DeserializeWithCx, SerializeWithCx},
@@ -17,11 +18,6 @@ type Object<'a> = dyn Any + Send + Sync + 'a;
 
 pub mod changes;
 pub mod map;
-
-#[deprecated = "use local-cx-provided instead"]
-mod dyn_any;
-
-use dyn_any::Any;
 
 pub use ahash::{AHashMap, AHashSet};
 
@@ -93,7 +89,7 @@ where
     PacketCodec {
         codec: UnsafePacketCodec {
             encode: |obj, buf, cx| {
-                unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) }
+                unsafe { &*(std::ptr::from_ref::<dyn Any + '_>(obj) as *const T) }
                     .encode(cx.with(buf))
             },
             decode: {
@@ -120,7 +116,7 @@ where
         codec: UnsafePacketCodec {
             encode: |obj, buf, cx| {
                 Cx::write_nbt(
-                    unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) },
+                    unsafe { &*(std::ptr::from_ref::<dyn Any + '_>(obj) as *const T) },
                     cx.with(buf.writer()),
                 )
                 .map_err(Into::into)
@@ -141,7 +137,7 @@ where
     SerdeCodec {
         codec: UnsafeSerdeCodec {
             ser: |obj| unsafe {
-                &*(std::ptr::from_ref::<WithLocalCx<&Object<'_>, UnsafeDynamicContext<'_>>>(obj)
+                &*(std::ptr::from_ref::<WithLocalCx<&(dyn Any + '_), UnsafeDynamicContext<'_>>>(obj)
                     as *const WithLocalCx<&T, UnsafeDynamicContext<'_>>
                     as *const (dyn erased_serde::Serialize + 'a))
             },
@@ -241,48 +237,12 @@ pub struct RawErasedComponentType<'a, Cx> {
 }
 
 /// Codec for serialization and deserialization.
-#[deprecated = "use local-cx-provided instead"]
-#[derive(Debug, Clone, Copy)]
-pub struct SerdeCodec<'a, T> {
-    codec: UnsafeSerdeCodec<'a>,
-    _marker: PhantomData<T>,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
-#[deprecated = "use local-cx-provided instead"]
-struct UnsafeSerdeCodec<'a> {
-    ser: for<'s, 'o> fn(
-        &'s WithLocalCx<&'o Object<'a>, UnsafeDynamicContext<'_>>,
-    ) -> &'s (dyn erased_serde::Serialize + 'o),
-    de: fn(
-        &mut dyn erased_serde::Deserializer<'_>,
-        UnsafeDynamicContext<'_>,
-    ) -> erased_serde::Result<Box<Object<'a>>>,
-}
+pub type SerdeCodec<'a, T> = local_cx::dyn_codecs::SerdeCodec<T, Object<'a>, dyn Any + 'a>;
+type UnsafeSerdeCodec<'a> = local_cx::dyn_codecs::UnsafeSerdeCodec<Object<'a>, dyn Any + 'a>;
 
 /// Codec for packet encoding and decoding.
-#[derive(Debug, Clone, Copy)]
-#[deprecated = "use local-cx-provided instead"]
-pub struct PacketCodec<'a, T> {
-    codec: UnsafePacketCodec<'a>,
-    _marker: PhantomData<T>,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
-#[deprecated = "use local-cx-provided instead"]
-struct UnsafePacketCodec<'a> {
-    encode: fn(
-        &'_ Object<'a>,
-        &'_ mut dyn BufMut,
-        UnsafeDynamicContext<'_>,
-    ) -> Result<(), edcode2::BoxedError<'static>>,
-    decode: fn(
-        &'_ mut dyn Buf,
-        UnsafeDynamicContext<'_>,
-    ) -> Result<Box<Object<'a>>, edcode2::BoxedError<'static>>,
-}
+pub type PacketCodec<'a, T> = local_cx::dyn_codecs::EdcodeCodec<T, Object<'a>, dyn Any + 'a>;
+type UnsafePacketCodec<'a> = local_cx::dyn_codecs::UnsafeEdcodeCodec<Object<'a>, dyn Any + 'a>;
 
 #[derive(Debug, Clone, Copy)]
 struct DynUtil<'a> {

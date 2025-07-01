@@ -5,12 +5,10 @@
 
 use std::{any::TypeId, fmt::Debug, marker::PhantomData};
 
-use edcode2::{Buf, BufMut};
-
 use crate::{WithLocalCx, dyn_cx::UnsafeDynamicContext};
 
 #[doc(hidden)]
-pub use edcode2::{Decode, Encode};
+pub use edcode2::{Buf, BufMut, Decode, Encode};
 #[doc(hidden)]
 pub use erased_serde::Serialize;
 
@@ -58,6 +56,7 @@ impl dyn Any + '_ {
 /// # Safety
 ///
 /// Lifetime not guaranteed.
+#[allow(clippy::missing_errors_doc)]
 pub unsafe fn downcast_boxed<'a, T>(any: Box<dyn Any + 'a>) -> Result<Box<T>, Box<dyn Any + 'a>> {
     if (*any).type_id() == typeid::of::<T>() {
         unsafe { Ok(Box::from_raw(Box::into_raw(any) as *mut T)) }
@@ -137,57 +136,15 @@ macro_rules! serde_codec {
 
 /// Generates an [`EdcodeCodec`].
 ///
-/// Syntax: `Type: Trait + 'lifetime`
-///
-/// Wrapped syntax: `Wrapper wrap Type: Trait + 'lifetime`: wrap the `Type` when encoding and decoding
-/// through `Wrapper<&Type>` and `Wrapper<Type>`.
+/// Syntax: `(?Nbt<Cx>) Type: Trait + 'lifetime`
 #[macro_export]
 macro_rules! edcode_codec {
-    ($wt:ident wrap $t:ty:$tr:ident+$l:lifetime) => {
-        $crate::dyn_codecs::EdcodeCodec {
-            codec: $crate::dyn_codecs::UnsafeEdcodeCodec {
-                encode: |obj, buf, cx| {
-                    ::edcode2::Encode::encode(
-                        &::std::convert::Into::<$wt<&$t>>::into(unsafe {
-                            &*(::std::ptr::from_ref::<dyn $tr + '_>(obj) as *const $t)
-                        }),
-                        $crate::LocalContextExt::with(cx, buf),
-                    )
-                },
-                decode: {
-                    ::std::assert!(
-                        <$wt<$t> as $crate::dyn_codecs::Decode<
-                            '_,
-                            $crate::WithLocalCx<_, $crate::dyn_cx::UnsafeDynamicContext<'_>>,
-                        >>::SUPPORT_NON_IN_PLACE,
-                        "non-in-place decoding is not supported for this type",
-                    );
-                    |buf, cx| {
-                        ::std::result::Result::Ok(::std::boxed::Box::new(
-                            ::std::convert::Into::<$t>::into(
-                                <$wt<$t> as $crate::dyn_codecs::Decode<
-                                    '_,
-                                    $crate::WithLocalCx<
-                                        _,
-                                        $crate::dyn_cx::UnsafeDynamicContext<'_>,
-                                    >,
-                                >>::decode(
-                                    $crate::LocalContextExt::with(cx, buf)
-                                )?,
-                            ),
-                        ))
-                    }
-                },
-            },
-            _marker: ::std::marker::PhantomData,
-        }
-    };
     ($t:ty:$tr:ident+$l:lifetime) => {
         $crate::dyn_codecs::EdcodeCodec {
             codec: $crate::dyn_codecs::UnsafeEdcodeCodec {
                 encode: |obj, buf, cx| {
                     ::edcode2::Encode::encode(
-                        &*(::std::ptr::from_ref::<dyn $tr + '_>(obj) as *const $t),
+                        unsafe{&*(::std::ptr::from_ref::<dyn $tr + '_>(obj) as *const $t),}
                         $crate::LocalContextExt::with(cx, buf),
                     )
                 },
@@ -210,6 +167,20 @@ macro_rules! edcode_codec {
                         ))
                     }
                 },
+            },
+            _marker: ::std::marker::PhantomData,
+        }
+    };
+    (Nbt<$cx:ty> $t:ty:$tr:ident+$l:lifetime) => {
+        $crate::dyn_codecs::EdcodeCodec {
+            codec: $crate::dyn_codecs::UnsafeEdcodeCodec {
+                encode: |obj, buf, cx| {
+                    <$cx as for<'c> $crate::nbt::WriteNbtWithCx<$t, $crate::dyn_cx::UnsafeDynamicContext<'c>>>::write_nbt(
+                        unsafe { &*(::std::ptr::from_ref::<dyn $tr + '_>(obj) as *const $t) },
+                        $crate::LocalContextExt::with(cx, $crate::dyn_codecs::BufMut::writer(buf))
+                    ).map_err(::std::convert::Into::into)
+                },
+                decode: |buf, cx| Ok(::std::boxed::Box::new(<$cx as for<'c> $crate::nbt::ReadNbtWithCx<$t, $crate::dyn_cx::UnsafeDynamicContext<'c>>>::read_nbt($crate::LocalContextExt::with(cx, $crate::dyn_codecs::Buf::reader(buf)))?)),
             },
             _marker: ::std::marker::PhantomData,
         }

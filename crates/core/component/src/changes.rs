@@ -7,6 +7,7 @@ use bytes::{Buf, BufMut};
 use edcode2::{BufExt as _, BufMutExt as _, Decode, Encode};
 use local_cx::{
     LocalContext, LocalContextExt, WithLocalCx,
+    dyn_codecs::Any,
     dyn_cx::{AsDynamicContext, UnsafeDynamicContext},
     serde::{DeserializeWithCx, SerializeWithCx},
 };
@@ -52,6 +53,7 @@ where
         unsafe {
             let val = self.get_raw(&RawErasedComponentType::from(ty))?;
             if let Some(val) = val {
+                let val: &(dyn Any + '_) = val;
                 let downcasted = val.downcast_ref::<T>()?;
                 Some(Some(downcasted))
             } else {
@@ -440,7 +442,7 @@ where
         serializer.serialize_str(self.cached_ser.get_or_init(|| {
             let id = Reg::to_id(self.ty);
             if self.rm {
-                format!("{}{}", REMOVED_PREFIX, id)
+                format!("{REMOVED_PREFIX}{id}")
             } else {
                 id.to_string()
             }
@@ -486,17 +488,17 @@ where
                 let stripped = value.strip_prefix(REMOVED_PREFIX);
                 let any = stripped.unwrap_or(value);
                 let id: Cx::Id = any.parse().ok().ok_or_else(|| {
-                    E::custom(format!("unable to deserialize the identifier {}", any))
+                    E::custom(format!("unable to deserialize the identifier {any}"))
                 })?;
 
-                let ty = self.cx.acquire().get(&id).ok_or_else(|| {
-                    E::custom(format!("unable to find the component type {}", id))
-                })?;
+                let ty =
+                    self.cx.acquire().get(&id).ok_or_else(|| {
+                        E::custom(format!("unable to find the component type {id}"))
+                    })?;
 
                 if ty.is_transient() {
                     return Err(E::custom(format!(
-                        "the component type {} is not serializable",
-                        id
+                        "the component type {id} is not serializable"
                     )));
                 }
 
