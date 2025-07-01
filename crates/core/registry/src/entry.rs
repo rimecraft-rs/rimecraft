@@ -211,7 +211,7 @@ mod edcode {
                 .acquire()
                 .of_raw(id)
                 .map(Reg::to_entry)
-                .ok_or_else(|| format!("unknown registry id: {}", id).into())
+                .ok_or_else(|| format!("unknown registry id: {id}").into())
         }
     }
 

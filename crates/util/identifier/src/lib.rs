@@ -70,7 +70,7 @@ where
 {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
@@ -93,8 +93,8 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FromStrError::Namespace(err) => write!(f, "parse namespace: {}", err),
-            FromStrError::Path(err) => write!(f, "parse path: {}", err),
+            FromStrError::Namespace(err) => write!(f, "parse namespace: {err}"),
+            FromStrError::Path(err) => write!(f, "parse path: {err}"),
             FromStrError::Separate => write!(f, "separator not found"),
         }
     }

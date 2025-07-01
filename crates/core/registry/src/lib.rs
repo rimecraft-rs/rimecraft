@@ -621,7 +621,7 @@ mod edcode {
             local_cx
                 .acquire()
                 .of_raw(id)
-                .ok_or_else(|| format!("invalid id: {}", id).into())
+                .ok_or_else(|| format!("invalid id: {id}").into())
         }
     }
 }

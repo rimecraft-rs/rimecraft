@@ -573,7 +573,7 @@ mod _serde {
                 ),
                 unsafe { cx.as_unsafe_cx() },
             )
-            .map_err(|e| A::Error::custom(e))
+            .map_err(A::Error::custom)
         }
     }
 

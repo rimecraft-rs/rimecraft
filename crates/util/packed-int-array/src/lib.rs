@@ -309,8 +309,7 @@ impl std::fmt::Display for Error {
             Self::InvalidLength { expected, actual } => {
                 write!(
                     f,
-                    "invalid length given for storage, expected: {}, actual: {}",
-                    expected, actual
+                    "invalid length given for storage, expected: {expected}, actual: {actual}"
                 )
             }
         }
