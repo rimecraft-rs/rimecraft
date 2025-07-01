@@ -1,13 +1,16 @@
 //! Rust implementation of Minecraft resource location.
 
 use core::str;
-use std::{fmt::Display, str::FromStr};
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
 #[cfg(feature = "vanilla")]
 pub mod vanilla;
 
 /// An identifier used to identify things.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[doc(alias = "ResourceLocation")]
 pub struct Identifier<N, P> {
     namespace: N,
@@ -60,6 +63,17 @@ where
     }
 }
 
+impl<N, P> Debug for Identifier<N, P>
+where
+    N: Display + Separate,
+    P: Display,
+{
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
 /// Errors that may occur when parsing an identifier.
 #[derive(Debug)]
 #[allow(clippy::exhaustive_enums)]
@@ -79,8 +93,8 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FromStrError::Namespace(err) => write!(f, "parse namespace: {}", err),
-            FromStrError::Path(err) => write!(f, "parse path: {}", err),
+            FromStrError::Namespace(err) => write!(f, "parse namespace: {err}"),
+            FromStrError::Path(err) => write!(f, "parse path: {err}"),
             FromStrError::Separate => write!(f, "separator not found"),
         }
     }

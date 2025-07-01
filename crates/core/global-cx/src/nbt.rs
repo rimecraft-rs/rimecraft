@@ -39,17 +39,3 @@ pub trait UpdateNbt<T: ?Sized>: GlobalContext {
     where
         R: io::Read;
 }
-
-impl<T, Cx> UpdateNbt<T> for Cx
-where
-    Cx: ReadNbt<T>,
-{
-    #[inline]
-    fn update_nbt<R>(value: &mut T, reader: R) -> Result<(), io::Error>
-    where
-        R: io::Read,
-    {
-        *value = Self::read_nbt(reader)?;
-        Ok(())
-    }
-}

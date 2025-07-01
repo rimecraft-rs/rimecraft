@@ -252,7 +252,7 @@ impl AxisDirection {
 #[repr(u8)]
 pub enum EightWayDirection {
     /// Represents [`Direction::North`].
-    North,
+    North = 0,
     /// Represents [`Direction::South`] and [`Direction::East`].
     NorthEast,
     /// Represents [`Direction::East`].
@@ -330,7 +330,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidId(id) => write!(f, "Invalid direction ID: {}", id),
+            Self::InvalidId(id) => write!(f, "Invalid direction ID: {id}"),
         }
     }
 }

@@ -17,6 +17,7 @@ use key::Key;
 use parking_lot::RwLock;
 use tag::Tags;
 
+mod dyn_manager;
 pub mod entry;
 pub mod key;
 pub mod tag;
@@ -26,6 +27,8 @@ pub use entry::Entry as RegistryEntry;
 #[doc(alias = "ResourceKey")]
 pub use key::Key as RegistryKey;
 pub use tag::TagKey;
+
+pub use dyn_manager::*;
 
 /// Immutable registry of various in-game components.
 #[derive(Debug)]
@@ -56,8 +59,7 @@ pub struct Registry<K, T> {
 /// This corresponds to the `compressed` option in *Mojang Serialization*.
 pub struct Reg<'a, K, T> {
     raw: usize,
-    registry: &'a Registry<K, T>,
-    value: &'a T,
+    entry: &'a RefEntry<K, T>,
 }
 
 impl<K, T> Registry<K, T>
@@ -70,11 +72,13 @@ where
         Q: AsKey<K, T>,
     {
         let index = *self.kv.get(key.as_key(&self.key))?;
-        let value = self.entries[index].value()?;
+
+        let entry = &self.entries[index];
+        debug_assert!(entry.value.is_some(), "entry is empty");
+
         Some(Reg {
             raw: index,
-            registry: self,
-            value,
+            entry: &self.entries[index],
         })
     }
 
@@ -111,12 +115,10 @@ impl<K, T> Registry<K, T> {
 
     /// Gets entry of given raw id.
     pub fn of_raw(&self, raw: usize) -> Option<Reg<'_, K, T>> {
-        let value = &self.entries.get(raw)?.value()?;
-        Some(Reg {
-            raw,
-            registry: self,
-            value,
-        })
+        let entry = self.entries.get(raw)?;
+        debug_assert!(entry.value.is_some(), "entry is empty");
+
+        Some(Reg { raw, entry })
     }
 
     /// Gets all entries of this registry.
@@ -124,7 +126,6 @@ impl<K, T> Registry<K, T> {
     pub fn entries(&self) -> Entries<'_, K, T> {
         Entries {
             inner: EntriesInner::Direct {
-                registry: self,
                 iter: self.entries.iter().enumerate(),
             },
         }
@@ -180,53 +181,42 @@ where
     }
 }
 
-impl<K: std::fmt::Debug, T: std::fmt::Debug> std::fmt::Debug for Reg<'_, K, T> {
+impl<K: std::fmt::Debug, T> std::fmt::Debug for Reg<'_, K, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RegRef")
-            .field("raw", &self.raw)
-            .field("registry", &self.registry.key)
-            .field("value", &self.value)
-            .finish()
+        write!(f, "{:?}", Self::to_id(*self))
     }
 }
 
 impl<'a, K, T> Reg<'a, K, T> {
     /// Gets the inner reference of this reference.
-    #[inline]
-    pub fn into_inner(this: Self) -> &'a T {
-        this.value
+    #[inline(always)]
+    pub fn to_value(this: Self) -> &'a T {
+        unsafe { this.entry.value().unwrap_unchecked() }
     }
 
     /// Gets the raw index of this reference.
-    #[inline]
-    pub fn raw_id(this: Self) -> usize {
+    #[inline(always)]
+    pub fn to_raw_id(this: Self) -> usize {
         this.raw
     }
 
     /// Gets the registry of this reference.
-    #[inline]
+    #[deprecated = "this function fails"]
     pub fn registry(this: Self) -> &'a Registry<K, T> {
-        this.registry
+        let _ = this;
+        unreachable!("deprecated function")
     }
 
     /// Gets the ID of this registration.
-    #[inline]
-    pub fn id(this: Self) -> &'a K {
-        <&RefEntry<_, _>>::from(this).key().value()
+    #[inline(always)]
+    pub fn to_id(this: Self) -> &'a K {
+        Self::to_entry(this).key().value()
     }
-}
 
-impl<'a, K, T> From<Reg<'a, K, T>> for &'a RefEntry<K, T> {
-    #[inline]
-    fn from(value: Reg<'a, K, T>) -> Self {
-        &value.registry.entries[value.raw]
-    }
-}
-
-impl<K, T> AsRef<RefEntry<K, T>> for Reg<'_, K, T> {
-    #[inline]
-    fn as_ref(&self) -> &RefEntry<K, T> {
-        &self.registry.entries[self.raw]
+    /// Gets the reference entry of this registration.
+    #[inline(always)]
+    pub fn to_entry(this: Self) -> &'a RefEntry<K, T> {
+        this.entry
     }
 }
 
@@ -236,7 +226,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &T) -> bool {
-        self.value == other
+        Self::to_value(*self) == other
     }
 }
 
@@ -254,7 +244,7 @@ impl<K, T> Deref for Reg<'_, K, T> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.value
+        Self::to_value(*self)
     }
 }
 
@@ -274,26 +264,13 @@ impl<K, T> PartialEq for Reg<'_, K, T> {
 
 impl<K, T> Eq for Reg<'_, K, T> {}
 
-impl<'r, K, T> Default for Reg<'r, K, T>
-where
-    K: 'r,
-    T: ProvideRegistry<'r, K, T> + 'r,
-{
-    #[inline]
-    fn default() -> Self {
-        T::registry()
-            .default_entry()
-            .expect("default entry not found in registry")
-    }
-}
-
 impl<K, T> Display for Reg<'_, K, T>
 where
     K: Display,
 {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <&RefEntry<K, T>>::from(*self).key.value().fmt(f)
+        write!(f, "{}", Self::to_id(*self))
     }
 }
 
@@ -335,7 +312,6 @@ pub struct Entries<'a, K, T> {
 #[derive(Debug)]
 enum EntriesInner<'a, K, T> {
     Direct {
-        registry: &'a Registry<K, T>,
         iter: std::iter::Enumerate<std::slice::Iter<'a, RefEntry<K, T>>>,
     },
     Raw {
@@ -349,13 +325,7 @@ impl<'a, K, T> Iterator for Entries<'a, K, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match &mut self.inner {
-            EntriesInner::Direct { registry, iter } => iter.next().and_then(|(raw, entry)| {
-                entry.value().map(|value| Reg {
-                    raw,
-                    registry,
-                    value,
-                })
-            }),
+            EntriesInner::Direct { iter } => iter.next().map(|(raw, entry)| Reg { raw, entry }),
             EntriesInner::Raw { registry, iter } => {
                 iter.next().and_then(|raw| registry.of_raw(*raw))
             }
@@ -463,7 +433,17 @@ where
     ///
     /// Returns back the given key and value if registration with the key already exists.
     #[allow(clippy::missing_panics_doc)]
+    #[inline]
     pub fn register(&mut self, key: Key<K, T>, value: T) -> Result<usize, (Key<K, T>, T)> {
+        self.register_raw(key, value, false)
+    }
+
+    fn register_raw(
+        &mut self,
+        key: Key<K, T>,
+        value: T,
+        is_default: bool,
+    ) -> Result<usize, (Key<K, T>, T)> {
         if self.keys.get_mut().is_none() {
             self.keys = HashSet::new().into();
         }
@@ -480,6 +460,7 @@ where
                 key,
                 value: None,
                 tags: RwLock::new(HashSet::new()),
+                is_default,
             },
         ));
         Ok(raw)
@@ -493,7 +474,7 @@ where
         if self.default.is_some() {
             return Err((key, value));
         }
-        let id = self.register(key, value)?;
+        let id = self.register_raw(key, value, true)?;
         self.default = Some(id);
         Ok(id)
     }
@@ -527,6 +508,7 @@ where
 }
 
 /// Trait for providing a registry.
+#[deprecated = "use local-cx to obtain registry instead"]
 pub trait ProvideRegistry<'r, K, T> {
     /// Gets the registry.
     fn registry() -> &'r Registry<K, T>;
@@ -571,7 +553,9 @@ where
 mod serde {
     use std::hash::Hash;
 
-    use crate::{entry::RefEntry, ProvideRegistry, Reg};
+    use local_cx::{LocalContext, serde::DeserializeWithCx};
+
+    use crate::{Reg, Registry};
 
     impl<K, T> serde::Serialize for Reg<'_, K, T>
     where
@@ -581,22 +565,24 @@ mod serde {
         where
             S: serde::Serializer,
         {
-            let entry: &RefEntry<_, _> = self.as_ref();
-            entry.serialize(serializer)
+            Self::to_entry(*self).serialize(serializer)
         }
     }
 
-    impl<'a, 'de, K, T> serde::Deserialize<'de> for Reg<'a, K, T>
+    impl<'a, 'de, K, T, Cx> DeserializeWithCx<'de, Cx> for Reg<'a, K, T>
     where
-        T: ProvideRegistry<'a, K, T> + 'a,
-        K: serde::Deserialize<'de> + Hash + Eq + 'a,
+        K: DeserializeWithCx<'de, Cx> + Hash + Eq + 'a,
+        Cx: LocalContext<&'a Registry<K, T>>,
     {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        fn deserialize_with_cx<D>(
+            deserializer: local_cx::WithLocalCx<D, Cx>,
+        ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
-            let key = K::deserialize(deserializer)?;
-            T::registry()
+            let cx = deserializer.local_cx;
+            let key = K::deserialize_with_cx(deserializer)?;
+            cx.acquire()
                 .get(&key)
                 .ok_or_else(|| serde::de::Error::custom("key not found"))
         }
@@ -607,31 +593,35 @@ mod serde {
 mod edcode {
 
     use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
+    use local_cx::{LocalContext, WithLocalCx};
 
-    use crate::{ProvideRegistry, Reg};
+    use crate::{Reg, Registry};
 
     impl<K, T, B> Encode<B> for Reg<'_, K, T>
     where
         B: BufMut,
     {
+        #[inline]
         fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             buf.put_variable(self.raw as u32);
             Ok(())
         }
     }
 
-    impl<'a, 'r, 'de, K, T, B> Decode<'de, B> for Reg<'a, K, T>
+    impl<'a, 'r, 'de, K: 'r, T: 'r, B, Cx> Decode<'de, WithLocalCx<B, Cx>> for Reg<'a, K, T>
     where
         'r: 'a,
-        K: 'r,
-        T: ProvideRegistry<'r, K, T> + 'r,
         B: Buf,
+        Cx: LocalContext<&'r Registry<K, T>>,
     {
-        fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+        fn decode(buf: WithLocalCx<B, Cx>) -> Result<Self, edcode2::BoxedError<'de>> {
+            let WithLocalCx { inner, local_cx } = buf;
+            let mut buf = inner;
             let id = buf.get_variable::<i32>() as usize;
-            T::registry()
+            local_cx
+                .acquire()
                 .of_raw(id)
-                .ok_or_else(|| format!("invalid id: {}", id).into())
+                .ok_or_else(|| format!("invalid id: {id}").into())
         }
     }
 }

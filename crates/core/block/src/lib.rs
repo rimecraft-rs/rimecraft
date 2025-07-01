@@ -2,7 +2,7 @@
 
 use behave::ProvideLuminance;
 use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
-use rimecraft_registry::{ProvideRegistry, Reg};
+use rimecraft_registry::Reg;
 use rimecraft_state::{State, States, StatesMut};
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
@@ -56,16 +56,6 @@ where
 {
     fn from(settings: Settings) -> Self {
         Self::new(settings, StatesMut::new(Default::default()).freeze())
-    }
-}
-
-impl<'r, K, Cx> ProvideRegistry<'r, K, Self> for RawBlock<'r, Cx>
-where
-    Cx: ProvideBlockStateExtTy + ProvideRegistry<'r, K, Self>,
-{
-    #[inline(always)]
-    fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
-        Cx::registry()
     }
 }
 
@@ -152,16 +142,15 @@ where
     }
 }
 
+impl<Cx> Copy for BlockState<'_, Cx> where Cx: ProvideBlockStateExtTy {}
+
 impl<Cx> Clone for BlockState<'_, Cx>
 where
     Cx: ProvideBlockStateExtTy,
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            block: self.block,
-            state: self.state,
-        }
+        *self
     }
 }
 

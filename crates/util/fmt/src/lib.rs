@@ -235,9 +235,9 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::InvalidColorIndex(i) => write!(f, "no matching color index found: {}", i),
-            Error::InvalidCode(c) => write!(f, "invalid code: {}", c),
-            Error::InvalidName(n) => write!(f, "invalid name: {}", n),
+            Error::InvalidColorIndex(i) => write!(f, "no matching color index found: {i}"),
+            Error::InvalidCode(c) => write!(f, "invalid code: {c}"),
+            Error::InvalidName(n) => write!(f, "invalid name: {n}"),
         }
     }
 }

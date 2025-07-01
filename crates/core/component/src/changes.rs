@@ -5,15 +5,21 @@ use std::{cell::UnsafeCell, fmt::Debug, marker::PhantomData, str::FromStr, sync:
 use ahash::{AHashMap, AHashSet};
 use bytes::{Buf, BufMut};
 use edcode2::{BufExt as _, BufMutExt as _, Decode, Encode};
+use local_cx::{
+    LocalContext, LocalContextExt, WithLocalCx,
+    dyn_codecs::Any,
+    dyn_cx::{AsDynamicContext, UnsafeDynamicContext},
+    serde::{DeserializeWithCx, SerializeWithCx},
+};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
-use rimecraft_registry::{ProvideRegistry, Reg};
-use serde::{de::DeserializeSeed, ser::SerializeMap, Deserialize, Serialize};
+use rimecraft_registry::{Reg, Registry};
+use serde::{Serialize, de::DeserializeSeed, ser::SerializeMap};
 
 use crate::{
-    map::{CompTyCell, ComponentMap},
     ComponentType, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
     UnsafeSerdeCodec,
+    map::{CompTyCell, ComponentMap},
 };
 
 /// Changes of components.
@@ -44,12 +50,14 @@ where
     /// This function could not guarantee lifetime of type `T` is sound.
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get<T: 'a>(&self, ty: &ComponentType<'a, T>) -> Option<Option<&T>> {
-        let val = self.get_raw(&RawErasedComponentType::from(ty))?;
-        if let Some(val) = val {
-            let downcasted = val.downcast_ref::<T>()?;
-            Some(Some(downcasted))
-        } else {
-            Some(None)
+        unsafe {
+            let val = self.get_raw(&RawErasedComponentType::from(ty))?;
+            if let Some(val) = val {
+                let downcasted = <dyn Any>::downcast_ref::<T>(val)?;
+                Some(Some(downcasted))
+            } else {
+                Some(None)
+            }
         }
     }
 
@@ -122,19 +130,26 @@ where
     }
 }
 
-impl<Cx> Serialize for ComponentChanges<'_, '_, Cx>
+impl<Cx, L> SerializeWithCx<L> for ComponentChanges<'_, '_, Cx>
 where
     Cx: ProvideIdTy,
+    L: AsDynamicContext,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut map = serializer.serialize_map(Some(self.ser_count))?;
-        for (&CompTyCell(ty), obj) in self.changed.iter().filter(|(k, _)| k.0.is_serializable()) {
+        let cx = serializer.local_cx;
+        let mut map = serializer.inner.serialize_map(Some(self.ser_count))?;
+
+        let dyn_cx = cx.as_dynamic_context();
+        let unsafe_cx = unsafe { dyn_cx.as_unsafe_cx() };
+
+        for (&CompTyCell(ty), obj) in self.changed.iter().filter(|(k, _)| !k.0.is_transient()) {
             struct Ser<'a, 's> {
                 obj: &'s Object<'a>,
-                codec: &'a UnsafeSerdeCodec<'a>,
+                codec: &'s UnsafeSerdeCodec<'a>,
+                cx: UnsafeDynamicContext<'s>,
             }
 
             impl Serialize for Ser<'_, '_> {
@@ -143,7 +158,7 @@ where
                 where
                     S: serde::Serializer,
                 {
-                    (self.codec.ser)(self.obj).serialize(serializer)
+                    (self.codec.ser)(&self.cx.with(self.obj)).serialize(serializer)
                 }
             }
 
@@ -154,34 +169,51 @@ where
             };
 
             map.serialize_key(&ty)?;
-            if obj.is_none() {
+            if let Some(obj) = obj.as_deref() {
+                map.serialize_value(&Ser {
+                    obj,
+                    codec: ty.ty.f.serde_codec.as_ref().expect("missing serde codec"),
+                    cx: unsafe_cx,
+                })?;
+            } else {
                 // Dummy value. fastnbt does not support Unit values.
                 map.serialize_value(&0u8)?;
-            } else {
-                map.serialize_value(&Ser {
-                    obj: obj.as_ref().unwrap(),
-                    codec: ty.ty.f.serde_codec.expect("missing serde codec"),
-                })?;
             }
         }
         map.end()
     }
 }
 
-impl<'a, 'de, Cx> Deserialize<'de> for ComponentChanges<'a, '_, Cx>
+impl<Cx, L> SerializeWithCx<L> for &ComponentChanges<'_, '_, Cx>
 where
-    Cx: ProvideIdTy<Id: FromStr> + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
+    Cx: ProvideIdTy,
+    L: AsDynamicContext,
 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    #[inline]
+    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        (**self).serialize_with_cx(serializer)
+    }
+}
+
+impl<'a, 'de, Cx, L> DeserializeWithCx<'de, L> for ComponentChanges<'a, '_, Cx>
+where
+    Cx: ProvideIdTy<Id: FromStr>,
+    L: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>> + AsDynamicContext,
+{
+    fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, L>) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        struct Visitor<'a, Cx>(PhantomData<(Cx, &'a ())>);
+        struct Visitor<'a, Cx, LCx>(PhantomData<(Cx, &'a ())>, LCx);
 
-        impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
+        impl<'a, 'de, Cx, L> serde::de::Visitor<'de> for Visitor<'a, Cx, L>
         where
-            Cx: ProvideIdTy<Id: FromStr>
-                + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
+            Cx: ProvideIdTy<Id: FromStr>,
+            L: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
+                + AsDynamicContext,
         {
             type Value = AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>;
 
@@ -201,14 +233,23 @@ where
                     changes = AHashMap::new();
                 }
 
-                while let Some(ty) = map.next_key::<Type<'a, Cx>>()? {
+                let dyn_cx = self.1.as_dynamic_context();
+                let unsafe_cx = unsafe { dyn_cx.as_unsafe_cx() };
+
+                while let Some(ty) = map.next_key_seed(WithLocalCx {
+                    inner: PhantomData::<Type<'a, Cx>>,
+                    local_cx: self.1,
+                })? {
                     if ty.rm {
                         // Skips a dummy value. fastnbt does not support Unit values.
                         let _: () = map.next_value()?;
                         changes.insert(CompTyCell(ty.ty), None);
                     } else {
-                        struct Seed<'a>(&'a UnsafeSerdeCodec<'a>);
-                        impl<'de, 'a> DeserializeSeed<'de> for Seed<'a> {
+                        struct Seed<'a, 'cx, 's>(
+                            &'s UnsafeSerdeCodec<'a>,
+                            UnsafeDynamicContext<'cx>,
+                        );
+                        impl<'de, 'a> DeserializeSeed<'de> for Seed<'a, '_, '_> {
                             type Value = Box<Object<'a>>;
 
                             fn deserialize<D>(
@@ -218,16 +259,18 @@ where
                             where
                                 D: serde::Deserializer<'de>,
                             {
-                                (self.0.de)(&mut <dyn erased_serde::Deserializer<'de>>::erase(
-                                    deserializer,
-                                ))
+                                (self.0.de)(
+                                    &mut <dyn erased_serde::Deserializer<'de>>::erase(deserializer),
+                                    self.1,
+                                )
                                 .map_err(serde::de::Error::custom)
                             }
                         }
                         changes.insert(
                             CompTyCell(ty.ty),
                             Some(map.next_value_seed(Seed(
-                                ty.ty.f.serde_codec.expect("missing serde codec"),
+                                ty.ty.f.serde_codec.as_ref().expect("missing serde codec"),
+                                unsafe_cx,
                             ))?),
                         );
                     }
@@ -237,8 +280,10 @@ where
             }
         }
 
+        let cx = deserializer.local_cx;
         deserializer
-            .deserialize_map(Visitor(PhantomData))
+            .inner
+            .deserialize_map(Visitor(PhantomData, cx))
             .map(|changed| ComponentChanges {
                 ser_count: changed.len(),
                 changed: Maybe::Owned(SimpleOwned(changed)),
@@ -246,21 +291,26 @@ where
     }
 }
 
-impl<Cx, B> Encode<B> for ComponentChanges<'_, '_, Cx>
+impl<Cx, B, L> Encode<WithLocalCx<B, L>> for ComponentChanges<'_, '_, Cx>
 where
     Cx: ProvideIdTy,
     B: BufMut,
+    L: AsDynamicContext,
 {
-    fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
+    fn encode(&self, buf: WithLocalCx<B, L>) -> Result<(), edcode2::BoxedError<'static>> {
+        let cx = buf.local_cx;
+        let mut buf = buf.inner;
         let present = self.changed.values().filter(|val| val.is_some()).count() as u32;
         buf.put_variable(present);
         buf.put_variable(self.changed.len() as u32 - present);
 
+        let dyn_cx = cx.as_dynamic_context();
+        let unsafe_cx = unsafe { dyn_cx.as_unsafe_cx() };
+
         for (&CompTyCell(ty), val) in self.changed.iter() {
             if let Some(val) = val {
-                buf.put_variable(1);
                 ty.encode(&mut buf)?;
-                (ty.f.packet_codec.encode)(&**val, &mut buf)?;
+                (ty.f.packet_codec.encode)(&**val, &mut buf, unsafe_cx)?;
             }
         }
         for (&CompTyCell(ty), val) in self.changed.iter() {
@@ -273,30 +323,35 @@ where
     }
 }
 
-impl<'a, 'de, Cx, B> Decode<'de, B> for ComponentChanges<'a, '_, Cx>
+impl<'a, 'de, Cx, B, LCx> Decode<'de, WithLocalCx<B, LCx>> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: ProvideIdTy<Id: for<'b> Decode<'de, &'b mut B>>
-        + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
+    Cx: ProvideIdTy,
     B: Buf,
+    LCx: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>> + AsDynamicContext,
 {
-    fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+    fn decode(mut buf: WithLocalCx<B, LCx>) -> Result<Self, edcode2::BoxedError<'de>> {
+        let cx = buf.local_cx;
+
         let present = buf.get_variable::<u32>();
         let absent = buf.get_variable::<u32>();
         let len = (present + absent) as usize;
 
+        let dyn_cx = cx.as_dynamic_context();
+        let unsafe_cx = unsafe { dyn_cx.as_unsafe_cx() };
+
         let mut changed = AHashMap::with_capacity(len);
         for _ in 0..present {
-            let ty = ErasedComponentType::decode(&mut buf)?;
-            let obj = (ty.f.packet_codec.decode)(&mut buf)?;
+            let ty = ErasedComponentType::decode(buf.as_mut())?;
+            let obj = (ty.f.packet_codec.decode)(&mut buf, unsafe_cx)?;
             changed.insert(CompTyCell(ty), Some(obj));
         }
         for _ in 0..absent {
-            let ty = ErasedComponentType::decode(&mut buf)?;
+            let ty = ErasedComponentType::decode(buf.as_mut())?;
             changed.insert(CompTyCell(ty), None);
         }
 
         Ok(ComponentChanges {
-            ser_count: changed.keys().filter(|k| k.0.is_serializable()).count(),
+            ser_count: changed.keys().filter(|k| !k.0.is_transient()).count(),
             changed: Maybe::Owned(SimpleOwned(changed)),
         })
     }
@@ -332,7 +387,7 @@ where
             std::any::type_name::<T>()
         );
         self.changes.insert(CompTyCell(ty), Some(Box::new(value)));
-        if ty.is_serializable() {
+        if !ty.is_transient() {
             self.ser_count += 1;
         }
     }
@@ -384,9 +439,9 @@ where
         S: serde::Serializer,
     {
         serializer.serialize_str(self.cached_ser.get_or_init(|| {
-            let id = Reg::id(self.ty);
+            let id = Reg::to_id(self.ty);
             if self.rm {
-                format!("{}{}", REMOVED_PREFIX, id)
+                format!("{REMOVED_PREFIX}{id}")
             } else {
                 id.to_string()
             }
@@ -394,26 +449,29 @@ where
     }
 }
 
-impl<'a, 'de, Cx> Deserialize<'de> for Type<'a, Cx>
+impl<'a, 'de, Cx, L> DeserializeWithCx<'de, L> for Type<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
+    Cx: ProvideIdTy,
     Cx::Id: FromStr,
+    L: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, L>) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        struct Visitor<'a, Cx>
+        struct Visitor<'a, Cx, L>
         where
             Cx: ProvideIdTy,
         {
+            cx: L,
             _marker: PhantomData<&'a Cx>,
         }
 
-        impl<'a, Cx> serde::de::Visitor<'_> for Visitor<'a, Cx>
+        impl<'a, Cx, L> serde::de::Visitor<'_> for Visitor<'a, Cx, L>
         where
-            Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
+            Cx: ProvideIdTy,
             Cx::Id: FromStr,
+            L: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
         {
             type Value = Type<'a, Cx>;
 
@@ -429,17 +487,17 @@ where
                 let stripped = value.strip_prefix(REMOVED_PREFIX);
                 let any = stripped.unwrap_or(value);
                 let id: Cx::Id = any.parse().ok().ok_or_else(|| {
-                    E::custom(format!("unable to deserialize the identifier {}", any))
+                    E::custom(format!("unable to deserialize the identifier {any}"))
                 })?;
 
-                let ty = Cx::registry().get(&id).ok_or_else(|| {
-                    E::custom(format!("unable to find the component type {}", id))
-                })?;
+                let ty =
+                    self.cx.acquire().get(&id).ok_or_else(|| {
+                        E::custom(format!("unable to find the component type {id}"))
+                    })?;
 
-                if !ty.is_serializable() {
+                if ty.is_transient() {
                     return Err(E::custom(format!(
-                        "the component type {} is not serializable",
-                        id
+                        "the component type {id} is not serializable"
                     )));
                 }
 
@@ -452,8 +510,10 @@ where
             }
         }
 
-        deserializer.deserialize_str(Visitor {
+        let cx = deserializer.local_cx;
+        deserializer.inner.deserialize_str(Visitor {
             _marker: PhantomData,
+            cx,
         })
     }
 }
@@ -464,7 +524,14 @@ where
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&UnsafeDebugIter(UnsafeCell::new(self.changed.keys())), f)
+        Debug::fmt(
+            &UnsafeDebugIter(UnsafeCell::new(
+                self.changed
+                    .iter()
+                    .map(|(k, v)| (k.0, v.as_ref().map(|v| (k.0.f.util.dbg)(&**v)))),
+            )),
+            f,
+        )
     }
 }
 

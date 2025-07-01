@@ -1,7 +1,7 @@
 [package]
 name = "rimecraft-math"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["KrLite"]
 description = "Math library for Rimecraft"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
@@ -12,7 +12,7 @@ categories = ["game-development"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-glam = "0.29"
+glam = "0.30"
 
 [lints]
 workspace = true

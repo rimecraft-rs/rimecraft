@@ -4,23 +4,24 @@ use std::{any::TypeId, cell::UnsafeCell, fmt::Debug, hash::Hash, marker::Phantom
 
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
-use rimecraft_global_cx::{
-    nbt::{ReadNbt, UpdateNbt, WriteNbt},
-    ProvideIdTy,
+use local_cx::{
+    WithLocalCx,
+    dyn_cx::UnsafeDynamicContext,
+    edcode_codec,
+    nbt::{ReadNbtWithCx, WriteNbtWithCx},
+    serde::{DeserializeWithCx, SerializeWithCx},
+    serde_codec,
 };
-use rimecraft_registry::{ProvideRegistry, Reg};
-use serde::{de::DeserializeOwned, Serialize};
+use rimecraft_global_cx::ProvideIdTy;
+use rimecraft_registry::Reg;
 
 type Object<'a> = dyn Any + Send + Sync + 'a;
 
 pub mod changes;
 pub mod map;
 
-mod dyn_any;
-
-use dyn_any::Any;
-
 pub use ahash::{AHashMap, AHashSet};
+pub use local_cx::dyn_codecs::Any;
 
 /// Type of a component data.
 ///
@@ -57,7 +58,7 @@ impl<'a, T> ComponentType<'a, T> {
 
 impl<'a, T> ComponentType<'a, T>
 where
-    T: Clone + Eq + Hash + Send + Sync + 'a,
+    T: Clone + Eq + Hash + Debug + Send + Sync + 'a,
 {
     const UTIL: DynUtil<'a> = DynUtil {
         clone: |obj| {
@@ -71,115 +72,67 @@ where
             let obj = unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) };
             obj.hash(&mut state);
         },
+        dbg: |obj| unsafe {
+            &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T as *const (dyn Debug + 'a))
+        },
     };
 }
 
 /// Creates a new [`PacketCodec`] by encoding and decoding through `edcode2`.
+#[deprecated = "use local-cx-provided macro instead"]
 pub const fn packet_codec_edcode<'a, T>() -> PacketCodec<'a, T>
 where
-    T: for<'b> Encode<&'b mut dyn BufMut>
-        + for<'b> Decode<'static, &'b mut dyn Buf>
+    T: for<'b, 'cx> Encode<WithLocalCx<&'b mut dyn BufMut, UnsafeDynamicContext<'cx>>>
+        + for<'b, 'cx> Decode<'static, WithLocalCx<&'b mut dyn Buf, UnsafeDynamicContext<'cx>>>
         + Send
         + Sync
         + 'a,
 {
-    PacketCodec {
-        codec: UnsafePacketCodec {
-            encode: |obj, buf| {
-                unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) }.encode(buf)
-            },
-            decode: {
-                assert!(
-                    <T as Decode<'_, _>>::SUPPORT_NON_IN_PLACE,
-                    "non-in-place decoding is not supported for this type",
-                );
-                |buf| Ok(Box::new(T::decode(buf)?))
-            },
-            upd: |obj, buf| {
-                unsafe { &mut *(std::ptr::from_mut::<Object<'_>>(obj) as *mut T) }
-                    .decode_in_place(buf)
-            },
-        },
-        _marker: PhantomData,
-    }
+    edcode_codec!(T: Any + 'a)
 }
 
 /// Creates a new [`PacketCodec`] by NBT serialization.
+#[deprecated = "use local-cx-provided macro instead"]
 pub const fn packet_codec_nbt<'a, T, Cx>() -> PacketCodec<'a, T>
 where
     T: Send + Sync + 'a,
-    Cx: ReadNbt<T> + for<'t> WriteNbt<&'t T>,
+    Cx: for<'cx> ReadNbtWithCx<T, UnsafeDynamicContext<'cx>>
+        + for<'t, 'cx> WriteNbtWithCx<&'t T, UnsafeDynamicContext<'cx>>,
 {
-    PacketCodec {
-        codec: UnsafePacketCodec {
-            encode: |obj, buf| {
-                Cx::write_nbt(
-                    unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) },
-                    buf.writer(),
-                )
-                .map_err(Into::into)
-            },
-            decode: |buf| Ok(Box::new(Cx::read_nbt(buf.reader())?)),
-            upd: |obj, buf| {
-                Cx::update_nbt(
-                    unsafe { &mut *(std::ptr::from_mut::<Object<'_>>(obj) as *mut T) },
-                    buf.reader(),
-                )
-                .map_err(Into::into)
-            },
-        },
-        _marker: PhantomData,
-    }
+    edcode_codec!(Nbt<Cx> T: Any + 'a)
 }
 
 /// Creates a new [`SerdeCodec`] by using `erased_serde`.
+#[deprecated = "use local-cx-provided macro instead"]
 pub const fn serde_codec<'a, T>() -> SerdeCodec<'a, T>
 where
-    T: Serialize + DeserializeOwned + Send + Sync + 'a,
+    for<'t, 'cx> &'t T: SerializeWithCx<UnsafeDynamicContext<'cx>>,
+    T: for<'de, 'cx> DeserializeWithCx<'de, UnsafeDynamicContext<'cx>> + Send + Sync + 'a,
 {
-    SerdeCodec {
-        codec: UnsafeSerdeCodec {
-            ser: |obj| unsafe {
-                &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T
-                    as *const (dyn erased_serde::Serialize + 'a))
-            },
-            de: |deserializer| {
-                erased_serde::deserialize::<T>(deserializer).map(|v| {
-                    let v: Box<Object<'_>> = Box::new(v);
-                    v
-                })
-            },
-            upd: |obj, deserializer| {
-                *unsafe { &mut *(std::ptr::from_mut::<Object<'_>>(obj) as *mut T) } =
-                    erased_serde::deserialize::<T>(deserializer)?;
-                Ok(())
-            },
-        },
-        _marker: PhantomData,
-    }
+    serde_codec!(T: Any + 'a)
 }
 
 /// Builder for creating a new [`ComponentType`].
 #[derive(Debug)]
 pub struct TypeBuilder<'a, T, Cx> {
-    serde_codec: Option<&'a UnsafeSerdeCodec<'a>>,
-    packet_codec: Option<&'a UnsafePacketCodec<'a>>,
+    serde_codec: Option<UnsafeSerdeCodec<'a>>,
+    packet_codec: Option<UnsafePacketCodec<'a>>,
     _marker: PhantomData<(T, Cx)>,
 }
 
 impl<'a, T, Cx> TypeBuilder<'a, T, Cx> {
     /// Applies the given serialization and deserialization codec.
-    pub const fn serde_codec(self, codec: &'a SerdeCodec<'a, T>) -> Self {
+    pub const fn serde_codec(self, codec: SerdeCodec<'a, T>) -> Self {
         Self {
-            serde_codec: Some(&codec.codec),
+            serde_codec: Some(codec.codec),
             ..self
         }
     }
 
     /// Applies the given packet encoding and decoding codec.
-    pub const fn packet_codec(self, codec: &'a PacketCodec<'a, T>) -> Self {
+    pub const fn packet_codec(self, codec: PacketCodec<'a, T>) -> Self {
         Self {
-            packet_codec: Some(&codec.codec),
+            packet_codec: Some(codec.codec),
             ..self
         }
     }
@@ -187,7 +140,7 @@ impl<'a, T, Cx> TypeBuilder<'a, T, Cx> {
 
 impl<'a, T, Cx> TypeBuilder<'a, T, Cx>
 where
-    T: Clone + Eq + Hash + Send + Sync + 'a,
+    T: Clone + Eq + Hash + Debug + Send + Sync + 'a,
 {
     /// Builds a new [`ComponentType`] with the given codecs.
     ///
@@ -202,7 +155,7 @@ where
                     Some(codec) => codec,
                     None => panic!("packet codec is required"),
                 },
-                util: &ComponentType::<T>::UTIL,
+                util: ComponentType::<T>::UTIL,
             },
             _marker: PhantomData,
         }
@@ -213,13 +166,14 @@ impl<T> Hash for ComponentType<'_, T> {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         typeid::of::<T>().hash(state);
+        self.is_transient().hash(state);
     }
 }
 
 impl<T> PartialEq for ComponentType<'_, T> {
     #[inline]
-    fn eq(&self, _other: &Self) -> bool {
-        true
+    fn eq(&self, other: &Self) -> bool {
+        self.is_transient() == other.is_transient()
     }
 }
 
@@ -243,48 +197,27 @@ pub struct RawErasedComponentType<'a, Cx> {
 }
 
 /// Codec for serialization and deserialization.
-#[derive(Debug, Clone, Copy)]
-pub struct SerdeCodec<'a, T> {
-    codec: UnsafeSerdeCodec<'a>,
-    _marker: PhantomData<T>,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
-struct UnsafeSerdeCodec<'a> {
-    ser: for<'s> fn(&'s Object<'a>) -> &'s (dyn erased_serde::Serialize + 'a),
-    de: fn(&mut dyn erased_serde::Deserializer<'_>) -> erased_serde::Result<Box<Object<'a>>>,
-    upd: fn(&mut Object<'a>, &mut dyn erased_serde::Deserializer<'a>) -> erased_serde::Result<()>,
-}
+pub type SerdeCodec<'a, T> = local_cx::dyn_codecs::SerdeCodec<T, Object<'a>, dyn Any + 'a>;
+type UnsafeSerdeCodec<'a> = local_cx::dyn_codecs::UnsafeSerdeCodec<Object<'a>, dyn Any + 'a>;
 
 /// Codec for packet encoding and decoding.
-#[derive(Debug, Clone, Copy)]
-pub struct PacketCodec<'a, T> {
-    codec: UnsafePacketCodec<'a>,
-    _marker: PhantomData<T>,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
-struct UnsafePacketCodec<'a> {
-    encode: fn(&'_ Object<'a>, &'_ mut dyn BufMut) -> Result<(), edcode2::BoxedError<'static>>,
-    decode: fn(&'_ mut dyn Buf) -> Result<Box<Object<'a>>, edcode2::BoxedError<'static>>,
-    upd: fn(&'_ mut Object<'a>, &'_ mut dyn Buf) -> Result<(), edcode2::BoxedError<'a>>,
-}
+pub type PacketCodec<'a, T> = local_cx::dyn_codecs::EdcodeCodec<T, Object<'a>, dyn Any + 'a>;
+type UnsafePacketCodec<'a> = local_cx::dyn_codecs::UnsafeEdcodeCodec<Object<'a>, dyn Any + 'a>;
 
 #[derive(Debug, Clone, Copy)]
 struct DynUtil<'a> {
     clone: fn(&Object<'a>) -> Box<Object<'a>>,
     eq: fn(&'_ Object<'a>, &'_ Object<'a>) -> bool,
     hash: fn(&'_ Object<'a>, &'_ mut dyn std::hash::Hasher),
+    dbg: for<'s> fn(&'s Object<'a>) -> &'s (dyn Debug + 'a),
 }
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 struct Funcs<'a> {
-    serde_codec: Option<&'a UnsafeSerdeCodec<'a>>,
-    packet_codec: &'a UnsafePacketCodec<'a>,
-    util: &'a DynUtil<'a>,
+    serde_codec: Option<UnsafeSerdeCodec<'a>>,
+    packet_codec: UnsafePacketCodec<'a>,
+    util: DynUtil<'a>,
 }
 
 impl<'a, Cx> RawErasedComponentType<'a, Cx> {
@@ -321,8 +254,15 @@ impl<'a, Cx> RawErasedComponentType<'a, Cx> {
 
     /// Returns whether the component is serializable.
     #[inline]
+    #[deprecated = "use `is_transient` instead"]
     pub fn is_serializable(&self) -> bool {
         self.f.serde_codec.is_some()
+    }
+
+    /// Returns whether the component is transient.
+    #[inline]
+    pub fn is_transient(&self) -> bool {
+        self.f.serde_codec.is_none()
     }
 }
 
@@ -341,29 +281,21 @@ impl<Cx> Hash for RawErasedComponentType<'_, Cx> {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.ty.hash(state);
+        self.is_transient().hash(state);
     }
 }
 
 impl<Cx> PartialEq for RawErasedComponentType<'_, Cx> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.ty == other.ty
+        self.ty == other.ty && self.is_transient() == other.is_transient()
     }
 }
 
 impl<Cx> Eq for RawErasedComponentType<'_, Cx> {}
 
-impl<'r, K, Cx> ProvideRegistry<'r, K, Self> for RawErasedComponentType<'_, Cx>
-where
-    Cx: ProvideRegistry<'r, K, Self>,
-{
-    #[inline]
-    fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
-        Cx::registry()
-    }
-}
-
 impl<Cx> Copy for RawErasedComponentType<'_, Cx> {}
+
 impl<Cx> Clone for RawErasedComponentType<'_, Cx> {
     fn clone(&self) -> Self {
         *self
@@ -387,3 +319,6 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

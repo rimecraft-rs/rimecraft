@@ -1,7 +1,7 @@
 [package]
 name = "rimecraft-edcode2"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Encode and Decode trait for PacketCodec implementations"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
@@ -12,7 +12,7 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-bytes = "1.7"
+bytes = "1.10"
 rimecraft-edcode2-derive = { path = "../edcode2-derive", optional = true }
 
 [features]

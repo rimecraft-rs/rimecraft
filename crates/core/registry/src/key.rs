@@ -36,6 +36,22 @@ impl<K, T> Key<K, T> {
     pub fn registry(&self) -> &K {
         &self.registry
     }
+
+    #[doc(hidden)]
+    #[inline]
+    pub fn cast<V>(self) -> Key<K, V> {
+        Key {
+            registry: self.registry,
+            value: self.value,
+            _marker: PhantomData,
+        }
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    pub fn cast_ref<V>(&self) -> &Key<K, V> {
+        unsafe { &*std::ptr::from_ref(self).cast::<Key<K, V>>() }
+    }
 }
 
 impl<K, T> Key<K, T>
@@ -103,7 +119,9 @@ pub trait Root: Sized {
 
 #[cfg(feature = "serde")]
 mod serde {
-    use crate::ProvideRegistry;
+    use local_cx::{LocalContext, serde::DeserializeWithCx};
+
+    use crate::Registry;
 
     use super::Key;
 
@@ -120,17 +138,19 @@ mod serde {
         }
     }
 
-    impl<'r, 'de, K, T> serde::Deserialize<'de> for Key<K, T>
+    impl<'r, 'de, K, T: 'r, Cx> DeserializeWithCx<'de, Cx> for Key<K, T>
     where
-        K: serde::Deserialize<'de> + Clone + 'r,
-        T: ProvideRegistry<'r, K, T> + 'r,
+        K: DeserializeWithCx<'de, Cx> + Clone + 'r,
+        Cx: LocalContext<&'r Registry<K, T>>,
     {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        fn deserialize_with_cx<D>(
+            deserializer: local_cx::WithLocalCx<D, Cx>,
+        ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
-            let registry = T::registry();
-            let value = K::deserialize(deserializer)?;
+            let registry = deserializer.local_cx.acquire();
+            let value = K::deserialize_with_cx(deserializer)?;
             Ok(Self::new(registry.key.value.clone(), value))
         }
     }
@@ -141,8 +161,9 @@ mod serde {
 pub mod edcode {
 
     use edcode2::{Decode, Encode};
+    use local_cx::{LocalContext, WithLocalCx};
 
-    use crate::ProvideRegistry;
+    use crate::Registry;
 
     use super::{Key, Root};
 
@@ -156,15 +177,16 @@ pub mod edcode {
         }
     }
 
-    impl<'r, 'de, K, T, B> Decode<'de, B> for Key<K, T>
+    impl<'r, 'de, K, T: 'r, B, Cx> Decode<'de, WithLocalCx<B, Cx>> for Key<K, T>
     where
-        K: Decode<'de, B> + Clone + 'r,
-        T: ProvideRegistry<'r, K, T> + 'r,
+        K: Decode<'de, WithLocalCx<B, Cx>> + Clone + 'r,
+        Cx: LocalContext<&'r Registry<K, T>>,
     {
         #[inline]
-        fn decode(buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+        fn decode(buf: WithLocalCx<B, Cx>) -> Result<Self, edcode2::BoxedError<'de>> {
+            let registry = buf.local_cx.acquire();
             let value = K::decode(buf)?;
-            Ok(Key::new(T::registry().key.value.to_owned(), value))
+            Ok(Key::new(registry.key.value.clone(), value))
         }
     }
 
@@ -192,9 +214,9 @@ pub mod edcode {
         }
     }
 
-    impl<'r, 'de, K, T, B> Decode<'de, B> for RegRef<Key<K, T>>
+    impl<'de, K, T, B> Decode<'de, B> for RegRef<Key<K, T>>
     where
-        K: Decode<'de, B> + Clone + Root + 'r,
+        K: Decode<'de, B> + Clone + Root,
     {
         #[inline]
         fn decode(buf: B) -> Result<Self, edcode2::BoxedError<'de>> {

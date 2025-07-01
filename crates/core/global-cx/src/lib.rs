@@ -18,9 +18,6 @@ use core::{fmt::Display, hash::Hash};
 #[cfg(feature = "std")]
 pub mod nbt;
 
-#[deprecated = "use `nbt` feature instead"]
-pub use nbt as nbt_edcode;
-
 #[cfg(feature = "edcode")]
 pub mod edcode;
 
@@ -55,8 +52,11 @@ pub trait ProvideNbtTy: GlobalContext {
     type IntArray: Into<alloc::boxed::Box<[i32]>> + From<alloc::boxed::Box<[i32]>>;
 
     /// [`i64`] array type.
-    type LongArray: Into<alloc::boxed::Box<[i64]>> + From<alloc::boxed::Box<[i32]>>;
+    type LongArray: Into<alloc::boxed::Box<[i64]>> + From<alloc::boxed::Box<[i64]>>;
 
     /// Function that converts a `Compound` to a `Deserializer`.
     fn compound_to_deserializer(compound: &Self::Compound) -> impl serde::Deserializer<'_>;
 }
+
+#[deprecated = "use `nbt` feature instead"]
+pub use nbt as nbt_edcode;

@@ -9,9 +9,10 @@ use std::{
 };
 
 use rgb::RGB8;
-use rimecraft_fmt::Formatting;
 
 use crate::Error;
+
+pub use rimecraft_fmt::Formatting;
 
 /// An RGB color of a text.
 #[derive(Debug, Clone, Copy)]

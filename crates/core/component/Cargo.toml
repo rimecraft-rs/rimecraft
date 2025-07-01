@@ -1,7 +1,7 @@
 [package]
 name = "rimecraft-component"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Minecraft Component implementation"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
@@ -14,13 +14,26 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 serde = "1.0"
 erased-serde = "0.4"
-bytes = "1.7"
+bytes = "1.10"
 ahash = "0.8"
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2" }
 rimecraft-registry = { path = "../registry", features = ["serde", "edcode"] }
 rimecraft-global-cx = { path = "../global-cx", features = ["nbt", "std"] }
 rimecraft-maybe = { path = "../../util/maybe" }
+local-cx = { path = "../local-cx", features = [
+  "serde",
+  "edcode",
+  "dyn-cx",
+  "dyn-codecs",
+], package = "rimecraft-local-cx" }
 typeid = "1.0"
+
+[dev-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+fastnbt = "2.5"
+test-global = { path = "../../test/global", features = [
+  "registry",
+], package = "rimecraft-test-global" }
 
 [features]
 

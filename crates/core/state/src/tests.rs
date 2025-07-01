@@ -1,9 +1,9 @@
 use crate::{
-    property::{
-        data::{BoolData, IntData},
-        BoolProperty, IntProperty,
-    },
     StatesMut,
+    property::{
+        BoolProperty, IntProperty,
+        data::{BoolData, IntData},
+    },
 };
 
 static INT_PROPERTY: IntProperty<'static> = IntProperty::new("int_property", IntData(1..=3));

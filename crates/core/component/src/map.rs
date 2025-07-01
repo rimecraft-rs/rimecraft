@@ -2,18 +2,24 @@
 
 use std::{
     borrow::Borrow, cell::UnsafeCell, collections::hash_map, fmt::Debug, hash::Hash,
-    marker::PhantomData,
+    marker::PhantomData, sync::Arc,
 };
 
 use ahash::AHashMap;
+use local_cx::{
+    LocalContext, LocalContextExt as _, WithLocalCx,
+    dyn_codecs::{self, Any},
+    dyn_cx::{AsDynamicContext, UnsafeDynamicContext},
+    serde::{DeserializeWithCx, SerializeWithCx},
+};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
-use rimecraft_registry::ProvideRegistry;
+use rimecraft_registry::Registry;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    changes::ComponentChanges, dyn_any, ComponentType, ErasedComponentType, Object,
-    RawErasedComponentType, UnsafeDebugIter, UnsafeSerdeCodec,
+    ComponentType, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
+    UnsafeSerdeCodec, changes::ComponentChanges,
 };
 
 #[repr(transparent)]
@@ -30,7 +36,7 @@ where
 {
     Empty,
     Patched {
-        base: &'a ComponentMap<'a, Cx>,
+        base: Maybe<'a, ComponentMap<'a, Cx>, Arc<ComponentMap<'a, Cx>>>,
         changes: AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
         changes_count: isize,
     },
@@ -65,20 +71,60 @@ where
     #[inline]
     pub fn new(base: &'a ComponentMap<'a, Cx>) -> Self {
         Self(MapInner::Patched {
-            base,
+            base: Maybe::Borrowed(base),
+            changes: AHashMap::new(),
+            changes_count: 0,
+        })
+    }
+
+    /// Creates a **patched** component map with given base map.
+    #[inline]
+    pub fn arc_new(base: Arc<ComponentMap<'a, Cx>>) -> Self {
+        Self(MapInner::Patched {
+            base: Maybe::Owned(base),
             changes: AHashMap::new(),
             changes_count: 0,
         })
     }
 
     /// Creates a **patched** component map with given base map and changes.
+    #[inline]
     pub fn with_changes(
         base: &'a ComponentMap<'a, Cx>,
         changes: ComponentChanges<'a, '_, Cx>,
     ) -> Self {
+        Self::with_changes_raw(Maybe::Borrowed(base), changes)
+    }
+
+    /// Creates a **patched** component map with given base map and changes.
+    #[inline]
+    pub fn arc_with_changes(
+        base: Arc<ComponentMap<'a, Cx>>,
+        changes: ComponentChanges<'a, '_, Cx>,
+    ) -> Self {
+        Self::with_changes_raw(Maybe::Owned(base), changes)
+    }
+
+    fn with_changes_raw(
+        base: Maybe<'a, ComponentMap<'a, Cx>, Arc<ComponentMap<'a, Cx>>>,
+        changes: ComponentChanges<'a, '_, Cx>,
+    ) -> Self {
         Self(MapInner::Patched {
+            changes_count: changes
+                .changed
+                .iter()
+                .map(|(&CompTyCell(k), v)| {
+                    let occupied = base.contains_raw(&k);
+                    if v.is_some() {
+                        if occupied { 0 } else { 1 }
+                    } else if occupied {
+                        -1
+                    } else {
+                        0
+                    }
+                })
+                .sum(),
             base,
-            changes_count: changes.changed.values().map(|v| v.is_some() as isize).sum(),
             changes: match changes.changed {
                 Maybe::Borrowed(c) => c
                     .iter()
@@ -113,7 +159,7 @@ where
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get<T>(&self, ty: &ComponentType<'a, T>) -> Option<&T> {
         self.get_raw(&RawErasedComponentType::from(ty))
-            .and_then(|val| unsafe { val.downcast_ref() })
+            .and_then(|val| unsafe { <dyn Any>::downcast_ref(val) })
     }
 
     /// Gets the component with given type.
@@ -140,8 +186,10 @@ where
         &self,
         ty: &ComponentType<'a, T>,
     ) -> Option<(ErasedComponentType<'a, Cx>, &T)> {
-        self.get_key_value_raw(&RawErasedComponentType::from(ty))
-            .and_then(|(k, v)| v.downcast_ref().map(|v| (k, v)))
+        unsafe {
+            self.get_key_value_raw(&RawErasedComponentType::from(ty))
+                .and_then(|(k, v)| <dyn Any>::downcast_ref(v).map(|v| (k, v)))
+        }
     }
 
     /// Gets the component and its type registration with given type.
@@ -188,7 +236,7 @@ where
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get_mut<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<&mut T> {
         self.get_mut_raw(&RawErasedComponentType::from(ty))
-            .and_then(|val| unsafe { val.downcast_mut() })
+            .and_then(|val| unsafe { <dyn Any>::downcast_mut(val) })
     }
 
     /// Gets the component with given type, with mutable access.
@@ -227,13 +275,15 @@ where
         &mut self,
         ty: ErasedComponentType<'a, Cx>,
         val: T,
-    ) -> Option<Maybe<'a, T>>
+    ) -> Option<Maybe<'_, T>>
     where
         T: Send + Sync + 'a,
     {
+        let ptr = self as *mut Self;
         let value = unsafe { self.insert_untracked(ty, val) };
         if value.is_none() {
-            self.track_add()
+            //SAFETY: this does not affect the lifetime of the value.
+            unsafe { (*ptr).track_add() }
         }
         value
     }
@@ -243,7 +293,7 @@ where
         &mut self,
         ty: ErasedComponentType<'a, Cx>,
         val: T,
-    ) -> Option<Maybe<'a, T>>
+    ) -> Option<Maybe<'_, T>>
     where
         T: Send + Sync + 'a,
     {
@@ -263,14 +313,14 @@ where
                     Some(v)
                 } else {
                     return old
-                        .and_then(|old| unsafe { old.downcast_ref::<T>() })
+                        .and_then(|old| unsafe { <dyn Any>::downcast_ref::<T>(old) })
                         .map(Maybe::Borrowed);
                 }
                 .flatten()
             }
             MapInner::Simple(map) => map.insert(CompTyCell(ty), Box::new(val)),
         }
-        .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
+        .and_then(|obj| unsafe { dyn_codecs::downcast_boxed(obj).ok() })
         .map(|boxed| Maybe::Owned(SimpleOwned(*boxed)))
     }
 
@@ -280,16 +330,18 @@ where
     ///
     /// This function could not guarantee lifetime of type `T` is sound.
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
-    pub unsafe fn remove<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'a, T>> {
+    pub unsafe fn remove<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'_, T>> {
+        let ptr = self as *mut Self;
         let value = unsafe { self.remove_untracked(ty) };
         if value.is_some() {
-            self.track_rm()
+            //SAFETY: this does not affect the lifetime of the value.
+            unsafe { (*ptr).track_rm() }
         }
         value
     }
 
     #[inline]
-    unsafe fn remove_untracked<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'a, T>> {
+    unsafe fn remove_untracked<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'_, T>> {
         match &mut self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => {
@@ -299,22 +351,23 @@ where
                 match (old, now) {
                     (Some((k, v)), None) => {
                         changes.insert(CompTyCell(k), None);
-                        v.downcast_ref::<T>().map(Maybe::Borrowed)
+                        let v: &(dyn Any + '_) = v;
+                        unsafe { v.downcast_ref::<T>().map(Maybe::Borrowed) }
                     }
                     (Some(_), Some(now)) => now
                         .take()
-                        .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
+                        .and_then(|obj| unsafe { dyn_codecs::downcast_boxed(obj).ok() })
                         .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
                     (None, Some(_)) => changes
                         .remove(era_ty)?
-                        .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
+                        .and_then(|obj| unsafe { dyn_codecs::downcast_boxed(obj).ok() })
                         .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
                     (None, None) => None,
                 }
             }
             MapInner::Simple(map) => map
                 .remove(&RawErasedComponentType::from(ty))
-                .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
+                .and_then(|obj| unsafe { dyn_codecs::downcast_boxed(obj).ok() })
                 .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
         }
     }
@@ -367,10 +420,7 @@ where
         if let MapInner::Patched { changes, .. } = &self.0 {
             Some(ComponentChanges {
                 changed: Maybe::Borrowed(changes),
-                ser_count: changes
-                    .keys()
-                    .filter(|cell| cell.0.is_serializable())
-                    .count(),
+                ser_count: changes.keys().filter(|cell| !cell.0.is_transient()).count(),
             })
         } else {
             None
@@ -405,7 +455,7 @@ where
 impl<Cx: ProvideIdTy> PartialEq for CompTyCell<'_, Cx> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        *self.0 == *other.0
     }
 }
 
@@ -463,10 +513,7 @@ where
                 for (k, v) in base_it {
                     let patched = changes.get(&CompTyCell(k));
                     match patched {
-                        Some(Some(opt)) => {
-                            return Some((k, &**opt));
-                        }
-                        Some(None) => continue,
+                        Some(_) => continue,
                         None => return Some((k, v)),
                     }
                 }
@@ -483,6 +530,16 @@ where
     }
 }
 
+impl<Cx> ExactSizeIterator for Iter<'_, '_, Cx>
+where
+    Cx: ProvideIdTy,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.1.len()
+    }
+}
+
 impl<Cx> PartialEq for ComponentMap<'_, Cx>
 where
     Cx: ProvideIdTy,
@@ -492,11 +549,8 @@ where
             return false;
         }
 
-        self.iter().all(move |(ty, obj)| {
-            other
-                .get_raw(&*ty)
-                .map_or(false, |o| (ty.f.util.eq)(obj, o))
-        })
+        self.iter()
+            .all(move |(ty, obj)| other.get_raw(&*ty).is_some_and(|o| (ty.f.util.eq)(obj, o)))
     }
 }
 
@@ -526,7 +580,7 @@ where
                 changes,
                 changes_count,
             } => Self(MapInner::Patched {
-                base,
+                base: Maybe::clone(base),
                 changes: changes
                     .iter()
                     .map(|(k, v)| (CompTyCell(k.0), v.as_deref().map(k.0.f.util.clone)))
@@ -665,12 +719,21 @@ where
             } => f
                 .debug_struct("PatchedComponentMap")
                 .field("base", base)
-                .field("changes", &UnsafeDebugIter(UnsafeCell::new(changes.keys())))
+                .field(
+                    "changes",
+                    &UnsafeDebugIter(UnsafeCell::new(
+                        changes
+                            .iter()
+                            .map(|(k, v)| (k, v.as_ref().map(|obj| (k.0.f.util.dbg)(obj)))),
+                    )),
+                )
                 .field("changes_count", changes_count)
                 .finish(),
             MapInner::Simple(map) => f
                 .debug_tuple("SimpleComponentMap")
-                .field(&UnsafeDebugIter(UnsafeCell::new(map.keys())))
+                .field(&UnsafeDebugIter(UnsafeCell::new(
+                    map.iter().map(|(k, v)| (k, (k.0.f.util.dbg)(v))),
+                )))
                 .finish(),
         }
     }
@@ -710,41 +773,65 @@ where
     }
 }
 
-impl<Cx> Serialize for ComponentMap<'_, Cx>
+impl<Cx, L> SerializeWithCx<L> for ComponentMap<'_, Cx>
 where
     Cx: ProvideIdTy,
     Cx::Id: Serialize,
+    L: AsDynamicContext,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         use serde::ser::SerializeMap;
-        let mut map = serializer.serialize_map(None)?;
+        let cx = serializer.local_cx;
+        let mut map = serializer.inner.serialize_map(None)?;
+
+        let dyn_cx = cx.as_dynamic_context();
+        let unsafe_cx = unsafe { dyn_cx.as_unsafe_cx() };
+
         for (ty, val) in self.iter() {
             if let Some(codec) = ty.f.serde_codec {
-                map.serialize_entry(&ty, (codec.ser)(val))?;
+                map.serialize_entry(&ty, (codec.ser)(&unsafe_cx.with(val)))?;
             }
         }
         map.end()
     }
 }
 
-impl<'a, 'de, Cx> Deserialize<'de> for ComponentMap<'a, Cx>
+impl<Cx, L> SerializeWithCx<L> for &ComponentMap<'_, Cx>
 where
-    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
-    Cx::Id: Deserialize<'de> + Hash + Eq,
+    Cx: ProvideIdTy,
+    Cx::Id: Serialize,
+    L: AsDynamicContext,
 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    #[inline]
+    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        (**self).serialize_with_cx(serializer)
+    }
+}
+
+impl<'a, 'de, Cx, LocalCx> DeserializeWithCx<'de, LocalCx> for ComponentMap<'a, Cx>
+where
+    Cx: ProvideIdTy,
+    Cx::Id: Deserialize<'de> + Hash + Eq,
+    LocalCx: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>> + AsDynamicContext,
+{
+    fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, LocalCx>) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        struct Visitor<'a, Cx>(PhantomData<&'a Cx>);
+        struct Visitor<'a, Cx, LCx>(PhantomData<&'a Cx>, LCx);
 
-        impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
+        impl<'a, 'de, Cx, L> serde::de::Visitor<'de> for Visitor<'a, Cx, L>
         where
-            Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
-            Cx::Id: Deserialize<'de> + Hash + Eq,
+            Cx: ProvideIdTy,
+            Cx::Id: DeserializeWithCx<'de, L> + Hash + Eq,
+            L: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
+                + AsDynamicContext,
         {
             type Value = ComponentMap<'a, Cx>;
 
@@ -758,13 +845,13 @@ where
                 } else {
                     AHashMap::new()
                 };
-                struct DeSeed<'a, Cx>(&'a UnsafeSerdeCodec<'a>, PhantomData<Cx>);
+                struct DeSeed<'a, 's, 'cx, Cx>(
+                    &'s UnsafeSerdeCodec<'a>,
+                    PhantomData<Cx>,
+                    UnsafeDynamicContext<'cx>,
+                );
 
-                impl<'a, 'de, Cx> serde::de::DeserializeSeed<'de> for DeSeed<'a, Cx>
-                where
-                    Cx: ProvideIdTy + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>,
-                    Cx::Id: Deserialize<'de> + Hash + Eq,
-                {
+                impl<'a, 'de, Cx> serde::de::DeserializeSeed<'de> for DeSeed<'a, '_, '_, Cx> {
                     type Value = Box<Object<'a>>;
 
                     #[inline]
@@ -772,13 +859,21 @@ where
                     where
                         D: serde::Deserializer<'de>,
                     {
-                        (self.0.de)(&mut <dyn erased_serde::Deserializer<'de>>::erase(
-                            deserializer,
-                        ))
+                        (self.0.de)(
+                            &mut <dyn erased_serde::Deserializer<'de>>::erase(deserializer),
+                            self.2,
+                        )
                         .map_err(serde::de::Error::custom)
                     }
                 }
-                while let Some(k) = map.next_key::<ErasedComponentType<'a, Cx>>()? {
+
+                let dyn_cx = self.1.as_dynamic_context();
+                let unsafe_cx = unsafe { dyn_cx.as_unsafe_cx() };
+
+                while let Some(k) = map.next_key_seed(WithLocalCx {
+                    inner: PhantomData::<ErasedComponentType<'a, Cx>>,
+                    local_cx: self.1,
+                })? {
                     let codec = k.f.serde_codec.as_ref().ok_or_else(|| {
                         serde::de::Error::invalid_type(
                             serde::de::Unexpected::Other("transient component type"),
@@ -787,7 +882,7 @@ where
                     })?;
                     m.insert(
                         CompTyCell(k),
-                        map.next_value_seed(DeSeed(codec, PhantomData::<Cx>))?,
+                        map.next_value_seed(DeSeed(codec, PhantomData::<Cx>, unsafe_cx))?,
                     );
                 }
                 m.shrink_to_fit();
@@ -799,6 +894,7 @@ where
             }
         }
 
-        deserializer.deserialize_map(Visitor(PhantomData))
+        let cx = deserializer.local_cx;
+        deserializer.inner.deserialize_map(Visitor(PhantomData, cx))
     }
 }

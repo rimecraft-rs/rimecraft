@@ -1,4 +1,4 @@
-use crate::{BufExt, BufMutExt};
+use crate::{BufExt, BufMutExt, Decode, Encode, codecs::ByteArray};
 
 #[test]
 fn var_long() {
@@ -7,4 +7,13 @@ fn var_long() {
     buf_mut.put_variable(TEST_VAL);
     let mut buf = buf_mut.as_slice();
     assert_eq!(buf.get_variable::<i64>(), TEST_VAL);
+}
+
+#[test]
+fn byte_array() {
+    let bytes = "Hello, World!".as_bytes();
+    let mut buf: Vec<u8> = Vec::new();
+    ByteArray(bytes).encode(&mut buf).expect("failed to encode");
+    let ByteArray(decoded) = ByteArray::<Vec<u8>>::decode(&buf[..]).expect("failed to decode");
+    assert_eq!(decoded.as_slice(), bytes);
 }

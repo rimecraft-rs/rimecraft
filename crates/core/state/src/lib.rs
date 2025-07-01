@@ -382,18 +382,18 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::PropertyNotFound(prop) => write!(f, "property not found: {}", prop),
+            Error::PropertyNotFound(prop) => write!(f, "property not found: {prop}"),
             Error::TableNotPresent => write!(f, "table not present"),
-            Error::ValueNotFound(value) => write!(f, "value not found: {}", value),
+            Error::ValueNotFound(value) => write!(f, "value not found: {value}"),
             Error::InvalidValue => write!(f, "invalid value"),
-            Error::InvalidPropertyName(name) => write!(f, "invalid property name: {}", name),
+            Error::InvalidPropertyName(name) => write!(f, "invalid property name: {name}"),
             Error::PropertyContainsOneOrNoValue(prop) => {
                 write!(f, "property {prop} contains <= 1 possible values")
             }
             Error::InvalidValueName { property, value } => {
                 write!(f, "invalid value name: {value} for property {property}")
             }
-            Error::DuplicatedProperty(prop) => write!(f, "duplicated property: {}", prop),
+            Error::DuplicatedProperty(prop) => write!(f, "duplicated property: {prop}"),
         }
     }
 }
@@ -403,7 +403,7 @@ impl std::error::Error for Error {}
 #[cfg(feature = "serde")]
 mod _serde {
     use rimecraft_serde_update::Update;
-    use serde::{ser::SerializeMap, Serialize};
+    use serde::{Serialize, ser::SerializeMap};
 
     use crate::State;
 

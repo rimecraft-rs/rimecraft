@@ -107,7 +107,7 @@ impl From<ChunkSectionPos> for u64 {
         let mut l = 0u64;
         l |= (x as u64 & 0x003F_FFFF) << 42;
         l |= y as u64 & 0x000F_FFFF;
-        l | (z as u64 & 0x003F_FFFF) << 20
+        l | ((z as u64 & 0x003F_FFFF) << 20)
     }
 }
 

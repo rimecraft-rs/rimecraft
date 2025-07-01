@@ -1,6 +1,6 @@
 use crate::*;
 
-use self::vanilla::{Namespace, Path, MINECRAFT};
+use self::vanilla::{MINECRAFT, Namespace, Path};
 
 #[test]
 fn create_identifiers() {

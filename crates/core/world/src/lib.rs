@@ -18,7 +18,7 @@ pub mod behave;
 use std::sync::Arc;
 
 pub use ahash::{AHashMap, AHashSet};
-use parking_lot::RwLock;
+use parking_lot::Mutex;
 use rimecraft_block_entity::BlockEntity;
 
 /// The default max light level of Minecraft.
@@ -37,4 +37,32 @@ impl<T> From<T> for Sealed<T> {
 }
 
 /// Boxed block entity cell with internal mutability and reference-counting.
-pub type BlockEntityCell<'w, Cx> = Arc<RwLock<Box<BlockEntity<'w, Cx>>>>;
+pub type BlockEntityCell<'w, Cx> = Arc<Mutex<Box<BlockEntity<'w, Cx>>>>;
+
+//TODO: PLACEHOLDERS
+
+/// Placeholder of type `ServerWorld`.
+pub(crate) type ServerWorld<'w, Cx> = placeholder::ServerWorld<'w, Cx>;
+
+/// Placeholder of type `World`.
+pub(crate) type World<'w, Cx> = placeholder::World<'w, Cx>;
+
+/// Placeholder of type `Entity`.
+pub(crate) type Entity<'w, Cx> = placeholder::Entity<'w, Cx>; // Should be atomic reference counted with internal mutability.
+
+#[allow(missing_docs, missing_debug_implementations)]
+mod placeholder {
+    use std::marker::PhantomData;
+
+    pub struct ServerWorld<'w, Cx>(PhantomData<&'w Cx>);
+
+    pub struct World<'w, Cx>(PhantomData<&'w Cx>);
+
+    pub struct Entity<'w, Cx>(PhantomData<&'w Cx>);
+
+    impl<Cx> Clone for Entity<'_, Cx> {
+        fn clone(&self) -> Self {
+            Self(PhantomData)
+        }
+    }
+}
