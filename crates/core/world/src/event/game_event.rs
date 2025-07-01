@@ -145,6 +145,7 @@ where
 
 /// Listening result of [`Listener::listen`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::exhaustive_enums)]
 pub enum ListenResult {
     /// Listener has accepted the event.
     Accepted,
@@ -300,7 +301,7 @@ where
         T: Listener<'w, Cx> + Send + Sync + 'w,
     {
         let boxed = Box::new(listener);
-        let ptr = &*boxed as *const T as *const ();
+        let ptr = std::ptr::from_ref::<T>(&*boxed) as *const ();
         if let Some(mut guard) = self.listeners.try_lock() {
             guard.push(boxed);
         } else {
@@ -316,7 +317,7 @@ where
             if let Some(i) = guard
                 .iter()
                 .enumerate()
-                .find(|(_, l)| &***l as *const _ as *const () == key.0)
+                .find(|(_, l)| std::ptr::from_ref(&***l) as *const () == key.0)
                 .map(|(i, _)| i)
             {
                 guard.swap_remove(i);
@@ -351,11 +352,21 @@ where
         vg.extend(std::mem::take(&mut buf.push));
         vg.retain(|l| {
             !buf.pop
-                .contains(&ListenerKey(&**l as *const _ as *const ()))
+                .contains(&ListenerKey(std::ptr::from_ref(&**l) as *const ()))
         });
         buf.pop.clear();
 
         visited
+    }
+}
+
+impl<'w, Cx> Default for Dispatcher<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    #[inline]
+    fn default() -> Self {
+        Self::new()
     }
 }
 

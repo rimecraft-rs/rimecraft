@@ -407,7 +407,7 @@ where
             bs = section
                 .set_block_state(x as u32, y as u32, z as u32, state)
                 .map(|maybe| match maybe {
-                    Maybe::Borrowed(bs) => bs.clone(),
+                    Maybe::Borrowed(bs) => *bs,
                     Maybe::Owned(SimpleOwned(bs)) => bs,
                 });
         }
