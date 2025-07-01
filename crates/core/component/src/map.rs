@@ -159,10 +159,7 @@ where
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get<T>(&self, ty: &ComponentType<'a, T>) -> Option<&T> {
         self.get_raw(&RawErasedComponentType::from(ty))
-            .and_then(|val| {
-                let val: &(dyn Any + '_) = val;
-                unsafe { val.downcast_ref() }
-            })
+            .and_then(|val| unsafe { <dyn Any>::downcast_ref(val) })
     }
 
     /// Gets the component with given type.
@@ -191,10 +188,7 @@ where
     ) -> Option<(ErasedComponentType<'a, Cx>, &T)> {
         unsafe {
             self.get_key_value_raw(&RawErasedComponentType::from(ty))
-                .and_then(|(k, v)| {
-                    let v: &(dyn Any + '_) = v;
-                    v.downcast_ref().map(|v| (k, v))
-                })
+                .and_then(|(k, v)| <dyn Any>::downcast_ref(v).map(|v| (k, v)))
         }
     }
 
@@ -242,10 +236,7 @@ where
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get_mut<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<&mut T> {
         self.get_mut_raw(&RawErasedComponentType::from(ty))
-            .and_then(|val| {
-                let val: &mut (dyn Any + '_) = val;
-                unsafe { val.downcast_mut() }
-            })
+            .and_then(|val| unsafe { <dyn Any>::downcast_mut(val) })
     }
 
     /// Gets the component with given type, with mutable access.
@@ -322,10 +313,7 @@ where
                     Some(v)
                 } else {
                     return old
-                        .and_then(|old| {
-                            let old: &(dyn Any + '_) = old;
-                            unsafe { old.downcast_ref::<T>() }
-                        })
+                        .and_then(|old| unsafe { <dyn Any>::downcast_ref::<T>(old) })
                         .map(Maybe::Borrowed);
                 }
                 .flatten()

@@ -53,8 +53,7 @@ where
         unsafe {
             let val = self.get_raw(&RawErasedComponentType::from(ty))?;
             if let Some(val) = val {
-                let val: &(dyn Any + '_) = val;
-                let downcasted = val.downcast_ref::<T>()?;
+                let downcasted = <dyn Any>::downcast_ref::<T>(val)?;
                 Some(Some(downcasted))
             } else {
                 Some(None)

@@ -261,8 +261,7 @@ fn iter_map() {
     assert_eq!(iter.size_hint(), (2, Some(2)));
     assert_eq!(iter.len(), 2);
     for (ty, obj) in iter {
-        let obj: &(dyn Any) = obj;
-        let obj = unsafe { obj.downcast_ref::<Foo>() }.expect("downcast failed");
+        let obj = unsafe { <dyn Any>::downcast_ref::<Foo>(obj) }.expect("downcast failed");
         if ty == edcode_ty {
             assert_eq!(obj.value, 114);
         } else if ty == persistent_ty {
@@ -293,8 +292,7 @@ fn iter_map() {
         assert_eq!(iter.size_hint(), (2, Some(2)));
         assert_eq!(iter.len(), 2);
         for (ty, obj) in iter {
-            let obj: &(dyn Any) = obj;
-            let obj = obj.downcast_ref::<Foo>().expect("downcast failed");
+            let obj = <dyn Any>::downcast_ref::<Foo>(obj).expect("downcast failed");
             if ty == edcode_ty {
                 assert_eq!(obj.value, 114);
             } else if ty == persistent_ty {
