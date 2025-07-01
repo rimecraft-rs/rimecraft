@@ -4,7 +4,8 @@ use rimecraft_global_cx::{
     nbt::{ReadNbt, WriteNbt},
 };
 use rimecraft_item::{component::RawErasedComponentType, ItemStack, RawItem};
-use rimecraft_registry::ProvideRegistry;
+use rimecraft_local_cx::{dyn_cx::AsDynamicContext, LocalContext, WithLocalCx};
+use rimecraft_registry::{ProvideRegistry, Registry};
 use rimecraft_text::Text;
 
 use crate::{AdvancementCx, DisplayInfo, Frame};
@@ -15,18 +16,22 @@ pub trait AdvancementEdcodeCx: AdvancementCx {
     fn frame_fmt(name: &str) -> Frame;
 }
 
-impl<'r, Cx, B> Encode<B> for DisplayInfo<'r, Cx>
+impl<'r, Cx, B, L> Encode<WithLocalCx<B, L>> for DisplayInfo<'r, Cx>
 where
     Cx: AdvancementEdcodeCx
-        + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>
+        + LocalContext<Registry<Cx::Id, RawItem<'r, Cx>>>
         + for<'a, 'b> WriteNbt<&'a &'b Text<Cx>>,
     B: BufMut,
+    L: AsDynamicContext,
     Cx::Id: for<'a> Encode<&'a mut B>,
 {
-    fn encode(&self, mut buf: B) -> Result<(), rimecraft_edcode2::BoxedError<'static>> {
+    fn encode(
+        &self,
+        mut buf: WithLocalCx<B, L>,
+    ) -> Result<(), rimecraft_edcode2::BoxedError<'static>> {
         Nbt::<&Text<Cx>, Cx>::new(&self.title).encode(&mut buf)?;
         Nbt::<&Text<Cx>, Cx>::new(&self.description).encode(&mut buf)?;
-        self.icon.encode(&mut buf)?;
+        self.icon.encode(buf.as_mut())?;
         self.frame.encode(&mut buf)?;
         let mut i = 0_i32;
         if self.background.is_some() {
@@ -41,7 +46,7 @@ where
         i.encode(&mut buf)?;
         self.background
             .as_ref()
-            .map_or(Ok(()), |bg| bg.encode(&mut buf))?;
+            .map_or(Ok(()), |bg| bg.encode(buf.as_mut().inner))?;
         self.pos.0.encode(&mut buf)?;
         self.pos.1.encode(&mut buf)?;
         Ok(())

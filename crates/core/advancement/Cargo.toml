@@ -19,6 +19,7 @@ rimecraft-fmt = { path = "../../util/fmt" }
 rimecraft-global-cx = { path = "../global-cx" }
 rimecraft-edcode2 = { path = "../../util/edcode2", optional = true }
 rimecraft-registry = { path = "../registry" }
+rimecraft-local-cx = { path = "../local-cx" }
 
 [lints]
 workspace = true
