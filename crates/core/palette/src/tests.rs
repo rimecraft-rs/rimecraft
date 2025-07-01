@@ -268,7 +268,7 @@ mod container {
             tests::List,
         };
 
-        macro_rules! helper {
+        macro_rules! helper_base {
             ($pascal:ident, $snake:ident, $expect:expr) => {
                 #[test]
                 fn $snake() {
@@ -299,10 +299,18 @@ mod container {
                 }
             };
         }
+        macro_rules! helper {
+            (Direct, $snake:ident) => {
+                helper_base!(Direct, $snake, None);
+            };
+            ($pascal:ident, $snake:ident) => {
+                helper_base!($pascal, $snake, Some(36));
+            };
+        }
 
-        helper!(Singular, singular, Some(36));
-        helper!(Array, array, Some(36));
-        helper!(BiMap, bi_map, Some(36));
-        helper!(Direct, direct, None);
+        helper!(Singular, singular);
+        helper!(Array, array);
+        helper!(BiMap, bi_map);
+        helper!(Direct, direct);
     }
 }
