@@ -5,10 +5,12 @@ use std::{any::TypeId, cell::UnsafeCell, fmt::Debug, hash::Hash, marker::Phantom
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use local_cx::{
-    LocalContextExt, WithLocalCx,
+    WithLocalCx,
     dyn_cx::UnsafeDynamicContext,
+    edcode_codec,
     nbt::{ReadNbtWithCx, WriteNbtWithCx},
     serde::{DeserializeWithCx, SerializeWithCx},
+    serde_codec,
 };
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
@@ -18,12 +20,8 @@ type Object<'a> = dyn Any + Send + Sync + 'a;
 pub mod changes;
 pub mod map;
 
-#[deprecated = "use local-cx-provided instead"]
-mod dyn_any;
-
-use dyn_any::Any;
-
 pub use ahash::{AHashMap, AHashSet};
+pub use local_cx::dyn_codecs::Any;
 
 /// Type of a component data.
 ///
@@ -81,7 +79,7 @@ where
 }
 
 /// Creates a new [`PacketCodec`] by encoding and decoding through `edcode2`.
-#[deprecated = "use local-cx-provided instead"]
+#[deprecated = "use local-cx-provided macro instead"]
 pub const fn packet_codec_edcode<'a, T>() -> PacketCodec<'a, T>
 where
     T: for<'b, 'cx> Encode<WithLocalCx<&'b mut dyn BufMut, UnsafeDynamicContext<'cx>>>
@@ -90,70 +88,28 @@ where
         + Sync
         + 'a,
 {
-    PacketCodec {
-        codec: UnsafePacketCodec {
-            encode: |obj, buf, cx| {
-                unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) }
-                    .encode(cx.with(buf))
-            },
-            decode: {
-                assert!(
-                    <T as Decode<'_, _>>::SUPPORT_NON_IN_PLACE,
-                    "non-in-place decoding is not supported for this type",
-                );
-                |buf, cx| Ok(Box::new(T::decode(cx.with(buf))?))
-            },
-        },
-        _marker: PhantomData,
-    }
+    edcode_codec!(T: Any + 'a)
 }
 
 /// Creates a new [`PacketCodec`] by NBT serialization.
-#[deprecated = "use local-cx-provided instead"]
+#[deprecated = "use local-cx-provided macro instead"]
 pub const fn packet_codec_nbt<'a, T, Cx>() -> PacketCodec<'a, T>
 where
     T: Send + Sync + 'a,
     Cx: for<'cx> ReadNbtWithCx<T, UnsafeDynamicContext<'cx>>
         + for<'t, 'cx> WriteNbtWithCx<&'t T, UnsafeDynamicContext<'cx>>,
 {
-    PacketCodec {
-        codec: UnsafePacketCodec {
-            encode: |obj, buf, cx| {
-                Cx::write_nbt(
-                    unsafe { &*(std::ptr::from_ref::<Object<'_>>(obj) as *const T) },
-                    cx.with(buf.writer()),
-                )
-                .map_err(Into::into)
-            },
-            decode: |buf, cx| Ok(Box::new(Cx::read_nbt(cx.with(buf.reader()))?)),
-        },
-        _marker: PhantomData,
-    }
+    edcode_codec!(Nbt<Cx> T: Any + 'a)
 }
 
 /// Creates a new [`SerdeCodec`] by using `erased_serde`.
-#[deprecated = "use local-cx-provided instead"]
+#[deprecated = "use local-cx-provided macro instead"]
 pub const fn serde_codec<'a, T>() -> SerdeCodec<'a, T>
 where
     for<'t, 'cx> &'t T: SerializeWithCx<UnsafeDynamicContext<'cx>>,
     T: for<'de, 'cx> DeserializeWithCx<'de, UnsafeDynamicContext<'cx>> + Send + Sync + 'a,
 {
-    SerdeCodec {
-        codec: UnsafeSerdeCodec {
-            ser: |obj| unsafe {
-                &*(std::ptr::from_ref::<WithLocalCx<&Object<'_>, UnsafeDynamicContext<'_>>>(obj)
-                    as *const WithLocalCx<&T, UnsafeDynamicContext<'_>>
-                    as *const (dyn erased_serde::Serialize + 'a))
-            },
-            de: |deserializer, cx| {
-                T::deserialize_with_cx(cx.with(deserializer)).map(|v| {
-                    let v: Box<Object<'_>> = Box::new(v);
-                    v
-                })
-            },
-        },
-        _marker: PhantomData,
-    }
+    serde_codec!(T: Any + 'a)
 }
 
 /// Builder for creating a new [`ComponentType`].
@@ -241,48 +197,12 @@ pub struct RawErasedComponentType<'a, Cx> {
 }
 
 /// Codec for serialization and deserialization.
-#[deprecated = "use local-cx-provided instead"]
-#[derive(Debug, Clone, Copy)]
-pub struct SerdeCodec<'a, T> {
-    codec: UnsafeSerdeCodec<'a>,
-    _marker: PhantomData<T>,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
-#[deprecated = "use local-cx-provided instead"]
-struct UnsafeSerdeCodec<'a> {
-    ser: for<'s, 'o> fn(
-        &'s WithLocalCx<&'o Object<'a>, UnsafeDynamicContext<'_>>,
-    ) -> &'s (dyn erased_serde::Serialize + 'o),
-    de: fn(
-        &mut dyn erased_serde::Deserializer<'_>,
-        UnsafeDynamicContext<'_>,
-    ) -> erased_serde::Result<Box<Object<'a>>>,
-}
+pub type SerdeCodec<'a, T> = local_cx::dyn_codecs::SerdeCodec<T, Object<'a>, dyn Any + 'a>;
+type UnsafeSerdeCodec<'a> = local_cx::dyn_codecs::UnsafeSerdeCodec<Object<'a>, dyn Any + 'a>;
 
 /// Codec for packet encoding and decoding.
-#[derive(Debug, Clone, Copy)]
-#[deprecated = "use local-cx-provided instead"]
-pub struct PacketCodec<'a, T> {
-    codec: UnsafePacketCodec<'a>,
-    _marker: PhantomData<T>,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
-#[deprecated = "use local-cx-provided instead"]
-struct UnsafePacketCodec<'a> {
-    encode: fn(
-        &'_ Object<'a>,
-        &'_ mut dyn BufMut,
-        UnsafeDynamicContext<'_>,
-    ) -> Result<(), edcode2::BoxedError<'static>>,
-    decode: fn(
-        &'_ mut dyn Buf,
-        UnsafeDynamicContext<'_>,
-    ) -> Result<Box<Object<'a>>, edcode2::BoxedError<'static>>,
-}
+pub type PacketCodec<'a, T> = local_cx::dyn_codecs::EdcodeCodec<T, Object<'a>, dyn Any + 'a>;
+type UnsafePacketCodec<'a> = local_cx::dyn_codecs::UnsafeEdcodeCodec<Object<'a>, dyn Any + 'a>;
 
 #[derive(Debug, Clone, Copy)]
 struct DynUtil<'a> {

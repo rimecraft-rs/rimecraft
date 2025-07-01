@@ -5,8 +5,11 @@ use edcode2::{Decode, Encode};
 use fastnbt::DeOpts;
 use local_cx::{
     BaseLocalContext, LocalContext, LocalContextExt,
+    dyn_codecs::Any,
     dyn_cx::{AsDynamicContext, ContextTable, DynamicContext},
+    edcode_codec,
     serde::DeserializeWithCx,
+    serde_codec,
 };
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{Registry, RegistryKey, RegistryMut};
@@ -50,15 +53,15 @@ where
 }
 
 const fn packet_codec_edcode<'a>() -> PacketCodec<'a, Foo> {
-    crate::packet_codec_edcode()
+    edcode_codec!(Foo: Any + 'a)
 }
 
 const fn packet_codec_nbt<'a>() -> PacketCodec<'a, Foo> {
-    crate::packet_codec_nbt::<'_, _, Context>()
+    edcode_codec!(Nbt<Context> Foo: Any + 'a)
 }
 
 const fn serde_codec<'a>() -> SerdeCodec<'a, Foo> {
-    crate::serde_codec()
+    serde_codec!(Foo: Any + 'a)
 }
 
 #[test]
@@ -258,7 +261,7 @@ fn iter_map() {
     assert_eq!(iter.size_hint(), (2, Some(2)));
     assert_eq!(iter.len(), 2);
     for (ty, obj) in iter {
-        let obj = unsafe { obj.downcast_ref::<Foo>() }.expect("downcast failed");
+        let obj = unsafe { <dyn Any>::downcast_ref::<Foo>(obj) }.expect("downcast failed");
         if ty == edcode_ty {
             assert_eq!(obj.value, 114);
         } else if ty == persistent_ty {
@@ -289,7 +292,7 @@ fn iter_map() {
         assert_eq!(iter.size_hint(), (2, Some(2)));
         assert_eq!(iter.len(), 2);
         for (ty, obj) in iter {
-            let obj = obj.downcast_ref::<Foo>().expect("downcast failed");
+            let obj = <dyn Any>::downcast_ref::<Foo>(obj).expect("downcast failed");
             if ty == edcode_ty {
                 assert_eq!(obj.value, 114);
             } else if ty == persistent_ty {

@@ -8,6 +8,7 @@ use std::{
 use ahash::AHashMap;
 use local_cx::{
     LocalContext, LocalContextExt as _, WithLocalCx,
+    dyn_codecs::{self, Any},
     dyn_cx::{AsDynamicContext, UnsafeDynamicContext},
     serde::{DeserializeWithCx, SerializeWithCx},
 };
@@ -18,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ComponentType, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
-    UnsafeSerdeCodec, changes::ComponentChanges, dyn_any,
+    UnsafeSerdeCodec, changes::ComponentChanges,
 };
 
 #[repr(transparent)]
@@ -158,7 +159,7 @@ where
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get<T>(&self, ty: &ComponentType<'a, T>) -> Option<&T> {
         self.get_raw(&RawErasedComponentType::from(ty))
-            .and_then(|val| unsafe { val.downcast_ref() })
+            .and_then(|val| unsafe { <dyn Any>::downcast_ref(val) })
     }
 
     /// Gets the component with given type.
@@ -187,7 +188,7 @@ where
     ) -> Option<(ErasedComponentType<'a, Cx>, &T)> {
         unsafe {
             self.get_key_value_raw(&RawErasedComponentType::from(ty))
-                .and_then(|(k, v)| v.downcast_ref().map(|v| (k, v)))
+                .and_then(|(k, v)| <dyn Any>::downcast_ref(v).map(|v| (k, v)))
         }
     }
 
@@ -235,7 +236,7 @@ where
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get_mut<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<&mut T> {
         self.get_mut_raw(&RawErasedComponentType::from(ty))
-            .and_then(|val| unsafe { val.downcast_mut() })
+            .and_then(|val| unsafe { <dyn Any>::downcast_mut(val) })
     }
 
     /// Gets the component with given type, with mutable access.
@@ -312,14 +313,14 @@ where
                     Some(v)
                 } else {
                     return old
-                        .and_then(|old| unsafe { old.downcast_ref::<T>() })
+                        .and_then(|old| unsafe { <dyn Any>::downcast_ref::<T>(old) })
                         .map(Maybe::Borrowed);
                 }
                 .flatten()
             }
             MapInner::Simple(map) => map.insert(CompTyCell(ty), Box::new(val)),
         }
-        .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
+        .and_then(|obj| unsafe { dyn_codecs::downcast_boxed(obj).ok() })
         .map(|boxed| Maybe::Owned(SimpleOwned(*boxed)))
     }
 
@@ -350,22 +351,23 @@ where
                 match (old, now) {
                     (Some((k, v)), None) => {
                         changes.insert(CompTyCell(k), None);
+                        let v: &(dyn Any + '_) = v;
                         unsafe { v.downcast_ref::<T>().map(Maybe::Borrowed) }
                     }
                     (Some(_), Some(now)) => now
                         .take()
-                        .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
+                        .and_then(|obj| unsafe { dyn_codecs::downcast_boxed(obj).ok() })
                         .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
                     (None, Some(_)) => changes
                         .remove(era_ty)?
-                        .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
+                        .and_then(|obj| unsafe { dyn_codecs::downcast_boxed(obj).ok() })
                         .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
                     (None, None) => None,
                 }
             }
             MapInner::Simple(map) => map
                 .remove(&RawErasedComponentType::from(ty))
-                .and_then(|obj| unsafe { dyn_any::downcast(obj).ok() })
+                .and_then(|obj| unsafe { dyn_codecs::downcast_boxed(obj).ok() })
                 .map(|boxed| Maybe::Owned(SimpleOwned(*boxed))),
         }
     }
