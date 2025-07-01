@@ -470,7 +470,9 @@ mod _serde {
                 // empty storages are always zeroed
             }
             apply_each(&mut is, |id| {
-                pal.get(id as usize)
+                self.data
+                    .palette
+                    .get(id as usize)
                     .map(|obj| match obj {
                         Maybe::Borrowed(obj) => obj.clone(),
                         Maybe::Owned(SimpleOwned(obj)) => obj,
