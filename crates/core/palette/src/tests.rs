@@ -189,13 +189,20 @@ mod edcode {
     helper!(BiMap, bi_map, 1);
 }
 
-#[cfg(feature = "serde")]
-mod serde {
-    #[test]
-    fn singular() {}
-}
-
 mod container {
+    macro_rules! context {
+        ($pascal:ident) => {
+            struct Cx;
+            impl ProvidePalette<List<0>, u8> for Cx {
+                const EDGE_BITS: u32 = 0;
+
+                fn provide_palette_config(_list: &List<0>, _bits: u32) -> (Strategy, u32) {
+                    (Strategy::$pascal, 0)
+                }
+            }
+        };
+    }
+
     #[cfg(feature = "edcode")]
     mod edcode {
         use crate::{
@@ -209,14 +216,7 @@ mod container {
             ($pascal:ident, $snake:ident, $expect:expr) => {
                 #[test]
                 fn $snake() {
-                    struct Cx;
-                    impl ProvidePalette<List<0>, u8> for Cx {
-                        const EDGE_BITS: u32 = 0;
-
-                        fn provide_palette_config(_list: &List<0>, _bits: u32) -> (Strategy, u32) {
-                            (Strategy::$pascal, 0)
-                        }
-                    }
+                    context!($pascal);
 
                     let palette: PalettedContainer<List<0>, u8, Cx> = PalettedContainer::new(
                         List,
@@ -254,5 +254,55 @@ mod container {
         helper!(Array, array);
         helper!(BiMap, bi_map);
         helper!(Direct, direct);
+    }
+
+    #[cfg(feature = "serde")]
+    mod serde {
+        use rimecraft_serde_update::Update;
+        use serde::Serialize;
+        use serde_json::{Deserializer, Serializer};
+
+        use crate::{
+            container::{PalettedContainer, ProvidePalette, Storage},
+            tests::List,
+            Strategy,
+        };
+
+        macro_rules! helper {
+            ($pascal:ident, $snake:ident, $expect:expr) => {
+                #[test]
+                fn $snake() {
+                    context!($pascal);
+
+                    let src: PalettedContainer<List<0>, u8, Cx> = PalettedContainer::new(
+                        List,
+                        (Strategy::$pascal, 0),
+                        Storage::Empty(0),
+                        vec![36],
+                    );
+                    let mut dest: PalettedContainer<List<0>, u8, Cx> = PalettedContainer::new(
+                        List,
+                        (Strategy::$pascal, 0),
+                        Storage::Empty(0),
+                        vec![114],
+                    );
+                    let mut serializer = Serializer::new(Vec::<u8>::new());
+                    src.serialize(&mut serializer).expect("serialize failed");
+                    let buf = serializer.into_inner();
+                    let mut deserializer = Deserializer::from_reader(&*buf);
+                    dest.update(&mut deserializer).expect("deserialize failed");
+                    assert_eq!(
+                        dest.get(0).map(|m| *m),
+                        $expect,
+                        "serde consistency check failed"
+                    );
+                }
+            };
+        }
+
+        helper!(Singular, singular, Some(36));
+        helper!(Array, array, Some(36));
+        helper!(BiMap, bi_map, Some(36));
+        helper!(Direct, direct, None);
     }
 }
