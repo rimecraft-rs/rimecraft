@@ -7,7 +7,9 @@ use local_cx::{
     BaseLocalContext, LocalContext, LocalContextExt,
     dyn_codecs::Any,
     dyn_cx::{AsDynamicContext, ContextTable, DynamicContext},
+    edcode_codec,
     serde::DeserializeWithCx,
+    serde_codec,
 };
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{Registry, RegistryKey, RegistryMut};
@@ -51,15 +53,15 @@ where
 }
 
 const fn packet_codec_edcode<'a>() -> PacketCodec<'a, Foo> {
-    crate::packet_codec_edcode()
+    edcode_codec!(Foo: Any + 'a)
 }
 
 const fn packet_codec_nbt<'a>() -> PacketCodec<'a, Foo> {
-    crate::packet_codec_nbt::<'_, _, Context>()
+    edcode_codec!(Nbt<Context> Foo: Any + 'a)
 }
 
 const fn serde_codec<'a>() -> SerdeCodec<'a, Foo> {
-    crate::serde_codec()
+    serde_codec!(Foo: Any + 'a)
 }
 
 #[test]
