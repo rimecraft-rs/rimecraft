@@ -118,8 +118,7 @@ where
     pub fn get(&self, index: usize) -> Option<Maybe<'_, T>> {
         self.data
             .storage
-            .as_array()
-            .and_then(|array| array.get(index))
+            .get(index)
             .and_then(|i| self.data.palette.get(i as usize))
     }
 
@@ -252,6 +251,15 @@ impl Storage {
         match self {
             Storage::PackedArray(array) => Some(array),
             _ => None,
+        }
+    }
+
+    #[inline]
+    fn get(&self, index: usize) -> Option<u32> {
+        if let Some(array) = self.as_array() {
+            array.get(index)
+        } else {
+            Some(0)
         }
     }
 
@@ -462,7 +470,9 @@ mod _serde {
                 // empty storages are always zeroed
             }
             apply_each(&mut is, |id| {
-                pal.get(id as usize)
+                self.data
+                    .palette
+                    .get(id as usize)
                     .map(|obj| match obj {
                         Maybe::Borrowed(obj) => obj.clone(),
                         Maybe::Owned(SimpleOwned(obj)) => obj,
