@@ -440,7 +440,7 @@ where
         serializer.serialize_str(self.cached_ser.get_or_init(|| {
             let id = Reg::to_id(self.ty);
             if self.rm {
-                format!("{}{}", REMOVED_PREFIX, id)
+                format!("{REMOVED_PREFIX}{id}")
             } else {
                 id.to_string()
             }
@@ -486,17 +486,17 @@ where
                 let stripped = value.strip_prefix(REMOVED_PREFIX);
                 let any = stripped.unwrap_or(value);
                 let id: Cx::Id = any.parse().ok().ok_or_else(|| {
-                    E::custom(format!("unable to deserialize the identifier {}", any))
+                    E::custom(format!("unable to deserialize the identifier {any}"))
                 })?;
 
-                let ty = self.cx.acquire().get(&id).ok_or_else(|| {
-                    E::custom(format!("unable to find the component type {}", id))
-                })?;
+                let ty =
+                    self.cx.acquire().get(&id).ok_or_else(|| {
+                        E::custom(format!("unable to find the component type {id}"))
+                    })?;
 
                 if ty.is_transient() {
                     return Err(E::custom(format!(
-                        "the component type {} is not serializable",
-                        id
+                        "the component type {id} is not serializable"
                     )));
                 }
 

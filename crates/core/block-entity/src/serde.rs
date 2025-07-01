@@ -271,7 +271,7 @@ where
                 )
                 .get(&id)
                 .ok_or_else(|| {
-                    serde::de::Error::custom(format!("unknown block entity type {}", id))
+                    serde::de::Error::custom(format!("unknown block entity type {id}"))
                 })?;
                 let mut be = ty
                     .instantiate(self.0, self.1)

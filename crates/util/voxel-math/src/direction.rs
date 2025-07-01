@@ -330,7 +330,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidId(id) => write!(f, "Invalid direction ID: {}", id),
+            Self::InvalidId(id) => write!(f, "Invalid direction ID: {id}"),
         }
     }
 }

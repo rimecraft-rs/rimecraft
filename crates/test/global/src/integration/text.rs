@@ -50,7 +50,7 @@ impl From<&str> for TextContent {
 impl Display for TextContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TextContent::Plain { text } => write!(f, "{}", text),
+            TextContent::Plain { text } => write!(f, "{text}"),
             TextContent::Translated {
                 translate,
                 fallback,

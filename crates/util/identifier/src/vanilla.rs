@@ -36,7 +36,7 @@ impl Namespace {
     ///
     /// # Safety
     ///
-    /// The given namespace shoule be all [a-z0-9_.-] character.
+    /// The given namespace should be all [a-z0-9_.-] character.
     pub const unsafe fn new_unchecked(value: &'static str) -> Self {
         Self(ArcCowStr::Ref(value))
     }
@@ -344,8 +344,8 @@ impl std::fmt::Display for Error {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::InvalidNamespace(s) => write!(f, "invalid namespace: {}", s),
-            Error::InvalidPath(s) => write!(f, "invalid path: {}", s),
+            Error::InvalidNamespace(s) => write!(f, "invalid namespace: {s}"),
+            Error::InvalidPath(s) => write!(f, "invalid path: {s}"),
         }
     }
 }

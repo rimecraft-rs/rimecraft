@@ -158,7 +158,7 @@ where
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for content in self {
-            write!(f, "{}", content)?;
+            write!(f, "{content}")?;
         }
         Ok(())
     }

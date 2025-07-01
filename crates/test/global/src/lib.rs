@@ -97,8 +97,7 @@ where
     where
         W: std::io::Write,
     {
-        fastnbt::to_writer(writer, &value)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        fastnbt::to_writer(writer, &value).map_err(std::io::Error::other)
     }
 }
 
@@ -119,7 +118,7 @@ where
                 local_cx: cx,
             },
         )
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .map_err(std::io::Error::other)
     }
 }
 
@@ -131,7 +130,7 @@ where
     where
         R: std::io::Read,
     {
-        fastnbt::from_reader(reader).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        fastnbt::from_reader(reader).map_err(std::io::Error::other)
     }
 }
 
@@ -149,7 +148,7 @@ where
             reader.inner,
             fastnbt::DeOpts::new(),
         )))
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .map_err(std::io::Error::other)
     }
 }
 
@@ -165,7 +164,7 @@ where
             value,
             &mut fastnbt::de::Deserializer::from_reader(reader, fastnbt::DeOpts::new()),
         )
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .map_err(std::io::Error::other)
     }
 }
 
@@ -186,7 +185,7 @@ where
                 fastnbt::DeOpts::new(),
             )),
         )
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .map_err(std::io::Error::other)
     }
 }
 
