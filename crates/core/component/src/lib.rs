@@ -6,6 +6,7 @@ use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use local_cx::{
     LocalContextExt, WithLocalCx,
+    dyn_codecs::Any,
     dyn_cx::UnsafeDynamicContext,
     nbt::{ReadNbtWithCx, WriteNbtWithCx},
     serde::{DeserializeWithCx, SerializeWithCx},
@@ -17,11 +18,6 @@ type Object<'a> = dyn Any + Send + Sync + 'a;
 
 pub mod changes;
 pub mod map;
-
-#[deprecated = "use local-cx-provided instead"]
-mod dyn_any;
-
-use dyn_any::Any;
 
 pub use ahash::{AHashMap, AHashSet};
 
