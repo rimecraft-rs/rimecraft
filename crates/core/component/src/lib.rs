@@ -6,7 +6,6 @@ use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use local_cx::{
     WithLocalCx,
-    dyn_codecs::Any,
     dyn_cx::UnsafeDynamicContext,
     edcode_codec,
     nbt::{ReadNbtWithCx, WriteNbtWithCx},
@@ -22,6 +21,7 @@ pub mod changes;
 pub mod map;
 
 pub use ahash::{AHashMap, AHashSet};
+pub use local_cx::dyn_codecs::Any;
 
 /// Type of a component data.
 ///
