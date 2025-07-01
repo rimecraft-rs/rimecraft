@@ -206,9 +206,9 @@ mod container {
     #[cfg(feature = "edcode")]
     mod edcode {
         use crate::{
+            Strategy,
             container::{PalettedContainer, ProvidePalette, Storage},
             tests::List,
-            Strategy,
         };
         use edcode2::{Decode, Encode};
 
@@ -263,9 +263,9 @@ mod container {
         use serde_json::{Deserializer, Serializer};
 
         use crate::{
+            Strategy,
             container::{PalettedContainer, ProvidePalette, Storage},
             tests::List,
-            Strategy,
         };
 
         macro_rules! helper {
