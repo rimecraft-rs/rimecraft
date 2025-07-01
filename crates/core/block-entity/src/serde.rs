@@ -3,15 +3,15 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use bitflags::bitflags;
-use component::{map::ComponentMap, RawErasedComponentType};
+use component::{RawErasedComponentType, map::ComponentMap};
 use local_cx::{
-    dyn_cx::AsDynamicContext, serde::SerializeWithCx, LocalContext, LocalContextExt as _,
-    WithLocalCx,
+    LocalContext, LocalContextExt as _, WithLocalCx, dyn_cx::AsDynamicContext,
+    serde::SerializeWithCx,
 };
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
-use serde::{de::DeserializeSeed, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeSeed};
 
 use crate::{BlockEntity, DynRawBlockEntityType, RawBlockEntity};
 
@@ -43,7 +43,7 @@ impl Default for Flags {
     }
 }
 
-/// Data flagged by [`SerializeFlags`], for serialization.
+/// Data flagged by [`Flags`], for serialization.
 #[derive(Debug)]
 pub struct Flagged<T>(pub T, pub Flags);
 
@@ -178,7 +178,7 @@ impl<'de> Deserialize<'de> for Field<'de> {
     }
 }
 
-/// This serializes the block entity using default value of [`SerializeFlags`].
+/// This serializes the block entity using default value of [`Flags`].
 impl<T, Cx, L> SerializeWithCx<L> for RawBlockEntity<'_, T, Cx>
 where
     Cx: ProvideBlockStateExtTy,
@@ -286,7 +286,7 @@ where
             }
         }
 
-        deserializer.deserialize_map(Visitor(self.pos, self.state.clone(), self.local_cx))
+        deserializer.deserialize_map(Visitor(self.pos, self.state, self.local_cx))
     }
 }
 

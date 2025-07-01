@@ -7,8 +7,8 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
 use syn::{
-    parse_macro_input, spanned::Spanned, Attribute, Data, DataEnum, DeriveInput, Error, Expr,
-    Fields, Ident, Meta,
+    Attribute, Data, DataEnum, DeriveInput, Error, Expr, Fields, Ident, Meta, parse_macro_input,
+    spanned::Spanned,
 };
 
 macro_rules! unsupported_object {

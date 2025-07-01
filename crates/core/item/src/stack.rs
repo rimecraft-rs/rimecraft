@@ -174,11 +174,11 @@ where
 mod _serde {
     use std::{hash::Hash, str::FromStr};
 
-    use component::{changes::ComponentChanges, RawErasedComponentType};
+    use component::{RawErasedComponentType, changes::ComponentChanges};
     use local_cx::{
+        LocalContextExt as _, WithLocalCx,
         dyn_cx::AsDynamicContext,
         serde::{DeserializeWithCx, SerializeWithCx},
-        LocalContextExt as _, WithLocalCx,
     };
     use rimecraft_registry::entry::RefEntry;
     use serde::{Deserialize, Serialize};

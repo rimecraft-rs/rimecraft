@@ -5,10 +5,10 @@ use std::{any::TypeId, cell::UnsafeCell, fmt::Debug, hash::Hash, marker::Phantom
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use local_cx::{
+    LocalContextExt, WithLocalCx,
     dyn_cx::UnsafeDynamicContext,
     nbt::{ReadNbtWithCx, WriteNbtWithCx},
     serde::{DeserializeWithCx, SerializeWithCx},
-    LocalContextExt, WithLocalCx,
 };
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
@@ -18,6 +18,7 @@ type Object<'a> = dyn Any + Send + Sync + 'a;
 pub mod changes;
 pub mod map;
 
+#[deprecated = "use local-cx-provided instead"]
 mod dyn_any;
 
 use dyn_any::Any;
@@ -80,6 +81,7 @@ where
 }
 
 /// Creates a new [`PacketCodec`] by encoding and decoding through `edcode2`.
+#[deprecated = "use local-cx-provided instead"]
 pub const fn packet_codec_edcode<'a, T>() -> PacketCodec<'a, T>
 where
     T: for<'b, 'cx> Encode<WithLocalCx<&'b mut dyn BufMut, UnsafeDynamicContext<'cx>>>
@@ -107,6 +109,7 @@ where
 }
 
 /// Creates a new [`PacketCodec`] by NBT serialization.
+#[deprecated = "use local-cx-provided instead"]
 pub const fn packet_codec_nbt<'a, T, Cx>() -> PacketCodec<'a, T>
 where
     T: Send + Sync + 'a,
@@ -129,6 +132,7 @@ where
 }
 
 /// Creates a new [`SerdeCodec`] by using `erased_serde`.
+#[deprecated = "use local-cx-provided instead"]
 pub const fn serde_codec<'a, T>() -> SerdeCodec<'a, T>
 where
     for<'t, 'cx> &'t T: SerializeWithCx<UnsafeDynamicContext<'cx>>,
@@ -237,6 +241,7 @@ pub struct RawErasedComponentType<'a, Cx> {
 }
 
 /// Codec for serialization and deserialization.
+#[deprecated = "use local-cx-provided instead"]
 #[derive(Debug, Clone, Copy)]
 pub struct SerdeCodec<'a, T> {
     codec: UnsafeSerdeCodec<'a>,
@@ -245,6 +250,7 @@ pub struct SerdeCodec<'a, T> {
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
+#[deprecated = "use local-cx-provided instead"]
 struct UnsafeSerdeCodec<'a> {
     ser: for<'s, 'o> fn(
         &'s WithLocalCx<&'o Object<'a>, UnsafeDynamicContext<'_>>,
@@ -257,6 +263,7 @@ struct UnsafeSerdeCodec<'a> {
 
 /// Codec for packet encoding and decoding.
 #[derive(Debug, Clone, Copy)]
+#[deprecated = "use local-cx-provided instead"]
 pub struct PacketCodec<'a, T> {
     codec: UnsafePacketCodec<'a>,
     _marker: PhantomData<T>,
@@ -264,6 +271,7 @@ pub struct PacketCodec<'a, T> {
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
+#[deprecated = "use local-cx-provided instead"]
 struct UnsafePacketCodec<'a> {
     encode: fn(
         &'_ Object<'a>,

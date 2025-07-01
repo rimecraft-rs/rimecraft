@@ -7,9 +7,9 @@ use std::{
 
 use ahash::AHashMap;
 use local_cx::{
+    LocalContext, LocalContextExt as _, WithLocalCx,
     dyn_cx::{AsDynamicContext, UnsafeDynamicContext},
     serde::{DeserializeWithCx, SerializeWithCx},
-    LocalContext, LocalContextExt as _, WithLocalCx,
 };
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
@@ -17,8 +17,8 @@ use rimecraft_registry::Registry;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    changes::ComponentChanges, dyn_any, ComponentType, ErasedComponentType, Object,
-    RawErasedComponentType, UnsafeDebugIter, UnsafeSerdeCodec,
+    ComponentType, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
+    UnsafeSerdeCodec, changes::ComponentChanges, dyn_any,
 };
 
 #[repr(transparent)]
@@ -115,11 +115,7 @@ where
                 .map(|(&CompTyCell(k), v)| {
                     let occupied = base.contains_raw(&k);
                     if v.is_some() {
-                        if occupied {
-                            0
-                        } else {
-                            1
-                        }
+                        if occupied { 0 } else { 1 }
                     } else if occupied {
                         -1
                     } else {
@@ -189,8 +185,10 @@ where
         &self,
         ty: &ComponentType<'a, T>,
     ) -> Option<(ErasedComponentType<'a, Cx>, &T)> {
-        self.get_key_value_raw(&RawErasedComponentType::from(ty))
-            .and_then(|(k, v)| v.downcast_ref().map(|v| (k, v)))
+        unsafe {
+            self.get_key_value_raw(&RawErasedComponentType::from(ty))
+                .and_then(|(k, v)| v.downcast_ref().map(|v| (k, v)))
+        }
     }
 
     /// Gets the component and its type registration with given type.
@@ -352,7 +350,7 @@ where
                 match (old, now) {
                     (Some((k, v)), None) => {
                         changes.insert(CompTyCell(k), None);
-                        v.downcast_ref::<T>().map(Maybe::Borrowed)
+                        unsafe { v.downcast_ref::<T>().map(Maybe::Borrowed) }
                     }
                     (Some(_), Some(now)) => now
                         .take()

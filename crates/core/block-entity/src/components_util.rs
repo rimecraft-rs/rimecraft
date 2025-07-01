@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use ahash::AHashSet;
-use component::{map::ComponentMap, ComponentType, RawErasedComponentType};
+use component::{ComponentType, RawErasedComponentType, map::ComponentMap};
 use rimecraft_global_cx::ProvideIdTy;
 
 /// Access to components of a block entity.
@@ -24,8 +24,10 @@ where
     /// This function could not guarantee lifetime of type `T` is sound.
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<&T> {
-        self.set.insert(RawErasedComponentType::from(ty));
-        self.map.get(ty)
+        unsafe {
+            self.set.insert(RawErasedComponentType::from(ty));
+            self.map.get(ty)
+        }
     }
 
     /// Reborrow this access.

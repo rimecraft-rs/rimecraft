@@ -2,7 +2,7 @@ use std::{any::TypeId, borrow::Borrow, fmt::Debug, hash::Hash, sync::Arc};
 
 use ahash::AHashSet;
 
-use crate::{key::Key, Registry};
+use crate::{Registry, key::Key};
 
 type RegistryObj<'a, K> = dyn DynRegistry<K> + Send + Sync + 'a;
 

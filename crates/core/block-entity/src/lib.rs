@@ -3,10 +3,10 @@
 use std::{any::TypeId, fmt::Debug};
 
 use ::component::{
-    changes::ComponentChanges, map::ComponentMap, ErasedComponentType, RawErasedComponentType,
+    ErasedComponentType, RawErasedComponentType, changes::ComponentChanges, map::ComponentMap,
 };
 use ahash::AHashSet;
-use erased_serde::{serialize_trait_object, Serialize as ErasedSerialize};
+use erased_serde::{Serialize as ErasedSerialize, serialize_trait_object};
 
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_global_cx::ProvideIdTy;

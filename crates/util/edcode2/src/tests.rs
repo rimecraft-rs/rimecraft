@@ -1,4 +1,4 @@
-use crate::{codecs::ByteArray, BufExt, BufMutExt, Decode, Encode};
+use crate::{BufExt, BufMutExt, Decode, Encode, codecs::ByteArray};
 
 #[test]
 fn var_long() {

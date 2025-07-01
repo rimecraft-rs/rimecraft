@@ -1,15 +1,15 @@
 //! Types and traits for working with chunks in a world.
 //!
-//! A chunk represents a scoped, mutable view of `Biome`s, [`BlockState`]s, [`FluidState`]s and [`BlockEntity`]s.
+//! A chunk represents a scoped, mutable view of `Biome`s, `BlockState`s, `FluidState`s and `BlockEntity`s.
 
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 use ahash::AHashMap;
 use local_cx::LocalContext;
 use parking_lot::{Mutex, RwLock};
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
 use rimecraft_chunk_palette::{
-    container::ProvidePalette, IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
+    IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe, container::ProvidePalette,
 };
 use rimecraft_fluid::ProvideFluidStateExtTy;
 use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
@@ -17,12 +17,13 @@ use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
 
 use crate::{
+    BlockEntityCell, Sealed,
+    event::game_event,
     heightmap::{self, Heightmap},
     view::{
-        block::{BlockLuminanceView, BlockView, LockedBlockViewMut},
         HeightLimit,
+        block::{BlockLuminanceView, BlockView, LockedBlockViewMut},
     },
-    BlockEntityCell, Sealed,
 };
 
 mod internal_types;
@@ -123,11 +124,9 @@ where
         + ProvideStateIds<List = Cx::BlockStateList>
         + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
-
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>
         + Clone,
-
     &'w Registry<Cx::Id, Cx::Biome>: Into<Cx::BiomeList>,
     Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
@@ -166,7 +165,11 @@ where
             section_array: {
                 let len = height_limit.count_vertical_sections() as usize;
                 if let Some(section_array) = section_array {
-                    assert_eq!(section_array.len(), len, "length of given section array should be the count of vertical sections of the chunk");
+                    assert_eq!(
+                        section_array.len(),
+                        len,
+                        "length of given section array should be the count of vertical sections of the chunk"
+                    );
                     section_array
                         .map(|opt| {
                             Mutex::new(opt.unwrap_or_else(|| ChunkSection::from_registries(cx)))
@@ -256,6 +259,26 @@ where
     fn pos(&self) -> ChunkPos {
         self.as_base_chunk().0.pos
     }
+
+    /// Peeks the [`game_event::Dispatcher`] of given Y section corrdinate.
+    #[inline]
+    fn peek_game_event_dispatcher<F, T>(&self, y_section_coord: i32, f: F) -> Option<T>
+    where
+        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
+    {
+        let _ = y_section_coord;
+        drop(f);
+        None
+    }
+
+    /// Gets the [`game_event::Dispatcher`] of given Y section corrdinate.
+    #[inline]
+    fn game_event_dispatcher(
+        &self,
+        y_section_coord: i32,
+    ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
+        self.peek_game_event_dispatcher(y_section_coord, Arc::clone)
+    }
 }
 
 /// Mutable chunk behaviors.
@@ -294,5 +317,29 @@ where
         self.sections_mut()
             .iter_mut()
             .rposition(|s| !s.get_mut().is_empty())
+    }
+
+    /// Peeks the [`game_event::Dispatcher`] of given Y section corrdinate.
+    ///
+    /// This method is the same as [`Chunk::peek_game_event_dispatcher`] but lock-free.
+    #[inline]
+    fn peek_game_event_dispatcher_lf<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>
+    where
+        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
+    {
+        let _ = y_section_coord;
+        drop(f);
+        None
+    }
+
+    /// Gets the [`game_event::Dispatcher`] of given Y section corrdinate.
+    ///
+    /// This method is the same as [`Chunk::game_event_dispatcher`] but lock-free.
+    #[inline]
+    fn game_event_dispatcher_lf(
+        &mut self,
+        y_section_coord: i32,
+    ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
+        self.peek_game_event_dispatcher_lf(y_section_coord, Arc::clone)
     }
 }

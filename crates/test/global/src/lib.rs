@@ -2,18 +2,18 @@
 
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicU64, LazyLock},
+    sync::{LazyLock, atomic::AtomicU64},
     thread::ThreadId,
 };
 
 use global_cx::{
-    nbt::{ReadNbt, UpdateNbt, WriteNbt},
     GlobalContext, ProvideIdTy, ProvideNbtTy, ProvideVersionTy,
+    nbt::{ReadNbt, UpdateNbt, WriteNbt},
 };
 use local_cx::{
+    BaseLocalContext, LocalContextExt as _, WithLocalCx,
     nbt::{ReadNbtWithCx, UpdateNbtWithCx, WriteNbtWithCx},
     serde::{DeserializeWithCx, SerializeWithCx},
-    BaseLocalContext, LocalContextExt as _, WithLocalCx,
 };
 use parking_lot::Mutex;
 
@@ -203,7 +203,7 @@ impl TestId {
     /// Get the test ID of the current thread.
     ///
     /// If the test ID is not set for this thread, a new one will be generated.
-    /// See [`capture`] for setting the test ID manually.
+    /// See [`Self::capture`] for setting the test ID manually.
     pub fn current() -> Self {
         let thread_id = std::thread::current().id();
         let mut tests = TESTS.lock();

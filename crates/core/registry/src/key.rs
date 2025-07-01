@@ -119,7 +119,7 @@ pub trait Root: Sized {
 
 #[cfg(feature = "serde")]
 mod serde {
-    use local_cx::{serde::DeserializeWithCx, LocalContext};
+    use local_cx::{LocalContext, serde::DeserializeWithCx};
 
     use crate::Registry;
 
