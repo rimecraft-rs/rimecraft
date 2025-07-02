@@ -20,7 +20,7 @@ rimecraft-serde-update = { path = "../../util/serde-update", optional = true }
 ahash = "0.8"
 
 [dev-dependencies]
-serde_json = "1.0"
+fastnbt = "2.5"
 
 [features]
 edcode = ["dep:edcode2"]

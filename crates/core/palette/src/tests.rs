@@ -258,9 +258,8 @@ mod container {
 
     #[cfg(feature = "serde")]
     mod serde {
+        use fastnbt::{DeOpts, SerOpts, de::Deserializer};
         use rimecraft_serde_update::Update;
-        use serde::Serialize;
-        use serde_json::{Deserializer, Serializer};
 
         use crate::{
             Strategy,
@@ -286,10 +285,9 @@ mod container {
                         Storage::Empty(0),
                         vec![114],
                     );
-                    let mut serializer = Serializer::new(Vec::<u8>::new());
-                    src.serialize(&mut serializer).expect("serialize failed");
-                    let buf = serializer.into_inner();
-                    let mut deserializer = Deserializer::from_reader(&*buf);
+                    let buf = fastnbt::to_bytes_with_opts(&src, SerOpts::network_nbt())
+                        .expect("serialize failed");
+                    let mut deserializer = Deserializer::from_reader(&*buf, DeOpts::network_nbt());
                     dest.update(&mut deserializer).expect("deserialize failed");
                     assert_eq!(
                         dest.get(0).map(|m| *m),
