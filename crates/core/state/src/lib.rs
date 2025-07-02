@@ -10,6 +10,7 @@ use std::{
 };
 
 use ahash::AHashMap;
+use ident_hash::{HashTableExt as _, IHashMap};
 use property::{BiIndex, ErasedProperty, Property, UnObjSafeErasedWrap as _, Wrap};
 
 #[cfg(feature = "regex")]
@@ -22,7 +23,7 @@ use crate::property::ErasedWrap;
 pub mod property;
 
 // <property> -> <<value> -> <state>>
-type Table<'a, T> = AHashMap<ErasedProperty<'a>, AHashMap<isize, NonNull<T>>>;
+type Table<'a, T> = AHashMap<ErasedProperty<'a>, IHashMap<isize, NonNull<T>>>;
 
 /// State of an object.
 pub struct State<'a, T> {
@@ -205,7 +206,7 @@ where
             let state = unsafe { state.as_ref() };
             let mut table: Table<'a, State<'a, T>> = Table::new();
             for (prop, s_val) in state.entries.iter() {
-                let mut row = AHashMap::new();
+                let mut row = IHashMap::new();
                 for val in prop.wrap.erased_iter().filter(|v| v != s_val) {
                     let Some(s) = list.iter().find(|s| {
                         let s = unsafe { s.as_ref() };

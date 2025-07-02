@@ -19,6 +19,7 @@ serde = { version = "1.0", optional = true }
 rimecraft-serde-update = { path = "../../util/serde-update", optional = true }
 ahash = "0.8"
 typeid = "1.0"
+ident-hash = { path = "../../util/ident-hash", package = "rimecraft-ident-hash" }
 
 [features]
 default = ["serde"]
