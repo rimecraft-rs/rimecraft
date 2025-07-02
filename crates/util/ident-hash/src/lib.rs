@@ -1,6 +1,9 @@
 //! Hasher that doesn't hash at all.
 
-use std::hash::{BuildHasherDefault, Hasher};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::{BuildHasherDefault, Hasher},
+};
 
 /// A hasher that doesn't hash anything, but returns the given value,
 /// which is useful for integral-keyed hash tables.
@@ -65,6 +68,45 @@ impl Hasher for IdentityHasher {
 
 /// A build hasher that uses [`IdentityHasher`].
 pub type IdentityBuildHasher = BuildHasherDefault<IdentityHasher>;
+
+/// A hash map that uses [`IdentityHasher`].
+pub type IHashMap<K, V> = HashMap<K, V, IdentityBuildHasher>;
+
+/// A hash set that uses [`IdentityHasher`].
+pub type IHashSet<K> = HashSet<K, IdentityBuildHasher>;
+
+/// Extension trait for hash tables.
+pub trait HashTableExt {
+    /// Creates an empty hash table, with zeroed capacity.
+    fn new() -> Self;
+
+    /// Creates an empty hash table, with at least the given capacity.
+    fn with_capacity(capacity: usize) -> Self;
+}
+
+impl<K, V> HashTableExt for IHashMap<K, V> {
+    #[inline(always)]
+    fn new() -> Self {
+        Self::with_hasher(IdentityBuildHasher::new())
+    }
+
+    #[inline(always)]
+    fn with_capacity(capacity: usize) -> Self {
+        Self::with_capacity_and_hasher(capacity, IdentityBuildHasher::new())
+    }
+}
+
+impl<K> HashTableExt for IHashSet<K> {
+    #[inline(always)]
+    fn new() -> Self {
+        Self::with_hasher(IdentityBuildHasher::new())
+    }
+
+    #[inline(always)]
+    fn with_capacity(capacity: usize) -> Self {
+        Self::with_capacity_and_hasher(capacity, IdentityBuildHasher::new())
+    }
+}
 
 #[cfg(test)]
 mod tests;

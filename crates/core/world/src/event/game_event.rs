@@ -4,10 +4,11 @@
 
 //TODO: funtion of dispatch manager, which requires interacting with a world instance.
 
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 
 use ahash::AHashSet;
 use glam::DVec3;
+use ident_hash::{HashTableExt as _, IHashSet};
 use local_cx::dyn_codecs::{Any, EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
 use maybe::Maybe;
 use parking_lot::Mutex;
@@ -261,18 +262,25 @@ where
 }
 
 /// Key of a dispatched listener.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct ListenerKey(*const ());
 
 unsafe impl Send for ListenerKey {}
 unsafe impl Sync for ListenerKey {}
+
+impl Hash for ListenerKey {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.addr().hash(state);
+    }
+}
 
 struct DispatcherBuf<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
     push: Vec<BoxedListener<'w, Cx>>,
-    pop: AHashSet<ListenerKey>,
+    pop: IHashSet<ListenerKey>,
 }
 
 impl<'w, Cx> Dispatcher<'w, Cx>
@@ -285,7 +293,7 @@ where
             listeners: Mutex::new(Vec::new()),
             buf: Mutex::new(DispatcherBuf {
                 push: Vec::new(),
-                pop: AHashSet::new(),
+                pop: IHashSet::new(),
             }),
         }
     }

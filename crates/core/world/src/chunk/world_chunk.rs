@@ -1,6 +1,6 @@
 //! World chunks.
 
-use ahash::AHashMap;
+use ident_hash::IHashMap;
 use local_cx::{LocalContext, dyn_cx::AsDynamicContext};
 use parking_lot::Mutex;
 use rimecraft_block::BlockState;
@@ -39,7 +39,7 @@ where
 
     is_client: bool,
     loaded_to_world: bool,
-    game_event_dispatchers: Mutex<AHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>,
+    game_event_dispatchers: Mutex<IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>,
 
     local_cx: Local,
 }
