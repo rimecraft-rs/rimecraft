@@ -89,7 +89,7 @@ impl<'a> DescriptorSet<'a> {
             "not under the same registry"
         );
         let raw = self.inner.get(ty.index);
-        raw.is_null().then(|| {
+        (!raw.is_null()).then(|| {
             let borrowed = &raw;
             let ptr = std::ptr::from_ref(borrowed) as *const T;
             unsafe { *ptr }
@@ -109,12 +109,12 @@ impl<'a> DescriptorSetBuilder<'a> {
         }
     }
 
-    /// Inserts a value into the descriptor set.
+    /// Inserts a value into the descriptor set, returns if the insertion was successful.
     ///
     /// # Panics
     ///
     /// Panics if the type is not under same registry as the builder.
-    pub fn insert<T: Copy + 'a>(&mut self, ty: Type<T>, value: T) {
+    pub fn insert<T: Copy + 'a>(&mut self, ty: Type<T>, value: T) -> bool {
         let _: () = Type::<T>::__TYPE_CHECK;
 
         if self.map.is_empty() {
@@ -130,9 +130,14 @@ impl<'a> DescriptorSetBuilder<'a> {
             self.max_index = ty.index;
         }
 
-        let borrowed = &value;
-        let ptr = std::ptr::from_ref(borrowed) as *const *const ();
-        self.map.insert(ty.index, unsafe { *ptr });
+        if let std::collections::hash_map::Entry::Vacant(e) = self.map.entry(ty.index) {
+            let borrowed = &value;
+            let ptr = std::ptr::from_ref(borrowed) as *const *const ();
+            e.insert(unsafe { *ptr });
+            true
+        } else {
+            false
+        }
     }
 
     /// Builds this builder into a [`DescriptorSet`].
@@ -143,7 +148,7 @@ impl<'a> DescriptorSetBuilder<'a> {
                 DescriptorSetInner::Empty
             } else if self.max_index < SLICE_THRESHOLD {
                 DescriptorSetInner::Slice(
-                    (0usize..self.max_index)
+                    (0usize..=self.max_index)
                         .map(|i| self.map.get(&i).copied().unwrap_or(std::ptr::null()))
                         .collect(),
                 )
@@ -215,3 +220,6 @@ unsafe impl Send for DescriptorSetBuilder<'_> {}
 unsafe impl Sync for DescriptorSetBuilder<'_> {}
 unsafe impl<T> Send for Type<T> {}
 unsafe impl<T> Sync for Type<T> {}
+
+#[cfg(test)]
+mod tests;
