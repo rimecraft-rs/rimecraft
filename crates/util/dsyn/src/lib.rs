@@ -120,7 +120,10 @@ impl<'a> DescriptorSetBuilder<'a> {
     /// # Panics
     ///
     /// Panics if the type is not under same registry as the builder.
-    pub fn insert<T: Copy + 'a>(&mut self, ty: Type<T>, value: T) -> bool {
+    pub fn insert<T>(&mut self, ty: Type<T>, value: T) -> bool
+    where
+        T: Copy + Send + Sync + 'a,
+    {
         let _: () = Type::<T>::__TYPE_CHECK;
 
         if self.map.is_empty() {
