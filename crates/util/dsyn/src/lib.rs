@@ -4,6 +4,12 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use ident_hash::{HashTableExt as _, IHashMap};
 
+#[cfg(any(feature = "simple-registry", test))]
+mod simple_registry;
+
+#[cfg(feature = "simple-registry")]
+pub use simple_registry::SimpleRegistry;
+
 /// The maximum number of elements in a slice or vector before it switches to a map.
 const SLICE_THRESHOLD: usize = 8;
 
