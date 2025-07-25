@@ -60,27 +60,35 @@ impl<T> Type<T> {
 
 /// A set of descriptors.
 #[derive(Debug)]
-pub struct DescriptorSet<'a> {
+pub struct DescriptorSet<'a, 'p> {
     inner: DescriptorSetInner,
     registry_marker: *const (),
+    parent: Option<&'p DescriptorSet<'a, 'p>>,
     // role of lifetime: constrain this type not to outlive it.
     _marker: PhantomData<&'a ()>,
 }
 
 /// Builder of a [`DescriptorSet`].
 #[derive(Debug)]
-pub struct DescriptorSetBuilder<'a> {
+pub struct DescriptorSetBuilder<'a, 'p> {
     map: IHashMap<usize, *const ()>,
     registry_marker: *const (),
     max_index: usize,
+    parent: Option<&'p DescriptorSet<'a, 'p>>,
     _marker: PhantomData<&'a ()>,
 }
 
-impl<'a> DescriptorSet<'a> {
+impl<'a> DescriptorSet<'a, '_> {
     /// Returns builder of this type.
     #[inline]
-    pub fn builder() -> DescriptorSetBuilder<'a> {
-        Default::default()
+    pub fn builder<'p>() -> DescriptorSetBuilder<'a, 'p> {
+        DescriptorSetBuilder::new()
+    }
+
+    /// Returns builder of this type with a parent.
+    #[inline]
+    pub fn builder_with_parent<'p>(parent: &'p Self) -> DescriptorSetBuilder<'a, 'p> {
+        DescriptorSetBuilder::with_parent(parent)
     }
 
     /// Returns the value of the given type if present.
@@ -90,20 +98,26 @@ impl<'a> DescriptorSet<'a> {
     /// Panics if the type is not under same registry as this set.
     pub fn get<T: Copy>(&self, ty: Type<T>) -> Option<T> {
         let _: () = Type::<T>::__TYPE_CHECK;
-        assert_eq!(
-            self.registry_marker, ty.registry_marker,
-            "not under the same registry"
-        );
+        if self.registry_marker != ty.registry_marker {
+            return None;
+        }
         let raw = self.inner.get(ty.index);
-        (!raw.is_null()).then(|| {
-            let borrowed = &raw;
-            let ptr = std::ptr::from_ref(borrowed) as *const T;
-            unsafe { *ptr }
-        })
+        (!raw.is_null())
+            .then(|| {
+                let borrowed = &raw;
+                let ptr = std::ptr::from_ref(borrowed) as *const T;
+                unsafe { *ptr }
+            })
+            .or_else(|| self.parent.and_then(|p| p.get(ty)))
+    }
+
+    /// Returns whether this set is empty.
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty() && self.parent.map(|p| p.is_empty()).unwrap_or(true)
     }
 }
 
-impl<'a> DescriptorSetBuilder<'a> {
+impl<'a, 'p> DescriptorSetBuilder<'a, 'p> {
     /// Creates a new descriptor set builder.
     #[inline]
     pub fn new() -> Self {
@@ -111,6 +125,19 @@ impl<'a> DescriptorSetBuilder<'a> {
             map: IHashMap::new(),
             registry_marker: std::ptr::null(),
             max_index: usize::MIN,
+            parent: None,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Creates a new descriptor set builder with a parent.
+    #[inline]
+    pub fn with_parent(parent: &'p DescriptorSet<'a, 'p>) -> Self {
+        Self {
+            map: IHashMap::new(),
+            registry_marker: parent.registry_marker,
+            max_index: usize::MIN,
+            parent: Some(parent),
             _marker: PhantomData,
         }
     }
@@ -150,7 +177,7 @@ impl<'a> DescriptorSetBuilder<'a> {
     }
 
     /// Builds this builder into a [`DescriptorSet`].
-    pub fn build(self) -> DescriptorSet<'a> {
+    pub fn build(self) -> DescriptorSet<'a, 'p> {
         DescriptorSet {
             registry_marker: self.registry_marker,
             inner: if self.map.is_empty() {
@@ -164,21 +191,22 @@ impl<'a> DescriptorSetBuilder<'a> {
             } else {
                 DescriptorSetInner::Map(self.map)
             },
+            parent: self.parent,
             _marker: PhantomData,
         }
     }
 }
 
-impl Default for DescriptorSetBuilder<'_> {
+impl Default for DescriptorSetBuilder<'_, '_> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> From<DescriptorSetBuilder<'a>> for DescriptorSet<'a> {
+impl<'a, 'p> From<DescriptorSetBuilder<'a, 'p>> for DescriptorSet<'a, 'p> {
     #[inline]
-    fn from(value: DescriptorSetBuilder<'a>) -> Self {
+    fn from(value: DescriptorSetBuilder<'a, 'p>) -> Self {
         value.build()
     }
 }
@@ -197,6 +225,15 @@ impl DescriptorSetInner {
             DescriptorSetInner::Slice(v) => v.get(index).copied().unwrap_or(std::ptr::null()),
             DescriptorSetInner::Map(m) => m.get(&index).copied().unwrap_or(std::ptr::null()),
             DescriptorSetInner::Empty => std::ptr::null(),
+        }
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        match self {
+            DescriptorSetInner::Slice(v) => v.is_empty(),
+            DescriptorSetInner::Map(m) => m.is_empty(),
+            DescriptorSetInner::Empty => true,
         }
     }
 }
@@ -223,10 +260,10 @@ pub unsafe trait Registry {
     fn marker(&self) -> *const ();
 }
 
-unsafe impl Send for DescriptorSet<'_> {}
-unsafe impl Sync for DescriptorSet<'_> {}
-unsafe impl Send for DescriptorSetBuilder<'_> {}
-unsafe impl Sync for DescriptorSetBuilder<'_> {}
+unsafe impl Send for DescriptorSet<'_, '_> {}
+unsafe impl Sync for DescriptorSet<'_, '_> {}
+unsafe impl Send for DescriptorSetBuilder<'_, '_> {}
+unsafe impl Sync for DescriptorSetBuilder<'_, '_> {}
 unsafe impl<T> Send for Type<T> {}
 unsafe impl<T> Sync for Type<T> {}
 
