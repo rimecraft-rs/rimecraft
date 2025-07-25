@@ -59,7 +59,13 @@ impl<T> Type<T> {
 }
 
 /// A set of descriptors.
-#[derive(Debug)]
+///
+/// A descriptor set holds an unique marker of its registry, avoiding the possibility
+/// of accessed by a descriptor from exotic registries.
+///
+/// Descriptor sets support inheritance. See [`Self::builder_with_parent`].
+/// The intended behavior is that the current sets override the parent's descriptors.
+#[derive(Debug, Clone)]
 pub struct DescriptorSet<'a, 'p> {
     inner: DescriptorSetInner,
     registry_marker: *const (),
@@ -69,7 +75,7 @@ pub struct DescriptorSet<'a, 'p> {
 }
 
 /// Builder of a [`DescriptorSet`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DescriptorSetBuilder<'a, 'p> {
     map: IHashMap<usize, *const ()>,
     registry_marker: *const (),
@@ -114,6 +120,28 @@ impl<'a> DescriptorSet<'a, '_> {
     /// Returns whether this set is empty.
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty() && self.parent.map(|p| p.is_empty()).unwrap_or(true)
+    }
+}
+
+impl<'a, 'p> DescriptorSet<'a, 'p> {
+    fn to_builder(&self) -> DescriptorSetBuilder<'a, 'p> {
+        DescriptorSetBuilder {
+            map: match &self.inner {
+                DescriptorSetInner::Slice(items) => items
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(k, &v)| if v.is_null() { None } else { Some((k, v)) })
+                    .collect(),
+                DescriptorSetInner::Map(hash_map) => hash_map.clone(),
+                DescriptorSetInner::Empty => IHashMap::new(),
+            },
+            registry_marker: self.registry_marker,
+            parent: self.parent,
+            _marker: PhantomData,
+
+            // no business inside use cases
+            max_index: 0,
+        }
     }
 }
 
@@ -173,6 +201,33 @@ impl<'a, 'p> DescriptorSetBuilder<'a, 'p> {
             true
         } else {
             false
+        }
+    }
+
+    /// Flattens the builder, merging parent into children.
+    ///
+    /// This is useful for approaching the best performance of a descriptor set.
+    pub fn flatten(self) -> DescriptorSetBuilder<'a, 'static> {
+        if let Some(parent) = self.parent {
+            let mut map = parent.to_builder().flatten().map;
+            // intended behavior: replacing parents with children. see std doc
+            map.extend(self.map);
+            let max_index = map.iter().map(|(&i, _)| i).max().unwrap_or(usize::MIN);
+            DescriptorSetBuilder {
+                map,
+                registry_marker: parent.registry_marker,
+                max_index,
+                parent: None,
+                _marker: PhantomData,
+            }
+        } else {
+            DescriptorSetBuilder {
+                map: self.map,
+                registry_marker: self.registry_marker,
+                max_index: self.max_index,
+                parent: None,
+                _marker: PhantomData,
+            }
         }
     }
 

@@ -1,9 +1,10 @@
 //! Minecraft block primitives.
 
 use behave::ProvideLuminance;
+use dsyn::DescriptorSet;
 use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
 use rimecraft_registry::Reg;
-use rimecraft_state::{State, States, StatesMut};
+use rimecraft_state::{State, States};
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
@@ -20,6 +21,9 @@ where
     settings: Settings,
     states: States<'a, Cx::BlockStateExt>,
     _marker: PhantomData<Cx>,
+
+    /// Object descriptors.
+    pub descriptors: DescriptorSet<'static, 'a>,
 }
 
 impl<'a, Cx> RawBlock<'a, Cx>
@@ -28,11 +32,16 @@ where
 {
     /// Creates a new block with the given settings.
     #[inline]
-    pub const fn new(settings: Settings, states: States<'a, Cx::BlockStateExt>) -> Self {
+    pub const fn new(
+        settings: Settings,
+        states: States<'a, Cx::BlockStateExt>,
+        descriptors: DescriptorSet<'static, 'a>,
+    ) -> Self {
         Self {
             settings,
             states,
             _marker: PhantomData,
+            descriptors,
         }
     }
 
@@ -46,16 +55,6 @@ where
     #[inline]
     pub fn states(&self) -> &States<'a, Cx::BlockStateExt> {
         &self.states
-    }
-}
-
-impl<Cx> From<Settings> for RawBlock<'_, Cx>
-where
-    Cx: ProvideBlockStateExtTy,
-    Cx::BlockStateExt: Default + Clone,
-{
-    fn from(settings: Settings) -> Self {
-        Self::new(settings, StatesMut::new(Default::default()).freeze())
     }
 }
 
