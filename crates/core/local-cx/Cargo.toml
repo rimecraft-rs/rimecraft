@@ -18,6 +18,7 @@ erased-serde = { version = "0.4", optional = true }
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 typeid = { version = "1.0", optional = true }
 ahash = { version = "0.8", optional = true }
+dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn", optional = true }
 
 [features]
 serde = ["dep:serde"]
@@ -25,6 +26,7 @@ erased-serde = ["dep:erased-serde", "serde"]
 edcode = ["dep:edcode2"]
 dyn-cx = ["dep:typeid", "dep:ahash"]
 dyn-codecs = ["erased-serde", "edcode", "dyn-cx"]
+dsyn = ["dep:dsyn"]
 
 [lints]
 workspace = true

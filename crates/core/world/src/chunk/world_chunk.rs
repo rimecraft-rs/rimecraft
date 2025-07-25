@@ -1,11 +1,11 @@
 //! World chunks.
 
 use ident_hash::IHashMap;
-use local_cx::{LocalContext, dyn_cx::AsDynamicContext};
+use local_cx::{LocalContext, dyn_cx::AsDynamicContext, instanceof};
 use parking_lot::Mutex;
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
-    BlockEntity, DynRawBlockEntityType, ProvideBlockEntity, component::RawErasedComponentType,
+    BlockEntity, BlockEntityConstructor, DynRawBlockEntityType, component::RawErasedComponentType,
 };
 use rimecraft_chunk_palette::{Maybe, SimpleOwned};
 use rimecraft_fluid::{BsToFs, FluidState};
@@ -86,10 +86,10 @@ where
 impl<'w, Cx, L> WorldChunk<'w, Cx, L>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx, L>>>
         + AsDynamicContext,
 {
     /// Peeks a [`BlockEntity`] at the target location, with given [`CreationType`].
@@ -226,16 +226,19 @@ where
 
     #[inline]
     fn create_block_entity(&self, pos: BlockPos) -> Option<Box<BlockEntity<'w, Cx>>> {
-        self.peek_block_state(pos, |be| {
-            be.state.data().block_entity_constructor().map(|f| f(pos))
+        self.peek_block_state(pos, |&bs| {
+            instanceof!(self.local_cx, &*bs.block => export BlockEntityConstructor<Cx, L>)
+                .map(|f| f(pos, bs, self.local_cx))
         })
         .flatten()
     }
 
     #[inline]
     fn create_block_entity_lf(&mut self, pos: BlockPos) -> Option<Box<BlockEntity<'w, Cx>>> {
-        self.peek_block_state_lf(pos, |be| {
-            be.state.data().block_entity_constructor().map(|f| f(pos))
+        let local_cx = self.local_cx;
+        self.peek_block_state_lf(pos, |&bs| {
+            instanceof!(local_cx, &*bs.block => export BlockEntityConstructor<Cx, L>)
+                .map(|f| f(pos, bs, local_cx))
         })
         .flatten()
     }
@@ -264,10 +267,10 @@ where
 impl<'w, Cx, L> BlockView<'w, Cx> for WorldChunk<'w, Cx, L>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx, L>>>
         + AsDynamicContext,
 {
     fn peek_block_state<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
@@ -322,10 +325,10 @@ where
 impl<'w, Cx, L> LockFreeBlockView<'w, Cx> for WorldChunk<'w, Cx, L>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx, L>>>
         + AsDynamicContext,
 {
     fn peek_block_state_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
@@ -380,10 +383,10 @@ where
 impl<'w, Cx, L> BlockViewMut<'w, Cx> for WorldChunk<'w, Cx, L>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx, L>>>
         + AsDynamicContext,
 {
     fn set_block_state(
@@ -443,7 +446,7 @@ where
         //TODO: update profiler
 
         if let Some(ref bs) = bs {
-            let has_be = bs.state.data().has_block_entity();
+            let has_be = instanceof!(self.local_cx, &*bs.block => BlockEntityConstructor<Cx, L>);
             if !self.is_client {
                 //TODO: call `on_state_replaced`.
             } else if bs.block != state.block && has_be {
@@ -455,8 +458,12 @@ where
     }
 
     fn set_block_entity(&mut self, mut block_entity: Box<BlockEntity<'w, Cx>>) {
+        let local_cx = self.local_cx;
         if self
-            .peek_block_state_lf(block_entity.pos(), |bs| bs.state.data().has_block_entity())
+            .peek_block_state_lf(
+                block_entity.pos(),
+                |bs| instanceof!(local_cx, &*bs.block => BlockEntityConstructor<Cx, L>),
+            )
             .unwrap_or_default()
         {
             block_entity.cancel_removal();
@@ -497,10 +504,10 @@ where
 impl<'w, Cx, L> LockedBlockViewMut<'w, Cx> for WorldChunk<'w, Cx, L>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx, L>>>
         + AsDynamicContext,
 {
     fn set_block_state_locked(
@@ -532,10 +539,10 @@ where
 impl<'w, Cx, L> BlockLuminanceView<'w, Cx> for WorldChunk<'w, Cx, L>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx, L>>>
         + AsDynamicContext,
 {
     fn luminance(&self, pos: BlockPos) -> crate::view::StateOption<u32> {
@@ -546,10 +553,10 @@ where
 impl<'w, Cx, L> Chunk<'w, Cx> for WorldChunk<'w, Cx, L>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx, L>>>
         + AsDynamicContext,
 {
     fn peek_game_event_dispatcher<F, T>(&self, y_section_coord: i32, f: F) -> Option<T>
@@ -575,10 +582,10 @@ where
 impl<'w, Cx, L> ChunkMut<'w, Cx> for WorldChunk<'w, Cx, L>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
     Cx::Id: for<'de> Deserialize<'de>,
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx, L>>>
         + AsDynamicContext,
 {
     fn peek_game_event_dispatcher_lf<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>

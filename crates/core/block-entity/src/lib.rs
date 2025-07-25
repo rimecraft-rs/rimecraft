@@ -346,21 +346,8 @@ where
     }
 }
 
-/// A trait for providing block entities.
+/// Constructor of a [`BlockEntity`].
 ///
-/// This should be implemented for [`ProvideBlockStateExtTy::BlockStateExt`]s.
-pub trait ProvideBlockEntity<'w, Cx>: 'w
-where
-    Cx: ProvideBlockStateExtTy<BlockStateExt = Self>,
-{
-    /// Whether this block has a block entity.
-    #[inline]
-    fn has_block_entity(&self) -> bool {
-        self.block_entity_constructor().is_some()
-    }
-
-    /// Gets the block entity constructor of this block.
-    fn block_entity_constructor(
-        &self,
-    ) -> Option<impl FnOnce(BlockPos) -> Box<BlockEntity<'w, Cx>> + '_>;
-}
+/// This should be used as a descriptor type.
+pub type BlockEntityConstructor<Cx, L> =
+    for<'env> fn(BlockPos, BlockState<'env, Cx>, L) -> Box<BlockEntity<'env, Cx>>;

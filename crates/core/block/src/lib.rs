@@ -1,7 +1,7 @@
 //! Minecraft block primitives.
 
 use behave::ProvideLuminance;
-use dsyn::DescriptorSet;
+use dsyn::{DescriptorSet, HoldDescriptors};
 use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
 use rimecraft_registry::Reg;
 use rimecraft_state::{State, States};
@@ -21,9 +21,7 @@ where
     settings: Settings,
     states: States<'a, Cx::BlockStateExt>,
     _marker: PhantomData<Cx>,
-
-    /// Object descriptors.
-    pub descriptors: DescriptorSet<'static, 'a>,
+    descriptors: DescriptorSet<'static, 'a>,
 }
 
 impl<'a, Cx> RawBlock<'a, Cx>
@@ -55,6 +53,16 @@ where
     #[inline]
     pub fn states(&self) -> &States<'a, Cx::BlockStateExt> {
         &self.states
+    }
+}
+
+impl<'a, Cx> HoldDescriptors<'static, 'a> for RawBlock<'a, Cx>
+where
+    Cx: ProvideBlockStateExtTy,
+{
+    #[inline]
+    fn descriptors(&self) -> &DescriptorSet<'static, 'a> {
+        &self.descriptors
     }
 }
 

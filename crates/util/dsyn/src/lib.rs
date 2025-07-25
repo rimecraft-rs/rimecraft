@@ -98,15 +98,15 @@ impl<'a> DescriptorSet<'a, '_> {
     }
 
     /// Returns the value of the given type if present.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the type is not under same registry as this set.
     pub fn get<T: Copy>(&self, ty: Type<T>) -> Option<T> {
-        let _: () = Type::<T>::__TYPE_CHECK;
         if self.registry_marker != ty.registry_marker {
             return None;
         }
+        self.__get_unchecked(ty)
+    }
+
+    fn __get_unchecked<T: Copy>(&self, ty: Type<T>) -> Option<T> {
+        let _: () = Type::<T>::__TYPE_CHECK;
         let raw = self.inner.get(ty.index);
         (!raw.is_null())
             .then(|| {
@@ -114,7 +114,24 @@ impl<'a> DescriptorSet<'a, '_> {
                 let ptr = std::ptr::from_ref(borrowed) as *const T;
                 unsafe { *ptr }
             })
-            .or_else(|| self.parent.and_then(|p| p.get(ty)))
+            .or_else(|| self.parent.and_then(|p| p.__get_unchecked(ty)))
+    }
+
+    /// Checks whether the given type is present.
+    pub fn contains<T>(&self, ty: Type<T>) -> bool {
+        if self.registry_marker != ty.registry_marker {
+            return false;
+        }
+        self.__contains_unchecked(ty)
+    }
+
+    fn __contains_unchecked<T>(&self, ty: Type<T>) -> bool {
+        let _: () = Type::<T>::__TYPE_CHECK;
+        self.inner.contains(ty.index)
+            || self
+                .parent
+                .map(|p| p.__contains_unchecked(ty))
+                .unwrap_or(false)
     }
 
     /// Returns whether this set is empty.
@@ -284,6 +301,15 @@ impl DescriptorSetInner {
     }
 
     #[inline]
+    fn contains(&self, index: usize) -> bool {
+        match self {
+            DescriptorSetInner::Slice(v) => v.get(index).copied().is_some_and(|ptr| !ptr.is_null()),
+            DescriptorSetInner::Map(m) => m.contains_key(&index),
+            DescriptorSetInner::Empty => false,
+        }
+    }
+
+    #[inline]
     fn is_empty(&self) -> bool {
         match self {
             DescriptorSetInner::Slice(v) => v.is_empty(),
@@ -321,6 +347,12 @@ unsafe impl Send for DescriptorSetBuilder<'_, '_> {}
 unsafe impl Sync for DescriptorSetBuilder<'_, '_> {}
 unsafe impl<T> Send for Type<T> {}
 unsafe impl<T> Sync for Type<T> {}
+
+/// Objects that support holding a descriptor set.
+pub trait HoldDescriptors<'a, 'p> {
+    /// Returns the descriptor set of this object.
+    fn descriptors(&self) -> &DescriptorSet<'a, 'p>;
+}
 
 #[cfg(test)]
 mod tests;

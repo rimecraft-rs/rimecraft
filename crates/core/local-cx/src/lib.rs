@@ -6,10 +6,15 @@ use global_cx::GlobalContext;
 
 pub mod dyn_cx;
 
+mod dsyn;
 pub mod dyn_codecs;
 mod edcode;
 pub mod nbt;
 pub mod serde;
+
+#[doc(hidden)]
+#[cfg(feature = "dsyn")]
+pub use ::dsyn as __dsyn;
 
 /// A base local context.
 pub trait BaseLocalContext: Sized + Copy {}
