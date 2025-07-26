@@ -6,6 +6,8 @@ use std::{
     hash::Hash,
 };
 
+use bytes::BytesMut;
+
 use crate::*;
 
 /// A variable-length wrapper type.
@@ -501,5 +503,108 @@ where
             set.insert(T::decode(&mut buf)?);
         }
         Ok(set)
+    }
+}
+
+/// A length-prepended cell for encoding and decoding.
+#[derive(Debug, Clone, Copy)]
+pub struct LengthPrepended<T: ?Sized> {
+    max_len: usize,
+    inner: T,
+}
+
+impl<T> LengthPrepended<T> {
+    /// Creates a new length-prepended value for encoding or seed for decoding.
+    #[inline]
+    pub const fn new(inner: T, max_len: usize) -> Self {
+        Self { inner, max_len }
+    }
+
+    /// Gets the inner value.
+    #[inline]
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<T> LengthPrepended<PhantomData<T>> {
+    /// Creates a new length-prepended seed for decoding without internal seed.
+    #[inline]
+    pub const fn new_unseeded(max_len: usize) -> Self {
+        Self {
+            inner: PhantomData,
+            max_len,
+        }
+    }
+}
+
+impl<T: ?Sized> LengthPrepended<T> {
+    /// Gets the maximum length of encoded bytes.
+    #[inline]
+    pub fn max_len(&self) -> usize {
+        self.max_len
+    }
+}
+
+impl<T> From<T> for LengthPrepended<T> {
+    #[inline]
+    fn from(inner: T) -> Self {
+        Self::new(inner, usize::MAX)
+    }
+}
+
+impl<T> Default for LengthPrepended<PhantomData<T>> {
+    fn default() -> Self {
+        Self::new_unseeded(usize::MAX)
+    }
+}
+
+impl<T, B> Encode<B> for LengthPrepended<T>
+where
+    B: BufMut,
+    T: for<'b> Encode<&'b mut BytesMut>,
+{
+    fn encode(&self, mut buf: B) -> Result<(), BoxedError<'static>> {
+        let mut bytes = BytesMut::new();
+        self.inner.encode(&mut bytes)?;
+        // why not 'limit' cells: they panic.
+        if bytes.len() > self.max_len {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "length too long: expected <= {} bytes, received {} bytes",
+                    self.max_len,
+                    bytes.len()
+                ),
+            )
+            .into());
+        }
+        buf.put_variable(bytes.len() as u32);
+        buf.put_slice(&bytes);
+        Ok(())
+    }
+}
+
+impl<'de, T, B> DecodeSeed<'de, B> for LengthPrepended<T>
+where
+    T: DecodeSeed<'de, bytes::buf::Take<B>>,
+    B: Buf,
+{
+    type Output = T::Output;
+
+    fn decode(self, mut buf: B) -> Result<Self::Output, BoxedError<'de>> {
+        let len = buf.get_variable::<u32>() as usize;
+        if len > self.max_len {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "length too long: expected <= {} bytes, received {len} bytes",
+                    self.max_len
+                ),
+            )
+            .into());
+        }
+        let taken = buf.take(len);
+        self.inner.decode(taken)
     }
 }

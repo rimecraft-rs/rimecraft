@@ -17,3 +17,12 @@ fn byte_array() {
     let ByteArray(decoded) = ByteArray::<Vec<u8>>::decode(&buf[..]).expect("failed to decode");
     assert_eq!(decoded.as_slice(), bytes);
 }
+
+#[test]
+fn var_int_signless() {
+    let mut buf_mut: Vec<u8> = Vec::new();
+    buf_mut.put_variable(114u32);
+    let mut buf_alt: Vec<u8> = Vec::new();
+    buf_alt.put_variable(114i32);
+    assert_eq!(buf_mut, buf_alt);
+}
