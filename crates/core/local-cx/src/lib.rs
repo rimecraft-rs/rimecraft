@@ -6,7 +6,7 @@ use global_cx::GlobalContext;
 
 pub mod dyn_cx;
 
-mod dsyn;
+pub mod dsyn;
 pub mod dyn_codecs;
 mod edcode;
 pub mod nbt;

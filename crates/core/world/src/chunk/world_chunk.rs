@@ -1,7 +1,8 @@
 //! World chunks.
 
+use dsyn::HoldDescriptors as _;
 use ident_hash::IHashMap;
-use local_cx::{LocalContext, dyn_cx::AsDynamicContext, instanceof};
+use local_cx::{LocalContext, dsyn_instanceof, dsyn_ty, dyn_cx::AsDynamicContext};
 use parking_lot::Mutex;
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
@@ -14,7 +15,7 @@ use rimecraft_voxel_math::{BlockPos, IVec3};
 use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{
-    Sealed,
+    DsynCache, Sealed,
     event::game_event,
     heightmap,
     view::block::{
@@ -42,6 +43,7 @@ where
     game_event_dispatchers: Mutex<IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>,
 
     local_cx: Cx::LocalContext<'w>,
+    dsyn_cache: Arc<DsynCache<'w, Cx>>,
 }
 
 impl<'w, Cx> Debug for WorldChunk<'w, Cx>
@@ -227,7 +229,7 @@ where
     #[inline]
     fn create_block_entity(&self, pos: BlockPos) -> Option<Box<BlockEntity<'w, Cx>>> {
         self.peek_block_state(pos, |&bs| {
-            instanceof!(self.local_cx, &*bs.block => export BlockEntityConstructor<Cx>)
+            dsyn_instanceof!(cached &*self.dsyn_cache, self.local_cx, &*bs.block => export BlockEntityConstructor<Cx>)
                 .map(|f| f(pos, bs, self.local_cx))
         })
         .flatten()
@@ -235,9 +237,13 @@ where
 
     #[inline]
     fn create_block_entity_lf(&mut self, pos: BlockPos) -> Option<Box<BlockEntity<'w, Cx>>> {
+        let dsyn_ty =
+            dsyn_ty!(cached &*self.dsyn_cache, self.local_cx => BlockEntityConstructor<Cx>);
         let local_cx = self.local_cx;
         self.peek_block_state_lf(pos, |&bs| {
-            instanceof!(local_cx, &*bs.block => export BlockEntityConstructor<Cx>)
+            (*bs.block)
+                .descriptors()
+                .get(dsyn_ty)
                 .map(|f| f(pos, bs, local_cx))
         })
         .flatten()
@@ -446,7 +452,7 @@ where
         //TODO: update profiler
 
         if let Some(ref bs) = bs {
-            let has_be = instanceof!(self.local_cx, &*bs.block => BlockEntityConstructor<Cx>);
+            let has_be = dsyn_instanceof!(cached &*self.dsyn_cache, self.local_cx, &*bs.block => BlockEntityConstructor<Cx>);
             if !self.is_client {
                 //TODO: call `on_state_replaced`.
             } else if bs.block != state.block && has_be {
@@ -458,12 +464,12 @@ where
     }
 
     fn set_block_entity(&mut self, mut block_entity: Box<BlockEntity<'w, Cx>>) {
-        let local_cx = self.local_cx;
+        let dsyn_ty =
+            dsyn_ty!(cached &*self.dsyn_cache, self.local_cx => BlockEntityConstructor<Cx>);
         if self
-            .peek_block_state_lf(
-                block_entity.pos(),
-                |bs| instanceof!(local_cx, &*bs.block => BlockEntityConstructor<Cx>),
-            )
+            .peek_block_state_lf(block_entity.pos(), |bs| {
+                (*bs.block).descriptors().contains(dsyn_ty)
+            })
             .unwrap_or_default()
         {
             block_entity.cancel_removal();
