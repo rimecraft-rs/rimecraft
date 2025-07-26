@@ -21,7 +21,7 @@ use std::{
 };
 
 pub use ahash::{AHashMap, AHashSet};
-use local_cx::{ProvideLocalCxTy, dsyn::DescriptorTypeCache};
+use local_cx::dsyn::DescriptorTypeCache;
 use parking_lot::Mutex;
 use rimecraft_block_entity::{BlockEntity, BlockEntityConstructor};
 
