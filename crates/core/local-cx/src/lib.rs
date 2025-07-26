@@ -28,7 +28,7 @@ pub trait LocalContext<T>: BaseLocalContext {
 /// A general type that provides explicit local context type.
 pub trait ProvideLocalCxTy {
     /// The local context type.
-    type Context<'cx>: BaseLocalContext;
+    type LocalContext<'cx>: BaseLocalContext;
 }
 
 /// Global context types that provides explicit local context type.

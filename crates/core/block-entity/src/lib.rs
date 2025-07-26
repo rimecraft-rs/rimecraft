@@ -8,6 +8,7 @@ use ::component::{
 use ahash::AHashSet;
 use erased_serde::{Serialize as ErasedSerialize, serialize_trait_object};
 
+use local_cx::ProvideLocalCxTy;
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
@@ -349,5 +350,8 @@ where
 /// Constructor of a [`BlockEntity`].
 ///
 /// This should be used as a descriptor type.
-pub type BlockEntityConstructor<Cx, L> =
-    for<'env> fn(BlockPos, BlockState<'env, Cx>, L) -> Box<BlockEntity<'env, Cx>>;
+pub type BlockEntityConstructor<Cx> = for<'env> fn(
+    BlockPos,
+    BlockState<'env, Cx>,
+    <Cx as ProvideLocalCxTy>::LocalContext<'env>,
+) -> Box<BlockEntity<'env, Cx>>;

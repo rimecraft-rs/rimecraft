@@ -5,7 +5,7 @@
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 use ahash::AHashMap;
-use local_cx::LocalContext;
+use local_cx::{LocalContext, ProvideLocalCxTy};
 use parking_lot::{Mutex, RwLock};
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
 use rimecraft_chunk_palette::{
@@ -53,7 +53,11 @@ pub const BORDER_LEN: u32 = 16;
 /// - `'w`: The world lifetime. See the crate document for more information.
 pub trait ChunkCx<'w>
 where
-    Self: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideIdTy + ProvideNbtTy,
+    Self: ProvideBlockStateExtTy
+        + ProvideFluidStateExtTy
+        + ProvideIdTy
+        + ProvideNbtTy
+        + ProvideLocalCxTy,
 {
     /// The type of block state id list.
     type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>
