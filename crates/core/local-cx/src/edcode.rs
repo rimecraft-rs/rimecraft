@@ -1,3 +1,5 @@
+//! edcode support for local context.
+
 #![cfg(feature = "edcode")]
 
 use edcode2::{Buf, BufMut};
