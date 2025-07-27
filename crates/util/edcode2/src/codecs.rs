@@ -611,7 +611,7 @@ where
 
 macro_rules! tuple_impl {
     ($($t:ident),*$(,)?) => {
-        impl<B,$($t: for<'env> Encode<&'env mut B>),*> Encode<B> for ($($t,)*) {
+        impl<B,$($t),*> Encode<B> for ($($t,)*) where $($t: for<'env> Encode<&'env mut B>),* {
             #[allow(non_snake_case)]
             fn encode(&self, mut _buf: B) -> Result<(), BoxedError<'static>> {
                 let ($($t,)*) = self;
@@ -620,7 +620,7 @@ macro_rules! tuple_impl {
             }
         }
 
-        impl<'de, B,$($t: for<'env> Decode<'de, &'env mut B>),*> Decode<'de, B> for ($($t,)*) {
+        impl<'de, B,$($t),*> Decode<'de, B> for ($($t,)*) where $($t: for<'env> Decode<'de, &'env mut B>),* {
             fn decode(mut _buf: B) -> Result<Self, BoxedError<'de>> {
                 Ok(($($t::decode(&mut _buf)?,)*))
             }
