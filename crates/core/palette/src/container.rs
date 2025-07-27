@@ -323,7 +323,7 @@ where
 
 #[cfg(feature = "edcode")]
 mod _edcode {
-    use edcode2::{Buf, BufMut, Decode, Encode};
+    use edcode2::{Buf, BufMut, Decode, Encode, codecs::FixedLength};
 
     use super::*;
 
@@ -340,11 +340,13 @@ mod _edcode {
                     .unwrap_or_default() as u8,
             );
             self.palette.encode(&mut buf)?;
-            self.storage
-                .as_array()
-                .map(PackedIntArray::data)
-                .unwrap_or(&[])
-                .encode(&mut buf)
+            FixedLength::new(
+                self.storage
+                    .as_array()
+                    .map(PackedIntArray::data)
+                    .unwrap_or(&[]),
+            )
+            .encode(&mut buf)
         }
     }
 
@@ -367,7 +369,7 @@ mod _edcode {
         B: Buf,
     {
         fn decode_in_place(&mut self, mut buf: B) -> Result<(), edcode2::BoxedError<'de>> {
-            let data = compatible_data::<L, T, Cx>(
+            let data: Option<Data<L, T>> = compatible_data::<L, T, Cx>(
                 self.list.clone(),
                 Some(&self.data),
                 buf.get_u8() as u32,
@@ -378,7 +380,7 @@ mod _edcode {
 
             self.data.palette.decode_in_place(&mut buf)?;
             if let Some(array) = self.data.storage.as_array_mut() {
-                array.data_mut().decode_in_place(&mut buf)?;
+                FixedLength::new(array.data_mut()).decode_in_place(&mut buf)?;
             }
 
             Ok(())
@@ -386,7 +388,7 @@ mod _edcode {
 
         #[inline]
         fn decode(_buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
-            Err("paletted containers does not support non-in-place decoding".into())
+            panic!("paletted containers does not support non-in-place decoding")
         }
 
         const SUPPORT_NON_IN_PLACE: bool = false;

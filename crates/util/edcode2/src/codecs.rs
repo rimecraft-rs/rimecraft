@@ -190,7 +190,7 @@ where
 
     #[inline]
     fn decode(_buf: B) -> Result<Self, BoxedError<'de>> {
-        Err("slices does not support non-in-place decoding".into())
+        panic!("slices does not support non-in-place decoding")
     }
 
     const SUPPORT_NON_IN_PLACE: bool = false;
@@ -606,6 +606,64 @@ where
         }
         let taken = buf.take(len);
         self.inner.decode(taken)
+    }
+}
+
+/// A fixed length sequence cell for encoding and decoding.
+///
+/// This is same as encoding/decoding an array but without writing or
+/// reading its length.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FixedLength<T>(T);
+
+impl<T> FixedLength<T> {
+    /// Creates a new fixed length sequence cell.
+    #[inline]
+    pub const fn new(inner: T) -> Self {
+        Self(inner)
+    }
+
+    /// Gets the inner value.
+    #[inline]
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+
+impl<T> From<T> for FixedLength<T> {
+    #[inline]
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T, B> Encode<B> for FixedLength<&'_ [T]>
+where
+    T: for<'b> Encode<&'b mut B>,
+{
+    fn encode(&self, mut buf: B) -> Result<(), BoxedError<'static>> {
+        for item in self.0 {
+            item.encode(&mut buf)?;
+        }
+        Ok(())
+    }
+}
+
+impl<'de, T, B> Decode<'de, B> for FixedLength<&'_ mut [T]>
+where
+    T: for<'b> Decode<'de, &'b mut B>,
+{
+    const SUPPORT_NON_IN_PLACE: bool = false;
+
+    fn decode_in_place(&mut self, mut buf: B) -> Result<(), BoxedError<'de>> {
+        for item in self.0.iter_mut() {
+            item.decode_in_place(&mut buf)?;
+        }
+        Ok(())
+    }
+
+    fn decode(_buf: B) -> Result<Self, BoxedError<'de>> {
+        panic!("fixed length slices does not support non-in-place decoding")
     }
 }
 
