@@ -19,6 +19,7 @@ use crate::{
     heightmap,
     view::block::{
         BlockLuminanceView, BlockView, BlockViewMut, LockFreeBlockView, LockedBlockViewMut,
+        SetBlockStateFlags,
     },
 };
 
@@ -390,7 +391,7 @@ where
         &mut self,
         pos: BlockPos,
         state: BlockState<'w, Cx>,
-        moved: bool,
+        flags: SetBlockStateFlags,
     ) -> Option<BlockState<'w, Cx>> {
         let section = self
             .section_mut(self.height_limit().section_index(pos.y()))?
@@ -412,10 +413,7 @@ where
                 });
         }
 
-        if bs
-            .as_ref()
-            .is_some_and(|s| std::ptr::eq(s.state, state.state))
-        {
+        if bs.is_some_and(|s| std::ptr::eq(s.state, state.state)) {
             return None;
         }
 
@@ -425,8 +423,9 @@ where
                 ..pos_alt
             };
             let this_ptr = self as *mut WorldChunk<'w, Cx, L>;
+            // (vanilla) MOTION_BLOCKING,MOTION_BLOCKING_NO_LEAVES, OCEAN_FLOOR, OCEAN_FLOOR, WORLD_SURFACE.
             for ty in <Cx::HeightmapType as heightmap::Type<'w, Cx>>::iter_block_update_types_wc() {
-                // SAFETY: This is safe because the `hms` is a valid pointer, and `peek_block_state_lf` does not interact with heightmaps.
+                //SAFETY: This is safe because the `hms` is a valid pointer, and `peek_block_state_lf` does not interact with heightmaps.
                 unsafe {
                     if let Some(hm) = self.base.heightmaps.get_mut().get_mut(ty) {
                         hm.track_update(x, y, z, &state, |pos, pred| {
@@ -439,8 +438,11 @@ where
             }
         }
 
+        //TODO: update chunk manager
         //TODO: update lighting
         //TODO: update profiler
+
+        //TODO: lots to do here
 
         if let Some(ref bs) = bs {
             let has_be = bs.state.data().has_block_entity();

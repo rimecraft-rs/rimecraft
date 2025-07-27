@@ -15,7 +15,7 @@ use rimecraft_block::BlockState;
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
 
-use crate::{Entity, World, chunk::ChunkCx};
+use crate::{Entity, ServerWorld, World, chunk::ChunkCx};
 
 /// Raw type of a [`GameEvent`], consisting of its notification radius.
 #[derive(Debug)]
@@ -64,7 +64,7 @@ where
     /// Listens to an incoming game event.
     fn listen(
         &mut self,
-        world: &World<'w, Cx>,
+        world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -91,7 +91,7 @@ where
 {
     fn _erased_listen(
         &mut self,
-        world: &World<'w, Cx>,
+        world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -119,7 +119,7 @@ where
 {
     fn _erased_listen(
         &mut self,
-        world: &World<'w, Cx>,
+        world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -338,14 +338,14 @@ where
     /// Firing event to any listener should be done by given `callback`, who receives listener and its position.
     ///
     /// Returns whether the callback was triggered.
-    pub fn dispatch<F>(&self, world: &World<'w, Cx>, pos: DVec3, mut callback: F) -> bool
+    pub fn dispatch<F>(&self, world: &ServerWorld<'w, Cx>, pos: DVec3, mut callback: F) -> bool
     where
         F: for<'env> FnMut(&'env mut dyn ErasedListener<'w, Cx>, DVec3),
     {
         let mut vg = self.listeners.lock();
         let mut visited = false;
         for listener in &mut *vg {
-            if let Some(sp) = listener._erased_ps_pos(world) {
+            if let Some(sp) = listener._erased_ps_pos(world.as_ref()) {
                 let d = sp.floor().distance_squared(pos.floor());
                 let i = listener._erased_range().pow(2) as f64;
                 if d <= i {

@@ -54,7 +54,18 @@ pub(crate) type Entity<'w, Cx> = placeholder::Entity<'w, Cx>; // Should be atomi
 mod placeholder {
     use std::marker::PhantomData;
 
+    use crate::chunk::ChunkCx;
+
     pub struct ServerWorld<'w, Cx>(PhantomData<&'w Cx>);
+
+    impl<'w, Cx> AsRef<World<'w, Cx>> for ServerWorld<'w, Cx>
+    where
+        Cx: ChunkCx<'w>,
+    {
+        fn as_ref(&self) -> &World<'w, Cx> {
+            &World(PhantomData)
+        }
+    }
 
     pub struct World<'w, Cx>(PhantomData<&'w Cx>);
 
