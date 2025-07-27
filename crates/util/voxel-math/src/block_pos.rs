@@ -104,15 +104,14 @@ impl std::ops::SubAssign<IVec3> for BlockPos {
     }
 }
 
-const LEN_BITS_X: i32 = 1 + (1i32 << (32 - (30000000i32 - 1).leading_zeros())).ilog2() as i32;
-const LEN_BITS_Y: i32 = 64 - LEN_BITS_X - LEN_BITS_Z;
-const LEN_BITS_Z: i32 = LEN_BITS_X;
+const LEN_BITS_XZ: i32 = 1 + (1i32 << (32 - (30000000i32 - 1).leading_zeros())).ilog2() as i32;
+const LEN_BITS_Y: i32 = 64 - LEN_BITS_XZ - LEN_BITS_XZ;
 
-const BITS_X: i64 = (1i64 << LEN_BITS_X) - 1;
+const BITS_X: i64 = (1i64 << LEN_BITS_XZ) - 1;
 const BITS_Y: i64 = (1i64 << LEN_BITS_Y) - 1;
-const BITS_Z: i64 = (1i64 << LEN_BITS_Z) - 1;
+const BITS_Z: i64 = (1i64 << LEN_BITS_XZ) - 1;
 
-const BIT_SHIFT_X: i32 = LEN_BITS_Y + LEN_BITS_Z;
+const BIT_SHIFT_X: i32 = LEN_BITS_Y + LEN_BITS_XZ;
 const BIT_SHIFT_Z: i32 = LEN_BITS_Y;
 
 impl From<BlockPos> for i64 {
@@ -129,9 +128,9 @@ impl From<i64> for BlockPos {
     #[inline]
     fn from(l: i64) -> BlockPos {
         Self(IVec3 {
-            x: (l << (64 - BIT_SHIFT_X - LEN_BITS_X) >> (64 - LEN_BITS_X)) as i32,
+            x: (l << (64 - BIT_SHIFT_X - LEN_BITS_XZ) >> (64 - LEN_BITS_XZ)) as i32,
             y: (l << (64 - LEN_BITS_Y) >> (64 - LEN_BITS_Y)) as i32,
-            z: (l << (64 - BIT_SHIFT_Z - LEN_BITS_Z) >> (64 - LEN_BITS_Z)) as i32,
+            z: (l << (64 - BIT_SHIFT_Z - LEN_BITS_XZ) >> (64 - LEN_BITS_XZ)) as i32,
         })
     }
 }
