@@ -6,7 +6,6 @@
 
 use std::{fmt::Debug, hash::Hash};
 
-use ahash::AHashSet;
 use glam::DVec3;
 use ident_hash::{HashTableExt as _, IHashSet};
 use local_cx::dyn_codecs::{Any, EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
@@ -461,24 +460,25 @@ mod sealed {
 
 mod _edcode {
     use edcode2::{Buf, BufMut, Decode, Encode};
-    use local_cx::{LocalContext, LocalContextExt, WithLocalCx, dyn_cx::AsDynamicContext};
+    use local_cx::{
+        ForwardToWithLocalCx, LocalContext, LocalContextExt, WithLocalCx, dyn_cx::AsDynamicContext,
+    };
     use rimecraft_registry::Registry;
 
     use crate::chunk::ChunkCx;
 
     use super::{PositionSource, PositionSourceType, RawPositionSourceType};
 
-    impl<'w, Cx, B, L> Encode<WithLocalCx<B, L>> for dyn PositionSource<'w, Cx> + 'w
+    impl<'w, Cx, Fw> Encode<Fw> for dyn PositionSource<'w, Cx> + 'w
     where
         Cx: ChunkCx<'w>,
-        L: AsDynamicContext,
-        B: BufMut,
+        Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx: AsDynamicContext>,
     {
-        fn encode(&self, buf: WithLocalCx<B, L>) -> Result<(), edcode2::BoxedError<'static>> {
+        fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
             let WithLocalCx {
                 local_cx,
                 mut inner,
-            } = buf;
+            } = buf.forward();
             let ty = self.ty();
             ty.encode(&mut inner)?;
             let dyn_cx = local_cx.as_dynamic_context();
@@ -486,18 +486,18 @@ mod _edcode {
         }
     }
 
-    impl<'de, 'w, Cx, B, L> Decode<'de, WithLocalCx<B, L>>
-        for Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>
+    impl<'de, 'w, Cx, Fw> Decode<'de, Fw> for Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>
     where
         Cx: ChunkCx<'w>,
-        L: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
-        B: Buf,
+        Fw: ForwardToWithLocalCx<Forwarded: Buf>,
+        Fw::LocalCx:
+            LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
     {
-        fn decode(buf: WithLocalCx<B, L>) -> Result<Self, edcode2::BoxedError<'de>> {
+        fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
             let WithLocalCx {
                 local_cx,
                 mut inner,
-            } = buf;
+            } = buf.forward();
             let ty = PositionSourceType::decode(local_cx.with(&mut inner))?;
             let cx = local_cx.as_dynamic_context();
             (ty.packet.decode)(&mut inner, unsafe { cx.as_unsafe_cx() })
