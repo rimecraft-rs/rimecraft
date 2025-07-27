@@ -608,3 +608,36 @@ where
         self.inner.decode(taken)
     }
 }
+
+macro_rules! tuple_impl {
+    ($($t:ident),*$(,)?) => {
+        impl<B,$($t: for<'env> Encode<&'env mut B>),*> Encode<B> for ($($t,)*) {
+            #[allow(non_snake_case)]
+            fn encode(&self, mut _buf: B) -> Result<(), BoxedError<'static>> {
+                let ($($t,)*) = self;
+                $($t.encode(&mut _buf)?;)*
+                Ok(())
+            }
+        }
+
+        impl<'de, B,$($t: for<'env> Decode<'de, &'env mut B>),*> Decode<'de, B> for ($($t,)*) {
+            fn decode(mut _buf: B) -> Result<Self, BoxedError<'de>> {
+                Ok(($($t::decode(&mut _buf)?,)*))
+            }
+        }
+    };
+}
+
+// There exist tuple codec with up to 11 elements in vanilla Minecraft
+tuple_impl![];
+tuple_impl![T1];
+tuple_impl![T1, T2];
+tuple_impl![T1, T2, T3];
+tuple_impl![T1, T2, T3, T4];
+tuple_impl![T1, T2, T3, T4, T5];
+tuple_impl![T1, T2, T3, T4, T5, T6];
+tuple_impl![T1, T2, T3, T4, T5, T6, T7];
+tuple_impl![T1, T2, T3, T4, T5, T6, T7, T8];
+tuple_impl![T1, T2, T3, T4, T5, T6, T7, T8, T9];
+tuple_impl![T1, T2, T3, T4, T5, T6, T7, T8, T9, T10];
+tuple_impl![T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11];

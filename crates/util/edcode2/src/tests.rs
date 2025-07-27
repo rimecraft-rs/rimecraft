@@ -26,3 +26,13 @@ fn var_int_signless() {
     buf_alt.put_variable(114i32);
     assert_eq!(buf_mut, buf_alt);
 }
+
+#[test]
+fn tuple_ordering() {
+    type T = (u8, i32, String);
+    let a: T = (13, -10, "3".to_owned());
+    let mut buf_mut: Vec<u8> = Vec::new();
+    a.encode(&mut buf_mut).expect("encoding err");
+    let a_decoded: T = Decode::decode(&*buf_mut).expect("decoding err");
+    assert_eq!(a, a_decoded, "decoded tuple does not match original tuple");
+}
