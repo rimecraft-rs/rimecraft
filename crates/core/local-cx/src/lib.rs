@@ -7,7 +7,7 @@ use global_cx::GlobalContext;
 pub mod dyn_cx;
 
 pub mod dyn_codecs;
-pub mod edcode;
+mod edcode;
 pub mod nbt;
 pub mod serde;
 
@@ -93,31 +93,6 @@ pub trait ForwardToWithLocalCx {
     fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx>;
 }
 
-/// A type that can be transformed into a [`WithLocalCx`] by taking reference of it.
-pub trait ForwardToWithLocalCxRef {
-    /// The type of the inner data.
-    type ForwardedRef<'a>
-    where
-        Self: 'a;
-
-    /// The type of the local context.
-    type LocalCx: BaseLocalContext;
-
-    /// Transform/forward into a [`WithLocalCx`] by taking reference.
-    fn forward_ref(&self) -> WithLocalCx<Self::ForwardedRef<'_>, Self::LocalCx>;
-}
-
-/// A type that can be transformed into a [`WithLocalCx`] by taking mutable reference of it.
-pub trait ForwardToWithLocalCxMut: ForwardToWithLocalCxRef {
-    /// The type of the inner data.
-    type ForwardedMut<'a>
-    where
-        Self: 'a;
-
-    /// Transform/forward into a [`WithLocalCx`] by taking mutable reference.
-    fn forward_mut(&mut self) -> WithLocalCx<Self::ForwardedMut<'_>, Self::LocalCx>;
-}
-
 impl<T, L: BaseLocalContext> ForwardToWithLocalCx for WithLocalCx<T, L> {
     type Forwarded = T;
 
@@ -129,16 +104,13 @@ impl<T, L: BaseLocalContext> ForwardToWithLocalCx for WithLocalCx<T, L> {
     }
 }
 
-impl<T: ?Sized, L: BaseLocalContext> ForwardToWithLocalCxRef for WithLocalCx<T, L> {
-    type ForwardedRef<'a>
-        = &'a T
-    where
-        Self: 'a;
+impl<'a, T, L: BaseLocalContext> ForwardToWithLocalCx for &'a WithLocalCx<T, L> {
+    type Forwarded = &'a T;
 
     type LocalCx = L;
 
     #[inline]
-    fn forward_ref(&self) -> WithLocalCx<Self::ForwardedRef<'_>, Self::LocalCx> {
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
         WithLocalCx {
             local_cx: self.local_cx,
             inner: &self.inner,
@@ -146,14 +118,13 @@ impl<T: ?Sized, L: BaseLocalContext> ForwardToWithLocalCxRef for WithLocalCx<T, 
     }
 }
 
-impl<T: ?Sized, L: BaseLocalContext> ForwardToWithLocalCxMut for WithLocalCx<T, L> {
-    type ForwardedMut<'a>
-        = &'a mut T
-    where
-        Self: 'a;
+impl<'a, T, L: BaseLocalContext> ForwardToWithLocalCx for &'a mut WithLocalCx<T, L> {
+    type Forwarded = &'a mut T;
+
+    type LocalCx = L;
 
     #[inline]
-    fn forward_mut(&mut self) -> WithLocalCx<Self::ForwardedMut<'_>, Self::LocalCx> {
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
         WithLocalCx {
             local_cx: self.local_cx,
             inner: &mut self.inner,
@@ -161,43 +132,31 @@ impl<T: ?Sized, L: BaseLocalContext> ForwardToWithLocalCxMut for WithLocalCx<T, 
     }
 }
 
-impl<'borrow, T: ForwardToWithLocalCxRef> ForwardToWithLocalCxRef for &'borrow T {
-    type ForwardedRef<'a>
-        = T::ForwardedRef<'borrow>
-    where
-        Self: 'a;
+impl<'b, T> ForwardToWithLocalCx for &'_ &'b T
+where
+    &'b T: ForwardToWithLocalCx,
+{
+    type Forwarded = <&'b T as ForwardToWithLocalCx>::Forwarded;
 
-    type LocalCx = T::LocalCx;
+    type LocalCx = <&'b T as ForwardToWithLocalCx>::LocalCx;
 
     #[inline]
-    fn forward_ref(&self) -> WithLocalCx<Self::ForwardedRef<'_>, Self::LocalCx> {
-        (**self).forward_ref()
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        (*self).forward()
     }
 }
 
-impl<T: ForwardToWithLocalCxRef> ForwardToWithLocalCxRef for &'_ mut T {
-    type ForwardedRef<'a>
-        = T::ForwardedRef<'a>
-    where
-        Self: 'a;
+impl<'a, T> ForwardToWithLocalCx for &'a mut &'_ mut T
+where
+    &'a mut T: ForwardToWithLocalCx,
+{
+    type Forwarded = <&'a mut T as ForwardToWithLocalCx>::Forwarded;
 
-    type LocalCx = T::LocalCx;
-
-    #[inline]
-    fn forward_ref(&self) -> WithLocalCx<Self::ForwardedRef<'_>, Self::LocalCx> {
-        (**self).forward_ref()
-    }
-}
-
-impl<T: ForwardToWithLocalCxMut> ForwardToWithLocalCxMut for &'_ mut T {
-    type ForwardedMut<'a>
-        = T::ForwardedMut<'a>
-    where
-        Self: 'a;
+    type LocalCx = <&'a mut T as ForwardToWithLocalCx>::LocalCx;
 
     #[inline]
-    fn forward_mut(&mut self) -> WithLocalCx<Self::ForwardedMut<'_>, Self::LocalCx> {
-        (**self).forward_mut()
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        (*self).forward()
     }
 }
 
