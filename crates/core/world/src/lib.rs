@@ -15,11 +15,17 @@ pub mod view;
 
 pub mod behave;
 
-use std::sync::Arc;
+use std::{
+    marker::PhantomData,
+    sync::{Arc, OnceLock},
+};
 
 pub use ahash::{AHashMap, AHashSet};
+use local_cx::dsyn::DescriptorTypeCache;
 use parking_lot::Mutex;
-use rimecraft_block_entity::BlockEntity;
+use rimecraft_block_entity::{BlockEntity, BlockEntityConstructor};
+
+use crate::chunk::ChunkCx;
 
 /// The default max light level of Minecraft.
 pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
@@ -75,5 +81,27 @@ mod placeholder {
         fn clone(&self) -> Self {
             Self(PhantomData)
         }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct DsynCache<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    be_constructor: OnceLock<dsyn::Type<BlockEntityConstructor<Cx>>>,
+    _marker: PhantomData<&'w ()>,
+}
+
+impl<'w, Cx> DescriptorTypeCache<BlockEntityConstructor<Cx>> for DsynCache<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    #[inline]
+    fn get_or_cache<F>(&self, f: F) -> dsyn::Type<BlockEntityConstructor<Cx>>
+    where
+        F: FnOnce() -> dsyn::Type<BlockEntityConstructor<Cx>>,
+    {
+        *self.be_constructor.get_or_init(f)
     }
 }

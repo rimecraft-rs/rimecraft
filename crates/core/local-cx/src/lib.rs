@@ -6,10 +6,15 @@ use global_cx::GlobalContext;
 
 pub mod dyn_cx;
 
+pub mod dsyn;
 pub mod dyn_codecs;
 mod edcode;
 pub mod nbt;
 pub mod serde;
+
+#[doc(hidden)]
+#[cfg(feature = "dsyn")]
+pub use ::dsyn as __dsyn;
 
 /// A base local context.
 pub trait BaseLocalContext: Sized + Copy {}
@@ -23,7 +28,7 @@ pub trait LocalContext<T>: BaseLocalContext {
 /// A general type that provides explicit local context type.
 pub trait ProvideLocalCxTy {
     /// The local context type.
-    type Context<'cx>: BaseLocalContext;
+    type LocalContext<'cx>: BaseLocalContext;
 }
 
 /// Global context types that provides explicit local context type.
