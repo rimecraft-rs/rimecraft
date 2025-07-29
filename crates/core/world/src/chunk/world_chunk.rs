@@ -414,12 +414,7 @@ where
         let pos_alt = pos.0 & (BORDER_LEN as i32 - 1);
         {
             let IVec3 { x, y, z } = pos_alt;
-            bs = section
-                .set_block_state(x as u32, y as u32, z as u32, state)
-                .map(|maybe| match maybe {
-                    Maybe::Borrowed(bs) => *bs,
-                    Maybe::Owned(SimpleOwned(bs)) => bs,
-                });
+            bs = section.set_block_state(x as u32, y as u32, z as u32, state);
         }
 
         if bs.is_some_and(|s| std::ptr::eq(s.state, state.state)) {
@@ -453,7 +448,7 @@ where
 
         //TODO: lots to do here
 
-        if let Some(ref bs) = bs {
+        if let Some(bs) = bs {
             let has_be = dsyn_instanceof!(cached &*self.dsyn_cache, self.local_cx, &*bs.block => BlockEntityConstructor<Cx>);
             if !self.is_client {
                 //TODO: call `on_state_replaced`.

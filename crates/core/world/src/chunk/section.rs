@@ -181,10 +181,16 @@ where
         y: u32,
         z: u32,
         state: BlockState<'w, Cx>,
-    ) -> Option<Maybe<'_, BlockState<'w, Cx>>> {
-        let bs_old = self.bsc.swap(Cx::compute_index(x, y, z), state);
+    ) -> Option<BlockState<'w, Cx>> {
+        let bs_old = self
+            .bsc
+            .swap(Cx::compute_index(x, y, z), state)
+            .map(|maybe| match maybe {
+                Maybe::Borrowed(bs) => *bs,
+                Maybe::Owned(maybe::SimpleOwned(bs)) => bs,
+            });
 
-        if let Some(state_old) = bs_old.as_deref() {
+        if let Some(state_old) = bs_old {
             if !state_old.block.settings().is_empty {
                 self.ne_block_c -= 1;
                 if state_old.block.settings().random_ticks {
