@@ -17,15 +17,12 @@ pub mod behave;
 
 use std::{
     fmt::Debug,
-    ops::{Deref, DerefMut},
-    sync::Arc,
+    sync::{Arc, Weak},
 };
 
 pub use ahash::{AHashMap, AHashSet};
 use parking_lot::Mutex;
 use rimecraft_block_entity::BlockEntity;
-
-use crate::chunk::ChunkCx;
 
 /// The default max light level of Minecraft.
 pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
@@ -84,72 +81,38 @@ mod placeholder {
     }
 }
 
-/// A data joined with a world reference.
+/// A trait for types that can provide access to an [`Arc`] or [`Weak`].
 ///
-/// This is mainly used to deal with self-referencing in vanilla Minecraft, and is intended only
-/// for temporary use as an intermediate trait implementor.
-pub struct WorldJoined<'borrow, 'w, Cx, T>
-where
-    Cx: ChunkCx<'w>,
-{
-    pub(crate) world: &'borrow World<'w, Cx>,
-    pub(crate) inner: T,
+/// This is most useful for self-referential types but need lazy access due to performance considerations.
+pub trait ArcAccess<T> {
+    /// Returns an [`Arc`] to the wrapped value.
+    fn access_arc(self) -> Arc<T>;
+
+    /// Returns a [`Weak`] to the wrapped value.
+    fn access_weak(self) -> Weak<T>;
 }
 
-impl<'w, Cx, T> Debug for WorldJoined<'_, 'w, Cx, T>
-where
-    World<'w, Cx>: Debug,
-    Cx: ChunkCx<'w>,
-    T: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WorldJoined")
-            .field("world", &self.world)
-            .field("data", &self.inner)
-            .finish()
+impl<T> ArcAccess<T> for Arc<T> {
+    #[inline]
+    fn access_arc(self) -> Arc<T> {
+        self.clone()
+    }
+
+    #[inline]
+    fn access_weak(self) -> Weak<T> {
+        Arc::downgrade(&self)
     }
 }
 
-impl<'w, Cx, T> Clone for WorldJoined<'_, 'w, Cx, T>
-where
-    Cx: ChunkCx<'w>,
-    T: Clone,
-{
+impl<T> ArcAccess<T> for Weak<T> {
     #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            world: self.world,
-            inner: self.inner.clone(),
-        }
+    fn access_arc(self) -> Arc<T> {
+        self.upgrade().expect("wrapped value was dropped")
     }
-}
-
-impl<'w, Cx, T> Copy for WorldJoined<'_, 'w, Cx, T>
-where
-    Cx: ChunkCx<'w>,
-    T: Copy,
-{
-}
-
-impl<'w, Cx, T> Deref for WorldJoined<'_, 'w, Cx, T>
-where
-    Cx: ChunkCx<'w>,
-{
-    type Target = T;
 
     #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<'w, Cx, T> DerefMut for WorldJoined<'_, 'w, Cx, T>
-where
-    Cx: ChunkCx<'w>,
-{
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+    fn access_weak(self) -> Weak<T> {
+        self.clone()
     }
 }
 
@@ -161,25 +124,25 @@ mod __dsyn_cache {
     use crate::chunk::ChunkCx;
 
     macro_rules! dsyn_caches_init {
-    ($($f:ident=>$t:ident),*$(,)?) => {
+    ($($f:ident=>$t:ty),*$(,)?) => {
         #[derive(Debug)]
         pub(crate) struct DsynCache<'w, Cx>
         where
             Cx: ChunkCx<'w>,
         {
-            $($f: std::sync::OnceLock<dsyn::Type<$t<Cx>>>,)*
+            $($f: std::sync::OnceLock<dsyn::Type<$t>>,)*
             _marker: std::marker::PhantomData<&'w ()>,
         }
 
         $(
-        impl<'w, Cx> local_cx::dsyn::DescriptorTypeCache<$t<Cx>> for DsynCache<'w, Cx>
+        impl<'w, Cx> local_cx::dsyn::DescriptorTypeCache<$t> for DsynCache<'w, Cx>
         where
             Cx: ChunkCx<'w>,
         {
             #[inline]
-            fn get_or_cache<F>(&self, f: F) -> dsyn::Type<$t<Cx>>
+            fn get_or_cache<F>(&self, f: F) -> dsyn::Type<$t>
             where
-                F: FnOnce() -> dsyn::Type<$t<Cx>>,
+                F: FnOnce() -> dsyn::Type<$t>,
             {
                 *self.$f.get_or_init(f)
             }
@@ -189,7 +152,8 @@ mod __dsyn_cache {
     }
 
     dsyn_caches_init! {
-        be_constructor => BlockEntityConstructor,
-        be_on_block_replaced => BlockEntityOnBlockReplaced,
+        be_constructor => BlockEntityConstructor<Cx>,
+        be_on_block_replaced => BlockEntityOnBlockReplaced<Cx>,
+        b_always_replace_state => BlockAlwaysReplaceState,
     }
 }

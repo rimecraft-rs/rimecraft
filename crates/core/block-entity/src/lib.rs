@@ -53,7 +53,7 @@ where
 
 /// [`RawBlockEntityType`] with type erased.
 #[allow(missing_docs)]
-pub trait ErasedRawBlockEntityType<'w, Cx>: Debug
+pub trait ErasedRawBlockEntityType<'w, Cx>: HoldDescriptors<'static, 'w> + Debug
 where
     Cx: ProvideBlockStateExtTy,
 {
@@ -137,6 +137,12 @@ impl<'a, T: ?Sized, Cx> RawBlockEntity<'a, T, Cx>
 where
     Cx: ProvideBlockStateExtTy,
 {
+    /// Returns the type of this block entity.
+    #[inline]
+    pub fn ty(&self) -> BlockEntityType<'a, Cx> {
+        self.ty
+    }
+
     /// Gets the immutable inner data of this block entity.
     #[inline]
     pub fn data(&self) -> &T {
