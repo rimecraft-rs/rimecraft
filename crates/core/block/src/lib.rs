@@ -95,6 +95,7 @@ pub use Settings as BlockSettings;
 /// # MCJE Reference
 ///
 /// This is the equivalent of `net.minecraft.block.Block.STATE_IDS` in MCJE.
+#[deprecated = "this should be provided by local contexts"]
 pub trait ProvideStateIds: GlobalContext {
     /// The type of the state IDs.
     type List;

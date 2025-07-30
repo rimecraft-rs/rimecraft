@@ -22,7 +22,10 @@ use crate::{
     heightmap::{self, Heightmap},
     view::{
         HeightLimit,
-        block::{BlockLuminanceView, BlockView, LockedBlockViewMut},
+        block::{
+            BlockEntityView, BlockLuminanceView, BlockView, LockedBlockEntityViewMut,
+            LockedBlockViewMut,
+        },
     },
 };
 
@@ -210,7 +213,10 @@ where
 /// Immutable chunk behaviors.
 pub trait Chunk<'w, Cx>
 where
-    Self: AsBaseChunk<'w, Cx> + BlockView<'w, Cx> + BlockLuminanceView<'w, Cx>,
+    Self: AsBaseChunk<'w, Cx>
+        + BlockView<'w, Cx>
+        + BlockEntityView<'w, Cx>
+        + BlockLuminanceView<'w, Cx>,
     Cx: ChunkCx<'w>,
 {
     /// Returns the array of chunk sections of this chunk.
@@ -288,7 +294,10 @@ where
 /// Mutable chunk behaviors.
 pub trait ChunkMut<'w, Cx>
 where
-    Self: AsBaseChunkMut<'w, Cx> + Chunk<'w, Cx> + LockedBlockViewMut<'w, Cx>,
+    Self: AsBaseChunkMut<'w, Cx>
+        + Chunk<'w, Cx>
+        + LockedBlockViewMut<'w, Cx>
+        + LockedBlockEntityViewMut<'w, Cx>,
     Cx: ChunkCx<'w>,
 {
     /// Returns the array of chunk sections of this chunk.

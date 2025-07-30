@@ -10,7 +10,7 @@ use crate::{BlockEntityCell, DEFAULT_MAX_LIGHT_LEVEL};
 
 use super::StateOption;
 
-/// A scoped, immutable view of [`BlockState`]s, [`FluidState`]s and [`BlockEntity`]s.
+/// A scoped, immutable view of [`BlockState`]s and [`FluidState`]s.
 pub trait BlockView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
@@ -24,7 +24,15 @@ where
     fn peek_fluid_state<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
     where
         F: for<'s> FnOnce(&'s FluidState<'w, Cx>) -> T;
+}
 
+/// A scoped, immutable view of [`BlockEntity`]s.
+///
+/// This is an affiliation of [`BlockView`].
+pub trait BlockEntityView<'w, Cx>: BlockView<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+{
     /// Peeks the [`BlockEntity`] at the given position.
     fn peek_block_entity<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
     where
@@ -62,7 +70,14 @@ where
     fn peek_fluid_state_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
     where
         F: for<'s> FnOnce(&'s FluidState<'w, Cx>) -> T;
+}
 
+/// Lock-free variant of [`BlockEntityView`].
+pub trait LockFreeBlockEntityView<'w, Cx>:
+    BlockEntityView<'w, Cx> + LockFreeBlockView<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+{
     /// Peeks the [`BlockEntity`] at the given position.
     fn peek_block_entity_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
     where
@@ -115,7 +130,13 @@ where
         state: BlockState<'w, Cx>,
         flags: SetBlockStateFlags,
     ) -> Option<BlockState<'w, Cx>>;
+}
 
+/// Mutable variant of [`BlockEntityView`], without internal mutability.
+pub trait BlockEntityViewMut<'w, Cx>: BlockEntityView<'w, Cx> + BlockViewMut<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+{
     /// Adds a [`BlockEntity`] to this view.
     fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>);
 
@@ -135,12 +156,19 @@ where
         &self,
         pos: BlockPos,
         state: BlockState<'w, Cx>,
-        moved: bool,
+        flags: SetBlockStateFlags,
     ) -> Option<BlockState<'w, Cx>>;
 
     /// Adds a [`BlockEntity`] to this view.
     fn set_block_entity_locked(&self, block_entity: Box<BlockEntity<'w, Cx>>);
+}
 
+/// [`BlockEntityViewMut`] with internal mutability.
+pub trait LockedBlockEntityViewMut<'w, Cx>:
+    BlockEntityViewMut<'w, Cx> + LockedBlockViewMut<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+{
     /// Removes a [`BlockEntity`] from this view, and returns it if presents.
     fn remove_block_entity_locked(&self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>>;
 }

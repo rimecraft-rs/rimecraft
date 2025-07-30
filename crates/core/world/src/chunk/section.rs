@@ -32,7 +32,6 @@ where
     for<'a> <&'a Cx::BlockStateList as IntoIterator>::IntoIter: ExactSizeIterator,
 {
     /// Creates a new chunk section with the given containers.
-    #[inline]
     pub fn new(
         bs_container: PalettedContainer<Cx::BlockStateList, BlockState<'w, Cx>, Cx>,
         bi_container: PalettedContainer<Cx::BiomeList, IBiome<'w, Cx>, Cx>,
@@ -172,49 +171,50 @@ where
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
         + Clone,
 {
-    /// Sets the block state at the given position and returns the
-    /// old one if present.
-    #[inline]
+    /// Sets the block state at the given position and returns the old one.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given inner position is out of bounds.
     pub fn set_block_state(
         &mut self,
         x: u32,
         y: u32,
         z: u32,
         state: BlockState<'w, Cx>,
-    ) -> Option<BlockState<'w, Cx>> {
-        let bs_old = self
+    ) -> BlockState<'w, Cx> {
+        let state_old = match self
             .bsc
             .swap(Cx::compute_index(x, y, z), state)
-            .map(|maybe| match maybe {
-                Maybe::Borrowed(bs) => *bs,
-                Maybe::Owned(maybe::SimpleOwned(bs)) => bs,
-            });
+            .expect("position out of bounds")
+        {
+            Maybe::Borrowed(bs) => *bs,
+            Maybe::Owned(maybe::SimpleOwned(bs)) => bs,
+        };
 
-        if let Some(state_old) = bs_old {
-            if !state_old.block.settings().is_empty {
-                self.ne_block_c -= 1;
-                if state_old.block.settings().random_ticks {
-                    self.rt_block_c -= 1;
-                }
-            }
-            let fs = state_old.to_fluid_state();
-            if !fs.fluid.settings().is_empty {
-                self.ne_fluid_c -= 1;
-            }
-
-            if !state.block.settings().is_empty {
-                self.ne_block_c += 1;
-                if state.block.settings().random_ticks {
-                    self.rt_block_c += 1;
-                }
-            }
-            let fs = state.to_fluid_state();
-            if !fs.fluid.settings().is_empty {
-                self.ne_fluid_c += 1;
+        if !state_old.block.settings().is_empty {
+            self.ne_block_c -= 1;
+            if state_old.block.settings().random_ticks {
+                self.rt_block_c -= 1;
             }
         }
+        let fs = state_old.to_fluid_state();
+        if !fs.fluid.settings().is_empty {
+            self.ne_fluid_c -= 1;
+        }
 
-        bs_old
+        if !state.block.settings().is_empty {
+            self.ne_block_c += 1;
+            if state.block.settings().random_ticks {
+                self.rt_block_c += 1;
+            }
+        }
+        let fs = state.to_fluid_state();
+        if !fs.fluid.settings().is_empty {
+            self.ne_fluid_c += 1;
+        }
+
+        state_old
     }
 }
 
