@@ -6,7 +6,8 @@ use local_cx::{LocalContext, dsyn_instanceof, dsyn_ty, dyn_cx::AsDynamicContext}
 use parking_lot::Mutex;
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
-    BlockEntity, BlockEntityConstructor, DynRawBlockEntityType, component::RawErasedComponentType,
+    BlockEntity, BlockEntityConstructor, DynErasedRawBlockEntityType,
+    component::RawErasedComponentType,
 };
 use rimecraft_fluid::{BsToFs, FluidState};
 use rimecraft_registry::Registry;
@@ -91,7 +92,7 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
         + AsDynamicContext,
 {
@@ -274,11 +275,6 @@ where
 impl<'w, Cx> BlockView<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
-        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
-        + AsDynamicContext,
 {
     fn peek_block_state<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
     where
@@ -326,7 +322,7 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
         + AsDynamicContext,
 {
@@ -342,11 +338,6 @@ where
 impl<'w, Cx> LockFreeBlockView<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
-        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
-        + AsDynamicContext,
 {
     fn peek_block_state_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
     where
@@ -394,7 +385,7 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
         + AsDynamicContext,
 {
@@ -412,7 +403,7 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
         + AsDynamicContext,
 {
@@ -463,9 +454,15 @@ where
         let has_be = dsyn_instanceof!(cached &*self.dsyn_cache, self.local_cx, &*bs.block => BlockEntityConstructor<Cx>);
         if bs.block != state.block && has_be {
             if !self.is_client
-                && flags.contains(SetBlockStateFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK)
+                && !flags.contains(SetBlockStateFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK)
             {
-                todo!()
+                self.peek_block_entity_typed_lf(
+                    pos,
+                    |cell| {
+                        //TODO: call on_block_replaced of block entity
+                    },
+                    CreationType::Immediate,
+                );
             }
             self.remove_block_entity(pos);
         }
@@ -479,7 +476,7 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
         + AsDynamicContext,
 {
@@ -532,7 +529,7 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
         + AsDynamicContext,
 {
@@ -563,7 +560,7 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
         + AsDynamicContext,
 {
@@ -577,7 +574,7 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
         + AsDynamicContext,
 {
@@ -591,7 +588,7 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
         + AsDynamicContext,
 {
@@ -620,7 +617,7 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynRawBlockEntityType<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
         + AsDynamicContext,
 {

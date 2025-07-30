@@ -29,6 +29,7 @@ local-cx = { path = "../local-cx", features = [
     "dyn-cx",
 ], package = "rimecraft-local-cx" }
 bitflags = "2.6"
+dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 
 [features]
 

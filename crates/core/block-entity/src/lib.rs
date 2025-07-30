@@ -6,6 +6,7 @@ use ::component::{
     ErasedComponentType, RawErasedComponentType, changes::ComponentChanges, map::ComponentMap,
 };
 use ahash::AHashSet;
+use dsyn::HoldDescriptors;
 use erased_serde::{Serialize as ErasedSerialize, serialize_trait_object};
 
 use local_cx::ProvideLocalCxTy;
@@ -32,10 +33,13 @@ pub trait ProvideBuiltInComponentTypes<'r>: ProvideIdTy {
 }
 
 /// A type of [`BlockEntity`].
-pub trait RawBlockEntityType<Cx>: Debug
+pub trait RawBlockEntityType<'a, Cx>: HoldDescriptors<'static, 'a>
 where
     Cx: ProvideBlockStateExtTy,
 {
+    /// Data type of the target block entities.
+    type Data;
+
     /// Whether the block entity supports the given state.
     fn supports(&self, state: &BlockState<'_, Cx>) -> bool;
 
@@ -44,14 +48,54 @@ where
         &self,
         pos: BlockPos,
         state: BlockState<'w, Cx>,
+    ) -> Option<RawBlockEntity<'w, Self::Data, Cx>>;
+}
+
+/// [`RawBlockEntityType`] with type erased.
+#[allow(missing_docs)]
+pub trait ErasedRawBlockEntityType<'w, Cx>: Debug
+where
+    Cx: ProvideBlockStateExtTy,
+{
+    fn erased_supports(&self, state: &BlockState<'_, Cx>) -> bool;
+
+    /// Creates a new instance of the block entity.
+    fn erased_instantiate(
+        &self,
+        pos: BlockPos,
+        state: BlockState<'w, Cx>,
     ) -> Option<Box<BlockEntity<'w, Cx>>>;
 }
 
+impl<'w, T, Cx> ErasedRawBlockEntityType<'w, Cx> for T
+where
+    T: RawBlockEntityType<'w, Cx> + Debug,
+    T::Data: ErasedData<'w, Cx> + 'w,
+    Cx: ProvideBlockStateExtTy,
+{
+    fn erased_supports(&self, state: &BlockState<'_, Cx>) -> bool {
+        self.supports(state)
+    }
+
+    fn erased_instantiate(
+        &self,
+        pos: BlockPos,
+        state: BlockState<'w, Cx>,
+    ) -> Option<Box<BlockEntity<'w, Cx>>> {
+        self.instantiate(pos, state).map(|be| {
+            let boxed: Box<BlockEntity<'w, Cx>> = Box::new(be);
+            boxed
+        })
+    }
+}
+
 /// A type of [`BlockEntity`] that can be used in a type erased context.
-pub type DynRawBlockEntityType<'r, Cx> = Box<dyn RawBlockEntityType<Cx> + Send + Sync + 'r>;
+pub type DynErasedRawBlockEntityType<'r, Cx> =
+    Box<dyn ErasedRawBlockEntityType<'r, Cx> + Send + Sync + 'r>;
 
 /// A type of [`BlockEntity`].
-pub type BlockEntityType<'r, Cx> = Reg<'r, <Cx as ProvideIdTy>::Id, DynRawBlockEntityType<'r, Cx>>;
+pub type BlockEntityType<'r, Cx> =
+    Reg<'r, <Cx as ProvideIdTy>::Id, DynErasedRawBlockEntityType<'r, Cx>>;
 
 /// An object holding extra data about a block in a world.
 pub struct RawBlockEntity<'a, T: ?Sized, Cx>

@@ -16,14 +16,14 @@ pub mod view;
 pub mod behave;
 
 use std::{
-    marker::PhantomData,
-    sync::{Arc, OnceLock},
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+    sync::Arc,
 };
 
 pub use ahash::{AHashMap, AHashSet};
-use local_cx::dsyn::DescriptorTypeCache;
 use parking_lot::Mutex;
-use rimecraft_block_entity::{BlockEntity, BlockEntityConstructor};
+use rimecraft_block_entity::BlockEntity;
 
 use crate::chunk::ChunkCx;
 
@@ -84,24 +84,112 @@ mod placeholder {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct DsynCache<'w, Cx>
+/// A data joined with a world reference.
+///
+/// This is mainly used to deal with self-referencing in vanilla Minecraft, and is intended only
+/// for temporary use as an intermediate trait implementor.
+pub struct WorldJoined<'borrow, 'w, Cx, T>
 where
     Cx: ChunkCx<'w>,
 {
-    be_constructor: OnceLock<dsyn::Type<BlockEntityConstructor<Cx>>>,
-    _marker: PhantomData<&'w ()>,
+    pub(crate) world: &'borrow World<'w, Cx>,
+    pub(crate) inner: T,
 }
 
-impl<'w, Cx> DescriptorTypeCache<BlockEntityConstructor<Cx>> for DsynCache<'w, Cx>
+impl<'w, Cx, T> Debug for WorldJoined<'_, 'w, Cx, T>
+where
+    World<'w, Cx>: Debug,
+    Cx: ChunkCx<'w>,
+    T: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WorldJoined")
+            .field("world", &self.world)
+            .field("data", &self.inner)
+            .finish()
+    }
+}
+
+impl<'w, Cx, T> Clone for WorldJoined<'_, 'w, Cx, T>
+where
+    Cx: ChunkCx<'w>,
+    T: Clone,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            world: self.world,
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<'w, Cx, T> Copy for WorldJoined<'_, 'w, Cx, T>
+where
+    Cx: ChunkCx<'w>,
+    T: Copy,
+{
+}
+
+impl<'w, Cx, T> Deref for WorldJoined<'_, 'w, Cx, T>
+where
+    Cx: ChunkCx<'w>,
+{
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<'w, Cx, T> DerefMut for WorldJoined<'_, 'w, Cx, T>
 where
     Cx: ChunkCx<'w>,
 {
     #[inline]
-    fn get_or_cache<F>(&self, f: F) -> dsyn::Type<BlockEntityConstructor<Cx>>
-    where
-        F: FnOnce() -> dsyn::Type<BlockEntityConstructor<Cx>>,
-    {
-        *self.be_constructor.get_or_init(f)
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+pub(crate) use __dsyn_cache::DsynCache;
+
+mod __dsyn_cache {
+    use crate::behave::*;
+
+    use crate::chunk::ChunkCx;
+
+    macro_rules! dsyn_caches_init {
+    ($($f:ident=>$t:ident),*$(,)?) => {
+        #[derive(Debug)]
+        pub(crate) struct DsynCache<'w, Cx>
+        where
+            Cx: ChunkCx<'w>,
+        {
+            $($f: std::sync::OnceLock<dsyn::Type<$t<Cx>>>,)*
+            _marker: std::marker::PhantomData<&'w ()>,
+        }
+
+        $(
+        impl<'w, Cx> local_cx::dsyn::DescriptorTypeCache<$t<Cx>> for DsynCache<'w, Cx>
+        where
+            Cx: ChunkCx<'w>,
+        {
+            #[inline]
+            fn get_or_cache<F>(&self, f: F) -> dsyn::Type<$t<Cx>>
+            where
+                F: FnOnce() -> dsyn::Type<$t<Cx>>,
+            {
+                *self.$f.get_or_init(f)
+            }
+        }
+        )*
+    };
+    }
+
+    dsyn_caches_init! {
+        be_constructor => BlockEntityConstructor,
+        be_on_block_replaced => BlockEntityOnBlockReplaced,
     }
 }
