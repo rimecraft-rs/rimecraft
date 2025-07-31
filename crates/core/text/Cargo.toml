@@ -2,7 +2,7 @@
 name = "rimecraft-text"
 version = "0.1.0"
 edition = "2024"
-authors = ["JieningYu <jiening.yu@outlook.com>", "C191239"]
+authors = ["C191239", "JieningYu <jiening.yu@outlook.com>"]
 description = "Minecraft text API"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
 license = "AGPL-3.0-or-later"
@@ -19,10 +19,10 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 edcode2 = { path = "../../util/edcode2", optional = true, package = "rimecraft-edcode2" }
 
 [features]
-default = ["macros"]
+default = ["macros", "rgb/argb"]
 serde = ["dep:serde"]
 macros = []
-edcode = ["dep:edcode2", "serde", "rimecraft-global-cx/edcode"]
+edcode = ["dep:edcode2", "rimecraft-global-cx/edcode", "serde"]
 
 [lints]
 workspace = true
