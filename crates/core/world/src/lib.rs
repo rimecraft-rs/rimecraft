@@ -55,11 +55,16 @@ pub(crate) type Entity<'w, Cx> = placeholder::Entity<'w, Cx>; // Should be atomi
 
 #[allow(missing_docs, missing_debug_implementations)]
 mod placeholder {
-    use std::marker::PhantomData;
+    use std::{
+        marker::PhantomData,
+        sync::{Arc, Weak},
+    };
 
     use crate::chunk::ChunkCx;
 
-    pub struct ServerWorld<'w, Cx>(PhantomData<&'w Cx>);
+    type Invariant<'a> = fn(&'a ()) -> &'a ();
+
+    pub struct ServerWorld<'w, Cx>(PhantomData<(Cx, Invariant<'w>)>);
 
     impl<'w, Cx> AsRef<World<'w, Cx>> for ServerWorld<'w, Cx>
     where
@@ -70,7 +75,22 @@ mod placeholder {
         }
     }
 
-    pub struct World<'w, Cx>(PhantomData<&'w Cx>);
+    impl<'w, Cx> ServerWorld<'w, Cx>
+    where
+        Cx: ChunkCx<'w>,
+    {
+        pub fn downcast_ref_from_world<'s>(world: &'s World<'w, Cx>) -> Option<&'s Self> {
+            let _unused = world;
+            unimplemented!("dummy impl")
+        }
+
+        pub fn downcast_arc_from_world(world: Arc<World<'w, Cx>>) -> Option<Arc<Self>> {
+            let _unused = world;
+            unimplemented!("dummy impl")
+        }
+    }
+
+    pub struct World<'w, Cx>(PhantomData<(Cx, Invariant<'w>)>);
 
     pub struct Entity<'w, Cx>(PhantomData<&'w Cx>);
 
@@ -155,5 +175,6 @@ mod __dsyn_cache {
         be_constructor => BlockEntityConstructor<Cx>,
         be_on_block_replaced => BlockEntityOnBlockReplaced<Cx>,
         b_always_replace_state => BlockAlwaysReplaceState,
+        b_on_state_replaced => BlockOnStateReplaced<Cx>,
     }
 }

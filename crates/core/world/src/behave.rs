@@ -7,7 +7,9 @@ use rimecraft_block::BlockState;
 use rimecraft_block_entity::BlockEntity;
 use rimecraft_voxel_math::BlockPos;
 
-use crate::{ArcAccess, World, chunk::ChunkCx};
+use crate::{ArcAccess, ServerWorld, World, chunk::ChunkCx};
+
+pub use rimecraft_block_entity::BlockEntityConstructorMarker;
 
 /// Constructor of a block entity.
 ///
@@ -17,6 +19,10 @@ use crate::{ArcAccess, World, chunk::ChunkCx};
 /// 2. State of the block the block entity will be placed.
 /// 3. Local context.
 pub type BlockEntityConstructor<Cx> = rimecraft_block_entity::BlockEntityConstructor<Cx>;
+
+/// Marker type for [`BlockEntityOnBlockReplaced`] to make it differs from other functions.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BlockEntityOnBlockReplacedMarker;
 
 /// Behavior of a block entity when its block was replaced.
 ///
@@ -33,6 +39,7 @@ pub type BlockEntityOnBlockReplaced<Cx> = for<'env> fn(
     BlockPos,
     BlockState<'env, Cx>,
     <Cx as ProvideLocalCxTy>::LocalContext<'env>,
+    BlockEntityOnBlockReplacedMarker,
 );
 
 /// The default implementation of [`BlockEntityOnBlockReplaced`], which is an empty function.
@@ -41,9 +48,7 @@ pub const fn default_block_entity_on_block_replaced<'w, Cx>() -> BlockEntityOnBl
 where
     Cx: ChunkCx<'w>,
 {
-    |be, w, pos, state, cx| {
-        let _ = (be, w, pos, state, cx);
-    }
+    |_, _, _, _, _, _| {}
 }
 
 /// Whether call block state replacement callback to the block even if the block is the same.
@@ -57,6 +62,38 @@ pub struct BlockAlwaysReplaceState(pub usize);
 #[inline]
 pub const fn default_block_always_replace_state() -> BlockAlwaysReplaceState {
     BlockAlwaysReplaceState(false as usize)
+}
+
+/// Marker type for [`BlockOnStateReplaced`] to make it differs from other functions.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BlockOnStateReplacedMarker;
+
+/// Behavior of a block when its block was been replaced.
+/// See [`BlockAlwaysReplaceState`] for always triggering this behavior.
+///
+/// # Parameters
+///
+/// 1. The old block state.
+/// 2. The server world.
+/// 3. The block position.
+/// 4. Whether the block was **moved** by thing like piston.
+/// 5. Local context.
+pub type BlockOnStateReplaced<Cx> = for<'env> fn(
+    BlockState<'env, Cx>,
+    &(dyn ArcAccess<ServerWorld<'env, Cx>> + '_),
+    BlockPos,
+    bool,
+    <Cx as ProvideLocalCxTy>::LocalContext<'env>,
+    BlockOnStateReplacedMarker,
+);
+
+/// The default implementation of [`BlockOnStateReplaced`], which does nothing.
+#[inline]
+pub const fn default_block_on_state_replaced<'w, Cx>() -> BlockOnStateReplaced<Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    |_, _, _, _, _, _| {}
 }
 
 // impl area

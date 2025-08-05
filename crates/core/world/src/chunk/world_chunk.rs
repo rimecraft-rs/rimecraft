@@ -6,8 +6,7 @@ use local_cx::{LocalContext, dsyn_instanceof, dsyn_ty, dyn_cx::AsDynamicContext}
 use parking_lot::Mutex;
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
-    BlockEntity, BlockEntityConstructor, DynErasedRawBlockEntityType,
-    component::RawErasedComponentType,
+    BlockEntity, DynErasedRawBlockEntityType, component::RawErasedComponentType,
 };
 use rimecraft_fluid::{BsToFs, FluidState};
 use rimecraft_registry::Registry;
@@ -15,8 +14,12 @@ use rimecraft_voxel_math::{BlockPos, IVec3};
 use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{
-    DsynCache, Sealed, World,
-    behave::{BlockAlwaysReplaceState, BlockEntityOnBlockReplaced},
+    DsynCache, Sealed, ServerWorld, World,
+    behave::{
+        BlockAlwaysReplaceState, BlockEntityConstructor, BlockEntityConstructorMarker,
+        BlockEntityOnBlockReplaced, BlockEntityOnBlockReplacedMarker, BlockOnStateReplaced,
+        BlockOnStateReplacedMarker, default_block_on_state_replaced,
+    },
     event::game_event,
     heightmap,
     view::block::{
@@ -44,6 +47,8 @@ pub trait WorldChunkLocalCx<'w, Cx>:
     + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
     + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
     + LocalContext<dsyn::Type<BlockEntityOnBlockReplaced<Cx>>>
+    + LocalContext<dsyn::Type<BlockAlwaysReplaceState>>
+    + LocalContext<dsyn::Type<BlockOnStateReplaced<Cx>>>
 where
     Cx: ChunkCx<'w>,
 {
@@ -55,7 +60,9 @@ where
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
-        + LocalContext<dsyn::Type<BlockEntityOnBlockReplaced<Cx>>>,
+        + LocalContext<dsyn::Type<BlockEntityOnBlockReplaced<Cx>>>
+        + LocalContext<dsyn::Type<BlockAlwaysReplaceState>>
+        + LocalContext<dsyn::Type<BlockOnStateReplaced<Cx>>>,
 {
 }
 
@@ -257,7 +264,7 @@ where
     fn create_block_entity(&self, pos: BlockPos) -> Option<Box<BlockEntity<'w, Cx>>> {
         self.peek_block_state(pos, |&bs| {
             dsyn_instanceof!(cached &*self.dsyn_cache, self.local_cx, &*bs.block => export BlockEntityConstructor<Cx>)
-                .map(|f| f(pos, bs, self.local_cx))
+                .map(|f| f(pos, bs, self.local_cx, BlockEntityConstructorMarker))
         })
         .flatten()
     }
@@ -271,7 +278,7 @@ where
             (*bs.block)
                 .descriptors()
                 .get(dsyn_ty)
-                .map(|f| f(pos, bs, local_cx))
+                .map(|f| f(pos, bs, local_cx, BlockEntityConstructorMarker))
         })
         .flatten()
     }
@@ -489,7 +496,14 @@ where
                             .descriptors()
                             .get(ty)
                             .unwrap_or(crate::behave::default_block_entity_on_block_replaced());
-                        f(&mut **guard, &wa, pos, old_state, local_cx);
+                        f(
+                            &mut **guard,
+                            &wa,
+                            pos,
+                            old_state,
+                            local_cx,
+                            BlockEntityOnBlockReplacedMarker,
+                        );
                     },
                     CreationType::Immediate,
                 );
@@ -497,12 +511,29 @@ where
             self.remove_block_entity(pos);
         }
 
-        if old_state.block != state.block
-            || bool::from(
+        if !self.is_client
+            && (old_state.block != state.block
+                || {
+                    bool::from(
                 dsyn_instanceof!(cached &*self.dsyn_cache, self.local_cx, &*state.block => export BlockAlwaysReplaceState)
                     .unwrap_or(crate::behave::default_block_always_replace_state())
+                )
+                })
+            && (flags.contains(SetBlockStateFlags::NOTIFY_NEIGHBORS)
+                || flags.contains(SetBlockStateFlags::MOVED))
+            && let Some(server_w) = ServerWorld::downcast_arc_from_world(
+                self.world_ptr.upgrade().expect("world vanished"),
             )
         {
+            let f = dsyn_instanceof!(cached &*self.dsyn_cache, self.local_cx, &*old_state.block => export BlockOnStateReplaced<Cx>).unwrap_or(default_block_on_state_replaced());
+            f(
+                old_state,
+                &server_w,
+                pos,
+                flags.contains(SetBlockStateFlags::MOVED),
+                self.local_cx,
+                BlockOnStateReplacedMarker,
+            );
         }
 
         todo!()

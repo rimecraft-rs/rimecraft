@@ -397,6 +397,10 @@ where
     }
 }
 
+/// Marker type for [`BlockEntityConstructor`] to make it differs from other functions.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BlockEntityConstructorMarker;
+
 /// Constructor of a [`BlockEntity`].
 ///
 /// This should be used as a descriptor type.
@@ -404,4 +408,5 @@ pub type BlockEntityConstructor<Cx> = for<'env> fn(
     BlockPos,
     BlockState<'env, Cx>,
     <Cx as ProvideLocalCxTy>::LocalContext<'env>,
+    BlockEntityConstructorMarker,
 ) -> Box<BlockEntity<'env, Cx>>;
