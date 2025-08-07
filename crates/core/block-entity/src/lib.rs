@@ -59,7 +59,6 @@ where
 {
     fn erased_supports(&self, state: BlockState<'_, Cx>) -> bool;
 
-    /// Creates a new instance of the block entity.
     fn erased_instantiate(
         &self,
         pos: BlockPos,
