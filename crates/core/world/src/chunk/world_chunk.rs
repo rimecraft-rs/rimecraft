@@ -475,6 +475,7 @@ where
             self.remove_block_entity(pos);
         }
 
+        // Generic callback
         if !self.is_client
             && (old_state.block != state.block
                 || {
@@ -508,6 +509,7 @@ where
             .block
             == state.block
         {
+            // Generic callback
             if !self.is_client && !flags.contains(SetBlockStateFlags::SKIP_BlOCK_ADDED_CALLBACK) {
                 let f = dsyn_instanceof!(cached &*self.dsyn_cache, self.local_cx, &*state.block => export BlockOnBlockAdded<Cx>)
                     .unwrap_or(default_block_on_block_added());
@@ -522,6 +524,7 @@ where
                 );
             }
 
+            // Update block entity
             if let Some(be_constructor) = dsyn_instanceof!(cached &*self.dsyn_cache, self.local_cx, &*state.block => export BlockEntityConstructor<Cx>)
             {
                 #[derive(Clone, Copy)]
