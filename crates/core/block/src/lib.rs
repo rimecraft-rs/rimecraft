@@ -103,7 +103,6 @@ pub trait ProvideStateIds: GlobalContext {
     /// Returns the state IDs.
     fn state_ids() -> Self::List;
 }
-
 /// Global contexts providing block state extensions.
 pub trait ProvideBlockStateExtTy: ProvideIdTy {
     /// The type of the block state extension.

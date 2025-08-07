@@ -5,9 +5,9 @@
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 use ahash::AHashMap;
-use local_cx::{LocalContext, ProvideLocalCxTy};
+use local_cx::{GlobalProvideLocalCxTy, LocalContext};
 use parking_lot::{Mutex, RwLock};
-use rimecraft_block::{BlockState, ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
+use rimecraft_block::{BlockState, ProvideBlockStateExtTy, RawBlock};
 use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe, container::ProvidePalette,
 };
@@ -60,7 +60,7 @@ where
         + ProvideFluidStateExtTy
         + ProvideIdTy
         + ProvideNbtTy
-        + ProvideLocalCxTy,
+        + GlobalProvideLocalCxTy,
 {
     /// The type of block state id list.
     type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>
@@ -128,7 +128,6 @@ where
 impl<'w, Cx> BaseChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>
-        + ProvideStateIds<List = Cx::BlockStateList>
         + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
@@ -158,7 +157,8 @@ where
     where
         I: Iterator<Item = Option<ChunkSection<'w, Cx>>> + ExactSizeIterator,
         Local: LocalContext<&'w Registry<Cx::Id, Cx::Biome>>
-            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>,
+            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+            + LocalContext<Cx::BlockStateList>,
     {
         Self {
             pos,

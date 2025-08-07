@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use local_cx::LocalContext;
-use rimecraft_block::{Block, BlockState, ProvideStateIds, RawBlock};
+use rimecraft_block::{Block, BlockState, RawBlock};
 use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
     container::{PalettedContainer, ProvidePalette},
@@ -232,7 +232,6 @@ where
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
     Cx: ChunkCx<'w>
-        + ProvideStateIds<List = Cx::BlockStateList>
         + ProvidePalette<Cx::BlockStateList, BlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
@@ -251,7 +250,8 @@ where
     pub fn from_registries<Local>(cx: Local) -> Self
     where
         Local: LocalContext<&'w Registry<Cx::Id, Cx::Biome>>
-            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>,
+            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+            + LocalContext<Cx::BlockStateList>,
     {
         let default_block = std::convert::identity::<&Registry<_, RawBlock<'_, _>>>(cx.acquire())
             .default_entry()
@@ -260,7 +260,7 @@ where
 
         Self {
             bsc: PalettedContainer::of_single(
-                Cx::state_ids(),
+                LocalContext::<Cx::BlockStateList>::acquire(cx),
                 BlockState {
                     block: default_block,
                     state: Block::to_value(default_block).states().default_state(),
