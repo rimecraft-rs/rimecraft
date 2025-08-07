@@ -15,15 +15,11 @@ pub trait BlockView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
-    /// Peeks the [`BlockState`] at the given position.
-    fn peek_block_state<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
-    where
-        F: for<'s> FnOnce(&'s BlockState<'w, Cx>) -> T;
+    /// Returns the [`BlockState`] at the given position.
+    fn block_state(&self, pos: BlockPos) -> Option<BlockState<'w, Cx>>;
 
-    /// Peeks the [`FluidState`] at the given position.
-    fn peek_fluid_state<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
-    where
-        F: for<'s> FnOnce(&'s FluidState<'w, Cx>) -> T;
+    /// Returns the [`FluidState`] at the given position.
+    fn fluid_state(&self, pos: BlockPos) -> Option<FluidState<'w, Cx>>;
 }
 
 /// A scoped, immutable view of [`BlockEntity`]s.
@@ -61,15 +57,11 @@ pub trait LockFreeBlockView<'w, Cx>: BlockView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
-    /// Peeks the [`BlockState`] at the given position.
-    fn peek_block_state_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
-    where
-        F: for<'s> FnOnce(&'s BlockState<'w, Cx>) -> T;
+    /// Returns the [`BlockState`] at the given position.
+    fn block_state_lf(&mut self, pos: BlockPos) -> Option<BlockState<'w, Cx>>;
 
-    /// Peeks the [`FluidState`] at the given position.
-    fn peek_fluid_state_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
-    where
-        F: for<'s> FnOnce(&'s FluidState<'w, Cx>) -> T;
+    /// Returns the [`FluidState`] at the given position.
+    fn fluid_state_lf(&mut self, pos: BlockPos) -> Option<FluidState<'w, Cx>>;
 }
 
 /// Lock-free variant of [`BlockEntityView`].

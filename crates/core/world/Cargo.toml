@@ -39,10 +39,12 @@ parking_lot = "0.12"
 ahash = "0.8"
 glam = "0.30"
 bitflags = "2.9"
+tracing = { version = "0.1", optional = true }
 
 [features]
 default = ["edcode"]
 edcode = ["dep:edcode2", "rimecraft-chunk-palette/edcode"]
+tracing = ["dep:tracing"]
 
 [lints]
 workspace = true

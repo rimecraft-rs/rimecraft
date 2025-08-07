@@ -41,7 +41,7 @@ where
     type Data;
 
     /// Whether the block entity supports the given state.
-    fn supports(&self, state: &BlockState<'_, Cx>) -> bool;
+    fn supports(&self, state: BlockState<'_, Cx>) -> bool;
 
     /// Creates a new instance of the block entity.
     fn instantiate<'w>(
@@ -57,7 +57,7 @@ pub trait ErasedRawBlockEntityType<'w, Cx>: HoldDescriptors<'static, 'w> + Debug
 where
     Cx: ProvideBlockStateExtTy,
 {
-    fn erased_supports(&self, state: &BlockState<'_, Cx>) -> bool;
+    fn erased_supports(&self, state: BlockState<'_, Cx>) -> bool;
 
     /// Creates a new instance of the block entity.
     fn erased_instantiate(
@@ -73,7 +73,7 @@ where
     T::Data: ErasedData<'w, Cx> + 'w,
     Cx: ProvideBlockStateExtTy,
 {
-    fn erased_supports(&self, state: &BlockState<'_, Cx>) -> bool {
+    fn erased_supports(&self, state: BlockState<'_, Cx>) -> bool {
         self.supports(state)
     }
 
@@ -291,7 +291,6 @@ where
     }
 }
 
-// Emit a warning
 #[allow(single_use_lifetimes)]
 mod ser_dyn_obj {
     use super::*;

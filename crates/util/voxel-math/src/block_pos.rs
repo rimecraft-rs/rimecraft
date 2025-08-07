@@ -1,5 +1,7 @@
 //! Position types.
 
+use std::fmt::Display;
+
 use glam::{DVec3, IVec3};
 
 /// A position of a block in a three-dimensional volume.
@@ -132,6 +134,12 @@ impl From<i64> for BlockPos {
             y: (l << (64 - LEN_BITS_Y) >> (64 - LEN_BITS_Y)) as i32,
             z: (l << (64 - BIT_SHIFT_Z - LEN_BITS_XZ) >> (64 - LEN_BITS_XZ)) as i32,
         })
+    }
+}
+
+impl Display for BlockPos {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {})", self.x(), self.y(), self.z())
     }
 }
 

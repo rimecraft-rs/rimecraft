@@ -137,18 +137,29 @@ where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
 {
     /// Returns the block state at the given position.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the given position out of bounds.
     #[inline]
-    pub fn block_state(&self, x: u32, y: u32, z: u32) -> Option<Maybe<'_, BlockState<'w, Cx>>> {
-        self.bsc.get(Cx::compute_index(x, y, z))
+    pub fn block_state(&self, x: u32, y: u32, z: u32) -> BlockState<'w, Cx> {
+        *self
+            .bsc
+            .get(Cx::compute_index(x, y, z))
+            .expect("position out of bounds: {x},{y},{z}")
     }
 
     /// Returns the fluid state at the given position.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the given position out of bounds.
     #[inline]
-    pub fn fluid_state(&self, x: u32, y: u32, z: u32) -> Option<Maybe<'_, IFluidState<'w, Cx>>>
+    pub fn fluid_state(&self, x: u32, y: u32, z: u32) -> IFluidState<'w, Cx>
     where
         Cx: BsToFs<'w>,
     {
-        self.block_state(x, y, z).map(Cx::block_to_fluid_state)
+        Cx::block_to_fluid_state(self.block_state(x, y, z))
     }
 }
 

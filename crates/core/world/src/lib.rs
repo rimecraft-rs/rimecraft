@@ -55,10 +55,7 @@ pub(crate) type Entity<'w, Cx> = placeholder::Entity<'w, Cx>; // Should be atomi
 
 #[allow(missing_docs, missing_debug_implementations)]
 mod placeholder {
-    use std::{
-        marker::PhantomData,
-        sync::{Arc, Weak},
-    };
+    use std::{marker::PhantomData, sync::Arc};
 
     use crate::chunk::ChunkCx;
 
@@ -176,5 +173,6 @@ mod __dsyn_cache {
         be_on_block_replaced => BlockEntityOnBlockReplaced<Cx>,
         b_always_replace_state => BlockAlwaysReplaceState,
         b_on_state_replaced => BlockOnStateReplaced<Cx>,
+        b_on_block_added => BlockOnBlockAdded<Cx>,
     }
 }

@@ -17,7 +17,6 @@ pub use rimecraft_block_entity::BlockEntityConstructorMarker;
 ///
 /// 1. Position of the block entity to construct.
 /// 2. State of the block the block entity will be placed.
-/// 3. Local context.
 pub type BlockEntityConstructor<Cx> = rimecraft_block_entity::BlockEntityConstructor<Cx>;
 
 /// Marker type for [`BlockEntityOnBlockReplaced`] to make it differs from other functions.
@@ -32,7 +31,6 @@ pub struct BlockEntityOnBlockReplacedMarker;
 /// 2. The world block entity lies in.
 /// 3. The block entity (or the block)'s position.
 /// 4. The old block state.
-/// 5. Local context.
 pub type BlockEntityOnBlockReplaced<Cx> = for<'env> fn(
     &mut BlockEntity<'env, Cx>,
     &(dyn ArcAccess<World<'env, Cx>> + '_),
@@ -68,16 +66,16 @@ pub const fn default_block_always_replace_state() -> BlockAlwaysReplaceState {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct BlockOnStateReplacedMarker;
 
-/// Behavior of a block when its block was been replaced.
+/// Behavior of a block when its block was been replaced by another one on server side.
+///
 /// See [`BlockAlwaysReplaceState`] for always triggering this behavior.
 ///
 /// # Parameters
 ///
-/// 1. The old block state.
+/// 1. The old block state (this block).
 /// 2. The server world.
 /// 3. The block position.
 /// 4. Whether the block was **moved** by thing like piston.
-/// 5. Local context.
 pub type BlockOnStateReplaced<Cx> = for<'env> fn(
     BlockState<'env, Cx>,
     &(dyn ArcAccess<ServerWorld<'env, Cx>> + '_),
@@ -94,6 +92,39 @@ where
     Cx: ChunkCx<'w>,
 {
     |_, _, _, _, _, _| {}
+}
+
+/// Marker type for [`BlockOnBlockAdded`] to make it differs from other functions.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BlockOnBlockAddedMarker;
+
+/// Behavior of a new block when its block state is changed on server side,
+/// including block placement.
+///
+/// # Parameters
+///
+/// 1. The new block state (this block).
+/// 2. The old block state.
+/// 3. The world.
+/// 4. The block position.
+/// 5. Whether to notify clients.
+pub type BlockOnBlockAdded<Cx> = for<'env> fn(
+    BlockState<'env, Cx>,
+    BlockState<'env, Cx>,
+    &(dyn ArcAccess<World<'env, Cx>> + '_),
+    BlockPos,
+    bool,
+    <Cx as ProvideLocalCxTy>::LocalContext<'env>,
+    BlockOnBlockAddedMarker,
+);
+
+/// The default implementation of [`BlockOnBlockAdded`], which does nothing.
+#[inline]
+pub const fn default_block_on_block_added<'w, Cx>() -> BlockOnBlockAdded<Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    |_, _, _, _, _, _, _| {}
 }
 
 // impl area

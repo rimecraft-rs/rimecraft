@@ -125,7 +125,7 @@ where
     pub fn get(&self, index: usize) -> Option<Maybe<'_, T>> {
         self.data
             .storage
-            .get(index)
+            .get(index) // none only if out of bounds
             .and_then(|i| self.data.palette.get(i as usize))
     }
 
