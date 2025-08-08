@@ -8,7 +8,7 @@ use std::{
 use bitvec::{bitbox, boxed::BitBox, slice::BitSlice};
 use rimecraft_voxel_math::direction::Axis;
 
-trait AbstVoxelSet {
+trait Abstract {
     fn props(&self) -> Props;
 
     fn bitslice(&self) -> &BitSlice;
@@ -20,17 +20,42 @@ trait AbstVoxelSet {
     fn bounds(&self, axis: Axis) -> RangeInclusive<u32>;
 }
 
+trait AbstractExt: Abstract {
+    fn contains(&self, x: u32, y: u32, z: u32) -> bool {
+        self.bitslice()
+            .get(self.index(x, y, z))
+            .as_deref()
+            .copied()
+            .unwrap_or_default()
+    }
+
+    fn set(&mut self, x: u32, y: u32, z: u32) {
+        let index = self.index(x, y, z);
+        self.bitslice_mut().set(index, true);
+        self.set_ext(x, y, z);
+    }
+
+    fn len_of(&self, axis: Axis) -> u32 {
+        let Props {
+            len_x,
+            len_y,
+            len_z,
+        } = self.props();
+        axis.choose(len_x, len_y, len_z)
+    }
+}
+
+impl<T> AbstractExt for T where T: Abstract {}
+
 /// Slice of a voxel set.
 #[repr(transparent)]
-pub struct VoxelSetSlice<'s> {
-    inner: dyn AbstVoxelSet + Send + Sync + 's,
-}
+pub struct VoxelSetSlice<'s>(dyn AbstractExt + Send + Sync + 's);
 
 impl Debug for VoxelSetSlice<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VoxelSetSlice")
-            .field("inner_slice", &self.inner.bitslice())
-            .field("props", &self.inner.props())
+            .field("inner_slice", &self.0.bitslice())
+            .field("props", &self.0.props())
             .finish()
     }
 }
@@ -39,36 +64,24 @@ impl<'s> VoxelSetSlice<'s> {
     /// Whether this set contains a voxel at the given position.
     #[inline]
     pub fn contains(&self, x: u32, y: u32, z: u32) -> bool {
-        self.inner
-            .bitslice()
-            .get(self.inner.index(x, y, z))
-            .as_deref()
-            .copied()
-            .unwrap_or_default()
+        self.0.contains(x, y, z)
     }
 
     /// Sets the voxel at given position.
     #[inline]
     pub fn set(&mut self, x: u32, y: u32, z: u32) {
-        let index = self.inner.index(x, y, z);
-        self.inner.bitslice_mut().set(index, true);
-        self.inner.set_ext(x, y, z);
+        self.0.set(x, y, z);
     }
 
     /// Gets the length of given axis.
     pub fn len_of(&self, axis: Axis) -> u32 {
-        let Props {
-            len_x,
-            len_y,
-            len_z,
-        } = self.inner.props();
-        axis.choose(len_x, len_y, len_z)
+        self.0.len_of(axis)
     }
 
     /// Gets the bounds of give axis.
     #[inline]
     pub fn bounds_of(&self, axis: Axis) -> RangeInclusive<u32> {
-        self.inner.bounds(axis)
+        self.0.bounds(axis)
     }
 
     /// Crops this set into a cropped slice.
@@ -101,17 +114,17 @@ impl<'s> VoxelSetSlice<'s> {
 #[allow(unsafe_code)] // SAFETY: safe because the type is marked as `repr(transparent)`
 impl<'a> VoxelSetSlice<'a> {
     #[inline]
-    fn from_ref<'s>(this: &'s (dyn AbstVoxelSet + Send + Sync + 'a)) -> &'s Self {
+    fn from_ref<'s>(this: &'s (dyn Abstract + Send + Sync + 'a)) -> &'s Self {
         unsafe { std::mem::transmute(this) }
     }
 
     #[inline]
-    fn from_mut<'s>(this: &'s mut (dyn AbstVoxelSet + Send + Sync + 'a)) -> &'s mut Self {
+    fn from_mut<'s>(this: &'s mut (dyn Abstract + Send + Sync + 'a)) -> &'s mut Self {
         unsafe { std::mem::transmute(this) }
     }
 
     #[inline]
-    fn from_boxed(this: Box<dyn AbstVoxelSet + Send + Sync + 'a>) -> Box<Self> {
+    fn from_boxed(this: Box<dyn Abstract + Send + Sync + 'a>) -> Box<Self> {
         unsafe { std::mem::transmute(this) }
     }
 }
@@ -168,7 +181,7 @@ impl VoxelSet {
         }
     }
 
-    /// Creates a new `BitSetImpl` with the given bounds.
+    /// Creates a new voxel set with the given bounds.
     pub fn with_bounds(props: Props, bounds: Bounds) -> Self {
         let mut this = Self::new(props);
         this.bounds = bounds;
@@ -182,7 +195,7 @@ impl VoxelSet {
     }
 }
 
-impl AbstVoxelSet for VoxelSet {
+impl Abstract for VoxelSet {
     #[inline]
     fn props(&self) -> Props {
         self.props
@@ -198,6 +211,7 @@ impl AbstVoxelSet for VoxelSet {
         &mut self.data
     }
 
+    #[inline]
     fn set_ext(&mut self, x: u32, y: u32, z: u32) {
         macro_rules! se {
             ($($a:ident),*$(,)?) => {
@@ -213,6 +227,7 @@ impl AbstVoxelSet for VoxelSet {
         ((x * self.props.len_y + y) * self.props.len_z + z) as usize
     }
 
+    #[inline]
     fn bounds(&self, axis: Axis) -> RangeInclusive<u32> {
         axis.choose(
             *self.bounds.x.start(),
@@ -251,7 +266,7 @@ pub struct Cropped<'a, 's> {
     parent: &'a VoxelSetSlice<'s>,
 }
 
-impl<'a> Cropped<'a, 'a> {
+impl<'a> Cropped<'a, '_> {
     /// Converts this set into a boxed slice.
     #[inline]
     pub fn into_boxed_slice(self) -> Box<VoxelSetSlice<'a>> {
@@ -259,7 +274,7 @@ impl<'a> Cropped<'a, 'a> {
     }
 }
 
-impl AbstVoxelSet for Cropped<'_, '_> {
+impl Abstract for Cropped<'_, '_> {
     #[inline]
     fn props(&self) -> Props {
         self.props
@@ -267,25 +282,29 @@ impl AbstVoxelSet for Cropped<'_, '_> {
 
     #[inline]
     fn bitslice(&self) -> &BitSlice {
-        self.parent.inner.bitslice()
+        self.parent.0.bitslice()
     }
 
+    #[inline]
     fn bitslice_mut(&mut self) -> &mut BitSlice {
-        unreachable!("Cropped is only for immutable")
+        unreachable!("cropped is only for immutable usage")
     }
 
+    #[inline]
     fn set_ext(&mut self, _x: u32, _y: u32, _z: u32) {
-        unreachable!("Cropped is only for immutable")
+        unreachable!("cropped is only for immutable usage")
     }
 
+    #[inline]
     fn index(&self, x: u32, y: u32, z: u32) -> usize {
-        self.parent.inner.index(
+        self.parent.0.index(
             *self.bounds.x.start() + x,
             *self.bounds.y.start() + y,
             *self.bounds.z.start() + z,
         )
     }
 
+    #[inline]
     fn bounds(&self, axis: Axis) -> RangeInclusive<u32> {
         let i = axis.choose(
             *self.bounds.x.start(),
@@ -297,7 +316,7 @@ impl AbstVoxelSet for Cropped<'_, '_> {
             *self.bounds.y.end(),
             *self.bounds.z.end(),
         );
-        let bounds = self.parent.inner.bounds(axis);
+        let bounds = self.parent.0.bounds(axis);
         (*bounds.start()).clamp(i, j) - i..=(*bounds.end()).clamp(i, j) - i
     }
 }
@@ -310,7 +329,7 @@ pub struct CroppedMut<'a, 's> {
     parent: &'a mut VoxelSetSlice<'s>,
 }
 
-impl<'a> CroppedMut<'a, 'a> {
+impl<'a> CroppedMut<'a, '_> {
     /// Converts this set into a boxed slice.
     #[inline]
     pub fn into_boxed_slice(self) -> Box<VoxelSetSlice<'a>> {
@@ -318,7 +337,7 @@ impl<'a> CroppedMut<'a, 'a> {
     }
 }
 
-impl AbstVoxelSet for CroppedMut<'_, '_> {
+impl Abstract for CroppedMut<'_, '_> {
     #[inline]
     fn props(&self) -> Props {
         self.props
@@ -326,29 +345,33 @@ impl AbstVoxelSet for CroppedMut<'_, '_> {
 
     #[inline]
     fn bitslice(&self) -> &BitSlice {
-        self.parent.inner.bitslice()
+        self.parent.0.bitslice()
     }
 
+    #[inline]
     fn bitslice_mut(&mut self) -> &mut BitSlice {
-        self.parent.inner.bitslice_mut()
+        self.parent.0.bitslice_mut()
     }
 
+    #[inline]
     fn set_ext(&mut self, x: u32, y: u32, z: u32) {
-        self.parent.inner.set_ext(
+        self.parent.0.set_ext(
             *self.bounds.x.start() + x,
             *self.bounds.y.start() + y,
             *self.bounds.z.start() + z,
         )
     }
 
+    #[inline]
     fn index(&self, x: u32, y: u32, z: u32) -> usize {
-        self.parent.inner.index(
+        self.parent.0.index(
             *self.bounds.x.start() + x,
             *self.bounds.y.start() + y,
             *self.bounds.z.start() + z,
         )
     }
 
+    #[inline]
     fn bounds(&self, axis: Axis) -> RangeInclusive<u32> {
         let i = axis.choose(
             *self.bounds.x.start(),
@@ -360,7 +383,7 @@ impl AbstVoxelSet for CroppedMut<'_, '_> {
             *self.bounds.y.end(),
             *self.bounds.z.end(),
         );
-        let bounds = self.parent.inner.bounds(axis);
+        let bounds = self.parent.0.bounds(axis);
         (*bounds.start()).clamp(i, j) - i..=(*bounds.end()).clamp(i, j) - i
     }
 }
