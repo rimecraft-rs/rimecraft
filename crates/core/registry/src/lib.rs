@@ -593,7 +593,7 @@ mod serde {
 mod edcode {
 
     use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
-    use local_cx::{LocalContext, WithLocalCx};
+    use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 
     use crate::{Reg, Registry};
 
@@ -608,14 +608,14 @@ mod edcode {
         }
     }
 
-    impl<'a, 'r, 'de, K: 'r, T: 'r, B, Cx> Decode<'de, WithLocalCx<B, Cx>> for Reg<'a, K, T>
+    impl<'a, 'r, 'de, K: 'r, T: 'r, Fw> Decode<'de, Fw> for Reg<'a, K, T>
     where
         'r: 'a,
-        B: Buf,
-        Cx: LocalContext<&'r Registry<K, T>>,
+        Fw: ForwardToWithLocalCx<Forwarded: Buf>,
+        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
     {
-        fn decode(buf: WithLocalCx<B, Cx>) -> Result<Self, edcode2::BoxedError<'de>> {
-            let WithLocalCx { inner, local_cx } = buf;
+        fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
+            let WithLocalCx { inner, local_cx } = buf.forward();
             let mut buf = inner;
             let id = buf.get_variable::<i32>() as usize;
             local_cx

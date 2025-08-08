@@ -39,7 +39,7 @@ where
 macro_rules! resize {
     ($s:expr,$r:expr) => {
         match $r {
-            Ok(e) => Some(e),
+            Ok(e) => e,
             Err(err) => $s.on_resize(err),
         }
     };
@@ -66,22 +66,29 @@ where
     }
 
     /// Sets the value at the given index and returns the old one.
+    ///
+    /// Returns `None` if index is out of bounds.
+    #[allow(clippy::missing_panics_doc)]
     pub fn swap(&mut self, index: usize, value: T) -> Option<Maybe<'_, T>> {
-        resize!(self, self.data.palette.index_or_insert(value))
-            .and_then(|i| {
-                if let Some(array) = self.data.storage.as_array_mut() {
-                    array.swap(index, i as u32)
-                } else {
-                    None
-                }
-            })
-            .and_then(|i| self.data.palette.get(i as usize))
+        let i = resize!(self, self.data.palette.index_or_insert(value));
+        let prev_val = self
+            .data
+            .storage
+            .as_array_mut()
+            .map(|s| s.swap(index, i as u32))
+            .unwrap_or(Some(0u32))?;
+        Some(
+            self.data
+                .palette
+                .get(prev_val as usize)
+                .expect("invalid previous id"),
+        )
     }
 
     /// Returns the value at the given index.
     #[inline]
     pub fn set(&mut self, index: usize, value: T) {
-        if let (Some(i), Some(array)) = (
+        if let (i, Some(array)) = (
             resize!(self, self.data.palette.index_or_insert(value)),
             self.data.storage.as_array_mut(),
         ) {
@@ -118,7 +125,7 @@ where
     pub fn get(&self, index: usize) -> Option<Maybe<'_, T>> {
         self.data
             .storage
-            .get(index)
+            .get(index) // none only if out of bounds
             .and_then(|i| self.data.palette.get(i as usize))
     }
 
@@ -158,6 +165,9 @@ where
     }
 }
 
+/// Obtains a compatible data object for the given entry size in bits.
+///
+/// A new [`Data`] will be returned or `None` will be returned when the previous data can be reused.
 fn compatible_data<L, T, Cx>(list: L, prev: Option<&Data<L, T>>, bits: u32) -> Option<Data<L, T>>
 where
     T: Clone + Hash + Eq,
@@ -177,15 +187,16 @@ where
     T: Clone + Hash + Eq,
     Cx: ProvidePalette<L, T>,
 {
-    fn on_resize(&mut self, (i, object): (u32, T)) -> Option<usize> {
-        if let Some(mut data) = compatible_data::<L, T, Cx>(self.list.clone(), Some(&self.data), i)
-        {
-            data.import_from(&self.data.palette, &self.data.storage);
-            self.data = data;
-            self.data.palette.index(&object)
-        } else {
-            None
-        }
+    fn on_resize(&mut self, (i, object): (u32, T)) -> usize {
+        let mut data = compatible_data::<L, T, Cx>(self.list.clone(), Some(&self.data), i)
+            .expect("on_resize should not be performed");
+        data.import_from(&self.data.palette, &self.data.storage);
+        self.data = data;
+        self.data
+            .palette
+            .index_or_insert(object)
+            .ok()
+            .expect("resize failed")
     }
 }
 
@@ -323,7 +334,7 @@ where
 
 #[cfg(feature = "edcode")]
 mod _edcode {
-    use edcode2::{Buf, BufMut, Decode, Encode};
+    use edcode2::{Buf, BufMut, Decode, Encode, codecs::FixedLength};
 
     use super::*;
 
@@ -340,11 +351,13 @@ mod _edcode {
                     .unwrap_or_default() as u8,
             );
             self.palette.encode(&mut buf)?;
-            self.storage
-                .as_array()
-                .map(PackedIntArray::data)
-                .unwrap_or(&[])
-                .encode(&mut buf)
+            FixedLength::new(
+                self.storage
+                    .as_array()
+                    .map(PackedIntArray::data)
+                    .unwrap_or(&[]),
+            )
+            .encode(&mut buf)
         }
     }
 
@@ -367,7 +380,7 @@ mod _edcode {
         B: Buf,
     {
         fn decode_in_place(&mut self, mut buf: B) -> Result<(), edcode2::BoxedError<'de>> {
-            let data = compatible_data::<L, T, Cx>(
+            let data: Option<Data<L, T>> = compatible_data::<L, T, Cx>(
                 self.list.clone(),
                 Some(&self.data),
                 buf.get_u8() as u32,
@@ -378,7 +391,7 @@ mod _edcode {
 
             self.data.palette.decode_in_place(&mut buf)?;
             if let Some(array) = self.data.storage.as_array_mut() {
-                array.data_mut().decode_in_place(&mut buf)?;
+                FixedLength::new(array.data_mut()).decode_in_place(&mut buf)?;
             }
 
             Ok(())
@@ -386,7 +399,7 @@ mod _edcode {
 
         #[inline]
         fn decode(_buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
-            Err("paletted containers does not support non-in-place decoding".into())
+            panic!("paletted containers does not support non-in-place decoding")
         }
 
         const SUPPORT_NON_IN_PLACE: bool = false;

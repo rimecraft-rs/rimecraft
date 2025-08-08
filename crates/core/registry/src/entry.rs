@@ -173,19 +173,20 @@ mod edcode {
     use std::{fmt::Display, hash::Hash};
 
     use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
-    use local_cx::{LocalContext, WithLocalCx};
+    use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 
     use crate::{Reg, Registry};
 
     use super::{Entry, RefEntry};
 
-    impl<'r, K, T: 'r, B, Cx> Encode<WithLocalCx<B, Cx>> for RefEntry<K, T>
+    impl<'r, K, T: 'r, Fw> Encode<Fw> for RefEntry<K, T>
     where
         K: Hash + Eq + Clone + Display + 'r,
-        B: BufMut,
-        Cx: LocalContext<&'r Registry<K, T>>,
+        Fw: ForwardToWithLocalCx<Forwarded: BufMut>,
+        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
     {
-        fn encode(&self, buf: WithLocalCx<B, Cx>) -> Result<(), edcode2::BoxedError<'static>> {
+        fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
+            let buf = buf.forward();
             let registry = buf.local_cx.acquire();
             let mut buf = buf.inner;
             let id = Reg::to_raw_id(registry.get(self.key()).ok_or_else(|| {
@@ -199,13 +200,14 @@ mod edcode {
         }
     }
 
-    impl<'a, 'r, 'de, K: 'r, T: 'r, B, Cx> Decode<'de, WithLocalCx<B, Cx>> for &'a RefEntry<K, T>
+    impl<'a, 'r, 'de, K: 'r, T: 'r, Fw> Decode<'de, Fw> for &'a RefEntry<K, T>
     where
         'r: 'a,
-        B: Buf,
-        Cx: LocalContext<&'r Registry<K, T>>,
+        Fw: ForwardToWithLocalCx<Forwarded: Buf>,
+        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
     {
-        fn decode(mut buf: WithLocalCx<B, Cx>) -> Result<Self, edcode2::BoxedError<'de>> {
+        fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
+            let mut buf = buf.forward();
             let id = buf.inner.get_variable::<u32>() as usize - 1;
             buf.local_cx
                 .acquire()
@@ -215,14 +217,15 @@ mod edcode {
         }
     }
 
-    impl<'r, K, T, B, Cx> Encode<WithLocalCx<B, Cx>> for Entry<'_, K, T>
+    impl<'r, K, T, Fw> Encode<Fw> for Entry<'_, K, T>
     where
         K: Hash + Eq + Clone + Display + 'r,
-        T: Encode<WithLocalCx<B, Cx>> + 'r,
-        B: BufMut,
-        Cx: LocalContext<&'r Registry<K, T>>,
+        T: Encode<WithLocalCx<Fw::Forwarded, Fw::LocalCx>> + 'r,
+        Fw: ForwardToWithLocalCx<Forwarded: BufMut>,
+        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
     {
-        fn encode(&self, mut buf: WithLocalCx<B, Cx>) -> Result<(), edcode2::BoxedError<'static>> {
+        fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
+            let mut buf = buf.forward();
             match self {
                 Entry::Direct(value) => {
                     buf.inner.put_variable(0i32);
@@ -233,15 +236,16 @@ mod edcode {
         }
     }
 
-    impl<'a, 'r, 'de, K, T, B, Cx> Decode<'de, WithLocalCx<B, Cx>> for Entry<'a, K, T>
+    impl<'a, 'r, 'de, K, T, Fw> Decode<'de, Fw> for Entry<'a, K, T>
     where
         'r: 'a,
         K: 'r,
-        T: Decode<'de, WithLocalCx<B, Cx>> + 'r,
-        B: Buf,
-        Cx: LocalContext<&'r Registry<K, T>>,
+        T: Decode<'de, WithLocalCx<Fw::Forwarded, Fw::LocalCx>> + 'r,
+        Fw: ForwardToWithLocalCx<Forwarded: Buf>,
+        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
     {
-        fn decode(mut buf: WithLocalCx<B, Cx>) -> Result<Self, edcode2::BoxedError<'de>> {
+        fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
+            let mut buf = buf.forward();
             let id = buf.inner.get_variable::<u32>() as usize;
             match id {
                 0 => T::decode(buf).map(Entry::Direct),

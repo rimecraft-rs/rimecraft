@@ -13,7 +13,7 @@ use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
 use serde::{Deserialize, Serialize, de::DeserializeSeed};
 
-use crate::{BlockEntity, DynRawBlockEntityType, RawBlockEntity};
+use crate::{BlockEntity, DynErasedRawBlockEntityType, RawBlockEntity};
 
 bitflags! {
     /// Essential flags for serializing a block entity.
@@ -212,7 +212,7 @@ impl<'a, 'de, Cx, L> DeserializeSeed<'de> for Seed<'a, Cx, L>
 where
     Cx: ProvideBlockStateExtTy<Id: Deserialize<'de>>,
     L: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
-        + LocalContext<&'a Registry<Cx::Id, DynRawBlockEntityType<'a, Cx>>>
+        + LocalContext<&'a Registry<Cx::Id, DynErasedRawBlockEntityType<'a, Cx>>>
         + AsDynamicContext,
 {
     type Value = Box<BlockEntity<'a, Cx>>;
@@ -230,7 +230,7 @@ where
             Cx: ProvideBlockStateExtTy<Id: Deserialize<'de>>,
             L: AsDynamicContext
                 + LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
-                + LocalContext<&'a Registry<Cx::Id, DynRawBlockEntityType<'a, Cx>>>,
+                + LocalContext<&'a Registry<Cx::Id, DynErasedRawBlockEntityType<'a, Cx>>>,
         {
             type Value = Box<BlockEntity<'a, Cx>>;
 
@@ -266,15 +266,16 @@ where
                 let id = id.ok_or_else(|| serde::de::Error::missing_field("id"))?;
                 let components = components.unwrap_or(ComponentMap::EMPTY);
 
-                let ty = std::convert::identity::<&Registry<_, DynRawBlockEntityType<'_, _>>>(
-                    self.2.acquire(),
-                )
-                .get(&id)
-                .ok_or_else(|| {
-                    serde::de::Error::custom(format!("unknown block entity type {id}"))
-                })?;
+                let ty =
+                    std::convert::identity::<&Registry<_, DynErasedRawBlockEntityType<'_, _>>>(
+                        self.2.acquire(),
+                    )
+                    .get(&id)
+                    .ok_or_else(|| {
+                        serde::de::Error::custom(format!("unknown block entity type {id}"))
+                    })?;
                 let mut be = ty
-                    .instantiate(self.0, self.1)
+                    .erased_instantiate(self.0, self.1)
                     .ok_or_else(|| serde::de::Error::custom("failed to create block entity"))?;
                 rimecraft_serde_update::Update::update(
                     &mut *be,
