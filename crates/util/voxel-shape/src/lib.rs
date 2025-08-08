@@ -13,59 +13,55 @@ use voxel_math::direction::Axis;
 pub use set::VoxelSet;
 
 trait Abstract {
-    fn as_raw(&self) -> &RawVoxelShape;
-    fn as_raw_mut(&mut self) -> &mut RawVoxelShape;
+    fn __as_raw(&self) -> &RawVoxelShape;
+    fn __as_raw_mut(&mut self) -> &mut RawVoxelShape;
 
-    fn index_point_pos(&self, axis: Axis, index: u32) -> Option<f64>;
-    fn point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a>;
-}
+    fn __index_point_pos(&self, axis: Axis, index: u32) -> Option<f64>;
+    fn __point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a>;
 
-trait AbstractExt: Abstract {
-    fn min(&self, axis: Axis) -> f64 {
-        let voxels = &self.as_raw().voxels;
+    fn __min(&self, axis: Axis) -> f64 {
+        let voxels = &self.__as_raw().voxels;
         let i = voxels.bounds_of(axis).start;
 
         (i >= voxels.len_of(axis))
-            .then(|| self.index_point_pos(axis, i))
+            .then(|| self.__index_point_pos(axis, i))
             .flatten()
             .unwrap_or(f64::INFINITY)
     }
 
-    fn max(&self, axis: Axis) -> f64 {
-        let voxels = &self.as_raw().voxels;
+    fn __max(&self, axis: Axis) -> f64 {
+        let voxels = &self.__as_raw().voxels;
         let i = voxels.bounds_of(axis).end;
 
         (i >= voxels.len_of(axis))
-            .then(|| self.index_point_pos(axis, i))
+            .then(|| self.__index_point_pos(axis, i))
             .flatten()
             .unwrap_or(f64::NEG_INFINITY)
     }
 }
 
-impl<T> AbstractExt for T where T: Abstract {}
-
 /// Slice of a `VoxelShape`.
 #[repr(transparent)]
-pub struct Slice<'a>(dyn AbstractExt + Send + Sync + 'a);
+pub struct Slice<'a>(dyn Abstract + Send + Sync + 'a);
 
 impl Slice<'_> {
     /// Returns the minimum coordinate of the shape along the given axis.
     #[inline]
     pub fn min(&self, axis: Axis) -> f64 {
-        self.0.min(axis)
+        self.0.__min(axis)
     }
 
     /// Returns the maximum coordinate of the shape along the given axis.
     #[inline]
     pub fn max(&self, axis: Axis) -> f64 {
-        self.0.max(axis)
+        self.0.__max(axis)
     }
 }
 
 impl Debug for Slice<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VoxelShapeSlice")
-            .field("voxels", &self.0.as_raw().voxels)
+            .field("voxels", &self.0.__as_raw().voxels)
             .finish()
     }
 }
@@ -108,16 +104,16 @@ impl Simple {
 
 impl Abstract for Simple {
     #[inline]
-    fn as_raw(&self) -> &RawVoxelShape {
+    fn __as_raw(&self) -> &RawVoxelShape {
         &self.0
     }
 
     #[inline]
-    fn as_raw_mut(&mut self) -> &mut RawVoxelShape {
+    fn __as_raw_mut(&mut self) -> &mut RawVoxelShape {
         &mut self.0
     }
 
-    fn index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
+    fn __index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
         let len = self.0.voxels.len_of(axis);
         if len == 0 {
             None
@@ -126,7 +122,7 @@ impl Abstract for Simple {
         }
     }
 
-    fn point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
+    fn __point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
         let len = self.0.voxels.len_of(axis);
         if len == 0 {
             Box::new(std::iter::empty())
@@ -173,16 +169,16 @@ impl Array {
 
 impl Abstract for Array {
     #[inline]
-    fn as_raw(&self) -> &RawVoxelShape {
+    fn __as_raw(&self) -> &RawVoxelShape {
         &self.raw
     }
 
     #[inline]
-    fn as_raw_mut(&mut self) -> &mut RawVoxelShape {
+    fn __as_raw_mut(&mut self) -> &mut RawVoxelShape {
         &mut self.raw
     }
 
-    fn index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
+    fn __index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
         let arr = match axis {
             Axis::X => &self.xp,
             Axis::Y => &self.yp,
@@ -191,7 +187,7 @@ impl Abstract for Array {
         arr.get(index as usize).copied()
     }
 
-    fn point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
+    fn __point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
         let arr = match axis {
             Axis::X => &self.xp,
             Axis::Y => &self.yp,
@@ -235,27 +231,27 @@ impl<'a> Sliced<'a, 'a> {
 
 impl Abstract for Sliced<'_, '_> {
     #[inline]
-    fn as_raw(&self) -> &RawVoxelShape {
+    fn __as_raw(&self) -> &RawVoxelShape {
         &self.shape
     }
 
-    fn as_raw_mut(&mut self) -> &mut RawVoxelShape {
+    fn __as_raw_mut(&mut self) -> &mut RawVoxelShape {
         unreachable!("Sliced shape is immutable")
     }
 
-    fn index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
+    fn __index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
         if axis == self.axis {
             Some(index as f64)
         } else {
-            self.parent.0.index_point_pos(axis, index)
+            self.parent.0.__index_point_pos(axis, index)
         }
     }
 
-    fn point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
+    fn __point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
         if axis == self.axis {
             Box::new((0u32..=1).map(|i| i as f64))
         } else {
-            self.parent.0.point_poss(axis)
+            self.parent.0.__point_poss(axis)
         }
     }
 }
@@ -278,28 +274,28 @@ impl<'a> SlicedMut<'a, 'a> {
 
 impl Abstract for SlicedMut<'_, '_> {
     #[inline]
-    fn as_raw(&self) -> &RawVoxelShape {
+    fn __as_raw(&self) -> &RawVoxelShape {
         &self.shape
     }
 
     #[inline]
-    fn as_raw_mut(&mut self) -> &mut RawVoxelShape {
+    fn __as_raw_mut(&mut self) -> &mut RawVoxelShape {
         &mut self.shape
     }
 
-    fn index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
+    fn __index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
         if axis == self.axis {
             Some(index as f64)
         } else {
-            self.parent.0.index_point_pos(axis, index)
+            self.parent.0.__index_point_pos(axis, index)
         }
     }
 
-    fn point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
+    fn __point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
         if axis == self.axis {
             Box::new((0u32..=1).map(|i| i as f64))
         } else {
-            self.parent.0.point_poss(axis)
+            self.parent.0.__point_poss(axis)
         }
     }
 }

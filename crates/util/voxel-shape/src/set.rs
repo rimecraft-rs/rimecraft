@@ -9,53 +9,60 @@ use bitvec::{bitbox, boxed::BitBox, slice::BitSlice};
 use voxel_math::direction::Axis;
 
 trait Abstract {
-    fn props(&self) -> Props;
+    fn __props(&self) -> Props;
 
-    fn bitslice(&self) -> &BitSlice;
-    fn bitslice_mut(&mut self) -> &mut BitSlice;
+    fn __bitslice(&self) -> &BitSlice;
+    fn __bitslice_mut(&mut self) -> &mut BitSlice;
 
-    fn set_ext(&mut self, x: u32, y: u32, z: u32);
-    fn index(&self, x: u32, y: u32, z: u32) -> usize;
+    fn __set_ext(&mut self, x: u32, y: u32, z: u32);
+    fn __index(&self, x: u32, y: u32, z: u32) -> usize;
 
-    fn bounds(&self, axis: Axis) -> Range<u32>;
-}
+    fn __bounds(&self, axis: Axis) -> Range<u32>;
 
-trait AbstractExt: Abstract {
-    fn contains(&self, x: u32, y: u32, z: u32) -> bool {
-        self.bitslice()
-            .get(self.index(x, y, z))
+    fn __is_empty(&self) -> bool {
+        for axis in Axis::VALUES {
+            if self.__bounds(axis).is_empty() {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn __contains(&self, x: u32, y: u32, z: u32) -> bool {
+        self.__bitslice()
+            .get(self.__index(x, y, z))
             .as_deref()
             .copied()
             .unwrap_or_default()
     }
 
-    fn set(&mut self, x: u32, y: u32, z: u32) {
-        let index = self.index(x, y, z);
-        self.bitslice_mut().set(index, true);
-        self.set_ext(x, y, z);
+    fn __set(&mut self, x: u32, y: u32, z: u32, perform_ext: bool) {
+        let index = self.__index(x, y, z);
+        self.__bitslice_mut().set(index, true);
+        if perform_ext {
+            self.__set_ext(x, y, z);
+        }
     }
 
-    fn len_of(&self, axis: Axis) -> u32 {
+    fn __len_of(&self, axis: Axis) -> u32 {
         let Props {
             len_x,
             len_y,
             len_z,
-        } = self.props();
+        } = self.__props();
         axis.choose(len_x, len_y, len_z)
     }
 }
 
-impl<T> AbstractExt for T where T: Abstract {}
-
 /// Slice of a voxel set.
 #[repr(transparent)]
-pub struct Slice<'s>(dyn AbstractExt + Send + Sync + 's);
+pub struct Slice<'s>(dyn Abstract + Send + Sync + 's);
 
 impl Debug for Slice<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VoxelSetSlice")
-            .field("inner_slice", &self.0.bitslice())
-            .field("props", &self.0.props())
+            .field("inner_slice", &self.0.__bitslice())
+            .field("props", &self.0.__props())
             .finish()
     }
 }
@@ -64,25 +71,25 @@ impl<'s> Slice<'s> {
     /// Whether this set contains a voxel at the given position.
     #[inline]
     pub fn contains(&self, x: u32, y: u32, z: u32) -> bool {
-        self.0.contains(x, y, z)
+        self.0.__contains(x, y, z)
     }
 
     /// Sets the voxel at given position.
     #[inline]
     pub fn set(&mut self, x: u32, y: u32, z: u32) {
-        self.0.set(x, y, z);
+        self.0.__set(x, y, z, true);
     }
 
     /// Gets the length of given axis.
     #[inline]
     pub fn len_of(&self, axis: Axis) -> u32 {
-        self.0.len_of(axis)
+        self.0.__len_of(axis)
     }
 
     /// Gets the bounds of give axis.
     #[inline]
     pub fn bounds_of(&self, axis: Axis) -> Range<u32> {
-        self.0.bounds(axis)
+        self.0.__bounds(axis)
     }
 
     /// Crops this set into a cropped slice.
@@ -109,6 +116,18 @@ impl<'s> Slice<'s> {
             bounds,
             parent: self,
         }
+    }
+
+    /// Returns the _inclusive_ minimum coordinate of the set along the given axis.
+    #[inline]
+    pub fn min(&self, axis: Axis) -> u32 {
+        self.bounds_of(axis).start
+    }
+
+    /// Returns the _exclusive_ maximum coordinate of the set along the given axis.
+    #[inline]
+    pub fn max(&self, axis: Axis) -> u32 {
+        self.bounds_of(axis).end
     }
 }
 
@@ -198,22 +217,22 @@ impl VoxelSet {
 
 impl Abstract for VoxelSet {
     #[inline]
-    fn props(&self) -> Props {
+    fn __props(&self) -> Props {
         self.props
     }
 
     #[inline]
-    fn bitslice(&self) -> &BitSlice {
+    fn __bitslice(&self) -> &BitSlice {
         &self.data
     }
 
     #[inline]
-    fn bitslice_mut(&mut self) -> &mut BitSlice {
+    fn __bitslice_mut(&mut self) -> &mut BitSlice {
         &mut self.data
     }
 
     #[inline]
-    fn set_ext(&mut self, x: u32, y: u32, z: u32) {
+    fn __set_ext(&mut self, x: u32, y: u32, z: u32) {
         macro_rules! se {
             ($($a:ident),*$(,)?) => {
                 $(self.bounds.$a =
@@ -224,32 +243,18 @@ impl Abstract for VoxelSet {
     }
 
     #[inline]
-    fn index(&self, x: u32, y: u32, z: u32) -> usize {
+    fn __index(&self, x: u32, y: u32, z: u32) -> usize {
         ((x * self.props.len_y + y) * self.props.len_z + z) as usize
     }
 
     #[inline]
-    fn bounds(&self, axis: Axis) -> Range<u32> {
+    fn __bounds(&self, axis: Axis) -> Range<u32> {
         axis.choose(
             self.bounds.x.start,
             self.bounds.y.start,
             self.bounds.z.start,
         )..axis.choose(self.bounds.x.end, self.bounds.y.end, self.bounds.z.end)
     }
-
-    // #[inline]
-    // fn min(&self, axis: Axis) -> u32 {
-    //     axis.choose(
-    //         self.bounds.x.start,
-    //         self.bounds.y.start,
-    //         self.bounds.z.start,
-    //     )
-    // }
-
-    // #[inline]
-    // fn max(&self, axis: Axis) -> u32 {
-    //     axis.choose(self.bounds.x.end, self.bounds.y.end, self.bounds.z.end)
-    // }
 }
 
 impl Deref for VoxelSet {
@@ -286,28 +291,28 @@ impl<'a> Cropped<'a, '_> {
 
 impl Abstract for Cropped<'_, '_> {
     #[inline]
-    fn props(&self) -> Props {
+    fn __props(&self) -> Props {
         self.props
     }
 
     #[inline]
-    fn bitslice(&self) -> &BitSlice {
-        self.parent.0.bitslice()
+    fn __bitslice(&self) -> &BitSlice {
+        self.parent.0.__bitslice()
     }
 
     #[inline]
-    fn bitslice_mut(&mut self) -> &mut BitSlice {
+    fn __bitslice_mut(&mut self) -> &mut BitSlice {
         unreachable!("cropped is only for immutable usage")
     }
 
     #[inline]
-    fn set_ext(&mut self, _x: u32, _y: u32, _z: u32) {
+    fn __set_ext(&mut self, _x: u32, _y: u32, _z: u32) {
         unreachable!("cropped is only for immutable usage")
     }
 
     #[inline]
-    fn index(&self, x: u32, y: u32, z: u32) -> usize {
-        self.parent.0.index(
+    fn __index(&self, x: u32, y: u32, z: u32) -> usize {
+        self.parent.0.__index(
             self.bounds.x.start + x,
             self.bounds.y.start + y,
             self.bounds.z.start + z,
@@ -315,14 +320,14 @@ impl Abstract for Cropped<'_, '_> {
     }
 
     #[inline]
-    fn bounds(&self, axis: Axis) -> Range<u32> {
+    fn __bounds(&self, axis: Axis) -> Range<u32> {
         let i = axis.choose(
             self.bounds.x.start,
             self.bounds.y.start,
             self.bounds.z.start,
         );
         let j = axis.choose(self.bounds.x.end, self.bounds.y.end, self.bounds.z.end);
-        let bounds = self.parent.0.bounds(axis);
+        let bounds = self.parent.0.__bounds(axis);
         bounds.start.clamp(i, j) - i..bounds.end.clamp(i, j) - i
     }
 }
@@ -345,23 +350,23 @@ impl<'a> CroppedMut<'a, '_> {
 
 impl Abstract for CroppedMut<'_, '_> {
     #[inline]
-    fn props(&self) -> Props {
+    fn __props(&self) -> Props {
         self.props
     }
 
     #[inline]
-    fn bitslice(&self) -> &BitSlice {
-        self.parent.0.bitslice()
+    fn __bitslice(&self) -> &BitSlice {
+        self.parent.0.__bitslice()
     }
 
     #[inline]
-    fn bitslice_mut(&mut self) -> &mut BitSlice {
-        self.parent.0.bitslice_mut()
+    fn __bitslice_mut(&mut self) -> &mut BitSlice {
+        self.parent.0.__bitslice_mut()
     }
 
     #[inline]
-    fn set_ext(&mut self, x: u32, y: u32, z: u32) {
-        self.parent.0.set_ext(
+    fn __set_ext(&mut self, x: u32, y: u32, z: u32) {
+        self.parent.0.__set_ext(
             self.bounds.x.start + x,
             self.bounds.y.start + y,
             self.bounds.z.start + z,
@@ -369,8 +374,8 @@ impl Abstract for CroppedMut<'_, '_> {
     }
 
     #[inline]
-    fn index(&self, x: u32, y: u32, z: u32) -> usize {
-        self.parent.0.index(
+    fn __index(&self, x: u32, y: u32, z: u32) -> usize {
+        self.parent.0.__index(
             self.bounds.x.start + x,
             self.bounds.y.start + y,
             self.bounds.z.start + z,
@@ -378,14 +383,14 @@ impl Abstract for CroppedMut<'_, '_> {
     }
 
     #[inline]
-    fn bounds(&self, axis: Axis) -> Range<u32> {
+    fn __bounds(&self, axis: Axis) -> Range<u32> {
         let i = axis.choose(
             self.bounds.x.start,
             self.bounds.y.start,
             self.bounds.z.start,
         );
         let j = axis.choose(self.bounds.x.end, self.bounds.y.end, self.bounds.z.end);
-        let bounds = self.parent.0.bounds(axis);
+        let bounds = self.parent.0.__bounds(axis);
         bounds.start.clamp(i, j) - i..bounds.end.clamp(i, j) - i
     }
 }
