@@ -2,11 +2,11 @@
 
 use std::{
     fmt::Debug,
-    ops::{Deref, DerefMut, RangeInclusive},
+    ops::{Deref, DerefMut, Range},
 };
 
 use bitvec::{bitbox, boxed::BitBox, slice::BitSlice};
-use rimecraft_voxel_math::direction::Axis;
+use voxel_math::direction::Axis;
 
 trait Abstract {
     fn props(&self) -> Props;
@@ -17,7 +17,7 @@ trait Abstract {
     fn set_ext(&mut self, x: u32, y: u32, z: u32);
     fn index(&self, x: u32, y: u32, z: u32) -> usize;
 
-    fn bounds(&self, axis: Axis) -> RangeInclusive<u32>;
+    fn bounds(&self, axis: Axis) -> Range<u32>;
 }
 
 trait AbstractExt: Abstract {
@@ -49,9 +49,9 @@ impl<T> AbstractExt for T where T: Abstract {}
 
 /// Slice of a voxel set.
 #[repr(transparent)]
-pub struct VoxelSetSlice<'s>(dyn AbstractExt + Send + Sync + 's);
+pub struct Slice<'s>(dyn AbstractExt + Send + Sync + 's);
 
-impl Debug for VoxelSetSlice<'_> {
+impl Debug for Slice<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VoxelSetSlice")
             .field("inner_slice", &self.0.bitslice())
@@ -60,7 +60,7 @@ impl Debug for VoxelSetSlice<'_> {
     }
 }
 
-impl<'s> VoxelSetSlice<'s> {
+impl<'s> Slice<'s> {
     /// Whether this set contains a voxel at the given position.
     #[inline]
     pub fn contains(&self, x: u32, y: u32, z: u32) -> bool {
@@ -74,13 +74,14 @@ impl<'s> VoxelSetSlice<'s> {
     }
 
     /// Gets the length of given axis.
+    #[inline]
     pub fn len_of(&self, axis: Axis) -> u32 {
         self.0.len_of(axis)
     }
 
     /// Gets the bounds of give axis.
     #[inline]
-    pub fn bounds_of(&self, axis: Axis) -> RangeInclusive<u32> {
+    pub fn bounds_of(&self, axis: Axis) -> Range<u32> {
         self.0.bounds(axis)
     }
 
@@ -88,9 +89,9 @@ impl<'s> VoxelSetSlice<'s> {
     pub fn crop<'a>(&'a self, bounds: Bounds) -> Cropped<'a, 's> {
         Cropped {
             props: Props {
-                len_x: *bounds.x.end() - *bounds.x.start(),
-                len_y: *bounds.y.end() - *bounds.y.start(),
-                len_z: *bounds.z.end() - *bounds.z.start(),
+                len_x: bounds.x.end - bounds.x.start,
+                len_y: bounds.y.end - bounds.y.start,
+                len_z: bounds.z.end - bounds.z.start,
             },
             bounds,
             parent: self,
@@ -101,9 +102,9 @@ impl<'s> VoxelSetSlice<'s> {
     pub fn crop_mut<'a>(&'a mut self, bounds: Bounds) -> CroppedMut<'a, 's> {
         CroppedMut {
             props: Props {
-                len_x: *bounds.x.end() - *bounds.x.start(),
-                len_y: *bounds.y.end() - *bounds.y.start(),
-                len_z: *bounds.z.end() - *bounds.z.start(),
+                len_x: bounds.x.end - bounds.x.start,
+                len_y: bounds.y.end - bounds.y.start,
+                len_z: bounds.z.end - bounds.z.start,
             },
             bounds,
             parent: self,
@@ -112,7 +113,7 @@ impl<'s> VoxelSetSlice<'s> {
 }
 
 #[allow(unsafe_code)] // SAFETY: safe because the type is marked as `repr(transparent)`
-impl<'a> VoxelSetSlice<'a> {
+impl<'a> Slice<'a> {
     #[inline]
     fn from_ref<'s>(this: &'s (dyn Abstract + Send + Sync + 'a)) -> &'s Self {
         unsafe { std::mem::transmute(this) }
@@ -145,11 +146,11 @@ pub struct Props {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Bounds {
     /// The range of X values that are set.
-    pub x: RangeInclusive<u32>,
+    pub x: Range<u32>,
     /// The range of Y values that are set.
-    pub y: RangeInclusive<u32>,
+    pub y: Range<u32>,
     /// The range of Z values that are set.
-    pub z: RangeInclusive<u32>,
+    pub z: Range<u32>,
 }
 
 /// A voxel set implemented using a bit set.
@@ -173,9 +174,9 @@ impl VoxelSet {
         Self {
             props,
             bounds: Bounds {
-                x: len_x..=0,
-                y: len_y..=0,
-                z: len_z..=0,
+                x: 0..len_x,
+                y: 0..len_y,
+                z: 0..len_z,
             },
             data: bitbox![0; len],
         }
@@ -190,8 +191,8 @@ impl VoxelSet {
 
     /// Converts this set into a boxed slice.
     #[inline]
-    pub fn into_boxed_slice(self) -> Box<VoxelSetSlice<'static>> {
-        VoxelSetSlice::from_boxed(Box::new(self))
+    pub fn into_boxed_slice(self) -> Box<Slice<'static>> {
+        Slice::from_boxed(Box::new(self))
     }
 }
 
@@ -216,7 +217,7 @@ impl Abstract for VoxelSet {
         macro_rules! se {
             ($($a:ident),*$(,)?) => {
                 $(self.bounds.$a =
-                    *self.bounds.$a.start().min(&$a)..=*self.bounds.$a.end().max(&($a + 1));)*
+                    self.bounds.$a.start.min($a)..self.bounds.$a.end.max($a + 1);)*
             };
         }
         se![x, y, z];
@@ -228,33 +229,42 @@ impl Abstract for VoxelSet {
     }
 
     #[inline]
-    fn bounds(&self, axis: Axis) -> RangeInclusive<u32> {
+    fn bounds(&self, axis: Axis) -> Range<u32> {
         axis.choose(
-            *self.bounds.x.start(),
-            *self.bounds.y.start(),
-            *self.bounds.z.start(),
-        )
-            ..=axis.choose(
-                *self.bounds.x.end(),
-                *self.bounds.y.end(),
-                *self.bounds.z.end(),
-            )
+            self.bounds.x.start,
+            self.bounds.y.start,
+            self.bounds.z.start,
+        )..axis.choose(self.bounds.x.end, self.bounds.y.end, self.bounds.z.end)
     }
+
+    // #[inline]
+    // fn min(&self, axis: Axis) -> u32 {
+    //     axis.choose(
+    //         self.bounds.x.start,
+    //         self.bounds.y.start,
+    //         self.bounds.z.start,
+    //     )
+    // }
+
+    // #[inline]
+    // fn max(&self, axis: Axis) -> u32 {
+    //     axis.choose(self.bounds.x.end, self.bounds.y.end, self.bounds.z.end)
+    // }
 }
 
 impl Deref for VoxelSet {
-    type Target = VoxelSetSlice<'static>;
+    type Target = Slice<'static>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        VoxelSetSlice::from_ref(self)
+        Slice::from_ref(self)
     }
 }
 
 impl DerefMut for VoxelSet {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        VoxelSetSlice::from_mut(self)
+        Slice::from_mut(self)
     }
 }
 
@@ -263,14 +273,14 @@ impl DerefMut for VoxelSet {
 pub struct Cropped<'a, 's> {
     props: Props,
     bounds: Bounds,
-    parent: &'a VoxelSetSlice<'s>,
+    parent: &'a Slice<'s>,
 }
 
 impl<'a> Cropped<'a, '_> {
     /// Converts this set into a boxed slice.
     #[inline]
-    pub fn into_boxed_slice(self) -> Box<VoxelSetSlice<'a>> {
-        VoxelSetSlice::from_boxed(Box::new(self))
+    pub fn into_boxed_slice(self) -> Box<Slice<'a>> {
+        Slice::from_boxed(Box::new(self))
     }
 }
 
@@ -298,26 +308,22 @@ impl Abstract for Cropped<'_, '_> {
     #[inline]
     fn index(&self, x: u32, y: u32, z: u32) -> usize {
         self.parent.0.index(
-            *self.bounds.x.start() + x,
-            *self.bounds.y.start() + y,
-            *self.bounds.z.start() + z,
+            self.bounds.x.start + x,
+            self.bounds.y.start + y,
+            self.bounds.z.start + z,
         )
     }
 
     #[inline]
-    fn bounds(&self, axis: Axis) -> RangeInclusive<u32> {
+    fn bounds(&self, axis: Axis) -> Range<u32> {
         let i = axis.choose(
-            *self.bounds.x.start(),
-            *self.bounds.y.start(),
-            *self.bounds.z.start(),
+            self.bounds.x.start,
+            self.bounds.y.start,
+            self.bounds.z.start,
         );
-        let j = axis.choose(
-            *self.bounds.x.end(),
-            *self.bounds.y.end(),
-            *self.bounds.z.end(),
-        );
+        let j = axis.choose(self.bounds.x.end, self.bounds.y.end, self.bounds.z.end);
         let bounds = self.parent.0.bounds(axis);
-        (*bounds.start()).clamp(i, j) - i..=(*bounds.end()).clamp(i, j) - i
+        bounds.start.clamp(i, j) - i..bounds.end.clamp(i, j) - i
     }
 }
 
@@ -326,14 +332,14 @@ impl Abstract for Cropped<'_, '_> {
 pub struct CroppedMut<'a, 's> {
     props: Props,
     bounds: Bounds,
-    parent: &'a mut VoxelSetSlice<'s>,
+    parent: &'a mut Slice<'s>,
 }
 
 impl<'a> CroppedMut<'a, '_> {
     /// Converts this set into a boxed slice.
     #[inline]
-    pub fn into_boxed_slice(self) -> Box<VoxelSetSlice<'a>> {
-        VoxelSetSlice::from_boxed(Box::new(self))
+    pub fn into_boxed_slice(self) -> Box<Slice<'a>> {
+        Slice::from_boxed(Box::new(self))
     }
 }
 
@@ -356,60 +362,56 @@ impl Abstract for CroppedMut<'_, '_> {
     #[inline]
     fn set_ext(&mut self, x: u32, y: u32, z: u32) {
         self.parent.0.set_ext(
-            *self.bounds.x.start() + x,
-            *self.bounds.y.start() + y,
-            *self.bounds.z.start() + z,
+            self.bounds.x.start + x,
+            self.bounds.y.start + y,
+            self.bounds.z.start + z,
         )
     }
 
     #[inline]
     fn index(&self, x: u32, y: u32, z: u32) -> usize {
         self.parent.0.index(
-            *self.bounds.x.start() + x,
-            *self.bounds.y.start() + y,
-            *self.bounds.z.start() + z,
+            self.bounds.x.start + x,
+            self.bounds.y.start + y,
+            self.bounds.z.start + z,
         )
     }
 
     #[inline]
-    fn bounds(&self, axis: Axis) -> RangeInclusive<u32> {
+    fn bounds(&self, axis: Axis) -> Range<u32> {
         let i = axis.choose(
-            *self.bounds.x.start(),
-            *self.bounds.y.start(),
-            *self.bounds.z.start(),
+            self.bounds.x.start,
+            self.bounds.y.start,
+            self.bounds.z.start,
         );
-        let j = axis.choose(
-            *self.bounds.x.end(),
-            *self.bounds.y.end(),
-            *self.bounds.z.end(),
-        );
+        let j = axis.choose(self.bounds.x.end, self.bounds.y.end, self.bounds.z.end);
         let bounds = self.parent.0.bounds(axis);
-        (*bounds.start()).clamp(i, j) - i..=(*bounds.end()).clamp(i, j) - i
+        bounds.start.clamp(i, j) - i..bounds.end.clamp(i, j) - i
     }
 }
 
 impl<'a> Deref for Cropped<'a, '_> {
-    type Target = VoxelSetSlice<'a>;
+    type Target = Slice<'a>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        VoxelSetSlice::from_ref(self)
+        Slice::from_ref(self)
     }
 }
 
 impl<'a> Deref for CroppedMut<'a, '_> {
-    type Target = VoxelSetSlice<'a>;
+    type Target = Slice<'a>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        VoxelSetSlice::from_ref(self)
+        Slice::from_ref(self)
     }
 }
 
 impl DerefMut for CroppedMut<'_, '_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        VoxelSetSlice::from_mut(self)
+        Slice::from_mut(self)
     }
 }
 
@@ -440,9 +442,9 @@ mod tests {
         set.set(8, 8, 8);
 
         let mut cropped = set.crop_mut(Bounds {
-            x: 4..=12,
-            y: 4..=12,
-            z: 4..=12,
+            x: 4..12,
+            y: 4..12,
+            z: 4..12,
         });
         assert!(cropped.contains(4, 4, 4));
         cropped.set(1, 3, 5);

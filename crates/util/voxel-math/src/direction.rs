@@ -204,6 +204,9 @@ pub enum Axis {
 }
 
 impl Axis {
+    /// All available values of [`Axis`].
+    pub const VALUES: [Self; 3] = [Self::X, Self::Y, Self::Z];
+
     /// Chooses a value from a position based on the axis.
     #[inline]
     pub fn choose<T>(self, x: T, y: T, z: T) -> T {
