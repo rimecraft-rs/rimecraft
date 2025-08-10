@@ -129,6 +129,12 @@ impl<'s> Slice<'s> {
     pub fn max(&self, axis: Axis) -> u32 {
         self.bounds_of(axis).end
     }
+
+    /// Returns whether the underlying slice is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.0.__is_empty()
+    }
 }
 
 #[allow(unsafe_code)] // SAFETY: safe because the type is marked as `repr(transparent)`
@@ -254,6 +260,11 @@ impl Abstract for VoxelSet {
             self.bounds.y.start,
             self.bounds.z.start,
         )..axis.choose(self.bounds.x.end, self.bounds.y.end, self.bounds.z.end)
+    }
+
+    #[inline]
+    fn __is_empty(&self) -> bool {
+        self.data.not_any()
     }
 }
 

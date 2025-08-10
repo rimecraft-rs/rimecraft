@@ -183,6 +183,11 @@ directions! {
     },
 }
 
+impl Direction {
+    /// The number of directions.
+    pub const COUNT: usize = 6;
+}
+
 impl From<(AxisDirection, Axis)> for Direction {
     #[inline]
     fn from((ad, a): (AxisDirection, Axis)) -> Self {
@@ -208,7 +213,7 @@ impl Axis {
     pub const VALUES: [Self; 3] = [Self::X, Self::Y, Self::Z];
 
     /// Chooses a value from a position based on the axis.
-    #[inline]
+    #[inline(always)]
     pub fn choose<T>(self, x: T, y: T, z: T) -> T {
         match self {
             Axis::X => x,

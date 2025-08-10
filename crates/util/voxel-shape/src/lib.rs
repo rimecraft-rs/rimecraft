@@ -5,38 +5,169 @@ pub mod set;
 use std::{
     fmt::Debug,
     ops::{Deref, DerefMut},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
-use voxel_math::direction::Axis;
+use parking_lot::Mutex;
+use voxel_math::direction::{Axis, Direction};
 
 pub use set::VoxelSet;
 
-trait Abstract {
+trait List<T> {
+    fn index(&self, index: usize) -> T;
+    fn iter(&self) -> impl IntoIterator<Item = T>;
+}
+
+trait ErasedList<T>: Send + Sync + Debug {
+    fn __erased_index(&self, index: usize) -> T;
+
+    fn __peek_erased_iter(&self, f: &mut (dyn FnMut(&mut (dyn Iterator<Item = T> + '_)) + '_));
+
+    fn __boxed_erased_iter<'a>(&'a self) -> Box<dyn Iterator<Item = T> + 'a>
+    where
+        T: 'a;
+}
+
+impl<L, T> List<T> for &L
+where
+    L: List<T> + ?Sized,
+{
+    #[inline]
+    fn index(&self, index: usize) -> T {
+        (**self).index(index)
+    }
+
+    #[inline]
+    fn iter(&self) -> impl IntoIterator<Item = T> {
+        (**self).iter()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FractionalDoubleList {
+    section_count: u32,
+}
+
+impl List<f64> for FractionalDoubleList {
+    #[inline]
+    fn index(&self, index: usize) -> f64 {
+        index as f64 / self.section_count as f64
+    }
+
+    fn iter(&self) -> impl IntoIterator<Item = f64> {
+        (0..=self.section_count).map(|i| i as f64 / self.section_count as f64)
+    }
+}
+
+impl<T> List<T> for dyn ErasedList<T> + '_ {
+    #[inline]
+    fn index(&self, index: usize) -> T {
+        self.__erased_index(index)
+    }
+
+    #[inline]
+    fn iter(&self) -> impl IntoIterator<Item = T> {
+        self.__boxed_erased_iter()
+    }
+}
+
+impl<L, T> ErasedList<T> for L
+where
+    L: List<T> + Send + Sync + Debug + ?Sized,
+{
+    #[inline]
+    fn __erased_index(&self, index: usize) -> T {
+        self.index(index)
+    }
+
+    #[inline]
+    fn __peek_erased_iter(&self, f: &mut (dyn FnMut(&mut (dyn Iterator<Item = T> + '_)) + '_)) {
+        f(&mut self.iter().into_iter())
+    }
+
+    #[inline]
+    fn __boxed_erased_iter<'a>(&'a self) -> Box<dyn Iterator<Item = T> + 'a>
+    where
+        T: 'a,
+    {
+        Box::new(self.iter().into_iter())
+    }
+}
+
+trait ProvidePointPosList {
+    fn point_pos_list(&self, axis: Axis) -> impl List<f64> + Send + Sync + Debug + '_;
+    fn point_pos_list_arc(&self, axis: Axis) -> Arc<dyn ErasedList<f64> + '_> {
+        Arc::new(self.point_pos_list(axis))
+    }
+}
+
+trait ErasedProvidePointPosList: Send + Sync + Debug {
+    fn __point_pos(&self, axis: Axis, index: u32) -> f64;
+
+    fn __iter_point_pos(
+        &self,
+        axis: Axis,
+        f: &mut (dyn FnMut(&mut (dyn Iterator<Item = f64> + '_)) + '_),
+    );
+
+    fn __point_pos_list_arc(&self, axis: Axis) -> Arc<dyn ErasedList<f64> + '_>;
+
+    fn __point_pos_list_boxed(&self, axis: Axis) -> Box<dyn ErasedList<f64> + '_>;
+}
+
+impl<P> ErasedProvidePointPosList for P
+where
+    P: ProvidePointPosList + Send + Sync + Debug,
+{
+    #[inline]
+    fn __point_pos(&self, axis: Axis, index: u32) -> f64 {
+        self.point_pos_list(axis).index(index as usize)
+    }
+
+    #[inline]
+    fn __iter_point_pos(
+        &self,
+        axis: Axis,
+        f: &mut (dyn FnMut(&mut (dyn Iterator<Item = f64> + '_)) + '_),
+    ) {
+        f(&mut self.point_pos_list(axis).iter().into_iter())
+    }
+
+    #[inline]
+    fn __point_pos_list_arc(&self, axis: Axis) -> Arc<dyn ErasedList<f64> + '_> {
+        self.point_pos_list_arc(axis)
+    }
+
+    #[inline]
+    fn __point_pos_list_boxed(&self, axis: Axis) -> Box<dyn ErasedList<f64> + '_> {
+        Box::new(self.point_pos_list(axis))
+    }
+}
+
+trait Abstract: ErasedProvidePointPosList {
     fn __as_raw(&self) -> &RawVoxelShape;
     fn __as_raw_mut(&mut self) -> &mut RawVoxelShape;
-
-    fn __index_point_pos(&self, axis: Axis, index: u32) -> Option<f64>;
-    fn __point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a>;
 
     fn __min(&self, axis: Axis) -> f64 {
         let voxels = &self.__as_raw().voxels;
         let i = voxels.bounds_of(axis).start;
 
-        (i >= voxels.len_of(axis))
-            .then(|| self.__index_point_pos(axis, i))
-            .flatten()
-            .unwrap_or(f64::INFINITY)
+        if i >= voxels.len_of(axis) {
+            self.__point_pos(axis, i)
+        } else {
+            f64::INFINITY
+        }
     }
 
     fn __max(&self, axis: Axis) -> f64 {
         let voxels = &self.__as_raw().voxels;
         let i = voxels.bounds_of(axis).end;
 
-        (i >= voxels.len_of(axis))
-            .then(|| self.__index_point_pos(axis, i))
-            .flatten()
-            .unwrap_or(f64::NEG_INFINITY)
+        if i >= voxels.len_of(axis) {
+            self.__point_pos(axis, i)
+        } else {
+            f64::NEG_INFINITY
+        }
     }
 }
 
@@ -84,10 +215,21 @@ impl<'a> Slice<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct RawVoxelShape {
     voxels: VoxelSet,
-    shape_cache: Vec<Arc<Slice<'static>>>, //TODO: done these
+    //WIP
+    face_cache: OnceLock<Mutex<[Arc<()>; Direction::COUNT]>>,
+}
+
+impl Clone for RawVoxelShape {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            voxels: self.voxels.clone(),
+            face_cache: OnceLock::new(),
+        }
+    }
 }
 
 /// A simple voxel shape.
@@ -112,23 +254,13 @@ impl Abstract for Simple {
     fn __as_raw_mut(&mut self) -> &mut RawVoxelShape {
         &mut self.0
     }
+}
 
-    fn __index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
-        let len = self.0.voxels.len_of(axis);
-        if len == 0 {
-            None
-        } else {
-            Some((index as f64) / len as f64)
-        }
-    }
-
-    fn __point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
-        let len = self.0.voxels.len_of(axis);
-        if len == 0 {
-            Box::new(std::iter::empty())
-        } else {
-            let len2 = len as f64;
-            Box::new((0u32..=len).map(move |index| index as f64 / len2))
+impl ProvidePointPosList for Simple {
+    #[inline]
+    fn point_pos_list(&self, axis: Axis) -> impl List<f64> + Send + Sync + Debug + '_ {
+        FractionalDoubleList {
+            section_count: self.0.voxels.len_of(axis),
         }
     }
 }
@@ -151,23 +283,47 @@ impl DerefMut for Simple {
 
 /// A voxel shape that is a backed by point arrays.
 #[derive(Debug, Clone)]
-pub struct Array {
+pub struct Array<'a> {
     raw: RawVoxelShape,
 
-    xp: Box<[f64]>,
-    yp: Box<[f64]>,
-    zp: Box<[f64]>,
+    xp: Arc<dyn ErasedList<f64> + 'a>,
+    yp: Arc<dyn ErasedList<f64> + 'a>,
+    zp: Arc<dyn ErasedList<f64> + 'a>,
 }
 
-impl Array {
+impl<'a> Array<'a> {
     /// Converts the shape into a boxed slice.
     #[inline]
-    pub fn into_boxed_slice(self) -> Box<Slice<'static>> {
+    pub fn into_boxed_slice(self) -> Box<Slice<'a>> {
         Slice::from_boxed(Box::new(self))
     }
 }
 
-impl Abstract for Array {
+impl ErasedProvidePointPosList for Array<'_> {
+    fn __point_pos(&self, axis: Axis, index: u32) -> f64 {
+        axis.choose(&*self.xp, &*self.yp, &*self.zp)
+            .__erased_index(index as usize)
+    }
+
+    fn __iter_point_pos(
+        &self,
+        axis: Axis,
+        f: &mut (dyn FnMut(&mut (dyn Iterator<Item = f64> + '_)) + '_),
+    ) {
+        axis.choose(&*self.xp, &*self.yp, &*self.zp)
+            .__peek_erased_iter(f);
+    }
+
+    fn __point_pos_list_arc(&self, axis: Axis) -> Arc<dyn ErasedList<f64> + '_> {
+        axis.choose(&self.xp, &self.yp, &self.zp).clone()
+    }
+
+    fn __point_pos_list_boxed(&self, axis: Axis) -> Box<dyn ErasedList<f64> + '_> {
+        Box::new(axis.choose(&*self.xp, &*self.yp, &*self.zp))
+    }
+}
+
+impl Abstract for Array<'_> {
     #[inline]
     fn __as_raw(&self) -> &RawVoxelShape {
         &self.raw
@@ -177,28 +333,10 @@ impl Abstract for Array {
     fn __as_raw_mut(&mut self) -> &mut RawVoxelShape {
         &mut self.raw
     }
-
-    fn __index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
-        let arr = match axis {
-            Axis::X => &self.xp,
-            Axis::Y => &self.yp,
-            Axis::Z => &self.zp,
-        };
-        arr.get(index as usize).copied()
-    }
-
-    fn __point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
-        let arr = match axis {
-            Axis::X => &self.xp,
-            Axis::Y => &self.yp,
-            Axis::Z => &self.zp,
-        };
-        Box::new(arr.iter().copied())
-    }
 }
 
-impl Deref for Array {
-    type Target = Slice<'static>;
+impl<'a> Deref for Array<'a> {
+    type Target = Slice<'a>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -206,7 +344,7 @@ impl Deref for Array {
     }
 }
 
-impl DerefMut for Array {
+impl DerefMut for Array<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         Slice::from_mut(self)
@@ -217,11 +355,11 @@ impl DerefMut for Array {
 #[derive(Debug, Clone)]
 pub struct Sliced<'a, 's> {
     parent: &'a Slice<'s>,
-    shape: RawVoxelShape,
+    sliced_shape: RawVoxelShape,
     axis: Axis,
 }
 
-impl<'a> Sliced<'a, 'a> {
+impl<'a> Sliced<'a, '_> {
     /// Converts the shape into a boxed slice.
     #[inline]
     pub fn into_boxed_slice(self) -> Box<Slice<'a>> {
@@ -229,30 +367,54 @@ impl<'a> Sliced<'a, 'a> {
     }
 }
 
+const SINGULAR_FRACTIONAL: FractionalDoubleList = FractionalDoubleList { section_count: 1 };
+
+impl ErasedProvidePointPosList for Sliced<'_, '_> {
+    fn __point_pos(&self, axis: Axis, index: u32) -> f64 {
+        if self.axis == axis {
+            SINGULAR_FRACTIONAL.index(index as usize)
+        } else {
+            self.parent.0.__point_pos(axis, index)
+        }
+    }
+
+    fn __iter_point_pos(
+        &self,
+        axis: Axis,
+        f: &mut (dyn FnMut(&mut (dyn Iterator<Item = f64> + '_)) + '_),
+    ) {
+        if self.axis == axis {
+            f(&mut SINGULAR_FRACTIONAL.iter().into_iter())
+        } else {
+            self.parent.0.__iter_point_pos(axis, f)
+        }
+    }
+
+    fn __point_pos_list_arc(&self, axis: Axis) -> Arc<dyn ErasedList<f64> + '_> {
+        if self.axis == axis {
+            Arc::new(SINGULAR_FRACTIONAL)
+        } else {
+            self.parent.0.__point_pos_list_arc(axis)
+        }
+    }
+
+    fn __point_pos_list_boxed(&self, axis: Axis) -> Box<dyn ErasedList<f64> + '_> {
+        if self.axis == axis {
+            Box::new(SINGULAR_FRACTIONAL)
+        } else {
+            self.parent.0.__point_pos_list_boxed(axis)
+        }
+    }
+}
+
 impl Abstract for Sliced<'_, '_> {
     #[inline]
     fn __as_raw(&self) -> &RawVoxelShape {
-        &self.shape
+        &self.sliced_shape
     }
 
     fn __as_raw_mut(&mut self) -> &mut RawVoxelShape {
         unreachable!("Sliced shape is immutable")
-    }
-
-    fn __index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
-        if axis == self.axis {
-            Some(index as f64)
-        } else {
-            self.parent.0.__index_point_pos(axis, index)
-        }
-    }
-
-    fn __point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
-        if axis == self.axis {
-            Box::new((0u32..=1).map(|i| i as f64))
-        } else {
-            self.parent.0.__point_poss(axis)
-        }
     }
 }
 
@@ -260,7 +422,7 @@ impl Abstract for Sliced<'_, '_> {
 #[derive(Debug)]
 pub struct SlicedMut<'a, 's> {
     parent: &'a mut Slice<'s>,
-    shape: RawVoxelShape,
+    sliced_shape: RawVoxelShape,
     axis: Axis,
 }
 
@@ -272,31 +434,53 @@ impl<'a> SlicedMut<'a, 'a> {
     }
 }
 
+impl ErasedProvidePointPosList for SlicedMut<'_, '_> {
+    fn __point_pos(&self, axis: Axis, index: u32) -> f64 {
+        if self.axis == axis {
+            SINGULAR_FRACTIONAL.index(index as usize)
+        } else {
+            self.parent.0.__point_pos(axis, index)
+        }
+    }
+
+    fn __iter_point_pos(
+        &self,
+        axis: Axis,
+        f: &mut (dyn FnMut(&mut (dyn Iterator<Item = f64> + '_)) + '_),
+    ) {
+        if self.axis == axis {
+            f(&mut SINGULAR_FRACTIONAL.iter().into_iter())
+        } else {
+            self.parent.0.__iter_point_pos(axis, f)
+        }
+    }
+
+    fn __point_pos_list_arc(&self, axis: Axis) -> Arc<dyn ErasedList<f64> + '_> {
+        if self.axis == axis {
+            Arc::new(SINGULAR_FRACTIONAL)
+        } else {
+            self.parent.0.__point_pos_list_arc(axis)
+        }
+    }
+
+    fn __point_pos_list_boxed(&self, axis: Axis) -> Box<dyn ErasedList<f64> + '_> {
+        if self.axis == axis {
+            Box::new(SINGULAR_FRACTIONAL)
+        } else {
+            self.parent.0.__point_pos_list_boxed(axis)
+        }
+    }
+}
+
 impl Abstract for SlicedMut<'_, '_> {
     #[inline]
     fn __as_raw(&self) -> &RawVoxelShape {
-        &self.shape
+        &self.sliced_shape
     }
 
     #[inline]
     fn __as_raw_mut(&mut self) -> &mut RawVoxelShape {
-        &mut self.shape
-    }
-
-    fn __index_point_pos(&self, axis: Axis, index: u32) -> Option<f64> {
-        if axis == self.axis {
-            Some(index as f64)
-        } else {
-            self.parent.0.__index_point_pos(axis, index)
-        }
-    }
-
-    fn __point_poss<'a>(&'a self, axis: Axis) -> Box<dyn Iterator<Item = f64> + 'a> {
-        if axis == self.axis {
-            Box::new((0u32..=1).map(|i| i as f64))
-        } else {
-            self.parent.0.__point_poss(axis)
-        }
+        &mut self.sliced_shape
     }
 }
 
