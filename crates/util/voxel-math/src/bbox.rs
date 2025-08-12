@@ -15,11 +15,19 @@ pub struct BBox {
 
 impl BBox {
     /// Creates a new bounding box from two corners.
+    #[inline]
     pub fn new(p1: DVec3, p2: DVec3) -> Self {
         Self {
             min: p1.min(p2),
             max: p1.max(p2),
         }
+    }
+
+    /// Creates a new bounding box from raw values:
+    /// min `x,y,z`` and max `x,y,z`.
+    #[inline]
+    pub fn from_raw(min: DVec3, max: DVec3) -> Self {
+        Self { min, max }
     }
 
     /// Gets the minimum corner of the box.

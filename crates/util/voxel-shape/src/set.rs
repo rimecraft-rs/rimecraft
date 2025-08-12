@@ -3,9 +3,11 @@
 use std::{
     fmt::Debug,
     ops::{Deref, DerefMut, Range},
+    sync::Arc,
 };
 
 use bitvec::{bitbox, boxed::BitBox, slice::BitSlice};
+use maybe::Maybe;
 use voxel_math::direction::Axis;
 
 trait Abstract {
@@ -93,6 +95,8 @@ impl<'s> Slice<'s> {
     }
 
     /// Crops this set into a cropped slice.
+    ///
+    /// See [`Self::crop_arc`] for cropping by reference counting.
     pub fn crop<'a>(&'a self, bounds: Bounds) -> Cropped<'a, 's> {
         Cropped {
             props: Props {
@@ -101,7 +105,22 @@ impl<'s> Slice<'s> {
                 len_z: bounds.z.end - bounds.z.start,
             },
             bounds,
-            parent: self,
+            parent: Maybe::Borrowed(self),
+        }
+    }
+
+    /// Crops this set into a cropped slice with reference counted.
+    ///
+    /// See [`Self::crop`] for cropping by lifetimed reference.
+    pub fn crop_arc(self: &Arc<Self>, bounds: Bounds) -> Cropped<'static, 's> {
+        Cropped {
+            props: Props {
+                len_x: bounds.x.end - bounds.x.start,
+                len_y: bounds.y.end - bounds.y.start,
+                len_z: bounds.z.end - bounds.z.start,
+            },
+            bounds,
+            parent: Maybe::Owned(self.clone()),
         }
     }
 
@@ -165,6 +184,17 @@ pub struct Props {
     pub len_y: u32,
     /// Length of the set in the Z direction.
     pub len_z: u32,
+}
+
+impl From<(u32, u32, u32)> for Props {
+    #[inline]
+    fn from((len_x, len_y, len_z): (u32, u32, u32)) -> Self {
+        Self {
+            len_x,
+            len_y,
+            len_z,
+        }
+    }
 }
 
 /// Bounds of a voxel set.
@@ -289,7 +319,7 @@ impl DerefMut for VoxelSet {
 pub struct Cropped<'a, 's> {
     props: Props,
     bounds: Bounds,
-    parent: &'a Slice<'s>,
+    parent: Maybe<'a, Slice<'s>, Arc<Slice<'s>>>,
 }
 
 impl<'a> Cropped<'a, '_> {
