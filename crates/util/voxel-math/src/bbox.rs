@@ -68,7 +68,7 @@ impl From<(DVec3, DVec3)> for BBox {
 impl From<BlockPos> for BBox {
     #[inline]
     fn from(value: BlockPos) -> Self {
-        Self::new(value.0.into(), (value.0 + IVec3::ONE).into())
+        Self::from_raw(value.0.into(), (value.0 + IVec3::ONE).into())
     }
 }
 
@@ -83,6 +83,6 @@ impl From<(BlockPos, BlockPos)> for BBox {
     fn from((p1, p2): (BlockPos, BlockPos)) -> Self {
         let v1 = p1.0.min(p2.0);
         let v2 = p1.0.max(p2.0) + IVec3::ONE;
-        Self::new(v1.into(), v2.into())
+        Self::from_raw(v1.into(), v2.into())
     }
 }

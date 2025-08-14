@@ -7,6 +7,7 @@ use std::{
 };
 
 use bitvec::{bitbox, boxed::BitBox, slice::BitSlice};
+use glam::UVec3;
 use maybe::Maybe;
 use voxel_math::direction::Axis;
 
@@ -194,6 +195,13 @@ impl From<(u32, u32, u32)> for Props {
             len_y,
             len_z,
         }
+    }
+}
+
+impl From<UVec3> for Props {
+    #[inline]
+    fn from(v: UVec3) -> Self {
+        <(u32, u32, u32)>::from(v).into()
     }
 }
 
