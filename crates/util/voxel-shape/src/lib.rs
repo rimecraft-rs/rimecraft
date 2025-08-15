@@ -56,6 +56,7 @@ pub fn full_cube() -> &'static Arc<Slice<'static>> {
     })
 }
 
+/// Constructs a cuboid shape within given bounds.
 pub fn cuboid(bounds: BBox) -> Arc<Slice<'static>> {
     let min = bounds.min();
     let max = bounds.max();
@@ -93,12 +94,18 @@ pub fn cuboid(bounds: BBox) -> Arc<Slice<'static>> {
             let bmax = (d - d.round()).abs().cmplt(v_precision);
             let bmin = (e - e.round()).abs().cmplt(v_precision);
             let bmerged = bmax & bmin;
-            if i == 0 && bmerged.all() {
-                return full_cube().clone();
-            }
+            // if i == 0 && bmerged.all() {
+            //     return full_cube().clone();
+            // }
             let bdiff = bmerged & (assigned ^ bmerged);
             assigned |= bdiff;
             result = UVec3::select(bdiff, UVec3::splat(i), result);
+            // if assigned.all() {
+            //     break;
+            // }
+
+            // left for auto-vectorization
+            // TODO: discomment if vectorization doesn't work
         }
 
         if assigned.all() {
