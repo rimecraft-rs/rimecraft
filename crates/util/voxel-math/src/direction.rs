@@ -186,6 +186,25 @@ directions! {
 impl Direction {
     /// The number of directions.
     pub const COUNT: usize = 6;
+
+    /// Gets the ordinal of the direction.
+    #[inline]
+    pub fn ordinal(self) -> usize {
+        self as u8 as usize
+    }
+
+    /// Gets the axis of the direction.
+    #[inline]
+    pub fn axis(self) -> Axis {
+        self.into()
+    }
+
+    /// Gets the axis direction of the direction.
+    #[inline]
+    #[doc(alias = "axis_direction")]
+    pub fn axis_dir(self) -> AxisDirection {
+        self.into()
+    }
 }
 
 impl From<(AxisDirection, Axis)> for Direction {
