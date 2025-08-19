@@ -19,6 +19,9 @@ use voxel_math::{
 pub use func::*;
 pub use set::VoxelSet;
 
+pub use crate::Slice as VoxelShapeSlice;
+pub use set::Slice as VoxelSetSlice;
+
 const DOUBLE_BOUNDARY: f64 = 1.0e-7f64;
 
 trait List<T> {
@@ -102,7 +105,7 @@ where
 
 #[derive(Debug, Clone, Copy)]
 struct FractionalDoubleList {
-    section_count: u32,
+    section_count: usize,
 }
 
 impl List<f64> for FractionalDoubleList {
@@ -116,7 +119,7 @@ impl List<f64> for FractionalDoubleList {
     }
 
     fn len(&self) -> usize {
-        self.section_count as usize + 1
+        self.section_count + 1
     }
 }
 
@@ -251,7 +254,7 @@ trait ProvidePointPosList {
 }
 
 trait ErasedProvidePointPosList: Send + Sync + Debug {
-    fn __point_pos(&self, axis: Axis, index: u32) -> f64;
+    fn __point_pos(&self, axis: Axis, index: usize) -> f64;
 
     fn __iter_point_pos(
         &self,
@@ -262,7 +265,6 @@ trait ErasedProvidePointPosList: Send + Sync + Debug {
     fn __point_pos_len(&self, axis: Axis) -> usize;
 
     fn __point_pos_list_arc(&self, axis: Axis) -> Arc<dyn ErasedList<f64>>;
-
     fn __point_pos_list_boxed(&self, axis: Axis) -> Box<dyn ErasedList<f64>>;
 }
 
@@ -271,8 +273,8 @@ where
     P: ProvidePointPosList + Send + Sync + Debug,
 {
     #[inline]
-    fn __point_pos(&self, axis: Axis, index: u32) -> f64 {
-        self.point_pos_list(axis).index(index as usize)
+    fn __point_pos(&self, axis: Axis, index: usize) -> f64 {
+        self.point_pos_list(axis).index(index)
     }
 
     #[inline]
@@ -308,7 +310,7 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
         let i = voxels.bounds_of(axis).start;
 
         if i >= voxels.len_of(axis) {
-            self.__point_pos(axis, i)
+            self.__point_pos(axis, i as usize)
         } else {
             f64::INFINITY
         }
@@ -319,7 +321,7 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
         let i = voxels.bounds_of(axis).end;
 
         if i >= voxels.len_of(axis) {
-            self.__point_pos(axis, i)
+            self.__point_pos(axis, i as usize)
         } else {
             f64::NEG_INFINITY
         }
@@ -428,15 +430,17 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
 
     fn __priv_coord_index(&self, axis: Axis, coord: f64) -> u32 {
         let max = self.__as_raw().voxels.len_of(axis) + 1;
-        math::binary_search_ie_32(0..max, |i| coord < self.__point_pos(axis, i)).unwrap_or(max) - 1
+        math::binary_search_ie_u32(0..max, |i| coord < self.__point_pos(axis, i as usize))
+            .unwrap_or(max)
+            - 1
     }
 }
 
-/// Slice of a `VoxelShape`.
+/// Slice of a voxel shape.
 #[repr(transparent)]
 #[derive(Debug)]
+#[doc(alias = "VoxelShapeSlice")]
 pub struct Slice<'a>(dyn Abstract + 'a);
-
 fn slice_set_bounds(set: &set::Slice<'_>, axis: Axis, width: u32) -> set::Bounds {
     let (sx, sy, sz) = (
         set.len_of(Axis::X),
@@ -451,14 +455,6 @@ fn slice_set_bounds(set: &set::Slice<'_>, axis: Axis, width: u32) -> set::Bounds
 }
 
 impl<'a> Slice<'a> {
-    /// An empty slice.
-    ///
-    /// This is same as function [`empty`].
-    #[inline]
-    pub fn empty() -> &'a Arc<Self> {
-        empty()
-    }
-
     /// Returns the minimum coordinate of the shape along the given axis.
     #[inline]
     pub fn min(&self, axis: Axis) -> f64 {
@@ -497,7 +493,7 @@ impl<'a> Slice<'a> {
         self.0
             .__offset(offset.into())
             .map(|a| Arc::from(a.into_boxed_slice()))
-            .unwrap_or_else(|| Self::empty().clone())
+            .unwrap_or_else(|| empty().clone())
     }
 
     /// Returns a shape that is sliced along the given axis.
@@ -532,6 +528,28 @@ impl<'a> Slice<'a> {
             ),
             axis,
         }
+    }
+
+    /// Gets the position of a specific point in the given axis.
+    #[inline]
+    pub fn point(&self, axis: Axis, index: usize) -> f64 {
+        self.0.__point_pos(axis, index)
+    }
+
+    /// Peeks an iterator over the point positions in the given axis.
+    #[allow(clippy::missing_panics_doc)] // panic points unreachable
+    pub fn peek_iter_points<F, T>(&self, axis: Axis, f: F) -> T
+    where
+        F: FnOnce(&mut (dyn Iterator<Item = f64> + '_)) -> T,
+    {
+        let mut opt = None;
+        let mut f = Some(f);
+        self.0.__iter_point_pos(axis, &mut |iter| {
+            if let Some(f) = f.take() {
+                opt = Some(f(iter));
+            }
+        });
+        opt.unwrap()
     }
 }
 
@@ -592,7 +610,7 @@ impl Clone for RawVoxelShape {
 
 /// A simple voxel shape.
 #[derive(Debug, Clone)]
-pub struct Simple(RawVoxelShape);
+struct Simple(RawVoxelShape);
 
 impl Simple {
     /// Converts the shape into a boxed slice.
@@ -613,14 +631,14 @@ impl ProvidePointPosList for Simple {
     #[inline]
     fn point_pos_list(&self, axis: Axis) -> impl List<f64> + Send + Sync + Debug + '_ {
         FractionalDoubleList {
-            section_count: self.0.voxels.len_of(axis),
+            section_count: self.0.voxels.len_of(axis) as usize,
         }
     }
 
     #[inline]
     fn point_pos_list_boxed(&self, axis: Axis) -> Box<dyn ErasedList<f64>> {
         Box::new(ListEraser(FractionalDoubleList {
-            section_count: self.0.voxels.len_of(axis),
+            section_count: self.0.voxels.len_of(axis) as usize,
         }))
     }
 }
@@ -643,7 +661,7 @@ impl DerefMut for Simple {
 
 /// A voxel shape that is a backed by point arrays.
 #[derive(Debug, Clone)]
-pub struct Array {
+struct Array {
     raw: RawVoxelShape,
 
     xp: Arc<dyn ErasedList<f64>>,
@@ -660,9 +678,9 @@ impl Array {
 }
 
 impl ErasedProvidePointPosList for Array {
-    fn __point_pos(&self, axis: Axis, index: u32) -> f64 {
+    fn __point_pos(&self, axis: Axis, index: usize) -> f64 {
         axis.choose(&*self.xp, &*self.yp, &*self.zp)
-            .__erased_index(index as usize)
+            .__erased_index(index)
     }
 
     fn __iter_point_pos(
@@ -750,9 +768,9 @@ impl<'s> Sliced<'_, 's> {
 const SINGULAR_FRACTIONAL: FractionalDoubleList = FractionalDoubleList { section_count: 1 };
 
 impl ErasedProvidePointPosList for Sliced<'_, '_> {
-    fn __point_pos(&self, axis: Axis, index: u32) -> f64 {
+    fn __point_pos(&self, axis: Axis, index: usize) -> f64 {
         if self.axis == axis {
-            SINGULAR_FRACTIONAL.index(index as usize)
+            SINGULAR_FRACTIONAL.index(index)
         } else {
             self.parent.0.__point_pos(axis, index)
         }

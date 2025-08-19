@@ -59,6 +59,7 @@ trait Abstract {
 
 /// Slice of a voxel set.
 #[repr(transparent)]
+#[doc(alias = "VoxelSetSlice")]
 pub struct Slice<'s>(dyn Abstract + Send + Sync + 's);
 
 impl Debug for Slice<'_> {

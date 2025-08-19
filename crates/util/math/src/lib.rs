@@ -57,7 +57,7 @@ pub fn map_f32(
 /// Finds the minimum value in the given range that satisfies the *monotonic predicate* `p`.
 ///
 /// A *monotonic predicate* is one that is true after a specific point, and false before that point.
-pub fn binary_search_ie_32<F>(range: Range<u32>, p: F) -> Option<u32>
+pub fn binary_search_ie_u32<F>(range: Range<u32>, p: F) -> Option<u32>
 where
     F: Fn(u32) -> bool,
 {
