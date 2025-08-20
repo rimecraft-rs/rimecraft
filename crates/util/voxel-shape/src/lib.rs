@@ -23,6 +23,7 @@ pub use crate::Slice as VoxelShapeSlice;
 pub use set::Slice as VoxelSetSlice;
 
 const DOUBLE_BOUNDARY: f64 = 1.0e-7f64;
+const MAX_SHAPE_RESOLUTION: u32 = 8;
 
 trait List<T> {
     fn index(&self, index: usize) -> T;
@@ -392,8 +393,8 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
         if !self.__is_empty()
             && std::ptr::from_ref(self).cast::<()>() != Arc::as_ptr(full_cube()).cast::<()>()
         {
-            let raw = self.__as_raw();
-            let cache = &raw
+            let cache = &self
+                .__as_raw()
                 .face_cache
                 .get_or_init(|| Box::new([const { OnceLock::new() }; Direction::COUNT]))
                 [facing.ordinal()];
@@ -580,7 +581,6 @@ impl<'a> Slice<'a> {
     }
 }
 
-#[derive(Debug)]
 #[allow(clippy::type_complexity)]
 struct RawVoxelShape {
     voxels: Arc<set::Slice<'static>>,
@@ -595,6 +595,12 @@ impl RawVoxelShape {
             voxels,
             face_cache: OnceLock::new(),
         }
+    }
+}
+
+impl Debug for RawVoxelShape {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&*self.voxels, f)
     }
 }
 
@@ -624,6 +630,11 @@ impl Abstract for Simple {
     #[inline]
     fn __as_raw(&self) -> &RawVoxelShape {
         &self.0
+    }
+
+    fn __priv_coord_index(&self, axis: Axis, coord: f64) -> u32 {
+        let i = self.0.voxels.len_of(axis) as f64;
+        (coord * i).clamp(-1f64, i).floor() as u32
     }
 }
 
@@ -828,3 +839,6 @@ impl<'s> Deref for Sliced<'s, 's> {
         Slice::from_ref(self)
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -11,7 +11,7 @@ use glam::UVec3;
 use maybe::Maybe;
 use voxel_math::direction::Axis;
 
-trait Abstract {
+trait Abstract: Send + Sync + Debug {
     fn __props(&self) -> Props;
 
     fn __bitslice(&self) -> &BitSlice;
@@ -60,16 +60,8 @@ trait Abstract {
 /// Slice of a voxel set.
 #[repr(transparent)]
 #[doc(alias = "VoxelSetSlice")]
-pub struct Slice<'s>(dyn Abstract + Send + Sync + 's);
-
-impl Debug for Slice<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("VoxelSetSlice")
-            .field("inner_slice", &self.0.__bitslice())
-            .field("props", &self.0.__props())
-            .finish()
-    }
-}
+#[derive(Debug)]
+pub struct Slice<'s>(dyn Abstract + 's);
 
 impl<'s> Slice<'s> {
     /// Whether this set contains a voxel at the given position.
@@ -161,17 +153,17 @@ impl<'s> Slice<'s> {
 #[allow(unsafe_code)] // SAFETY: safe because the type is marked as `repr(transparent)`
 impl<'a> Slice<'a> {
     #[inline]
-    fn from_ref<'s>(this: &'s (dyn Abstract + Send + Sync + 'a)) -> &'s Self {
+    fn from_ref<'s>(this: &'s (dyn Abstract + 'a)) -> &'s Self {
         unsafe { std::mem::transmute(this) }
     }
 
     #[inline]
-    fn from_mut<'s>(this: &'s mut (dyn Abstract + Send + Sync + 'a)) -> &'s mut Self {
+    fn from_mut<'s>(this: &'s mut (dyn Abstract + 'a)) -> &'s mut Self {
         unsafe { std::mem::transmute(this) }
     }
 
     #[inline]
-    fn from_boxed(this: Box<dyn Abstract + Send + Sync + 'a>) -> Box<Self> {
+    fn from_boxed(this: Box<dyn Abstract + 'a>) -> Box<Self> {
         unsafe { std::mem::transmute(this) }
     }
 }
@@ -226,7 +218,7 @@ pub struct VoxelSet {
 }
 
 impl VoxelSet {
-    /// Creates a new voxel set.
+    /// Creates a new voxel set without filling it.
     #[inline]
     pub fn new(props: Props) -> Self {
         let Props {
@@ -234,7 +226,7 @@ impl VoxelSet {
             len_y,
             len_z,
         } = props;
-        let len = (props.len_x as usize) * (props.len_y as usize) * (props.len_z as usize);
+        let len = (props.len_x * props.len_y * props.len_z) as usize;
         Self {
             props,
             bounds: Bounds {
@@ -246,10 +238,18 @@ impl VoxelSet {
         }
     }
 
-    /// Creates a new voxel set with the given bounds.
+    /// Creates a new voxel set with the given bounds, filling bounded area.
     pub fn with_bounds(props: Props, bounds: Bounds) -> Self {
         let mut this = Self::new(props);
         this.bounds = bounds;
+        // cheap clones
+        for x in this.bounds.x.clone() {
+            for y in this.bounds.y.clone() {
+                for z in this.bounds.z.clone() {
+                    this.set(x, y, z);
+                }
+            }
+        }
         this
     }
 
@@ -294,11 +294,8 @@ impl Abstract for VoxelSet {
 
     #[inline]
     fn __bounds(&self, axis: Axis) -> Range<u32> {
-        axis.choose(
-            self.bounds.x.start,
-            self.bounds.y.start,
-            self.bounds.z.start,
-        )..axis.choose(self.bounds.x.end, self.bounds.y.end, self.bounds.z.end)
+        axis.choose(&self.bounds.x, &self.bounds.y, &self.bounds.z)
+            .clone()
     }
 
     #[inline]
@@ -467,43 +464,5 @@ impl DerefMut for CroppedMut<'_, '_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         Slice::from_mut(self)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn boxed() {
-        let mut set = VoxelSet::new(Props {
-            len_x: 16,
-            len_y: 16,
-            len_z: 16,
-        });
-
-        assert!(!set.contains(1, 5, 4));
-        set.set(1, 5, 4);
-        assert!(set.contains(1, 5, 4));
-    }
-
-    #[test]
-    fn crop() {
-        let mut set = VoxelSet::new(Props {
-            len_x: 16,
-            len_y: 16,
-            len_z: 16,
-        });
-        set.set(8, 8, 8);
-
-        let mut cropped = set.crop_mut(Bounds {
-            x: 4..12,
-            y: 4..12,
-            z: 4..12,
-        });
-        assert!(cropped.contains(4, 4, 4));
-        cropped.set(1, 3, 5);
-
-        assert!(set.contains(5, 7, 9));
     }
 }

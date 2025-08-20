@@ -16,7 +16,13 @@ pub struct BBox {
 impl BBox {
     /// Creates a new bounding box from two corners.
     #[inline]
-    pub fn new(p1: DVec3, p2: DVec3) -> Self {
+    pub fn new<T1, T2>(p1: T1, p2: T2) -> Self
+    where
+        T1: Into<DVec3>,
+        T2: Into<DVec3>,
+    {
+        let p1 = p1.into();
+        let p2 = p2.into();
         Self {
             min: p1.min(p2),
             max: p1.max(p2),
