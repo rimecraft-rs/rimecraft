@@ -11,6 +11,10 @@ use glam::UVec3;
 use maybe::Maybe;
 use voxel_math::direction::Axis;
 
+mod iter;
+
+pub use iter::*;
+
 trait Abstract: Send + Sync + Debug {
     fn __props(&self) -> Props;
 
@@ -167,7 +171,17 @@ impl<'s> Slice<'s> {
         self.0.__is_empty()
     }
 
-    //TODO: boxes iteration
+    /// Returns an iterator over the coalesced boxes of the set.
+    #[inline]
+    pub fn boxes(&self) -> Boxes<'_> {
+        Boxes::from_slice(self)
+    }
+
+    /// Returns an iterator over every single voxels of the set.
+    #[inline]
+    pub fn voxels(&self) -> Voxels<'_, 's> {
+        Voxels::from_slice(self)
+    }
 }
 
 #[allow(unsafe_code)] // SAFETY: safe because the type is marked as `repr(transparent)`
