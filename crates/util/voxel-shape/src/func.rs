@@ -4,7 +4,7 @@ use glam::{BVec3, DVec3, UVec3};
 use voxel_math::BBox;
 
 use crate::{
-    Array, DOUBLE_BOUNDARY, ErasedList, ListEraser, MAX_SHAPE_RESOLUTION, RawVoxelShape, Simple,
+    Array, ErasedList, F64_TOLERANCE, ListEraser, MAX_SHAPE_RESOLUTION, RawVoxelShape, Simple,
     Slice, VoxelSet,
 };
 
@@ -63,9 +63,9 @@ pub fn cuboid(bounds: BBox) -> Arc<Slice<'static>> {
         .into()
     };
 
-    if (max - min).cmplt(DVec3::splat(DOUBLE_BOUNDARY)).any() {
+    if (max - min).cmplt(DVec3::splat(F64_TOLERANCE)).any() {
         empty().clone()
-    } else if min.cmplt(DVec3::splat(-DOUBLE_BOUNDARY)).any()
+    } else if min.cmplt(DVec3::splat(-F64_TOLERANCE)).any()
         || max.cmpgt(DVec3::splat(1.0000001f64)).any()
     {
         fallback()
@@ -76,7 +76,7 @@ pub fn cuboid(bounds: BBox) -> Arc<Slice<'static>> {
             let j = (1u32 << i) as f64; // 1, 2, 4, 8.
             let d = min * j;
             let e = max * j;
-            let v_precision = DVec3::splat(DOUBLE_BOUNDARY * j);
+            let v_precision = DVec3::splat(F64_TOLERANCE * j);
             let bmax = (d - d.round()).abs().cmplt(v_precision);
             let bmin = (e - e.round()).abs().cmplt(v_precision);
             let bmerged = bmax & bmin;

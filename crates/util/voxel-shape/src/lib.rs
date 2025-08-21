@@ -24,7 +24,7 @@ pub use crate::Slice as VoxelShapeSlice;
 use crate::list::{ErasedList, FractionalDoubleList, List, ListDeref, ListEraser, OffsetList};
 pub use set::Slice as VoxelSetSlice;
 
-const DOUBLE_BOUNDARY: f64 = 1.0e-7f64;
+const F64_TOLERANCE: f64 = 1.0e-7f64;
 const MAX_SHAPE_RESOLUTION: u32 = 8;
 
 trait ProvidePointPosList {
