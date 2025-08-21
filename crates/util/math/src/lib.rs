@@ -2,6 +2,8 @@
 
 use std::ops::Range;
 
+pub mod int;
+
 /// Linear interpolates an [`f32`] between two values by a factor.
 pub fn __lerp_f32(factor: f32, start: f32, end: f32) -> f32 {
     start + (end - start) * factor

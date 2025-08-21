@@ -3,7 +3,6 @@
 use std::{iter::FusedIterator, marker::PhantomData};
 
 use glam::UVec3;
-use voxel_math::direction::Axis;
 
 use crate::{
     VoxelSet,
@@ -182,11 +181,7 @@ impl Iterator for Voxels<'_, '_> {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let ones = self.slice.0.__bits_data().map_or_else(
-            || {
-                (self.slice.len_of(Axis::X)
-                    * self.slice.len_of(Axis::Y)
-                    * self.slice.len_of(Axis::Z)) as usize
-            },
+            || self.slice.0.__len_vectorized().element_product() as usize,
             bitvec::slice::BitSlice::count_ones,
         );
         (if ones == 0 { 0 } else { 1 }, Some(ones))

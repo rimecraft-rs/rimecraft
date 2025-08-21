@@ -1,11 +1,11 @@
 use std::sync::{Arc, OnceLock};
 
 use glam::{BVec3, DVec3, UVec3};
-use voxel_math::BBox;
+use voxel_math::{BBox, direction::Axis};
 
 use crate::{
     Array, ErasedList, F64_TOLERANCE, ListEraser, MAX_SHAPE_RESOLUTION, RawVoxelShape, Simple,
-    Slice, VoxelSet,
+    Slice, VoxelSet, list::*,
 };
 
 /// An empty voxel shape slice.
@@ -115,5 +115,132 @@ pub fn cuboid(bounds: BBox) -> Arc<Slice<'static>> {
         } else {
             fallback()
         }
+    }
+}
+
+/// Combine two slices, returning a new slice that is unioned.
+///
+/// See [`combine_with`] for customized voxel merging logic.
+#[inline]
+#[doc(alias = "union")]
+pub fn combine<'a>(lhs: &Arc<Slice<'a>>, rhs: &Arc<Slice<'a>>) -> Arc<Slice<'a>> {
+    combine_with(lhs, rhs, |a, b| a || b)
+}
+
+/// Combine two slices using a function describing how to combine two single voxels.
+///
+/// # Panics
+///
+/// Panics if the given function returns `true` for two `false` voxel inputs.
+pub fn combine_with<'a, F>(lhs: &Arc<Slice<'a>>, rhs: &Arc<Slice<'a>>, f: F) -> Arc<Slice<'a>>
+where
+    F: Fn(bool, bool) -> bool,
+{
+    assert!(
+        !f(false, false),
+        "combination function should not return true for all false inputs"
+    );
+
+    // identical slices
+    if std::ptr::eq(lhs, rhs) {
+        return if f(true, true) { lhs } else { empty() }.clone();
+    }
+
+    // tolerance of single-sided existence
+    let lhs_tol = f(true, false);
+    let rhs_tol = f(false, true);
+
+    // singular-empty cases
+    if lhs.is_empty() {
+        return if rhs_tol { rhs } else { empty() }.clone();
+    } else if rhs.is_empty() {
+        return if lhs_tol { lhs } else { empty() }.clone();
+    }
+
+    let pair_x = list_pair(
+        1,
+        lhs.0.__point_pos_list_arc(Axis::X),
+        rhs.0.__point_pos_list_arc(Axis::X),
+        lhs_tol,
+        rhs_tol,
+    );
+    let pair_y = list_pair(
+        pair_x.__erased_len(),
+        lhs.0.__point_pos_list_arc(Axis::Y),
+        rhs.0.__point_pos_list_arc(Axis::Y),
+        lhs_tol,
+        rhs_tol,
+    );
+    let pair_z = list_pair(
+        (pair_x.__erased_len() - 1) * (pair_y.__erased_len() - 1),
+        lhs.0.__point_pos_list_arc(Axis::Z),
+        rhs.0.__point_pos_list_arc(Axis::Z),
+        lhs_tol,
+        rhs_tol,
+    );
+
+    let set = VoxelSet::combine_with(
+        &lhs.0.__as_raw().voxels,
+        &rhs.0.__as_raw().voxels,
+        [&*pair_x, &*pair_y, &*pair_z],
+        f,
+    );
+    let raw = RawVoxelShape::from_arc(set.into_boxed_slice().into());
+
+    if pair_x.__downcast_fractional_pair_double_list().is_some()
+        && pair_y.__downcast_fractional_pair_double_list().is_some()
+        && pair_z.__downcast_fractional_pair_double_list().is_some()
+    {
+        Simple(raw).into_boxed_slice()
+    } else {
+        #[inline]
+        fn conv(x: Box<dyn PairErasedList<f64>>) -> Box<dyn ErasedList<f64>> {
+            x
+        }
+
+        Array {
+            raw,
+            xp: conv(pair_x).into(),
+            yp: conv(pair_y).into(),
+            zp: conv(pair_z).into(),
+        }
+        .into_boxed_slice()
+    }
+    .into()
+}
+
+fn list_pair(
+    len: usize,
+    lhs: Arc<dyn ErasedList<f64>>,
+    rhs: Arc<dyn ErasedList<f64>>,
+    lhs_tol: bool,
+    rhs_tol: bool,
+) -> Box<dyn PairErasedList<f64>> {
+    let lhs_lr = lhs.__erased_len() - 1;
+    let rhs_lr = rhs.__erased_len() - 1;
+
+    if lhs.__downcast_fractional_double_list().is_some()
+        && rhs.__downcast_fractional_double_list().is_some()
+        && len as u64 * math::int::lcm(lhs_lr as u64, rhs_lr as u64) < 256
+    {
+        return Box::new(FractionalPairDoubleList::new(lhs_lr, rhs_lr));
+    }
+
+    if lhs.__erased_index(lhs_lr) < rhs.__erased_index(0) - F64_TOLERANCE {
+        Box::new(ChainedPairList {
+            left: ListDeref(lhs),
+            right: ListDeref(rhs),
+            inverted: false,
+        })
+    } else if rhs.__erased_index(rhs_lr) < lhs.__erased_index(0) - F64_TOLERANCE {
+        Box::new(ChainedPairList {
+            left: ListDeref(rhs),
+            right: ListDeref(lhs),
+            inverted: true,
+        })
+    } else if Arc::ptr_eq(&lhs, &rhs) {
+        Box::new(IdentityPairList(ListDeref(lhs)))
+    } else {
+        Box::new(SimplePairDoubleList::new(&*lhs, &*rhs, lhs_tol, rhs_tol))
     }
 }

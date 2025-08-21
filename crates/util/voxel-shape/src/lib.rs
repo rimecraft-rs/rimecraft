@@ -11,6 +11,7 @@ use std::{
 };
 
 use approx::abs_diff_eq;
+use glam::{USizeVec3, UVec3};
 use maybe::Maybe;
 use voxel_math::{
     BBox, DVec3,
@@ -40,6 +41,14 @@ trait ProvidePointPosList {
 trait ErasedProvidePointPosList: Send + Sync + Debug {
     fn __point_pos(&self, axis: Axis, index: usize) -> f64;
 
+    fn __point_pos_vectorized(&self, index: USizeVec3) -> DVec3 {
+        DVec3::new(
+            self.__point_pos(Axis::X, index.x),
+            self.__point_pos(Axis::Y, index.y),
+            self.__point_pos(Axis::Z, index.z),
+        )
+    }
+
     fn __iter_point_pos(
         &self,
         axis: Axis,
@@ -47,6 +56,14 @@ trait ErasedProvidePointPosList: Send + Sync + Debug {
     );
 
     fn __point_pos_len(&self, axis: Axis) -> usize;
+
+    fn __point_pos_len_vectorized(&self) -> USizeVec3 {
+        USizeVec3::new(
+            self.__point_pos_len(Axis::X),
+            self.__point_pos_len(Axis::Y),
+            self.__point_pos_len(Axis::Z),
+        )
+    }
 
     fn __point_pos_list_arc(&self, axis: Axis) -> Arc<dyn ErasedList<f64>>;
     fn __point_pos_list_boxed(&self, axis: Axis) -> Box<dyn ErasedList<f64>>;
@@ -100,6 +117,17 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
         }
     }
 
+    fn __min_vectorized(&self) -> DVec3 {
+        let voxels = &self.__as_raw().voxels;
+        let i = UVec3::from_array(voxels.0.__bounds_vectorized().into_array().map(|r| r.start));
+
+        DVec3::select(
+            i.cmpge(voxels.0.__len_vectorized()),
+            self.__point_pos_vectorized(i.as_usizevec3()),
+            DVec3::splat(f64::INFINITY),
+        )
+    }
+
     fn __max(&self, axis: Axis) -> f64 {
         let voxels = &self.__as_raw().voxels;
         let i = voxels.bounds_of(axis).end;
@@ -111,6 +139,17 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
         }
     }
 
+    fn __max_vectorized(&self) -> DVec3 {
+        let voxels = &self.__as_raw().voxels;
+        let i = UVec3::from_array(voxels.0.__bounds_vectorized().into_array().map(|r| r.end));
+
+        DVec3::select(
+            i.cmpge(voxels.0.__len_vectorized()),
+            self.__point_pos_vectorized(i.as_usizevec3()),
+            DVec3::splat(f64::NEG_INFINITY),
+        )
+    }
+
     #[inline]
     fn __is_empty(&self) -> bool {
         self.__as_raw().voxels.is_empty()
@@ -118,18 +157,7 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
 
     fn __bounding_box(&self) -> BBox {
         assert!(!self.__is_empty(), "no bounds for empty shape");
-        BBox::from_raw(
-            DVec3 {
-                x: self.__min(Axis::X),
-                y: self.__min(Axis::Y),
-                z: self.__min(Axis::Z),
-            },
-            DVec3 {
-                x: self.__max(Axis::X),
-                y: self.__max(Axis::Y),
-                z: self.__min(Axis::Z),
-            },
-        )
+        BBox::from_raw(self.__min_vectorized(), self.__max_vectorized())
     }
 
     fn __offset(&self, DVec3 { x, y, z }: DVec3) -> Option<Array> {
@@ -155,27 +183,32 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
     }
 
     fn __priv_is_cube(&self) -> bool {
-        Axis::VALUES.map(|a| self.__priv_is_square(a)) == [true; 3]
+        self.__point_pos_len_vectorized()
+            .cmpeq(USizeVec3::splat(2))
+            .all()
+            && self
+                .__point_pos_vectorized(USizeVec3::splat(0))
+                .abs_diff_eq(DVec3::splat(0.0), F64_TOLERANCE)
+            && self
+                .__point_pos_vectorized(USizeVec3::splat(1))
+                .abs_diff_eq(DVec3::splat(1.0), F64_TOLERANCE)
     }
 
     fn __priv_is_square(&self, axis: Axis) -> bool {
         self.__point_pos_len(axis) == 2
-            && abs_diff_eq!(self.__point_pos(axis, 0), 0f64, epsilon = 1.0e-7)
-            && abs_diff_eq!(self.__point_pos(axis, 1), 1f64, epsilon = 1.0e-7)
+            && abs_diff_eq!(self.__point_pos(axis, 0), 0f64, epsilon = F64_TOLERANCE)
+            && abs_diff_eq!(self.__point_pos(axis, 1), 1f64, epsilon = F64_TOLERANCE)
     }
 
     #[allow(clippy::if_then_some_else_none)]
     fn __face(&self, this: &Arc<Slice<'static>>, facing: Direction) -> Option<Arc<Slice<'static>>> {
         // None for itself
-        debug_assert_eq!(
-            Arc::as_ptr(this).cast::<()>(),
-            std::ptr::from_ref(self).cast::<()>(),
+        debug_assert!(
+            std::ptr::addr_eq(Arc::as_ptr(this), self),
             "this must be identical to self"
         );
 
-        if !self.__is_empty()
-            && std::ptr::from_ref(self).cast::<()>() != Arc::as_ptr(full_cube()).cast::<()>()
-        {
+        if !self.__is_empty() && !std::ptr::addr_eq(self, Arc::as_ptr(full_cube())) {
             let cache = &self
                 .__as_raw()
                 .face_cache
@@ -226,11 +259,7 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
 #[doc(alias = "VoxelShapeSlice")]
 pub struct Slice<'a>(dyn Abstract + 'a);
 fn slice_set_bounds(set: &set::Slice<'_>, axis: Axis, width: u32) -> set::Bounds {
-    let (sx, sy, sz) = (
-        set.len_of(Axis::X),
-        set.len_of(Axis::Y),
-        set.len_of(Axis::Z),
-    );
+    let (sx, sy, sz) = set.0.__len_vectorized().into();
     set::Bounds {
         x: axis.choose(width, 0, 0)..axis.choose(width + 1, sy, sz),
         y: axis.choose(0, width, 0)..axis.choose(sx, width + 1, sz),
@@ -472,6 +501,7 @@ impl Array {
 }
 
 impl ErasedProvidePointPosList for Array {
+    #[inline]
     fn __point_pos(&self, axis: Axis, index: usize) -> f64 {
         axis.choose(&*self.xp, &*self.yp, &*self.zp)
             .__erased_index(index)
@@ -486,6 +516,7 @@ impl ErasedProvidePointPosList for Array {
             .__peek_erased_iter(f);
     }
 
+    #[inline]
     fn __point_pos_len(&self, axis: Axis) -> usize {
         axis.choose(&self.xp, &self.yp, &self.zp).__erased_len()
     }
@@ -546,9 +577,8 @@ impl<'s> Sliced<'_, 's> {
     /// Panics if the given slice is not identical to the one this shape is holding.
     #[inline]
     pub fn adopt_arc(self, arc: Arc<Slice<'s>>) -> Sliced<'static, 's> {
-        assert_eq!(
-            std::ptr::from_ref(&self.parent.0).cast::<()>(),
-            Arc::as_ptr(&arc).cast::<()>(),
+        assert!(
+            std::ptr::addr_eq(&self.parent.0, Arc::as_ptr(&arc)),
             "arc must be the same as the parent slice"
         );
         Sliced {

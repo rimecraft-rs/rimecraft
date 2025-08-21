@@ -9,6 +9,11 @@ pub trait List<T> {
     fn index(&self, index: usize) -> T;
     fn iter(&self) -> impl IntoIterator<Item = T>;
     fn len(&self) -> usize;
+
+    #[inline]
+    fn downcast_fractional_double_list(&self) -> Option<&FractionalDoubleList> {
+        None
+    }
 }
 
 pub trait ErasedList<T>: Send + Sync + Debug {
@@ -21,6 +26,11 @@ pub trait ErasedList<T>: Send + Sync + Debug {
         T: 'a;
 
     fn __erased_len(&self) -> usize;
+
+    #[inline]
+    fn __downcast_fractional_double_list(&self) -> Option<&FractionalDoubleList> {
+        None
+    }
 }
 
 impl<T> List<T> for [T]
@@ -81,6 +91,11 @@ where
     fn len(&self) -> usize {
         (**self).len()
     }
+
+    #[inline]
+    fn downcast_fractional_double_list(&self) -> Option<&FractionalDoubleList> {
+        (**self).downcast_fractional_double_list()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -98,8 +113,14 @@ impl List<f64> for FractionalDoubleList {
         (0..=self.section_count).map(|i| i as f64 / self.section_count as f64)
     }
 
+    #[inline]
     fn len(&self) -> usize {
         self.section_count + 1
+    }
+
+    #[inline]
+    fn downcast_fractional_double_list(&self) -> Option<&FractionalDoubleList> {
+        Some(self)
     }
 }
 
@@ -132,6 +153,11 @@ where
     fn __erased_len(&self) -> usize {
         self.0.__erased_len()
     }
+
+    #[inline]
+    fn __downcast_fractional_double_list(&self) -> Option<&FractionalDoubleList> {
+        self.0.__downcast_fractional_double_list()
+    }
 }
 
 #[repr(transparent)]
@@ -162,6 +188,11 @@ where
     #[inline]
     fn __erased_len(&self) -> usize {
         self.0.len()
+    }
+
+    #[inline]
+    fn __downcast_fractional_double_list(&self) -> Option<&FractionalDoubleList> {
+        self.0.downcast_fractional_double_list()
     }
 }
 
@@ -235,6 +266,11 @@ pub trait PairErasedList<T>: ErasedList<T> {
         &self,
         f: &mut (dyn FnMut(&mut (dyn Iterator<Item = PairListIterItem> + '_)) + '_),
     );
+
+    #[inline]
+    fn __downcast_fractional_pair_double_list(&self) -> Option<&FractionalPairDoubleList> {
+        None
+    }
 }
 
 #[derive(Debug)]
@@ -265,6 +301,11 @@ where
     #[inline]
     fn __erased_len(&self) -> usize {
         self.0.__erased_len()
+    }
+
+    #[inline]
+    fn __downcast_fractional_double_list(&self) -> Option<&FractionalDoubleList> {
+        self.0.__downcast_fractional_double_list()
     }
 }
 
@@ -411,6 +452,17 @@ pub struct FractionalPairDoubleList {
     gcd: u32,
 }
 
+impl FractionalPairDoubleList {
+    pub fn new(i: usize, j: usize) -> Self {
+        let (gcd, lcm) = math::int::gcd_lcm(i, j);
+        Self {
+            list: FractionalDoubleList { section_count: lcm },
+            first_sec_count: (i / gcd) as u32,
+            gcd: (j / gcd) as u32,
+        }
+    }
+}
+
 impl ErasedList<f64> for FractionalPairDoubleList {
     #[inline]
     fn __erased_index(&self, index: usize) -> f64 {
@@ -447,11 +499,16 @@ impl PairErasedList<f64> for FractionalPairDoubleList {
             index: i,
         }))
     }
+
+    #[inline]
+    fn __downcast_fractional_pair_double_list(&self) -> Option<&FractionalPairDoubleList> {
+        Some(self)
+    }
 }
 
 #[derive(Debug)]
 #[doc(alias = "DisjointPairList")]
-pub struct ChainedPairList<L, R> {
+pub struct ChainedPairList<L, R = L> {
     pub left: R,
     pub right: L,
     pub inverted: bool,

@@ -11,11 +11,14 @@ use glam::UVec3;
 use maybe::Maybe;
 use voxel_math::direction::Axis;
 
-use crate::set::iter::{Boxes, Voxels};
+use crate::{
+    list::{PairErasedList, PairListIterItem},
+    set::iter::{Boxes, Voxels},
+};
 
 pub mod iter;
 
-trait Abstract: Send + Sync + Debug {
+pub(crate) trait Abstract: Send + Sync + Debug {
     fn __props(&self) -> Props;
 
     fn __bitslice(&self) -> &BitSlice;
@@ -26,13 +29,19 @@ trait Abstract: Send + Sync + Debug {
 
     fn __bounds(&self, axis: Axis) -> Range<u32>;
 
-    fn __is_empty(&self) -> bool {
-        for axis in Axis::VALUES {
-            if self.__bounds(axis).is_empty() {
-                return true;
-            }
+    fn __bounds_vectorized(&self) -> Bounds {
+        Bounds {
+            x: self.__bounds(Axis::X),
+            y: self.__bounds(Axis::Y),
+            z: self.__bounds(Axis::Z),
         }
-        false
+    }
+
+    fn __is_empty(&self) -> bool {
+        self.__bounds_vectorized()
+            .into_array()
+            .iter()
+            .any(Range::is_empty)
     }
 
     fn __contains(&self, x: u32, y: u32, z: u32) -> bool {
@@ -65,6 +74,15 @@ trait Abstract: Send + Sync + Debug {
         axis.choose(len_x, len_y, len_z)
     }
 
+    fn __len_vectorized(&self) -> UVec3 {
+        let Props {
+            len_x,
+            len_y,
+            len_z,
+        } = self.__props();
+        (len_x, len_y, len_z).into()
+    }
+
     #[inline]
     fn __bits_data(&self) -> Option<&BitSlice> {
         None
@@ -75,7 +93,7 @@ trait Abstract: Send + Sync + Debug {
 #[repr(transparent)]
 #[doc(alias = "VoxelSetSlice")]
 #[derive(Debug)]
-pub struct Slice<'s>(dyn Abstract + 's);
+pub struct Slice<'s>(pub(crate) dyn Abstract + 's);
 
 impl<'s> Slice<'s> {
     /// Whether this set contains a voxel at the given position.
@@ -243,6 +261,13 @@ pub struct Bounds {
     pub z: Range<u32>,
 }
 
+impl Bounds {
+    #[inline]
+    pub(crate) fn into_array(self) -> [Range<u32>; 3] {
+        [self.x, self.y, self.z]
+    }
+}
+
 /// A voxel set implemented using a bit set.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VoxelSet {
@@ -291,13 +316,10 @@ impl VoxelSet {
     pub fn from_slice(slice: &Slice<'_>) -> Self {
         let value = slice;
         let props = value.0.__props();
+
         Self {
             props,
-            bounds: Bounds {
-                x: value.0.__bounds(Axis::X),
-                y: value.0.__bounds(Axis::Y),
-                z: value.0.__bounds(Axis::Z),
-            },
+            bounds: value.0.__bounds_vectorized(),
             data: value.0.__bits_data().map_or_else(
                 || {
                     let mut bits = bitbox![0; (props.len_x * props.len_y * props.len_z) as usize];
@@ -337,6 +359,88 @@ impl VoxelSet {
 
         self.data[__vset_index(self.props, x, y, z.start)..__vset_index(self.props, x, y, z.end)]
             .fill(false);
+    }
+
+    pub(crate) fn combine_with<F>(
+        lhs: &Slice<'_>,
+        rhs: &Slice<'_>,
+        points: [&(dyn PairErasedList<f64> + '_); 3],
+        f: F,
+    ) -> Self
+    where
+        F: Fn(bool, bool) -> bool,
+    {
+        let (xp, yp, zp) = (points[0], points[1], points[2]);
+        let mut bounds_cast = [u32::MAX, u32::MAX, u32::MAX, u32::MIN, u32::MIN, u32::MIN];
+        let mut this = Self::new(Props {
+            len_x: xp.__erased_len() as u32 - 1,
+            len_y: yp.__erased_len() as u32 - 1,
+            len_z: zp.__erased_len() as u32 - 1,
+        });
+
+        xp.__peek_pair_erased_iter(&mut |xit| {
+            for PairListIterItem {
+                x: x1,
+                y: x2,
+                index: xi,
+            } in xit
+            {
+                let mut x_active = false;
+                let (x1, x2, xi) = (x1 as u32, x2 as u32, xi as u32);
+
+                yp.__peek_pair_erased_iter(&mut |yit| {
+                    for PairListIterItem {
+                        x: y1,
+                        y: y2,
+                        index: yi,
+                    } in yit
+                    {
+                        let mut y_active = false;
+                        let (y1, y2, yi) = (y1 as u32, y2 as u32, yi as u32);
+
+                        zp.__peek_pair_erased_iter(&mut |zit| {
+                            for PairListIterItem {
+                                x: z1,
+                                y: z2,
+                                index: zi,
+                            } in zit
+                            {
+                                let (z1, z2, zi) = (z1 as u32, z2 as u32, zi as u32);
+                                if f(
+                                    lhs.in_bounds_and_contains(x1, y1, z1),
+                                    rhs.in_bounds_and_contains(x2, y2, z2),
+                                ) {
+                                    this.data.set(__vset_index(this.props, xi, yi, zi), true);
+
+                                    bounds_cast[2] = bounds_cast[2].min(zi);
+                                    bounds_cast[5] = bounds_cast[5].max(zi);
+                                    y_active = true;
+                                }
+                            }
+                        });
+
+                        if y_active {
+                            bounds_cast[1] = bounds_cast[1].min(yi);
+                            bounds_cast[4] = bounds_cast[4].max(yi);
+                            x_active = true;
+                        }
+                    }
+                });
+
+                if x_active {
+                    bounds_cast[0] = bounds_cast[0].min(xi);
+                    bounds_cast[3] = bounds_cast[3].max(xi);
+                }
+            }
+        });
+
+        this.bounds = Bounds {
+            x: bounds_cast[0]..bounds_cast[3] + 1,
+            y: bounds_cast[1]..bounds_cast[4] + 1,
+            z: bounds_cast[2]..bounds_cast[5] + 1,
+        };
+
+        this
     }
 }
 
