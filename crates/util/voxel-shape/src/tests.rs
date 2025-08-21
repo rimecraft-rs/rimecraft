@@ -34,6 +34,38 @@ fn set_crop() {
 }
 
 #[test]
+fn set_voxels() {
+    let mut set = VoxelSet::new(set::Props {
+        len_x: 16,
+        len_y: 16,
+        len_z: 16,
+    });
+    set.set(1, 3, 5);
+    set.set(2, 3, 5);
+    set.set(1, 4, 5);
+    set.set(2, 5, 6);
+
+    let iter = set.voxels();
+    assert_eq!(iter.count(), 4, "wrong number of voxels");
+}
+
+#[test]
+fn set_boxes() {
+    let mut set = VoxelSet::new(set::Props {
+        len_x: 16,
+        len_y: 16,
+        len_z: 16,
+    });
+    set.set(1, 3, 5);
+    set.set(2, 3, 5);
+    set.set(1, 4, 5);
+    set.set(2, 5, 6);
+
+    let iter = set.boxes();
+    assert_eq!(iter.count(), 3, "wrong number of boxes");
+}
+
+#[test]
 fn empty_shape() {
     let empty_shape = empty();
     assert!(empty_shape.is_empty(), "empty shape should be empty")

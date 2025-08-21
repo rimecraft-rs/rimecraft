@@ -53,7 +53,7 @@ impl Boxes<'_> {
         // order: y -> x -> z
         if self.z > self.set.props.len_z {
             self.z = 0;
-            self.y += 1;
+            self.x += 1;
             self.k = None;
         }
         if self.x >= self.set.props.len_x {
@@ -98,12 +98,13 @@ impl Iterator for Boxes<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            match self.__next() {
-                ControlFlow::Continue => (),
-                ControlFlow::Break => return None,
-                ControlFlow::Return(tuple) => return Some(tuple),
-            };
+            let result = self.__next();
             self.z += 1;
+            return match result {
+                ControlFlow::Continue => continue,
+                ControlFlow::Break => None,
+                ControlFlow::Return(tuple) => Some(tuple),
+            };
         }
     }
 
@@ -145,7 +146,7 @@ impl Voxels<'_, '_> {
     fn __next(&mut self) -> ControlFlow<(UVec3, UVec3)> {
         if self.z >= self.props.len_z {
             self.z = 0;
-            self.y += 1;
+            self.x += 1;
         }
         if self.x >= self.props.len_x {
             self.x = 0;
@@ -169,12 +170,13 @@ impl Iterator for Voxels<'_, '_> {
     type Item = (UVec3, UVec3);
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            match self.__next() {
-                ControlFlow::Continue => (),
-                ControlFlow::Break => return None,
-                ControlFlow::Return(tuple) => return Some(tuple),
-            };
+            let result = self.__next();
             self.z += 1;
+            return match result {
+                ControlFlow::Continue => continue,
+                ControlFlow::Break => None,
+                ControlFlow::Return(tuple) => Some(tuple),
+            };
         }
     }
 
