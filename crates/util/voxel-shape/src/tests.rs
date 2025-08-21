@@ -1,6 +1,4 @@
-use voxel_math::BBox;
-
-use crate::{VoxelSet, cuboid, empty, full_cube, set};
+use crate::{VoxelSet, empty, full_cube, set};
 
 #[test]
 fn set_boxed() {

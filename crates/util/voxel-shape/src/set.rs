@@ -39,6 +39,11 @@ trait Abstract: Send + Sync + Debug {
             .unwrap_or_default()
     }
 
+    fn __in_bounds_and_contains(&self, x: u32, y: u32, z: u32) -> bool {
+        let props = self.__props();
+        x < props.len_x && y < props.len_y && z < props.len_z && self.__contains(x, y, z)
+    }
+
     fn __set(&mut self, x: u32, y: u32, z: u32, perform_ext: bool) {
         let index = self.__index(x, y, z);
         self.__bitslice_mut().set(index, true);
@@ -55,6 +60,11 @@ trait Abstract: Send + Sync + Debug {
         } = self.__props();
         axis.choose(len_x, len_y, len_z)
     }
+
+    #[inline]
+    fn __bits_data(&self) -> Option<&BitSlice> {
+        None
+    }
 }
 
 /// Slice of a voxel set.
@@ -65,9 +75,17 @@ pub struct Slice<'s>(dyn Abstract + 's);
 
 impl<'s> Slice<'s> {
     /// Whether this set contains a voxel at the given position.
+    ///
+    /// See [`Self::in_bounds_and_contains`] for bounds checking.
     #[inline]
     pub fn contains(&self, x: u32, y: u32, z: u32) -> bool {
         self.0.__contains(x, y, z)
+    }
+
+    /// Whether this set contains a voxel at the given position which is within the set's overall length.
+    #[inline]
+    pub fn in_bounds_and_contains(&self, x: u32, y: u32, z: u32) -> bool {
+        self.0.__in_bounds_and_contains(x, y, z)
     }
 
     /// Sets the voxel at given position.
@@ -148,6 +166,8 @@ impl<'s> Slice<'s> {
     pub fn is_empty(&self) -> bool {
         self.0.__is_empty()
     }
+
+    //TODO: boxes iteration
 }
 
 #[allow(unsafe_code)] // SAFETY: safe because the type is marked as `repr(transparent)`
@@ -253,10 +273,56 @@ impl VoxelSet {
         this
     }
 
+    /// Creates a new bitvec-backed voxel set from a slice, accepts any underlying representation.
+    pub fn from_slice(slice: &Slice<'_>) -> Self {
+        let value = slice;
+        let props = value.0.__props();
+        Self {
+            props,
+            bounds: Bounds {
+                x: value.0.__bounds(Axis::X),
+                y: value.0.__bounds(Axis::Y),
+                z: value.0.__bounds(Axis::Z),
+            },
+            data: value.0.__bits_data().map_or_else(
+                || {
+                    let mut bits = bitbox![0; (props.len_x * props.len_y * props.len_z) as usize];
+                    for x in 0..props.len_x {
+                        for y in 0..props.len_y {
+                            for z in 0..props.len_z {
+                                if value.contains(x, y, z) {
+                                    bits.set(__vset_index(props, x, y, z), true);
+                                }
+                            }
+                        }
+                    }
+                    bits
+                },
+                BitBox::from_bitslice,
+            ),
+        }
+    }
+
     /// Converts this set into a boxed slice.
     #[inline]
     pub fn into_boxed_slice(self) -> Box<Slice<'static>> {
         Slice::from_boxed(Box::new(self))
+    }
+
+    fn is_column_full(&self, x: u32, y: u32, z: Range<u32>) -> bool {
+        x < self.props.len_x
+            && y < self.props.len_y
+            && self.data
+                [__vset_index(self.props, x, y, z.start)..__vset_index(self.props, x, y, z.end)]
+                .all()
+    }
+
+    fn clear_column(&mut self, x: u32, y: u32, z: Range<u32>) {
+        debug_assert!(x < self.props.len_x, "x should be less than len_x");
+        debug_assert!(y < self.props.len_y, "y should be less than len_y");
+
+        self.data[__vset_index(self.props, x, y, z.start)..__vset_index(self.props, x, y, z.end)]
+            .fill(false);
     }
 }
 
@@ -289,7 +355,7 @@ impl Abstract for VoxelSet {
 
     #[inline]
     fn __index(&self, x: u32, y: u32, z: u32) -> usize {
-        ((x * self.props.len_y + y) * self.props.len_z + z) as usize
+        __vset_index(self.props, x, y, z)
     }
 
     #[inline]
@@ -302,6 +368,17 @@ impl Abstract for VoxelSet {
     fn __is_empty(&self) -> bool {
         self.data.not_any()
     }
+
+    #[inline]
+    fn __bits_data(&self) -> Option<&BitSlice> {
+        Some(&self.data)
+    }
+}
+
+#[inline]
+fn __vset_index(props: Props, x: u32, y: u32, z: u32) -> usize {
+    // continuous inside a column
+    ((x * props.len_y + y) * props.len_z + z) as usize
 }
 
 impl Deref for VoxelSet {
@@ -317,6 +394,13 @@ impl DerefMut for VoxelSet {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         Slice::from_mut(self)
+    }
+}
+
+impl From<&Slice<'_>> for VoxelSet {
+    #[inline]
+    fn from(value: &Slice<'_>) -> Self {
+        Self::from_slice(value)
     }
 }
 
