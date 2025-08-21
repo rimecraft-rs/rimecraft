@@ -1,6 +1,7 @@
 //! Minecraft voxel shapes.
 
 mod func;
+pub mod iter;
 mod list;
 pub mod set;
 
@@ -11,18 +12,24 @@ use std::{
 };
 
 use approx::abs_diff_eq;
-use glam::{USizeVec3, UVec3};
+use glam::{DVec3, USizeVec3, UVec3};
 use maybe::Maybe;
-use voxel_math::{
-    BBox, DVec3,
-    direction::{Axis, AxisDirection, Direction},
-};
 
 pub use func::*;
 pub use set::VoxelSet;
 
+pub use voxel_math;
+use voxel_math::{
+    BBox,
+    direction::{Axis, AxisDirection, Direction},
+};
+
+use crate::{
+    iter::Boxes,
+    list::{ErasedList, FractionalDoubleList, List, ListDeref, ListEraser, OffsetList},
+};
+
 pub use crate::Slice as VoxelShapeSlice;
-use crate::list::{ErasedList, FractionalDoubleList, List, ListDeref, ListEraser, OffsetList};
 pub use set::Slice as VoxelSetSlice;
 
 const F64_TOLERANCE: f64 = 1.0e-7f64;
@@ -363,6 +370,22 @@ impl<'a> Slice<'a> {
             }
         });
         opt.unwrap()
+    }
+
+    /// Restructures this voxel shape by merging largest coalesce boxes' cuboid shapes into one large shape.
+    pub fn simplify(&self) -> Arc<Self> {
+        self.boxes()
+            .map(cuboid)
+            .reduce(|a, b| combine(&a, &b))
+            .unwrap_or_else(|| empty().clone())
+    }
+
+    /// Iterates over all boxes within a voxel shape.
+    pub fn boxes(&self) -> Boxes<'_, 'a> {
+        Boxes {
+            slice: self,
+            inner: self.0.__as_raw().voxels.boxes(),
+        }
     }
 }
 
