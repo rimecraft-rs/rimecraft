@@ -1,3 +1,5 @@
+//! Iterators for voxel sets.
+
 use std::{iter::FusedIterator, marker::PhantomData};
 
 use glam::UVec3;

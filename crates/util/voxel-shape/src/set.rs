@@ -11,9 +11,9 @@ use glam::UVec3;
 use maybe::Maybe;
 use voxel_math::direction::Axis;
 
-mod iter;
+use crate::set::iter::{Boxes, Voxels};
 
-pub use iter::*;
+pub mod iter;
 
 trait Abstract: Send + Sync + Debug {
     fn __props(&self) -> Props;
