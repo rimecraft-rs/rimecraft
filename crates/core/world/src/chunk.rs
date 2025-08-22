@@ -5,9 +5,9 @@
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 use ahash::AHashMap;
-use local_cx::{LocalContext, ProvideLocalCxTy};
+use local_cx::{GlobalProvideLocalCxTy, LocalContext};
 use parking_lot::{Mutex, RwLock};
-use rimecraft_block::{BlockState, ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
+use rimecraft_block::{BlockState, ProvideBlockStateExtTy, RawBlock};
 use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe, container::ProvidePalette,
 };
@@ -22,7 +22,10 @@ use crate::{
     heightmap::{self, Heightmap},
     view::{
         HeightLimit,
-        block::{BlockLuminanceView, BlockView, LockedBlockViewMut},
+        block::{
+            BlockEntityView, BlockLuminanceView, BlockView, LockedBlockEntityViewMut,
+            LockedBlockViewMut,
+        },
     },
 };
 
@@ -57,7 +60,7 @@ where
         + ProvideFluidStateExtTy
         + ProvideIdTy
         + ProvideNbtTy
-        + ProvideLocalCxTy,
+        + GlobalProvideLocalCxTy,
 {
     /// The type of block state id list.
     type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>
@@ -125,7 +128,6 @@ where
 impl<'w, Cx> BaseChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>
-        + ProvideStateIds<List = Cx::BlockStateList>
         + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
@@ -155,7 +157,8 @@ where
     where
         I: Iterator<Item = Option<ChunkSection<'w, Cx>>> + ExactSizeIterator,
         Local: LocalContext<&'w Registry<Cx::Id, Cx::Biome>>
-            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>,
+            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+            + LocalContext<Cx::BlockStateList>,
     {
         Self {
             pos,
@@ -210,7 +213,10 @@ where
 /// Immutable chunk behaviors.
 pub trait Chunk<'w, Cx>
 where
-    Self: AsBaseChunk<'w, Cx> + BlockView<'w, Cx> + BlockLuminanceView<'w, Cx>,
+    Self: AsBaseChunk<'w, Cx>
+        + BlockView<'w, Cx>
+        + BlockEntityView<'w, Cx>
+        + BlockLuminanceView<'w, Cx>,
     Cx: ChunkCx<'w>,
 {
     /// Returns the array of chunk sections of this chunk.
@@ -288,7 +294,10 @@ where
 /// Mutable chunk behaviors.
 pub trait ChunkMut<'w, Cx>
 where
-    Self: AsBaseChunkMut<'w, Cx> + Chunk<'w, Cx> + LockedBlockViewMut<'w, Cx>,
+    Self: AsBaseChunkMut<'w, Cx>
+        + Chunk<'w, Cx>
+        + LockedBlockViewMut<'w, Cx>
+        + LockedBlockEntityViewMut<'w, Cx>,
     Cx: ChunkCx<'w>,
 {
     /// Returns the array of chunk sections of this chunk.

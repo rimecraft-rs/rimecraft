@@ -86,4 +86,83 @@ pub trait LocalContextExt {
 
 impl<Cx> LocalContextExt for Cx where Cx: BaseLocalContext {}
 
+/// A type that can be transformed into a [`WithLocalCx`] by taking ownership of it.
+pub trait ForwardToWithLocalCx {
+    /// The type of the inner data.
+    type Forwarded;
+
+    /// The type of the local context.
+    type LocalCx: BaseLocalContext;
+
+    /// Transform/forward into a [`WithLocalCx`].
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx>;
+}
+
+impl<T, L: BaseLocalContext> ForwardToWithLocalCx for WithLocalCx<T, L> {
+    type Forwarded = T;
+
+    type LocalCx = L;
+
+    #[inline]
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        self
+    }
+}
+
+impl<'a, T, L: BaseLocalContext> ForwardToWithLocalCx for &'a WithLocalCx<T, L> {
+    type Forwarded = &'a T;
+
+    type LocalCx = L;
+
+    #[inline]
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        WithLocalCx {
+            local_cx: self.local_cx,
+            inner: &self.inner,
+        }
+    }
+}
+
+impl<'a, T, L: BaseLocalContext> ForwardToWithLocalCx for &'a mut WithLocalCx<T, L> {
+    type Forwarded = &'a mut T;
+
+    type LocalCx = L;
+
+    #[inline]
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        WithLocalCx {
+            local_cx: self.local_cx,
+            inner: &mut self.inner,
+        }
+    }
+}
+
+impl<'b, T> ForwardToWithLocalCx for &'_ &'b T
+where
+    &'b T: ForwardToWithLocalCx,
+{
+    type Forwarded = <&'b T as ForwardToWithLocalCx>::Forwarded;
+
+    type LocalCx = <&'b T as ForwardToWithLocalCx>::LocalCx;
+
+    #[inline]
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        (*self).forward()
+    }
+}
+
+impl<'a, T> ForwardToWithLocalCx for &'a mut &'_ mut T
+where
+    &'a mut T: ForwardToWithLocalCx,
+{
+    type Forwarded = <&'a mut T as ForwardToWithLocalCx>::Forwarded;
+
+    type LocalCx = <&'a mut T as ForwardToWithLocalCx>::LocalCx;
+
+    #[inline]
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        (*self).forward()
+    }
+}
+
 mod tests;

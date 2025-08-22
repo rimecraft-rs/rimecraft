@@ -15,7 +15,7 @@ use rimecraft_block::BlockState;
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
 
-use crate::{Entity, World, chunk::ChunkCx};
+use crate::{Entity, ServerWorld, World, chunk::ChunkCx};
 
 /// Raw type of a [`GameEvent`], consisting of its notification radius.
 #[derive(Debug)]
@@ -64,7 +64,7 @@ where
     /// Listens to an incoming game event.
     fn listen(
         &mut self,
-        world: &World<'w, Cx>,
+        world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -91,7 +91,7 @@ where
 {
     fn _erased_listen(
         &mut self,
-        world: &World<'w, Cx>,
+        world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -119,7 +119,7 @@ where
 {
     fn _erased_listen(
         &mut self,
-        world: &World<'w, Cx>,
+        world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -338,14 +338,14 @@ where
     /// Firing event to any listener should be done by given `callback`, who receives listener and its position.
     ///
     /// Returns whether the callback was triggered.
-    pub fn dispatch<F>(&self, world: &World<'w, Cx>, pos: DVec3, mut callback: F) -> bool
+    pub fn dispatch<F>(&self, world: &ServerWorld<'w, Cx>, pos: DVec3, mut callback: F) -> bool
     where
         F: for<'env> FnMut(&'env mut dyn ErasedListener<'w, Cx>, DVec3),
     {
         let mut vg = self.listeners.lock();
         let mut visited = false;
         for listener in &mut *vg {
-            if let Some(sp) = listener._erased_ps_pos(world) {
+            if let Some(sp) = listener._erased_ps_pos(world.as_ref()) {
                 let d = sp.floor().distance_squared(pos.floor());
                 let i = listener._erased_range().pow(2) as f64;
                 if d <= i {
@@ -460,24 +460,25 @@ mod sealed {
 
 mod _edcode {
     use edcode2::{Buf, BufMut, Decode, Encode};
-    use local_cx::{LocalContext, LocalContextExt, WithLocalCx, dyn_cx::AsDynamicContext};
+    use local_cx::{
+        ForwardToWithLocalCx, LocalContext, LocalContextExt, WithLocalCx, dyn_cx::AsDynamicContext,
+    };
     use rimecraft_registry::Registry;
 
     use crate::chunk::ChunkCx;
 
     use super::{PositionSource, PositionSourceType, RawPositionSourceType};
 
-    impl<'w, Cx, B, L> Encode<WithLocalCx<B, L>> for dyn PositionSource<'w, Cx> + 'w
+    impl<'w, Cx, Fw> Encode<Fw> for dyn PositionSource<'w, Cx> + 'w
     where
         Cx: ChunkCx<'w>,
-        L: AsDynamicContext,
-        B: BufMut,
+        Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx: AsDynamicContext>,
     {
-        fn encode(&self, buf: WithLocalCx<B, L>) -> Result<(), edcode2::BoxedError<'static>> {
+        fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
             let WithLocalCx {
                 local_cx,
                 mut inner,
-            } = buf;
+            } = buf.forward();
             let ty = self.ty();
             ty.encode(&mut inner)?;
             let dyn_cx = local_cx.as_dynamic_context();
@@ -485,18 +486,18 @@ mod _edcode {
         }
     }
 
-    impl<'de, 'w, Cx, B, L> Decode<'de, WithLocalCx<B, L>>
-        for Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>
+    impl<'de, 'w, Cx, Fw> Decode<'de, Fw> for Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>
     where
         Cx: ChunkCx<'w>,
-        L: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
-        B: Buf,
+        Fw: ForwardToWithLocalCx<Forwarded: Buf>,
+        Fw::LocalCx:
+            LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
     {
-        fn decode(buf: WithLocalCx<B, L>) -> Result<Self, edcode2::BoxedError<'de>> {
+        fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
             let WithLocalCx {
                 local_cx,
                 mut inner,
-            } = buf;
+            } = buf.forward();
             let ty = PositionSourceType::decode(local_cx.with(&mut inner))?;
             let cx = local_cx.as_dynamic_context();
             (ty.packet.decode)(&mut inner, unsafe { cx.as_unsafe_cx() })

@@ -6,7 +6,7 @@ use ahash::{AHashMap, AHashSet};
 use bytes::{Buf, BufMut};
 use edcode2::{BufExt as _, BufMutExt as _, Decode, Encode};
 use local_cx::{
-    LocalContext, LocalContextExt, WithLocalCx,
+    ForwardToWithLocalCx, LocalContext, LocalContextExt, WithLocalCx,
     dyn_codecs::Any,
     dyn_cx::{AsDynamicContext, UnsafeDynamicContext},
     serde::{DeserializeWithCx, SerializeWithCx},
@@ -291,13 +291,13 @@ where
     }
 }
 
-impl<Cx, B, L> Encode<WithLocalCx<B, L>> for ComponentChanges<'_, '_, Cx>
+impl<Cx, Fw> Encode<Fw> for ComponentChanges<'_, '_, Cx>
 where
     Cx: ProvideIdTy,
-    B: BufMut,
-    L: AsDynamicContext,
+    Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx: AsDynamicContext>,
 {
-    fn encode(&self, buf: WithLocalCx<B, L>) -> Result<(), edcode2::BoxedError<'static>> {
+    fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
+        let buf = buf.forward();
         let cx = buf.local_cx;
         let mut buf = buf.inner;
         let present = self.changed.values().filter(|val| val.is_some()).count() as u32;
@@ -323,13 +323,15 @@ where
     }
 }
 
-impl<'a, 'de, Cx, B, LCx> Decode<'de, WithLocalCx<B, LCx>> for ComponentChanges<'a, '_, Cx>
+impl<'a, 'de, Cx, Fw> Decode<'de, Fw> for ComponentChanges<'a, '_, Cx>
 where
     Cx: ProvideIdTy,
-    B: Buf,
-    LCx: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>> + AsDynamicContext,
+    Fw: ForwardToWithLocalCx<Forwarded: Buf>,
+    Fw::LocalCx:
+        LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>> + AsDynamicContext,
 {
-    fn decode(mut buf: WithLocalCx<B, LCx>) -> Result<Self, edcode2::BoxedError<'de>> {
+    fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
+        let mut buf = buf.forward();
         let cx = buf.local_cx;
 
         let present = buf.get_variable::<u32>();

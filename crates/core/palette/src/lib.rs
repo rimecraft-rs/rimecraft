@@ -351,7 +351,7 @@ mod _edcode {
 
         #[inline]
         fn decode(_buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
-            Err("palettes do not support non-in-place decoding".into())
+            panic!("palettes do not support non-in-place decoding")
         }
 
         const SUPPORT_NON_IN_PLACE: bool = false;

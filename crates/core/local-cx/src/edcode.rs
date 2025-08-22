@@ -1,8 +1,11 @@
+//! edcode support for local context.
+
 #![cfg(feature = "edcode")]
 
+use bytes::buf::{Limit, Take};
 use edcode2::{Buf, BufMut};
 
-use crate::WithLocalCx;
+use crate::{ForwardToWithLocalCx, WithLocalCx};
 
 impl<T, Cx> Buf for WithLocalCx<T, Cx>
 where
@@ -64,5 +67,101 @@ where
     #[inline(always)]
     fn put_bytes(&mut self, val: u8, cnt: usize) {
         self.inner.put_bytes(val, cnt)
+    }
+}
+
+impl<T> ForwardToWithLocalCx for Limit<T>
+where
+    T: ForwardToWithLocalCx<Forwarded: BufMut>,
+{
+    type Forwarded = Limit<T::Forwarded>;
+    type LocalCx = T::LocalCx;
+
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        let (limit, inner) = (self.limit(), self.into_inner().forward());
+        WithLocalCx {
+            local_cx: inner.local_cx,
+            inner: inner.inner.limit(limit),
+        }
+    }
+}
+
+impl<'a, T> ForwardToWithLocalCx for &'a Limit<T>
+where
+    &'a T: ForwardToWithLocalCx<Forwarded: BufMut>,
+{
+    type Forwarded = Limit<<&'a T as ForwardToWithLocalCx>::Forwarded>;
+    type LocalCx = <&'a T as ForwardToWithLocalCx>::LocalCx;
+
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        let (limit, inner) = (self.limit(), self.get_ref().forward());
+        WithLocalCx {
+            local_cx: inner.local_cx,
+            inner: inner.inner.limit(limit),
+        }
+    }
+}
+
+impl<'a, T> ForwardToWithLocalCx for &'a mut Limit<T>
+where
+    &'a mut T: ForwardToWithLocalCx<Forwarded: BufMut>,
+{
+    type Forwarded = Limit<<&'a mut T as ForwardToWithLocalCx>::Forwarded>;
+    type LocalCx = <&'a mut T as ForwardToWithLocalCx>::LocalCx;
+
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        let (limit, inner) = (self.limit(), self.get_mut().forward());
+        WithLocalCx {
+            local_cx: inner.local_cx,
+            inner: inner.inner.limit(limit),
+        }
+    }
+}
+
+impl<T> ForwardToWithLocalCx for Take<T>
+where
+    T: ForwardToWithLocalCx<Forwarded: Buf>,
+{
+    type Forwarded = Take<T::Forwarded>;
+    type LocalCx = T::LocalCx;
+
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        let (limit, inner) = (self.limit(), self.into_inner().forward());
+        WithLocalCx {
+            local_cx: inner.local_cx,
+            inner: inner.inner.take(limit),
+        }
+    }
+}
+
+impl<'a, T> ForwardToWithLocalCx for &'a Take<T>
+where
+    &'a T: ForwardToWithLocalCx<Forwarded: Buf>,
+{
+    type Forwarded = Take<<&'a T as ForwardToWithLocalCx>::Forwarded>;
+    type LocalCx = <&'a T as ForwardToWithLocalCx>::LocalCx;
+
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        let (limit, inner) = (self.limit(), self.get_ref().forward());
+        WithLocalCx {
+            local_cx: inner.local_cx,
+            inner: inner.inner.take(limit),
+        }
+    }
+}
+
+impl<'a, T> ForwardToWithLocalCx for &'a mut Take<T>
+where
+    &'a mut T: ForwardToWithLocalCx<Forwarded: Buf>,
+{
+    type Forwarded = Take<<&'a mut T as ForwardToWithLocalCx>::Forwarded>;
+    type LocalCx = <&'a mut T as ForwardToWithLocalCx>::LocalCx;
+
+    fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
+        let (limit, inner) = (self.limit(), self.get_mut().forward());
+        WithLocalCx {
+            local_cx: inner.local_cx,
+            inner: inner.inner.take(limit),
+        }
     }
 }

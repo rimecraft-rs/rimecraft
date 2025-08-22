@@ -44,7 +44,7 @@ where
 impl<'w, P, Cx> RawHeightmap<'w, P, Cx>
 where
     Cx: ChunkCx<'w>,
-    P: for<'s> FnMut(Option<&'s BlockState<'w, Cx>>) -> bool,
+    P: for<'s> FnMut(Option<BlockState<'w, Cx>>) -> bool,
 {
     /// Returns the highest block at the given coordinate.
     #[inline]
@@ -72,7 +72,7 @@ where
         x: i32,
         y: i32,
         z: i32,
-        state: &BlockState<'w, Cx>,
+        state: BlockState<'w, Cx>,
         mut peeker: Pk,
     ) -> bool
     where
@@ -114,7 +114,7 @@ const fn to_index(x: i32, z: i32) -> usize {
 /// and are used for different purposes.
 pub trait Type<'w, Cx: ChunkCx<'w>>: 'w {
     /// Predicate of block states.
-    type Predicate: for<'s> Fn(Option<&'s BlockState<'w, Cx>>) -> bool;
+    type Predicate: for<'s> Fn(Option<BlockState<'w, Cx>>) -> bool;
 
     /// Predicate of this type.
     fn predicate(&self) -> Self::Predicate;
