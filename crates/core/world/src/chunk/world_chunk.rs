@@ -131,15 +131,15 @@ where
                 return None;
             }
         } else {
-            if let Some(nbt) = self.base.block_entity_nbts.lock().remove(&pos) {
-                if let Some(be2) = self.load_block_entity_locked(pos, nbt) {
-                    return Some(pk(&be2));
-                }
+            if let Some(nbt) = self.base.block_entity_nbts.lock().remove(&pos)
+                && let Some(be2) = self.load_block_entity_locked(pos, nbt)
+            {
+                return Some(pk(&be2));
             }
-            if ty == CreationType::Immediate {
-                if let Some(be) = self.create_block_entity(pos) {
-                    self.add_block_entity_locked(be)
-                }
+            if ty == CreationType::Immediate
+                && let Some(be) = self.create_block_entity(pos)
+            {
+                self.add_block_entity_locked(be)
             }
         }
 
@@ -163,15 +163,15 @@ where
                 return None;
             }
         } else {
-            if let Some(nbt) = self.base.block_entity_nbts.get_mut().remove(&pos) {
-                if let Some(be2) = self.load_block_entity(pos, nbt) {
-                    return Some(pk(&be2));
-                }
+            if let Some(nbt) = self.base.block_entity_nbts.get_mut().remove(&pos)
+                && let Some(be2) = self.load_block_entity(pos, nbt)
+            {
+                return Some(pk(&be2));
             }
-            if ty == CreationType::Immediate {
-                if let Some(be) = self.create_block_entity_lf(pos) {
-                    self.add_block_entity(be)
-                }
+            if ty == CreationType::Immediate
+                && let Some(be) = self.create_block_entity_lf(pos)
+            {
+                self.add_block_entity(be)
             }
         }
 
