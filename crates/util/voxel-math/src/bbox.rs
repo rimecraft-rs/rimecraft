@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use std::{fmt::Debug, hash::Hash};
 
 use glam::{DVec3, IVec3};
 
@@ -7,7 +7,7 @@ use crate::BlockPos;
 /// A 3D axis-aligned bounding box.
 ///
 /// The box is defined by its minimum and maximum corners.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy)]
 pub struct BBox {
     min: DVec3,
     max: DVec3,
@@ -90,5 +90,14 @@ impl From<(BlockPos, BlockPos)> for BBox {
         let v1 = p1.0.min(p2.0);
         let v2 = p1.0.max(p2.0) + IVec3::ONE;
         Self::from_raw(v1.into(), v2.into())
+    }
+}
+
+impl Debug for BBox {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("BBox")
+            .field(&self.min.to_array())
+            .field(&self.max.to_array())
+            .finish()
     }
 }
