@@ -549,7 +549,7 @@ where
         pos: BlockPos,
     ) -> Option<FluidState<'w, Cx>> {
         let bca = this.bca();
-        let index = bca.bca_as_base_chunk().height_limit.section_index(pos.y());
+        let index = bca.bca_as_bc().height_limit.section_index(pos.y());
         bca.read_chunk_section(index).and_then(|section| {
             if section.is_empty() {
                 None

@@ -389,7 +389,7 @@ trait BaseChunkAccess<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    fn bca_as_base_chunk(&self) -> &BaseChunk<'w, Cx>;
+    fn bca_as_bc(&self) -> &BaseChunk<'w, Cx>;
     fn reclaim(&mut self) -> impl BaseChunkAccess<'w, Cx>;
 
     type HeighmapsRead: Deref<Target = AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
@@ -465,7 +465,7 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> 
     }
 
     #[inline]
-    fn bca_as_base_chunk(&self) -> &BaseChunk<'w, Cx> {
+    fn bca_as_bc(&self) -> &BaseChunk<'w, Cx> {
         self
     }
 
@@ -526,7 +526,7 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, 
     }
 
     #[inline]
-    fn bca_as_base_chunk(&self) -> &BaseChunk<'w, Cx> {
+    fn bca_as_bc(&self) -> &BaseChunk<'w, Cx> {
         self
     }
 
