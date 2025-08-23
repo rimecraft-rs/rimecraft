@@ -386,7 +386,7 @@ impl VoxelSet {
             } in xit
             {
                 let mut x_active = false;
-                let (x1, x2, xi) = (x1 as u32, x2 as u32, xi as u32);
+                let (x1, x2, xi) = (x1, x2, xi as u32);
 
                 yp.__peek_pair_erased_iter(&mut |yit| {
                     for PairListIterItem {
@@ -396,7 +396,7 @@ impl VoxelSet {
                     } in yit
                     {
                         let mut y_active = false;
-                        let (y1, y2, yi) = (y1 as u32, y2 as u32, yi as u32);
+                        let (y1, y2, yi) = (y1, y2, yi as u32);
 
                         zp.__peek_pair_erased_iter(&mut |zit| {
                             for PairListIterItem {
@@ -405,7 +405,7 @@ impl VoxelSet {
                                 index: zi,
                             } in zit
                             {
-                                let (z1, z2, zi) = (z1 as u32, z2 as u32, zi as u32);
+                                let (z1, z2, zi) = (z1, z2, zi as u32);
                                 if f(
                                     lhs.in_bounds_and_contains(x1, y1, z1),
                                     rhs.in_bounds_and_contains(x2, y2, z2),

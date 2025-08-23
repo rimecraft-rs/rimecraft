@@ -256,8 +256,8 @@ impl<I, T> From<(I, T)> for OffsetList<I, T> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct PairListIterItem {
-    pub x: i32,
-    pub y: i32,
+    pub x: u32,
+    pub y: u32,
     pub index: usize,
 }
 
@@ -319,8 +319,8 @@ where
     ) {
         f(
             &mut (0..self.0.__erased_len() - 1).map(|i| PairListIterItem {
-                x: i as i32,
-                y: i as i32,
+                x: i as u32,
+                y: i as u32,
                 index: i,
             }),
         )
@@ -330,8 +330,8 @@ where
 #[derive(Debug)]
 pub struct SimplePairDoubleList {
     indices: Box<[f64]>,
-    min_vals: Box<[i32]>,
-    max_vals: Box<[i32]>,
+    min_vals: Box<[u32]>,
+    max_vals: Box<[u32]>,
     len: usize,
 }
 
@@ -348,8 +348,8 @@ impl SimplePairDoubleList {
         let len_merged = len_lhs + len_rhs;
         let mut this = Self {
             indices: vec![0f64; len_merged].into_boxed_slice(),
-            min_vals: vec![0i32; len_merged].into_boxed_slice(),
-            max_vals: vec![0i32; len_merged].into_boxed_slice(),
+            min_vals: vec![0u32; len_merged].into_boxed_slice(),
+            max_vals: vec![0u32; len_merged].into_boxed_slice(),
             len: 0,
         };
         let mut indices_ptr = 0usize;
@@ -383,22 +383,22 @@ impl SimplePairDoubleList {
                 }
             }
 
-            let lhs_ptr_current = lhs_ptr as i32 - 1;
-            let rhs_ptr_current = rhs_ptr as i32 - 1;
+            let lhs_ptr_current = lhs_ptr.overflowing_sub(1).0;
+            let rhs_ptr_current = rhs_ptr.overflowing_sub(1).0;
             let e = if make_lhs {
-                lhs.__erased_index(lhs_ptr_current as usize)
+                lhs.__erased_index(lhs_ptr_current)
             } else {
-                rhs.__erased_index(rhs_ptr_current as usize)
+                rhs.__erased_index(rhs_ptr_current)
             };
             if d < e - F64_TOLERANCE {
-                this.min_vals[indices_ptr] = lhs_ptr_current;
-                this.max_vals[indices_ptr] = rhs_ptr_current;
+                this.min_vals[indices_ptr] = lhs_ptr_current as u32;
+                this.max_vals[indices_ptr] = rhs_ptr_current as u32;
                 this.indices[indices_ptr] = e;
                 indices_ptr += 1;
                 d = e;
             } else {
-                this.min_vals[indices_ptr - 1] = lhs_ptr_current;
-                this.max_vals[indices_ptr - 1] = rhs_ptr_current;
+                this.min_vals[indices_ptr - 1] = lhs_ptr_current as u32;
+                this.max_vals[indices_ptr - 1] = rhs_ptr_current as u32;
             }
         }
 
@@ -494,8 +494,8 @@ impl PairErasedList<f64> for FractionalPairDoubleList {
         f: &mut (dyn FnMut(&mut (dyn Iterator<Item = PairListIterItem> + '_)) + '_),
     ) {
         f(&mut (0..self.list.len() - 1).map(|i| PairListIterItem {
-            x: (i as u32 / self.gcd) as i32,
-            y: (i as u32 / self.first_sec_count) as i32,
+            x: i as u32 / self.gcd,
+            y: i as u32 / self.first_sec_count,
             index: i,
         }))
     }
@@ -563,9 +563,9 @@ where
         let len_l = self.left.__erased_len();
         let len_r = self.right.__erased_len();
 
-        let base = (0..len_l)
-            .map(|j| (j as i32, -1i32, j))
-            .chain((0..len_r - 1).map(|k| (len_l as i32 - 1, k as i32, len_r + k)));
+        let base = (0..len_l).map(|j| (j as u32, u32::MAX, j)).chain(
+            (0..len_r - 1).map(|k| (len_l.overflowing_sub(1).0 as u32, k as u32, len_r + k)),
+        );
 
         if self.inverted {
             f(&mut base.map(|(x, y, index)| PairListIterItem { x: y, y: x, index }))
