@@ -1,0 +1,1 @@
+//! Rimecraft Entity primitives.

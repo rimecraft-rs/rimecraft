@@ -1,0 +1,21 @@
+[package]
+name = "rimecraft-entity"
+version = "0.1.0"
+edition = "2024"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Minecraft Entity primitives"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+rimecraft-global-cx = { path = "../global-cx" }
+rimecraft-registry = { path = "../registry" }
+
+[features]
+
+[lints]
+workspace = true
