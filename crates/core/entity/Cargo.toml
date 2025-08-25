@@ -12,8 +12,9 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-global-cx = { path = "../global-cx" }
-rimecraft-registry = { path = "../registry" }
+global-cx = { path = "../global-cx", package = "rimecraft-global-cx" }
+registry = { path = "../registry", package = "rimecraft-registry" }
+dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 
 [features]
 

@@ -4,7 +4,7 @@ use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use fastnbt::DeOpts;
 use local_cx::{
-    BaseLocalContext, LocalContext, LocalContextExt,
+    BaseLocalContext, LocalContext, LocalContextExt, ProvideLocalCxTy,
     dyn_codecs::Any,
     dyn_cx::{AsDynamicContext, ContextTable, DynamicContext},
     edcode_codec,
@@ -52,32 +52,41 @@ where
     }
 }
 
-const fn packet_codec_edcode<'a>() -> PacketCodec<'a, Foo> {
+const fn packet_codec_edcode<'a, Cx>() -> PacketCodec<'a, Foo, Cx::LocalContext<'a>>
+where
+    Cx: ProvideLocalCxTy,
+{
     edcode_codec!(Foo: Any + 'a)
 }
 
-const fn packet_codec_nbt<'a>() -> PacketCodec<'a, Foo> {
+const fn packet_codec_nbt<'a, Cx>() -> PacketCodec<'a, Foo, Cx::LocalContext<'a>>
+where
+    Cx: ProvideLocalCxTy,
+{
     edcode_codec!(Nbt<Context> Foo: Any + 'a)
 }
 
-const fn serde_codec<'a>() -> SerdeCodec<'a, Foo> {
+const fn serde_codec<'a, Cx>() -> SerdeCodec<'a, Foo, Cx::LocalContext<'a>>
+where
+    Cx: ProvideLocalCxTy,
+{
     serde_codec!(Foo: Any + 'a)
 }
 
 #[test]
 #[should_panic]
 fn type_builder_no_edcode() {
-    let _ty = ComponentType::<'static, Foo>::builder::<Context>().build();
+    let _ty = ComponentType::<'static, Foo, Context>::builder().build();
 }
 
 #[test]
 fn type_transient_check() {
-    let ty = ComponentType::<'_, Foo>::builder::<Context>()
+    let ty = ComponentType::<'_, Foo, Context>::builder()
         .packet_codec(packet_codec_edcode())
         .build();
     assert!(ty.is_transient());
 
-    let ty = ComponentType::<'_, Foo>::builder::<Context>()
+    let ty = ComponentType::<'_, Foo, Context>::builder()
         .packet_codec(packet_codec_edcode())
         .serde_codec(serde_codec())
         .build();
@@ -87,8 +96,8 @@ fn type_transient_check() {
 const REGISTRY_ID: Id =
     unsafe { test_global::integration::registry::id_unchecked("data_component_types") };
 
-const fn type_transient_edcode<'a>() -> ComponentType<'a, Foo> {
-    ComponentType::<'_, Foo>::builder::<Context>()
+const fn type_transient_edcode<'a>() -> ComponentType<'a, Foo, Context> {
+    ComponentType::<'_, Foo, Context>::builder()
         .packet_codec(packet_codec_edcode())
         .build()
 }
@@ -96,8 +105,8 @@ const fn type_transient_edcode_key<'a>() -> RegistryKey<Id, RawErasedComponentTy
     registry_key("foo_transient_edcode")
 }
 
-const fn type_persistent<'a>() -> ComponentType<'a, Foo> {
-    ComponentType::<'_, Foo>::builder::<Context>()
+const fn type_persistent<'a>() -> ComponentType<'a, Foo, Context> {
+    ComponentType::<'_, Foo, Context>::builder()
         .packet_codec(packet_codec_nbt())
         .serde_codec(serde_codec())
         .build()

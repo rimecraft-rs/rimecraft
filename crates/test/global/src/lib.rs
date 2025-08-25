@@ -11,7 +11,7 @@ use global_cx::{
     nbt::{ReadNbt, UpdateNbt, WriteNbt},
 };
 use local_cx::{
-    BaseLocalContext, LocalContextExt as _, WithLocalCx,
+    BaseLocalContext, LocalContextExt as _, ProvideLocalCxTy, WithLocalCx,
     nbt::{ReadNbtWithCx, UpdateNbtWithCx, WriteNbtWithCx},
     serde::{DeserializeWithCx, SerializeWithCx},
 };
@@ -22,16 +22,39 @@ pub mod pool;
 
 /// Integration with several Rimecraft crates.
 pub mod integration {
+    pub mod component;
     pub mod registry;
     pub mod text;
 }
 
 pub use identifier::Id;
+#[cfg(feature = "component")]
+use registry::Registry;
 
 /// The global context.
 #[derive(Debug)]
 #[allow(clippy::exhaustive_enums)]
 pub enum TestContext {}
+
+/// The owned local context.
+#[derive(Debug)]
+pub struct OwnedLocalTestContext<'a> {
+    /// The component registry.
+    #[cfg(feature = "component")]
+    pub reg_components: Registry<Id, component::RawErasedComponentType<'a, TestContext>>,
+}
+
+impl Default for OwnedLocalTestContext<'_> {
+    fn default() -> Self {
+        Self {
+            #[cfg(feature = "component")]
+            reg_components: integration::component::default_components_registry_builder().into(),
+        }
+    }
+}
+
+/// The local context.
+pub type LocalTestContext<'a> = &'a OwnedLocalTestContext<'a>;
 
 unsafe impl GlobalContext for TestContext {}
 
@@ -42,6 +65,12 @@ impl ProvideIdTy for TestContext {
 impl ProvideVersionTy for TestContext {
     type Version = String;
 }
+
+impl ProvideLocalCxTy for TestContext {
+    type LocalContext<'cx> = LocalTestContext<'cx>;
+}
+
+impl BaseLocalContext for LocalTestContext<'_> {}
 
 /// A integer array.
 #[derive(Debug)]

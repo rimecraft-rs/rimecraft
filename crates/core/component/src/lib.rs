@@ -5,9 +5,7 @@ use std::{any::TypeId, cell::UnsafeCell, fmt::Debug, hash::Hash, marker::Phantom
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
 use local_cx::{
-    WithLocalCx,
-    dyn_cx::UnsafeDynamicContext,
-    edcode_codec,
+    ProvideLocalCxTy, WithLocalCx, edcode_codec,
     nbt::{ReadNbtWithCx, WriteNbtWithCx},
     serde::{DeserializeWithCx, SerializeWithCx},
     serde_codec,
@@ -30,24 +28,27 @@ pub use local_cx::dyn_codecs::Any;
 /// For the type-erased variant, see [`RawErasedComponentType`].
 #[derive(Debug)]
 #[doc(alias = "DataComponentType")]
-pub struct ComponentType<'a, T> {
-    f: Funcs<'a>,
+pub struct ComponentType<'a, T, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    f: Funcs<'a, Cx::LocalContext<'a>>,
     _marker: PhantomData<T>,
 }
 
-impl<T> ComponentType<'_, T> {
+impl<'a, T, Cx> ComponentType<'a, T, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
     /// Returns whether the component is transient.
     #[inline]
     #[doc(alias = "should_skip_serialization")]
     pub fn is_transient(&self) -> bool {
         self.f.serde_codec.is_none()
     }
-}
-
-impl<'a, T> ComponentType<'a, T> {
     /// Creates a builder of component type.
     #[inline]
-    pub const fn builder<Cx>() -> TypeBuilder<'a, T, Cx> {
+    pub const fn builder() -> TypeBuilder<'a, T, Cx> {
         TypeBuilder {
             serde_codec: None,
             packet_codec: None,
@@ -56,9 +57,10 @@ impl<'a, T> ComponentType<'a, T> {
     }
 }
 
-impl<'a, T> ComponentType<'a, T>
+impl<'a, T, Cx> ComponentType<'a, T, Cx>
 where
     T: Clone + Eq + Hash + Debug + Send + Sync + 'a,
+    Cx: ProvideLocalCxTy,
 {
     const UTIL: DynUtil<'a> = DynUtil {
         clone: |obj| {
@@ -80,49 +82,58 @@ where
 
 /// Creates a new [`PacketCodec`] by encoding and decoding through `edcode2`.
 #[deprecated = "use local-cx-provided macro instead"]
-pub const fn packet_codec_edcode<'a, T>() -> PacketCodec<'a, T>
+pub const fn packet_codec_edcode<'a, T, Cx>() -> PacketCodec<'a, T, Cx::LocalContext<'a>>
 where
-    T: for<'b, 'cx> Encode<WithLocalCx<&'b mut dyn BufMut, UnsafeDynamicContext<'cx>>>
-        + for<'b, 'cx> Decode<'static, WithLocalCx<&'b mut dyn Buf, UnsafeDynamicContext<'cx>>>
+    T: for<'b, 'cx> Encode<WithLocalCx<&'b mut dyn BufMut, Cx::LocalContext<'cx>>>
+        + for<'b, 'cx> Decode<'static, WithLocalCx<&'b mut dyn Buf, Cx::LocalContext<'cx>>>
         + Send
         + Sync
         + 'a,
+    Cx: ProvideLocalCxTy,
 {
     edcode_codec!(T: Any + 'a)
 }
 
 /// Creates a new [`PacketCodec`] by NBT serialization.
 #[deprecated = "use local-cx-provided macro instead"]
-pub const fn packet_codec_nbt<'a, T, Cx>() -> PacketCodec<'a, T>
+pub const fn packet_codec_nbt<'a, T, Cx>() -> PacketCodec<'a, T, Cx::LocalContext<'a>>
 where
     T: Send + Sync + 'a,
-    Cx: for<'cx> ReadNbtWithCx<T, UnsafeDynamicContext<'cx>>
-        + for<'t, 'cx> WriteNbtWithCx<&'t T, UnsafeDynamicContext<'cx>>,
+    Cx: ProvideLocalCxTy
+        + for<'cx> ReadNbtWithCx<T, Cx::LocalContext<'cx>>
+        + for<'t, 'cx> WriteNbtWithCx<&'t T, Cx::LocalContext<'cx>>,
 {
     edcode_codec!(Nbt<Cx> T: Any + 'a)
 }
 
 /// Creates a new [`SerdeCodec`] by using `erased_serde`.
 #[deprecated = "use local-cx-provided macro instead"]
-pub const fn serde_codec<'a, T>() -> SerdeCodec<'a, T>
+pub const fn serde_codec<'a, T, Cx>() -> SerdeCodec<'a, T, Cx::LocalContext<'a>>
 where
-    for<'t, 'cx> &'t T: SerializeWithCx<UnsafeDynamicContext<'cx>>,
-    T: for<'de, 'cx> DeserializeWithCx<'de, UnsafeDynamicContext<'cx>> + Send + Sync + 'a,
+    for<'t> &'t T: SerializeWithCx<Cx::LocalContext<'t>>,
+    T: for<'de, 'cx> DeserializeWithCx<'de, Cx::LocalContext<'cx>> + Send + Sync + 'a,
+    Cx: ProvideLocalCxTy,
 {
     serde_codec!(T: Any + 'a)
 }
 
 /// Builder for creating a new [`ComponentType`].
 #[derive(Debug)]
-pub struct TypeBuilder<'a, T, Cx> {
-    serde_codec: Option<UnsafeSerdeCodec<'a>>,
-    packet_codec: Option<UnsafePacketCodec<'a>>,
+pub struct TypeBuilder<'a, T, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    serde_codec: Option<UnsafeSerdeCodec<'a, Cx::LocalContext<'a>>>,
+    packet_codec: Option<UnsafePacketCodec<'a, Cx::LocalContext<'a>>>,
     _marker: PhantomData<(T, Cx)>,
 }
 
-impl<'a, T, Cx> TypeBuilder<'a, T, Cx> {
+impl<'a, T, Cx> TypeBuilder<'a, T, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
     /// Applies the given serialization and deserialization codec.
-    pub const fn serde_codec(self, codec: SerdeCodec<'a, T>) -> Self {
+    pub const fn serde_codec(self, codec: SerdeCodec<'a, T, Cx::LocalContext<'a>>) -> Self {
         Self {
             serde_codec: Some(codec.codec),
             ..self
@@ -130,7 +141,7 @@ impl<'a, T, Cx> TypeBuilder<'a, T, Cx> {
     }
 
     /// Applies the given packet encoding and decoding codec.
-    pub const fn packet_codec(self, codec: PacketCodec<'a, T>) -> Self {
+    pub const fn packet_codec(self, codec: PacketCodec<'a, T, Cx::LocalContext<'a>>) -> Self {
         Self {
             packet_codec: Some(codec.codec),
             ..self
@@ -141,13 +152,14 @@ impl<'a, T, Cx> TypeBuilder<'a, T, Cx> {
 impl<'a, T, Cx> TypeBuilder<'a, T, Cx>
 where
     T: Clone + Eq + Hash + Debug + Send + Sync + 'a,
+    Cx: ProvideLocalCxTy,
 {
     /// Builds a new [`ComponentType`] with the given codecs.
     ///
     /// # Panics
     ///
     /// Panics if the packet codec is not set.
-    pub const fn build(self) -> ComponentType<'a, T> {
+    pub const fn build(self) -> ComponentType<'a, T, Cx> {
         ComponentType {
             f: Funcs {
                 serde_codec: self.serde_codec,
@@ -155,14 +167,17 @@ where
                     Some(codec) => codec,
                     None => panic!("packet codec is required"),
                 },
-                util: ComponentType::<T>::UTIL,
+                util: ComponentType::<T, Cx>::UTIL,
             },
             _marker: PhantomData,
         }
     }
 }
 
-impl<T> Hash for ComponentType<'_, T> {
+impl<T, Cx> Hash for ComponentType<'_, T, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         typeid::of::<T>().hash(state);
@@ -170,16 +185,22 @@ impl<T> Hash for ComponentType<'_, T> {
     }
 }
 
-impl<T> PartialEq for ComponentType<'_, T> {
+impl<T, Cx> PartialEq for ComponentType<'_, T, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.is_transient() == other.is_transient()
     }
 }
 
-impl<T> Copy for ComponentType<'_, T> {}
+impl<T, Cx> Copy for ComponentType<'_, T, Cx> where Cx: ProvideLocalCxTy {}
 
-impl<T> Clone for ComponentType<'_, T> {
+impl<T, Cx> Clone for ComponentType<'_, T, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
     #[inline]
     fn clone(&self) -> Self {
         *self
@@ -190,19 +211,23 @@ impl<T> Clone for ComponentType<'_, T> {
 ///
 /// This contains the type ID of the component and the codecs for serialization and packet encoding.
 #[derive(Debug)]
-pub struct RawErasedComponentType<'a, Cx> {
+pub struct RawErasedComponentType<'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
     ty: TypeId,
-    f: Funcs<'a>,
+    f: Funcs<'a, Cx::LocalContext<'a>>,
     _marker: PhantomData<Cx>,
 }
 
 /// Codec for serialization and deserialization.
-pub type SerdeCodec<'a, T> = local_cx::dyn_codecs::SerdeCodec<T, Object<'a>, dyn Any + 'a>;
-type UnsafeSerdeCodec<'a> = local_cx::dyn_codecs::UnsafeSerdeCodec<Object<'a>, dyn Any + 'a>;
+pub type SerdeCodec<'a, T, L> = local_cx::dyn_codecs::SerdeCodec<T, L, Object<'a>, dyn Any + 'a>;
+type UnsafeSerdeCodec<'a, L> = local_cx::dyn_codecs::UnsafeSerdeCodec<L, Object<'a>, dyn Any + 'a>;
 
 /// Codec for packet encoding and decoding.
-pub type PacketCodec<'a, T> = local_cx::dyn_codecs::EdcodeCodec<T, Object<'a>, dyn Any + 'a>;
-type UnsafePacketCodec<'a> = local_cx::dyn_codecs::UnsafeEdcodeCodec<Object<'a>, dyn Any + 'a>;
+pub type PacketCodec<'a, T, L> = local_cx::dyn_codecs::EdcodeCodec<T, L, Object<'a>, dyn Any + 'a>;
+type UnsafePacketCodec<'a, L> =
+    local_cx::dyn_codecs::UnsafeEdcodeCodec<L, Object<'a>, dyn Any + 'a>;
 
 #[derive(Debug, Clone, Copy)]
 struct DynUtil<'a> {
@@ -214,13 +239,16 @@ struct DynUtil<'a> {
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
-struct Funcs<'a> {
-    serde_codec: Option<UnsafeSerdeCodec<'a>>,
-    packet_codec: UnsafePacketCodec<'a>,
+struct Funcs<'a, L> {
+    serde_codec: Option<UnsafeSerdeCodec<'a, L>>,
+    packet_codec: UnsafePacketCodec<'a, L>,
     util: DynUtil<'a>,
 }
 
-impl<'a, Cx> RawErasedComponentType<'a, Cx> {
+impl<'a, Cx> RawErasedComponentType<'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
     /// Downcasts this type-erased component type into a typed data component type.
     ///
     /// # Safety
@@ -228,7 +256,7 @@ impl<'a, Cx> RawErasedComponentType<'a, Cx> {
     /// This function could not guarantee lifetime of type `T` is sound.
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     #[inline]
-    pub unsafe fn downcast<T>(&self) -> Option<ComponentType<'a, T>> {
+    pub unsafe fn downcast<T>(&self) -> Option<ComponentType<'a, T, Cx>> {
         (typeid::of::<T>() == self.ty).then_some(ComponentType {
             f: self.f,
             _marker: PhantomData,
@@ -244,7 +272,7 @@ impl<'a, Cx> RawErasedComponentType<'a, Cx> {
     ///
     /// This function does not validate equality of two types.
     #[inline]
-    pub unsafe fn downcast_unchecked<T>(&self) -> ComponentType<'a, T> {
+    pub unsafe fn downcast_unchecked<T>(&self) -> ComponentType<'a, T, Cx> {
         debug_assert_eq!(typeid::of::<T>(), self.ty);
         ComponentType {
             f: self.f,
@@ -266,9 +294,12 @@ impl<'a, Cx> RawErasedComponentType<'a, Cx> {
     }
 }
 
-impl<'a, T, Cx> From<&ComponentType<'a, T>> for RawErasedComponentType<'a, Cx> {
+impl<'a, T, Cx> From<&ComponentType<'a, T, Cx>> for RawErasedComponentType<'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
     #[inline]
-    fn from(value: &ComponentType<'a, T>) -> Self {
+    fn from(value: &ComponentType<'a, T, Cx>) -> Self {
         Self {
             ty: typeid::of::<T>(),
             f: value.f,
@@ -277,7 +308,10 @@ impl<'a, T, Cx> From<&ComponentType<'a, T>> for RawErasedComponentType<'a, Cx> {
     }
 }
 
-impl<Cx> Hash for RawErasedComponentType<'_, Cx> {
+impl<Cx> Hash for RawErasedComponentType<'_, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.ty.hash(state);
@@ -285,18 +319,24 @@ impl<Cx> Hash for RawErasedComponentType<'_, Cx> {
     }
 }
 
-impl<Cx> PartialEq for RawErasedComponentType<'_, Cx> {
+impl<Cx> PartialEq for RawErasedComponentType<'_, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.ty == other.ty && self.is_transient() == other.is_transient()
     }
 }
 
-impl<Cx> Eq for RawErasedComponentType<'_, Cx> {}
+impl<Cx> Eq for RawErasedComponentType<'_, Cx> where Cx: ProvideLocalCxTy {}
 
-impl<Cx> Copy for RawErasedComponentType<'_, Cx> {}
+impl<Cx> Copy for RawErasedComponentType<'_, Cx> where Cx: ProvideLocalCxTy {}
 
-impl<Cx> Clone for RawErasedComponentType<'_, Cx> {
+impl<Cx> Clone for RawErasedComponentType<'_, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
     fn clone(&self) -> Self {
         *self
     }

@@ -21,10 +21,7 @@ pub mod serde;
 
 pub use components_util::ComponentsAccess;
 
-/// Re-export of `rimecraft-component`
-pub mod component {
-    pub use ::component::*;
-}
+pub use component;
 
 /// Newtype wrapper of block entity's component type of its data.
 pub struct DataComponentType<'a, Cx>(pub ErasedComponentType<'a, Cx>)

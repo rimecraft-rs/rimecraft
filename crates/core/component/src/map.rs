@@ -7,9 +7,9 @@ use std::{
 
 use ahash::AHashMap;
 use local_cx::{
-    LocalContext, LocalContextExt as _, WithLocalCx,
+    LocalContext, LocalContextExt as _, ProvideLocalCxTy, WithLocalCx,
     dyn_codecs::{self, Any},
-    dyn_cx::{AsDynamicContext, UnsafeDynamicContext},
+    dyn_cx::AsDynamicContext,
     serde::{DeserializeWithCx, SerializeWithCx},
 };
 use rimecraft_global_cx::ProvideIdTy;
@@ -23,16 +23,18 @@ use crate::{
 };
 
 #[repr(transparent)]
-pub(crate) struct CompTyCell<'a, Cx: ProvideIdTy>(pub(crate) ErasedComponentType<'a, Cx>);
+pub(crate) struct CompTyCell<'a, Cx>(pub(crate) ErasedComponentType<'a, Cx>)
+where
+    Cx: ProvideIdTy + ProvideLocalCxTy;
 
 /// A map that stores components.
 pub struct ComponentMap<'a, Cx>(MapInner<'a, Cx>)
 where
-    Cx: ProvideIdTy;
+    Cx: ProvideIdTy + ProvideLocalCxTy;
 
 enum MapInner<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     Empty,
     Patched {
@@ -45,7 +47,7 @@ where
 
 impl<Cx> Default for ComponentMap<'_, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     #[inline]
     fn default() -> Self {
@@ -55,7 +57,7 @@ where
 
 impl<'a, Cx> ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     /// An empty component map.
     pub const EMPTY: Self = Self(MapInner::Empty);
@@ -157,7 +159,7 @@ where
     ///
     /// This function could not guarantee lifetime of type `T` is sound.
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
-    pub unsafe fn get<T>(&self, ty: &ComponentType<'a, T>) -> Option<&T> {
+    pub unsafe fn get<T>(&self, ty: &ComponentType<'a, T, Cx>) -> Option<&T> {
         self.get_raw(&RawErasedComponentType::from(ty))
             .and_then(|val| unsafe { <dyn Any>::downcast_ref(val) })
     }
@@ -184,7 +186,7 @@ where
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get_key_value<T>(
         &self,
-        ty: &ComponentType<'a, T>,
+        ty: &ComponentType<'a, T, Cx>,
     ) -> Option<(ErasedComponentType<'a, Cx>, &T)> {
         unsafe {
             self.get_key_value_raw(&RawErasedComponentType::from(ty))
@@ -210,7 +212,7 @@ where
     }
 
     /// Returns whether a component with given type exist.
-    pub fn contains<T>(&self, ty: &ComponentType<'a, T>) -> bool {
+    pub fn contains<T>(&self, ty: &ComponentType<'a, T, Cx>) -> bool {
         self.contains_raw(&RawErasedComponentType::from(ty))
     }
 
@@ -234,7 +236,7 @@ where
     ///
     /// This function could not guarantee lifetime of type `T` is sound.
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
-    pub unsafe fn get_mut<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<&mut T> {
+    pub unsafe fn get_mut<T>(&mut self, ty: &ComponentType<'a, T, Cx>) -> Option<&mut T> {
         self.get_mut_raw(&RawErasedComponentType::from(ty))
             .and_then(|val| unsafe { <dyn Any>::downcast_mut(val) })
     }
@@ -330,7 +332,7 @@ where
     ///
     /// This function could not guarantee lifetime of type `T` is sound.
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
-    pub unsafe fn remove<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'_, T>> {
+    pub unsafe fn remove<T>(&mut self, ty: &ComponentType<'a, T, Cx>) -> Option<Maybe<'_, T>> {
         let ptr = self as *mut Self;
         let value = unsafe { self.remove_untracked(ty) };
         if value.is_some() {
@@ -341,7 +343,10 @@ where
     }
 
     #[inline]
-    unsafe fn remove_untracked<T>(&mut self, ty: &ComponentType<'a, T>) -> Option<Maybe<'_, T>> {
+    unsafe fn remove_untracked<T>(
+        &mut self,
+        ty: &ComponentType<'a, T, Cx>,
+    ) -> Option<Maybe<'_, T>> {
         match &mut self.0 {
             MapInner::Empty => None,
             MapInner::Patched { base, changes, .. } => {
@@ -430,7 +435,7 @@ where
 
 impl<'a, 's, Cx> IntoIterator for &'s ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     type Item = <Iter<'s, 'a, Cx> as Iterator>::Item;
 
@@ -452,23 +457,25 @@ where
     }
 }
 
-impl<Cx: ProvideIdTy> PartialEq for CompTyCell<'_, Cx> {
+impl<Cx: ProvideIdTy + ProvideLocalCxTy> PartialEq for CompTyCell<'_, Cx> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         *self.0 == *other.0
     }
 }
 
-impl<Cx: ProvideIdTy> Eq for CompTyCell<'_, Cx> {}
+impl<Cx: ProvideIdTy + ProvideLocalCxTy> Eq for CompTyCell<'_, Cx> {}
 
-impl<Cx: ProvideIdTy> Hash for CompTyCell<'_, Cx> {
+impl<Cx: ProvideIdTy + ProvideLocalCxTy> Hash for CompTyCell<'_, Cx> {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         (*self.0).hash(state)
     }
 }
 
-impl<'a, Cx: ProvideIdTy> Borrow<RawErasedComponentType<'a, Cx>> for CompTyCell<'a, Cx> {
+impl<'a, Cx: ProvideIdTy + ProvideLocalCxTy> Borrow<RawErasedComponentType<'a, Cx>>
+    for CompTyCell<'a, Cx>
+{
     #[inline]
     fn borrow(&self) -> &RawErasedComponentType<'a, Cx> {
         &self.0
@@ -478,9 +485,9 @@ impl<'a, Cx: ProvideIdTy> Borrow<RawErasedComponentType<'a, Cx>> for CompTyCell<
 /// Iterates over the components in this map.
 pub struct Iter<'s, 'a, Cx>(IterInner<'s, 'a, Cx>, &'s ComponentMap<'a, Cx>)
 where
-    Cx: ProvideIdTy;
+    Cx: ProvideIdTy + ProvideLocalCxTy;
 
-enum IterInner<'s, 'a, Cx: ProvideIdTy> {
+enum IterInner<'s, 'a, Cx: ProvideIdTy + ProvideLocalCxTy> {
     Empty,
     Patched {
         changes: &'s AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
@@ -492,7 +499,7 @@ enum IterInner<'s, 'a, Cx: ProvideIdTy> {
 
 impl<'s, 'a, Cx> Iterator for Iter<'s, 'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     type Item = (ErasedComponentType<'a, Cx>, &'s Object<'a>);
 
@@ -532,7 +539,7 @@ where
 
 impl<Cx> ExactSizeIterator for Iter<'_, '_, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -542,7 +549,7 @@ where
 
 impl<Cx> PartialEq for ComponentMap<'_, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     fn eq(&self, other: &Self) -> bool {
         if self.len() != other.len() {
@@ -554,11 +561,11 @@ where
     }
 }
 
-impl<Cx> Eq for ComponentMap<'_, Cx> where Cx: ProvideIdTy {}
+impl<Cx> Eq for ComponentMap<'_, Cx> where Cx: ProvideIdTy + ProvideLocalCxTy {}
 
 impl<Cx> Hash for ComponentMap<'_, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         for (ty, obj) in self.iter() {
@@ -570,7 +577,7 @@ where
 
 impl<Cx> Clone for ComponentMap<'_, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     fn clone(&self) -> Self {
         match &self.0 {
@@ -599,14 +606,14 @@ where
 /// A builder for creating a simple component map.
 pub struct Builder<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     map: AHashMap<CompTyCell<'a, Cx>, Box<Object<'a>>>,
 }
 
 impl<'a, Cx> Builder<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     /// Inserts a component into this map.
     ///
@@ -656,7 +663,7 @@ where
 
 impl<'a, Cx> Extend<(ErasedComponentType<'a, Cx>, Box<Object<'a>>)> for Builder<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     fn extend<T: IntoIterator<Item = (ErasedComponentType<'a, Cx>, Box<Object<'a>>)>>(
         &mut self,
@@ -672,7 +679,7 @@ where
 
 impl<'a, 's, Cx> Extend<(ErasedComponentType<'a, Cx>, &'s Object<'a>)> for Builder<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     #[inline]
     fn extend<T: IntoIterator<Item = (ErasedComponentType<'a, Cx>, &'s Object<'a>)>>(
@@ -685,7 +692,7 @@ where
 
 impl<'a, Cx> From<Builder<'a, Cx>> for ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     #[inline]
     fn from(builder: Builder<'a, Cx>) -> Self {
@@ -695,7 +702,7 @@ where
 
 impl<Cx> Debug for CompTyCell<'_, Cx>
 where
-    Cx: ProvideIdTy + Debug,
+    Cx: ProvideIdTy + ProvideLocalCxTy + Debug,
     Cx::Id: Debug,
 {
     #[inline]
@@ -706,7 +713,7 @@ where
 
 impl<Cx> Debug for ComponentMap<'_, Cx>
 where
-    Cx: ProvideIdTy + Debug,
+    Cx: ProvideIdTy + ProvideLocalCxTy + Debug,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -741,7 +748,7 @@ where
 
 impl<Cx> Debug for Iter<'_, '_, Cx>
 where
-    Cx: ProvideIdTy + Debug,
+    Cx: ProvideIdTy + ProvideLocalCxTy + Debug,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -763,7 +770,7 @@ where
 
 impl<Cx> Debug for Builder<'_, Cx>
 where
-    Cx: ProvideIdTy + Debug,
+    Cx: ProvideIdTy + ProvideLocalCxTy + Debug,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -773,13 +780,15 @@ where
     }
 }
 
-impl<Cx, L> SerializeWithCx<L> for ComponentMap<'_, Cx>
+impl<'a, Cx> SerializeWithCx<Cx::LocalContext<'a>> for ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
     Cx::Id: Serialize,
-    L: AsDynamicContext,
 {
-    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(
+        &self,
+        serializer: WithLocalCx<S, Cx::LocalContext<'a>>,
+    ) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -787,26 +796,25 @@ where
         let cx = serializer.local_cx;
         let mut map = serializer.inner.serialize_map(None)?;
 
-        let dyn_cx = cx.as_dynamic_context();
-        let unsafe_cx = unsafe { dyn_cx.as_unsafe_cx() };
-
         for (ty, val) in self.iter() {
             if let Some(codec) = ty.f.serde_codec {
-                map.serialize_entry(&ty, (codec.ser)(&unsafe_cx.with(val)))?;
+                map.serialize_entry(&ty, (codec.ser)(&cx.with(val)))?;
             }
         }
         map.end()
     }
 }
 
-impl<Cx, L> SerializeWithCx<L> for &ComponentMap<'_, Cx>
+impl<'a, Cx> SerializeWithCx<Cx::LocalContext<'a>> for &ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
     Cx::Id: Serialize,
-    L: AsDynamicContext,
 {
     #[inline]
-    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(
+        &self,
+        serializer: WithLocalCx<S, Cx::LocalContext<'a>>,
+    ) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -814,23 +822,28 @@ where
     }
 }
 
-impl<'a, 'de, Cx, LocalCx> DeserializeWithCx<'de, LocalCx> for ComponentMap<'a, Cx>
+impl<'a, 'de, Cx> DeserializeWithCx<'de, Cx::LocalContext<'a>> for ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
     Cx::Id: Deserialize<'de> + Hash + Eq,
-    LocalCx: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>> + AsDynamicContext,
+    Cx::LocalContext<'a>:
+        LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>> + AsDynamicContext,
 {
-    fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, LocalCx>) -> Result<Self, D::Error>
+    fn deserialize_with_cx<D>(
+        deserializer: WithLocalCx<D, Cx::LocalContext<'a>>,
+    ) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        struct Visitor<'a, Cx, LCx>(PhantomData<&'a Cx>, LCx);
-
-        impl<'a, 'de, Cx, L> serde::de::Visitor<'de> for Visitor<'a, Cx, L>
+        struct Visitor<'a, Cx>(PhantomData<&'a Cx>, Cx::LocalContext<'a>)
         where
-            Cx: ProvideIdTy,
-            Cx::Id: DeserializeWithCx<'de, L> + Hash + Eq,
-            L: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
+            Cx: ProvideLocalCxTy;
+
+        impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
+        where
+            Cx: ProvideIdTy + ProvideLocalCxTy,
+            Cx::Id: DeserializeWithCx<'de, Cx::LocalContext<'a>> + Hash + Eq,
+            Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
                 + AsDynamicContext,
         {
             type Value = ComponentMap<'a, Cx>;
@@ -845,13 +858,13 @@ where
                 } else {
                     AHashMap::new()
                 };
-                struct DeSeed<'a, 's, 'cx, Cx>(
-                    &'s UnsafeSerdeCodec<'a>,
+                struct DeSeed<'a, 's, Cx: ProvideLocalCxTy>(
+                    &'s UnsafeSerdeCodec<'a, Cx::LocalContext<'a>>,
                     PhantomData<Cx>,
-                    UnsafeDynamicContext<'cx>,
+                    Cx::LocalContext<'a>,
                 );
 
-                impl<'a, 'de, Cx> serde::de::DeserializeSeed<'de> for DeSeed<'a, '_, '_, Cx> {
+                impl<'a, 'de, Cx: ProvideLocalCxTy> serde::de::DeserializeSeed<'de> for DeSeed<'a, '_, Cx> {
                     type Value = Box<Object<'a>>;
 
                     #[inline]
@@ -867,9 +880,6 @@ where
                     }
                 }
 
-                let dyn_cx = self.1.as_dynamic_context();
-                let unsafe_cx = unsafe { dyn_cx.as_unsafe_cx() };
-
                 while let Some(k) = map.next_key_seed(WithLocalCx {
                     inner: PhantomData::<ErasedComponentType<'a, Cx>>,
                     local_cx: self.1,
@@ -882,7 +892,7 @@ where
                     })?;
                     m.insert(
                         CompTyCell(k),
-                        map.next_value_seed(DeSeed(codec, PhantomData::<Cx>, unsafe_cx))?,
+                        map.next_value_seed(DeSeed(codec, PhantomData::<Cx>, self.1))?,
                     );
                 }
                 m.shrink_to_fit();
