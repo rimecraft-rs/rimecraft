@@ -275,7 +275,7 @@ where
                         serde::de::Error::custom(format!("unknown block entity type {id}"))
                     })?;
                 let mut be = ty
-                    .erased_instantiate(self.0, self.1)
+                    .erased_instantiate(self.0, self.1, ty)
                     .ok_or_else(|| serde::de::Error::custom("failed to create block entity"))?;
                 rimecraft_serde_update::Update::update(
                     &mut *be,

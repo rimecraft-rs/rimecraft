@@ -9,7 +9,7 @@ use ahash::AHashSet;
 use dsyn::HoldDescriptors;
 use erased_serde::{Serialize as ErasedSerialize, serialize_trait_object};
 
-use local_cx::ProvideLocalCxTy;
+use local_cx::{LocalContext, ProvideLocalCxTy};
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
@@ -26,11 +26,18 @@ pub mod component {
     pub use ::component::*;
 }
 
-/// A trait for providing fundamental built-in component types.
-#[deprecated = "should be provided by a local context"]
-pub trait ProvideBuiltInComponentTypes<'r>: ProvideIdTy {
-    /// The type of block entity data.
-    fn block_entity_data() -> ErasedComponentType<'r, Self>;
+/// Newtype wrapper of block entity's component type of its data.
+pub struct DataComponentType<'a, Cx>(pub ErasedComponentType<'a, Cx>)
+where
+    Cx: ProvideIdTy;
+
+impl<Cx> Debug for DataComponentType<'_, Cx>
+where
+    Cx: ProvideIdTy<Id: Debug>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.0, f)
+    }
 }
 
 /// A type of [`BlockEntity`].
@@ -49,6 +56,7 @@ where
         &self,
         pos: BlockPos,
         state: BlockState<'w, Cx>,
+        this: BlockEntityType<'a, Cx>,
     ) -> Option<RawBlockEntity<'w, Self::Data, Cx>>;
 }
 
@@ -64,6 +72,7 @@ where
         &self,
         pos: BlockPos,
         state: BlockState<'w, Cx>,
+        this: BlockEntityType<'w, Cx>,
     ) -> Option<Box<BlockEntity<'w, Cx>>>;
 }
 
@@ -81,8 +90,9 @@ where
         &self,
         pos: BlockPos,
         state: BlockState<'w, Cx>,
+        this: BlockEntityType<'w, Cx>,
     ) -> Option<Box<BlockEntity<'w, Cx>>> {
-        self.instantiate(pos, state).map(|be| {
+        self.instantiate(pos, state, this).map(|be| {
             let boxed: Box<BlockEntity<'w, Cx>> = Box::new(be);
             boxed
         })
@@ -194,16 +204,19 @@ where
 
 impl<'a, T: ?Sized, Cx> RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideBuiltInComponentTypes<'a>,
+    Cx: ProvideBlockStateExtTy,
     T: Data<'a, Cx>,
 {
     /// Reads components from given pair of default and changed components.
-    pub fn read_components(
+    pub fn read_components<Local>(
         &mut self,
         default: &'a ComponentMap<'a, Cx>,
         changes: ComponentChanges<'a, '_, Cx>,
-    ) {
-        let mut set: AHashSet<RawErasedComponentType<'a, Cx>> = [*Cx::block_entity_data()].into();
+        local: Local,
+    ) where
+        Local: LocalContext<DataComponentType<'a, Cx>>,
+    {
+        let mut set: AHashSet<RawErasedComponentType<'a, Cx>> = [*local.acquire().0].into();
         let mut map = ComponentMap::with_changes(default, changes);
         self.data.read_components(ComponentsAccess {
             set: &mut set,
