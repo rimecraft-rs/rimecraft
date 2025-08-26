@@ -12,6 +12,7 @@ use registry::{Registry, RegistryKey};
 use serde::{Deserialize, Serialize};
 use test_global::{
     Id, LocalTestContext, OwnedLocalTestContext, TestContext,
+    integration::component::REGISTRY_ID,
     local_cx::{LocalContextExt as _, edcode_codec, serde::DeserializeWithCx as _, serde_codec},
 };
 
@@ -76,9 +77,6 @@ fn type_transient_check() {
         .build();
     assert!(!ty.is_transient());
 }
-
-const REGISTRY_ID: Id =
-    unsafe { test_global::integration::registry::id_unchecked("data_component_types") };
 
 const fn type_transient_edcode<'a>() -> ComponentType<'a, Foo, Context> {
     ComponentType::<'_, Foo, Context>::builder()
