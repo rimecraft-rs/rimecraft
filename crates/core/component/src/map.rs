@@ -9,7 +9,6 @@ use ahash::AHashMap;
 use local_cx::{
     LocalContext, LocalContextExt as _, ProvideLocalCxTy, WithLocalCx,
     dyn_codecs::{self, Any},
-    dyn_cx::AsDynamicContext,
     serde::{DeserializeWithCx, SerializeWithCx},
 };
 use rimecraft_global_cx::ProvideIdTy;
@@ -826,8 +825,7 @@ impl<'a, 'de, Cx> DeserializeWithCx<'de, Cx::LocalContext<'a>> for ComponentMap<
 where
     Cx: ProvideIdTy + ProvideLocalCxTy,
     Cx::Id: Deserialize<'de> + Hash + Eq,
-    Cx::LocalContext<'a>:
-        LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>> + AsDynamicContext,
+    Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
 {
     fn deserialize_with_cx<D>(
         deserializer: WithLocalCx<D, Cx::LocalContext<'a>>,
@@ -843,8 +841,8 @@ where
         where
             Cx: ProvideIdTy + ProvideLocalCxTy,
             Cx::Id: DeserializeWithCx<'de, Cx::LocalContext<'a>> + Hash + Eq,
-            Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
-                + AsDynamicContext,
+            Cx::LocalContext<'a>:
+                LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
         {
             type Value = ComponentMap<'a, Cx>;
 

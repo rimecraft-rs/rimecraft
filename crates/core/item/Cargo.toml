@@ -21,9 +21,7 @@ rimecraft-fmt = { path = "../../util/fmt" }
 serde = { version = "1.0", optional = true }
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 component = { path = "../component", package = "rimecraft-component" }
-local-cx = { path = "../local-cx", features = [
-    "dyn-cx",
-], package = "rimecraft-local-cx" }
+local-cx = { path = "../local-cx", package = "rimecraft-local-cx" }
 
 [features]
 default = ["serde", "edcode"]

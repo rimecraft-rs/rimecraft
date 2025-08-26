@@ -91,7 +91,7 @@ where
         + 'a,
     Cx: ProvideLocalCxTy,
 {
-    edcode_codec!(T: Any + 'a)
+    edcode_codec!(Local<Cx::LocalContext<'a>> T: Any + 'a)
 }
 
 /// Creates a new [`PacketCodec`] by NBT serialization.
@@ -114,7 +114,7 @@ where
     T: for<'de, 'cx> DeserializeWithCx<'de, Cx::LocalContext<'cx>> + Send + Sync + 'a,
     Cx: ProvideLocalCxTy,
 {
-    serde_codec!(T: Any + 'a)
+    serde_codec!(Local<Cx::LocalContext<'a>> T: Any + 'a)
 }
 
 /// Builder for creating a new [`ComponentType`].
@@ -210,7 +210,6 @@ where
 /// [`ComponentType`] with erased type.
 ///
 /// This contains the type ID of the component and the codecs for serialization and packet encoding.
-#[derive(Debug)]
 pub struct RawErasedComponentType<'a, Cx>
 where
     Cx: ProvideLocalCxTy,
@@ -218,6 +217,18 @@ where
     ty: TypeId,
     f: Funcs<'a, Cx::LocalContext<'a>>,
     _marker: PhantomData<Cx>,
+}
+
+impl<Cx: Debug> Debug for RawErasedComponentType<'_, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawErasedComponentType")
+            .field("ty", &self.ty)
+            .field("f", &self.f)
+            .finish()
+    }
 }
 
 /// Codec for serialization and deserialization.
@@ -237,12 +248,30 @@ struct DynUtil<'a> {
     dbg: for<'s> fn(&'s Object<'a>) -> &'s (dyn Debug + 'a),
 }
 
-#[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 struct Funcs<'a, L> {
     serde_codec: Option<UnsafeSerdeCodec<'a, L>>,
     packet_codec: UnsafePacketCodec<'a, L>,
     util: DynUtil<'a>,
+}
+
+impl<L> Debug for Funcs<'_, L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Funcs")
+            .field("serde_codec", &self.serde_codec)
+            .field("packet_codec", &self.packet_codec)
+            .field("util", &self.util)
+            .finish()
+    }
+}
+
+impl<L> Copy for Funcs<'_, L> {}
+
+impl<L> Clone for Funcs<'_, L> {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl<'a, Cx> RawErasedComponentType<'a, Cx>
@@ -359,6 +388,3 @@ where
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

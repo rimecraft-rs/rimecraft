@@ -20,6 +20,9 @@ use parking_lot::Mutex;
 pub mod identifier;
 pub mod pool;
 
+pub use global_cx;
+pub use local_cx;
+
 /// Integration with several Rimecraft crates.
 pub mod integration {
     pub mod component;
@@ -38,6 +41,7 @@ pub enum TestContext {}
 
 /// The owned local context.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct OwnedLocalTestContext<'a> {
     /// The component registry.
     #[cfg(feature = "component")]

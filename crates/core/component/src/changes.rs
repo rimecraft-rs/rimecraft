@@ -9,7 +9,6 @@ use local_cx::{
     BaseLocalContext, ForwardToWithLocalCx, LocalContext, LocalContextExt, ProvideLocalCxTy,
     WithLocalCx,
     dyn_codecs::Any,
-    dyn_cx::AsDynamicContext,
     serde::{DeserializeWithCx, SerializeWithCx},
 };
 use rimecraft_global_cx::ProvideIdTy;
@@ -203,8 +202,7 @@ where
 impl<'a, 'de, Cx> DeserializeWithCx<'de, Cx::LocalContext<'a>> for ComponentChanges<'a, '_, Cx>
 where
     Cx: ProvideIdTy<Id: FromStr> + ProvideLocalCxTy,
-    Cx::LocalContext<'a>:
-        LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>> + AsDynamicContext,
+    Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
 {
     fn deserialize_with_cx<D>(
         deserializer: WithLocalCx<D, Cx::LocalContext<'a>>,
@@ -219,8 +217,8 @@ where
         impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
         where
             Cx: ProvideIdTy<Id: FromStr> + ProvideLocalCxTy,
-            Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
-                + AsDynamicContext,
+            Cx::LocalContext<'a>:
+                LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
         {
             type Value = AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>;
 

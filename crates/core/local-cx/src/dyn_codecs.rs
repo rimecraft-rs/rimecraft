@@ -102,12 +102,12 @@ pub struct UnsafeEdcodeCodec<L, DynS: ?Sized, Dyn: ?Sized = DynS> {
 /// Syntax: `Type: Trait + 'lifetime`
 #[macro_export]
 macro_rules! serde_codec {
-    ($t:ty:$tr:ident+$l:lifetime) => {
+    (Local<$lcx:ty>$t:ty:$tr:ident+$l:lifetime) => {
         $crate::dyn_codecs::SerdeCodec {
             codec: $crate::dyn_codecs::UnsafeSerdeCodec {
                 ser: |obj| unsafe {
-                    &*(::std::ptr::from_ref::<$crate::WithLocalCx<&(dyn $tr + '_), _>>(obj)
-                        as *const $crate::WithLocalCx<&$t, _>
+                    &*(::std::ptr::from_ref::<$crate::WithLocalCx<&(dyn $tr + '_), $lcx>>(obj)
+                        as *const $crate::WithLocalCx<&$t, $lcx>
                         as *const (dyn $crate::dyn_codecs::Serialize + $l))
                 },
                 de: |deserializer, cx| {
@@ -129,10 +129,10 @@ macro_rules! serde_codec {
 
 /// Generates an [`EdcodeCodec`].
 ///
-/// Syntax: `(?Nbt<Cx>) Type: Trait + 'lifetime`
+/// Syntax: `(Nbt<Cx>)or(Local<LocalCx>) Type: Trait + 'lifetime`
 #[macro_export]
 macro_rules! edcode_codec {
-    ($t:ty:$tr:ident+$l:lifetime) => {
+    (Local<$lcx:ty>$t:ty:$tr:ident+$l:lifetime) => {
         $crate::dyn_codecs::EdcodeCodec {
             codec: $crate::dyn_codecs::UnsafeEdcodeCodec {
                 encode: |obj, buf, cx| {
@@ -145,7 +145,7 @@ macro_rules! edcode_codec {
                     ::std::assert!(
                         <$t as $crate::dyn_codecs::Decode<
                             '_,
-                            $crate::WithLocalCx<&'_ mut dyn Buf, _>,
+                            $crate::WithLocalCx<&'_ mut dyn Buf, $lcx>,
                         >>::SUPPORT_NON_IN_PLACE,
                         "non-in-place decoding is not supported for this type",
                     );

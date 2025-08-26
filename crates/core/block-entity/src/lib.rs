@@ -26,11 +26,11 @@ pub use component;
 /// Newtype wrapper of block entity's component type of its data.
 pub struct DataComponentType<'a, Cx>(pub ErasedComponentType<'a, Cx>)
 where
-    Cx: ProvideIdTy;
+    Cx: ProvideIdTy + ProvideLocalCxTy;
 
 impl<Cx> Debug for DataComponentType<'_, Cx>
 where
-    Cx: ProvideIdTy<Id: Debug>,
+    Cx: ProvideIdTy<Id: Debug> + ProvideLocalCxTy,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(&self.0, f)
@@ -40,7 +40,7 @@ where
 /// A type of [`BlockEntity`].
 pub trait RawBlockEntityType<'a, Cx>: HoldDescriptors<'static, 'a>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideLocalCxTy,
 {
     /// Data type of the target block entities.
     type Data;
@@ -61,7 +61,7 @@ where
 #[allow(missing_docs)]
 pub trait ErasedRawBlockEntityType<'w, Cx>: HoldDescriptors<'static, 'w> + Debug
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideLocalCxTy,
 {
     fn erased_supports(&self, state: BlockState<'_, Cx>) -> bool;
 
@@ -77,7 +77,7 @@ impl<'w, T, Cx> ErasedRawBlockEntityType<'w, Cx> for T
 where
     T: RawBlockEntityType<'w, Cx> + Debug,
     T::Data: ErasedData<'w, Cx> + 'w,
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideLocalCxTy,
 {
     fn erased_supports(&self, state: BlockState<'_, Cx>) -> bool {
         self.supports(state)
@@ -107,7 +107,7 @@ pub type BlockEntityType<'r, Cx> =
 /// An object holding extra data about a block in a world.
 pub struct RawBlockEntity<'a, T: ?Sized, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideLocalCxTy,
 {
     ty: BlockEntityType<'a, Cx>,
     pos: BlockPos,
@@ -120,7 +120,7 @@ where
 
 impl<'a, T, Cx> RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideLocalCxTy,
 {
     /// Creates a new block entity.
     pub fn new(
@@ -142,7 +142,7 @@ where
 
 impl<'a, T: ?Sized, Cx> RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideLocalCxTy,
 {
     /// Returns the type of this block entity.
     #[inline]
@@ -201,7 +201,7 @@ where
 
 impl<'a, T: ?Sized, Cx> RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideLocalCxTy,
     T: Data<'a, Cx>,
 {
     /// Reads components from given pair of default and changed components.
@@ -232,7 +232,7 @@ where
 
 impl<'a, T: ?Sized, Cx> RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideLocalCxTy,
     T: Data<'a, Cx>,
 {
     /// Creates a component map from the data and inner components
@@ -247,7 +247,7 @@ where
 
 impl<T, Cx> Debug for RawBlockEntity<'_, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy + Debug,
+    Cx: ProvideBlockStateExtTy + ProvideLocalCxTy + Debug,
     Cx::BlockStateExt: Debug,
     Cx::Id: Debug,
     T: Debug + ?Sized,
@@ -266,7 +266,7 @@ where
 /// A trait for generic block entity data types.
 pub trait Data<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     /// Reads components from the given accessor.
     #[inline]
@@ -293,7 +293,7 @@ where
         + Sync
         + Debug
         + sealed::Sealed,
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     /// The [`TypeId`] of this data.
     fn type_id(&self) -> TypeId {
@@ -304,7 +304,7 @@ where
 #[allow(single_use_lifetimes)]
 mod ser_dyn_obj {
     use super::*;
-    serialize_trait_object!(<'a, Cx> ErasedData<'a, Cx> where Cx: ProvideIdTy);
+    serialize_trait_object!(<'a, Cx> ErasedData<'a, Cx> where Cx: ProvideIdTy + ProvideLocalCxTy);
 }
 
 impl<'de, Cx> rimecraft_serde_update::Update<'de> for dyn ErasedData<'_, Cx> + '_
@@ -341,7 +341,7 @@ impl<T> sealed::Sealed for T where T: ErasedSerialize + for<'de> ErasedUpdate<'d
 impl<'a, T, Cx> ErasedData<'a, Cx> for T
 where
     T: ErasedSerialize + for<'de> ErasedUpdate<'de> + Data<'a, Cx> + Debug + Send + Sync,
-    Cx: ProvideIdTy,
+    Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     #[inline]
     fn type_id(&self) -> TypeId {
@@ -354,7 +354,7 @@ pub type BlockEntity<'w, Cx> = RawBlockEntity<'w, dyn ErasedData<'w, Cx> + 'w, C
 
 impl<'w, Cx> BlockEntity<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideLocalCxTy,
 {
     /// Downcasts this type erased block entity into block entity with a concrete data type.
     ///
