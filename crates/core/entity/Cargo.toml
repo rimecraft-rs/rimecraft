@@ -15,6 +15,13 @@ maintenance = { status = "passively-maintained" }
 global-cx = { path = "../global-cx", package = "rimecraft-global-cx" }
 registry = { path = "../registry", package = "rimecraft-registry" }
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
+uuid = "1.18"
+erased-serde = "0.4"
+serde = "1.0"
+serde-update = { path = "../../util/serde-update", features = [
+    "erased",
+], package = "rimecraft-serde-update" }
+typeid = "1.0"
 
 [features]
 

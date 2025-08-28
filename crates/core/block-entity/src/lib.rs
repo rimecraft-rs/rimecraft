@@ -24,11 +24,11 @@ pub use components_util::ComponentsAccess;
 pub use component;
 
 /// Newtype wrapper of block entity's component type of its data.
-pub struct DataComponentType<'a, Cx>(pub ErasedComponentType<'a, Cx>)
+pub struct BEDataComponentType<'a, Cx>(pub ErasedComponentType<'a, Cx>)
 where
     Cx: ProvideIdTy + ProvideLocalCxTy;
 
-impl<Cx> Debug for DataComponentType<'_, Cx>
+impl<Cx> Debug for BEDataComponentType<'_, Cx>
 where
     Cx: ProvideIdTy<Id: Debug> + ProvideLocalCxTy,
 {
@@ -43,7 +43,7 @@ where
     Cx: ProvideBlockStateExtTy + ProvideLocalCxTy,
 {
     /// Data type of the target block entities.
-    type Data;
+    type Data: Data<'a, Cx>;
 
     /// Whether the block entity supports the given state.
     fn supports(&self, state: BlockState<'_, Cx>) -> bool;
@@ -211,7 +211,7 @@ where
         changes: ComponentChanges<'a, '_, Cx>,
         local: Local,
     ) where
-        Local: LocalContext<DataComponentType<'a, Cx>>,
+        Local: LocalContext<BEDataComponentType<'a, Cx>>,
     {
         let mut set: AHashSet<RawErasedComponentType<'a, Cx>> = [*local.acquire().0].into();
         let mut map = ComponentMap::with_changes(default, changes);
@@ -254,7 +254,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BlockEntity")
-            .field("type", &Reg::to_id(self.ty))
+            .field("type", &self.ty)
             .field("pos", &self.pos)
             .field("removed", &self.removed)
             .field("cached_state", &self.cached_state)
@@ -296,6 +296,7 @@ where
     Cx: ProvideIdTy + ProvideLocalCxTy,
 {
     /// The [`TypeId`] of this data.
+    #[inline]
     fn type_id(&self) -> TypeId {
         typeid::of::<Self>()
     }
@@ -343,10 +344,6 @@ where
     T: ErasedSerialize + for<'de> ErasedUpdate<'de> + Data<'a, Cx> + Debug + Send + Sync,
     Cx: ProvideIdTy + ProvideLocalCxTy,
 {
-    #[inline]
-    fn type_id(&self) -> TypeId {
-        typeid::of::<T>()
-    }
 }
 
 /// A type-erased variant of [`RawBlockEntity`].
