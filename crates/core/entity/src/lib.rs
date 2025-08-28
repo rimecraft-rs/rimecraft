@@ -2,22 +2,34 @@
 
 use std::{any::TypeId, fmt::Debug, sync::Arc};
 
+use block::{BlockState, ProvideBlockStateExtTy};
 use dsyn::HoldDescriptors;
 use erased_serde::Serialize as ErasedSerialize;
 use glam::DVec3;
 use global_cx::{GlobalContext, ProvideIdTy, ProvideNbtTy};
 use parking_lot::Mutex;
 use registry::Reg;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::Serialize;
 use serde_update::erased::ErasedUpdate;
 use uuid::Uuid;
+use voxel_math::{BlockPos, ChunkPos};
 
 mod _serde;
 
-/// Global context types satisfying use of entities.
-pub trait EntityCx<'a>: ProvideIdTy + ProvideNbtTy + ProvideEntityExtTy {}
+const POS_XZ_BOUND: f64 = 3.0000512e7;
+const POS_Y_BOUND: f64 = 2.0e7;
+const VELOCITY_BOUND: f64 = 10.0;
 
-impl<T> EntityCx<'_> for T where T: ProvideIdTy + ProvideNbtTy + ProvideEntityExtTy {}
+/// Global context types satisfying use of entities.
+pub trait EntityCx<'a>:
+    ProvideIdTy + ProvideNbtTy + ProvideEntityExtTy + ProvideBlockStateExtTy
+{
+}
+
+impl<T> EntityCx<'_> for T where
+    T: ProvideIdTy + ProvideNbtTy + ProvideEntityExtTy + ProvideBlockStateExtTy
+{
+}
 
 /// Global context types providing an extension type to entities.
 pub trait ProvideEntityExtTy: GlobalContext {
@@ -26,7 +38,7 @@ pub trait ProvideEntityExtTy: GlobalContext {
     ///
     /// Fields like `fall_distance`, `Glowing` in vanilla Minecraft should be contained
     /// in here.
-    type EntityExt<'a>: Serialize + DeserializeOwned;
+    type EntityExt<'a>: Serialize + for<'de> serde_update::Update<'de>;
 }
 
 /// Boxed entity cell with internal mutability and reference-counting.
@@ -88,6 +100,7 @@ pub struct RawEntity<'a, T: ?Sized, Cx>
 where
     Cx: EntityCx<'a>,
 {
+    net_id: u32,
     ty: EntityType<'a, Cx>,
     uuid: Uuid,
 
@@ -97,7 +110,16 @@ where
     yaw: f32,
     pitch: f32,
     removal: Option<&'static RemovalReason>,
-    passengers: Option<Box<[EntityCell<'a, Cx>]>>,
+    passengers: Box<[EntityCell<'a, Cx>]>,
+
+    velocity_dirty: bool,
+    block_pos: BlockPos,
+    chunk_pos: ChunkPos,
+    bs_at_pos: Option<BlockState<'a, Cx>>,
+
+    last_pos: DVec3,
+    last_yaw: f32,
+    last_pitch: f32,
 
     custom_compound: Cx::Compound,
     ext: Cx::EntityExt<'a>,
@@ -130,6 +152,10 @@ pub trait Data<'a, Cx>
 where
     Cx: EntityCx<'a>,
 {
+    /// Sets the multi-parted yaw of the entity, usually consists of head and body yaws.
+    fn set_yaws(&mut self, yaw: f32) {
+        let _ = yaw;
+    }
 }
 
 /// The reason for removing an entity.
@@ -146,6 +172,7 @@ pub struct RemovalReason {
 /// Type erased entity data.
 ///
 /// See [`Data`].
+#[allow(missing_docs)]
 pub trait ErasedData<'a, Cx>
 where
     Self: ErasedSerialize
@@ -162,6 +189,8 @@ where
     fn type_id(&self) -> TypeId {
         typeid::of::<Self>()
     }
+
+    fn erased_set_yaws(&mut self, yaw: f32);
 }
 
 #[allow(single_use_lifetimes)]
@@ -207,6 +236,10 @@ where
     T: ErasedSerialize + for<'de> ErasedUpdate<'de> + Data<'a, Cx> + Debug + Send + Sync,
     Cx: EntityCx<'a>,
 {
+    #[inline]
+    fn erased_set_yaws(&mut self, yaw: f32) {
+        self.set_yaws(yaw);
+    }
 }
 
 /// A type-erased variant of [`RawEntity`].
@@ -262,7 +295,7 @@ where
     }
 }
 
-impl<'w, T, Cx> RawEntity<'w, T, Cx>
+impl<'w, T: ?Sized, Cx> RawEntity<'w, T, Cx>
 where
     Cx: EntityCx<'w>,
 {
@@ -270,5 +303,130 @@ where
     #[inline]
     pub fn has_vehicle(&self) -> bool {
         self.vehicle.is_some()
+    }
+
+    /// Returns the vehicle of this entity.
+    #[inline]
+    pub fn vehicle(&self) -> Option<&EntityCell<'w, Cx>> {
+        self.vehicle.as_ref()
+    }
+
+    /// Whether this entity has passengers.
+    #[inline]
+    pub fn has_passengers(&self) -> bool {
+        !self.passengers.is_empty()
+    }
+
+    /// Returns the passengers of this entity.
+    #[inline]
+    pub fn passengers(&self) -> &[EntityCell<'w, Cx>] {
+        &self.passengers
+    }
+
+    /// Returns the position of this entity.
+    #[inline]
+    pub fn pos(&self) -> DVec3 {
+        self.pos
+    }
+
+    /// Sets the position of this entity.
+    pub fn set_pos(&mut self, pos: DVec3) {
+        self.pos = pos;
+        let block_pos = pos.floor().as_ivec3().into();
+        if self.block_pos != block_pos {
+            self.block_pos = block_pos;
+            self.chunk_pos = block_pos.into();
+            self.bs_at_pos = None;
+        }
+
+        //TODO: fire change listener
+        //TODO: update server-side waypoint handlers
+    }
+
+    /// Returns the velocity of this entity.
+    #[inline]
+    pub fn velocity(&self) -> DVec3 {
+        self.velocity
+    }
+
+    /// Sets the velocity of this entity.
+    #[inline]
+    pub fn set_velocity(&mut self, velocity: DVec3) {
+        self.velocity = velocity;
+    }
+
+    /// Returns the yaw of this entity.
+    #[inline]
+    pub fn yaw(&self) -> f32 {
+        self.yaw
+    }
+
+    /// Returns the pitch of this entity.
+    #[inline]
+    pub fn pitch(&self) -> f32 {
+        self.pitch
+    }
+
+    /// Sets the yaw of this entity.
+    #[inline]
+    pub fn set_yaw(&mut self, yaw: f32) {
+        debug_assert!(yaw.is_finite(), "entity rotation should be finite");
+        self.yaw = yaw;
+    }
+
+    /// Sets the pitch of this entity.
+    #[inline]
+    pub fn set_pitch(&mut self, pitch: f32) {
+        debug_assert!(pitch.is_finite(), "entity rotation should be finite");
+        self.pitch = (pitch % 360.0).clamp(-90.0, 90.0);
+    }
+
+    /// Updates the last position of this entity by setting it to its current position.
+    #[inline]
+    pub fn update_last_pos(&mut self) {
+        self.last_pos = self.pos;
+    }
+
+    /// Updates the last rotation(yaw, pitch) of this entity by setting it to its current rotation.
+    #[inline]
+    pub fn update_last_rotation(&mut self) {
+        self.last_yaw = self.yaw;
+        self.last_pitch = self.pitch;
+    }
+
+    /// Gets the inner data of this entity.
+    #[inline]
+    pub fn data(&self) -> &T {
+        &self.data
+    }
+
+    /// Gets the mutable inner data of this entity.
+    #[inline]
+    pub fn data_mut(&mut self) -> &mut T {
+        &mut self.data
+    }
+
+    /// Gets the extra data of this entity required by global context.
+    #[inline]
+    pub fn ext(&self) -> &Cx::EntityExt<'w> {
+        &self.ext
+    }
+
+    /// Gets the mutable extra data of this entity required by global context.
+    #[inline]
+    pub fn ext_mut(&mut self) -> &mut Cx::EntityExt<'w> {
+        &mut self.ext
+    }
+
+    /// Gets the custom compound of this entity.
+    #[inline]
+    pub fn custom_compound(&self) -> &Cx::Compound {
+        &self.custom_compound
+    }
+
+    /// Gets the mutable custom compound of this entity.
+    #[inline]
+    pub fn custom_compound_mut(&mut self) -> &mut Cx::Compound {
+        &mut self.custom_compound
     }
 }
