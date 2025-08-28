@@ -21,7 +21,12 @@ serde = "1.0"
 serde-update = { path = "../../util/serde-update", features = [
     "erased",
 ], package = "rimecraft-serde-update" }
+serde-compat = { path = "../../util/serde-compat", features = [
+    "uuid",
+], package = "rimecraft-serde-compat" }
 typeid = "1.0"
+parking_lot = "0.12"
+glam = { version = "0.30", features = ["serde"] }
 
 [features]
 

@@ -3,11 +3,11 @@
 use bitflags::bitflags;
 use local_cx::ProvideLocalCxTy;
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
-use rimecraft_block_entity::BlockEntity;
+use rimecraft_block_entity::{BlockEntity, BlockEntityCell};
 use rimecraft_fluid::{FluidState, ProvideFluidStateExtTy};
 use rimecraft_voxel_math::BlockPos;
 
-use crate::{BlockEntityCell, DEFAULT_MAX_LIGHT_LEVEL};
+use crate::DEFAULT_MAX_LIGHT_LEVEL;
 
 use super::StateOption;
 

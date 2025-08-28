@@ -8,6 +8,7 @@ use ahash::AHashMap;
 use local_cx::{GlobalProvideLocalCxTy, LocalContext};
 use parking_lot::{Mutex, RwLock};
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy, RawBlock};
+use rimecraft_block_entity::BlockEntityCell;
 use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe, container::ProvidePalette,
 };
@@ -17,7 +18,7 @@ use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
 
 use crate::{
-    BlockEntityCell, Sealed,
+    Sealed,
     event::game_event,
     heightmap::{self, Heightmap},
     view::{

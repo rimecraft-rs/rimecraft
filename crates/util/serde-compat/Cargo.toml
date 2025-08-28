@@ -1,0 +1,23 @@
+[package]
+name = "rimecraft-serde-compat"
+version = "0.1.0"
+edition = "2024"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "serde implementation that matches Minecraft codecs"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["rust-patterns"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+serde = "1.0"
+# compat crates
+uuid = { version = "1.18", optional = true }
+
+[features]
+uuid = ["dep:uuid"]
+
+[lints]
+workspace = true

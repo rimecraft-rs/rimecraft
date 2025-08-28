@@ -39,9 +39,6 @@ impl<T> From<T> for Sealed<T> {
     }
 }
 
-/// Boxed block entity cell with internal mutability and reference-counting.
-pub type BlockEntityCell<'w, Cx> = Arc<Mutex<Box<BlockEntity<'w, Cx>>>>;
-
 //TODO: PLACEHOLDERS
 
 /// Placeholder of type `ServerWorld`.
