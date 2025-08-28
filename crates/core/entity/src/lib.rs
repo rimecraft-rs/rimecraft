@@ -112,7 +112,9 @@ where
     removal: Option<&'static RemovalReason>,
     passengers: Box<[EntityCell<'a, Cx>]>,
 
-    velocity_dirty: bool,
+    /// Whether the updated velocity needs to be handled.
+    pub velocity_dirty: bool,
+
     block_pos: BlockPos,
     chunk_pos: ChunkPos,
     bs_at_pos: Option<BlockState<'a, Cx>>,
@@ -428,5 +430,19 @@ where
     #[inline]
     pub fn custom_compound_mut(&mut self) -> &mut Cx::Compound {
         &mut self.custom_compound
+    }
+
+    /// Gets the network ID of this entity.
+    #[inline]
+    pub fn net_id(&self) -> u32 {
+        self.net_id
+    }
+
+    /// Sets the network ID of this entity.
+    ///
+    /// This should only be done at client side.
+    #[inline]
+    pub fn set_net_id(&mut self, net_id: u32) {
+        self.net_id = net_id;
     }
 }

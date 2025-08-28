@@ -21,8 +21,6 @@ use std::{
 };
 
 pub use ahash::{AHashMap, AHashSet};
-use parking_lot::Mutex;
-use rimecraft_block_entity::BlockEntity;
 
 /// The default max light level of Minecraft.
 pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
