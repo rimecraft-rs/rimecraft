@@ -14,7 +14,7 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 serde = "1.0"
 # compat crates
-uuid = { version = "1.18", optional = true }
+uuid = { version = "1.18", default-features = false, optional = true }
 
 [features]
 uuid = ["dep:uuid"]

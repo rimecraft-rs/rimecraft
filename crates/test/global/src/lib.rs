@@ -108,17 +108,29 @@ impl From<NbtLongArray> for Box<[i64]> {
     }
 }
 
+/// A NBT compound.
+#[derive(Debug)]
+#[repr(transparent)]
+// Because the function `compound_to_deserializer` returns a `impl Deserializer<'_>`, we need to
+// use a value type here, instead of a hash map.
+pub struct NbtCompound(fastnbt::Value);
+
+impl Default for NbtCompound {
+    #[inline]
+    fn default() -> Self {
+        Self(fastnbt::Value::Compound(Default::default()))
+    }
+}
+
 impl ProvideNbtTy for TestContext {
-    // Because the function `compound_to_deserializer` returns a `impl Deserializer<'_>`, we need to
-    // use a value type here, instead of a hash map.
-    type Compound = fastnbt::Value;
+    type Compound = NbtCompound;
 
     type IntArray = NbtIntArray;
 
     type LongArray = NbtLongArray;
 
     fn compound_to_deserializer(compound: &Self::Compound) -> impl serde::Deserializer<'_> {
-        compound
+        &compound.0
     }
 }
 

@@ -1,12 +1,19 @@
 //! Rimecraft Entity primitives.
 
-use std::{any::TypeId, fmt::Debug, sync::Arc};
+use std::{
+    any::TypeId,
+    fmt::Debug,
+    sync::{Arc, atomic::AtomicU32},
+};
 
 use block::{BlockState, ProvideBlockStateExtTy};
 use dsyn::HoldDescriptors;
 use erased_serde::Serialize as ErasedSerialize;
 use glam::DVec3;
-use global_cx::{GlobalContext, ProvideIdTy, ProvideNbtTy};
+use global_cx::{
+    GlobalContext, ProvideIdTy, ProvideNbtTy,
+    rand::{LockedRng, ProvideRng, Rng as _},
+};
 use parking_lot::Mutex;
 use registry::Reg;
 use serde::Serialize;
@@ -294,6 +301,42 @@ where
     #[inline]
     pub fn matches_type<T>(&self) -> bool {
         self.data.type_id() == typeid::of::<T>()
+    }
+}
+
+impl<'w, T, Cx> RawEntity<'w, T, Cx>
+where
+    Cx: EntityCx<'w, EntityExt<'w>: Default> + ProvideRng,
+{
+    /// Creates a new entity.
+    pub fn new(ty: EntityType<'w, Cx>, data: T) -> Self {
+        static ID_COUNTER: AtomicU32 = AtomicU32::new(0);
+        Self {
+            net_id: ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            ty,
+            uuid: {
+                let mut bytes = [0u8; 16];
+                Cx::crypto_rng().lock().fill(&mut bytes);
+                uuid::Builder::from_random_bytes(bytes).into_uuid()
+            },
+            pos: DVec3::ZERO,
+            vehicle: None,
+            velocity: DVec3::ZERO,
+            yaw: 0.0,
+            pitch: 0.0,
+            removal: None,
+            passengers: Box::new([]),
+            velocity_dirty: false,
+            block_pos: BlockPos::ORIGIN,
+            chunk_pos: ChunkPos::ORIGIN,
+            bs_at_pos: None,
+            last_pos: DVec3::ZERO,
+            last_yaw: 0.0,
+            last_pitch: 0.0,
+            custom_compound: Default::default(),
+            ext: Default::default(),
+            data,
+        }
     }
 }
 

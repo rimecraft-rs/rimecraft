@@ -12,6 +12,9 @@ pub struct ChunkPos {
 }
 
 impl ChunkPos {
+    /// The origin chunk position.
+    pub const ORIGIN: Self = Self { x: 0, z: 0 };
+
     /// Creates a new `ChunkPos` with the given X and Z coordinates.
     #[inline]
     pub const fn new(x: i32, z: i32) -> Self {

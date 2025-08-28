@@ -12,10 +12,13 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-global-cx = { path = "../global-cx", package = "rimecraft-global-cx" }
+global-cx = { path = "../global-cx", package = "rimecraft-global-cx", features = [
+    "rand",
+    "nbt",
+] }
 registry = { path = "../registry", package = "rimecraft-registry" }
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
-uuid = "1.18"
+uuid = { version = "1.18", default-features = false }
 erased-serde = "0.4"
 serde = "1.0"
 serde-update = { path = "../../util/serde-update", features = [
