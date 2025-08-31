@@ -136,7 +136,7 @@ macro_rules! edcode_codec {
         $crate::dyn_codecs::EdcodeCodec {
             codec: $crate::dyn_codecs::UnsafeEdcodeCodec {
                 encode: |obj, buf, cx| {
-                    ::edcode2::Encode::encode(
+                    $crate::dyn_codecs::Encode::encode(
                         unsafe { &*(::std::ptr::from_ref::<dyn $tr + '_>(obj) as *const $t) },
                         $crate::LocalContextExt::with(cx, buf),
                     )
@@ -145,7 +145,7 @@ macro_rules! edcode_codec {
                     ::std::assert!(
                         <$t as $crate::dyn_codecs::Decode<
                             '_,
-                            $crate::WithLocalCx<&'_ mut dyn Buf, $lcx>,
+                            $crate::WithLocalCx<&'_ mut dyn $crate::dyn_codecs::Buf, $lcx>,
                         >>::SUPPORT_NON_IN_PLACE,
                         "non-in-place decoding is not supported for this type",
                     );

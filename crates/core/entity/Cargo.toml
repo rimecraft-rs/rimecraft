@@ -16,6 +16,9 @@ global-cx = { path = "../global-cx", package = "rimecraft-global-cx", features =
     "rand",
     "nbt",
 ] }
+local-cx = { path = "../local-cx", package = "rimecraft-local-cx", features = [
+    "dyn-codecs",
+] }
 registry = { path = "../registry", package = "rimecraft-registry" }
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 uuid = { version = "1.18", default-features = false }
@@ -27,6 +30,7 @@ serde-update = { path = "../../util/serde-update", features = [
 serde-compat = { path = "../../util/serde-compat", features = [
     "uuid",
 ], package = "rimecraft-serde-compat" }
+edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2" }
 typeid = "1.0"
 parking_lot = "0.12"
 glam = { version = "0.30", features = ["serde"] }

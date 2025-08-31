@@ -45,18 +45,8 @@ pub struct Registry<K, T> {
 
 /// Reference of a registration.
 ///
-/// # Serialization and Deserialization
-///
-/// This type can be serialized and deserialized using `serde` and `edcode2`.
-/// (with `serde` feature and `edcode` feature respectively)
-///
-/// ## Serde
-///
 /// When serializing this reference with `serde`, it will serialize the ID
-/// of the entry, if the serializer is **human readable**. Otherwise, it will
-/// serialize the **raw ID** of the entry.
-///
-/// This corresponds to the `compressed` option in *Mojang Serialization*.
+/// of the entry.
 pub struct Reg<'a, K, T> {
     raw: usize,
     entry: &'a RefEntry<K, T>,

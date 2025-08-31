@@ -22,6 +22,7 @@ use uuid::Uuid;
 use voxel_math::{BlockPos, ChunkPos};
 
 mod _serde;
+pub mod data;
 
 const POS_XZ_BOUND: f64 = 3.0000512e7;
 const POS_Y_BOUND: f64 = 2.0e7;
@@ -77,6 +78,7 @@ where
 {
     fn erased_create(&self, this: EntityType<'a, Cx>) -> Box<Entity<'a, Cx>>;
     fn erased_is_saveable(&self) -> bool;
+    fn erased_typeid(&self) -> TypeId;
 }
 
 impl<'a, Cx, T> ErasedRawEntityType<'a, Cx> for T
@@ -93,6 +95,11 @@ where
     #[inline]
     fn erased_is_saveable(&self) -> bool {
         self.is_saveable()
+    }
+
+    #[inline]
+    fn erased_typeid(&self) -> TypeId {
+        typeid::of::<T>()
     }
 }
 
@@ -168,7 +175,9 @@ where
 }
 
 /// The reason for removing an entity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// In practice this should exist as a static reference and be compared using [`std::ptr::eq`].
+#[derive(Debug)]
 pub struct RemovalReason {
     /// Description of the reason for removing the entity.
     pub reason: &'static str,
