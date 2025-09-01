@@ -2,7 +2,12 @@
 //!
 //! A chunk represents a scoped, mutable view of `Biome`s, `BlockState`s, `FluidState`s and `BlockEntity`s.
 
-use std::{fmt::Debug, hash::Hash, sync::Arc};
+use std::{
+    fmt::Debug,
+    hash::Hash,
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use ahash::AHashMap;
 use local_cx::{GlobalProvideLocalCxTy, LocalContext};
@@ -210,6 +215,28 @@ where
     fn as_base_chunk_mut(&mut self) -> Sealed<&mut BaseChunk<'w, Cx>>;
 }
 
+impl<'w, Cx, T> AsBaseChunk<'w, Cx> for &T
+where
+    T: AsBaseChunk<'w, Cx>,
+    Cx: ChunkCx<'w>,
+{
+    #[inline]
+    fn as_base_chunk(&self) -> Sealed<&BaseChunk<'w, Cx>> {
+        (**self).as_base_chunk()
+    }
+}
+
+impl<'w, Cx, T> AsBaseChunk<'w, Cx> for &mut T
+where
+    T: AsBaseChunk<'w, Cx>,
+    Cx: ChunkCx<'w>,
+{
+    #[inline]
+    fn as_base_chunk(&self) -> Sealed<&BaseChunk<'w, Cx>> {
+        (**self).as_base_chunk()
+    }
+}
+
 /// Immutable chunk behaviors.
 pub trait Chunk<'w, Cx>
 where
@@ -270,7 +297,7 @@ where
         self.as_base_chunk().0.pos
     }
 
-    /// Peeks the [`game_event::Dispatcher`] of given Y section corrdinate.
+    /// Peeks the [`game_event::Dispatcher`] of given Y section coordinate.
     #[inline]
     fn peek_game_event_dispatcher<F, T>(&self, y_section_coord: i32, f: F) -> Option<T>
     where
@@ -281,7 +308,7 @@ where
         None
     }
 
-    /// Gets the [`game_event::Dispatcher`] of given Y section corrdinate.
+    /// Gets the [`game_event::Dispatcher`] of given Y section coordinate.
     #[inline]
     fn game_event_dispatcher(
         &self,
@@ -332,7 +359,7 @@ where
             .rposition(|s| !s.get_mut().is_empty())
     }
 
-    /// Peeks the [`game_event::Dispatcher`] of given Y section corrdinate.
+    /// Peeks the [`game_event::Dispatcher`] of given Y section coordinate.
     ///
     /// This method is the same as [`Chunk::peek_game_event_dispatcher`] but lock-free.
     #[inline]
@@ -345,7 +372,7 @@ where
         None
     }
 
-    /// Gets the [`game_event::Dispatcher`] of given Y section corrdinate.
+    /// Gets the [`game_event::Dispatcher`] of given Y section coordinate.
     ///
     /// This method is the same as [`Chunk::game_event_dispatcher`] but lock-free.
     #[inline]
@@ -354,5 +381,157 @@ where
         y_section_coord: i32,
     ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
         self.peek_game_event_dispatcher_lf(y_section_coord, Arc::clone)
+    }
+}
+
+#[allow(unused)]
+trait BaseChunkAccess<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    fn bca_as_bc(&self) -> &BaseChunk<'w, Cx>;
+    fn reclaim(&mut self) -> impl BaseChunkAccess<'w, Cx>;
+
+    type HeighmapsRead: Deref<Target = AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
+    type HeighmapsWrite: DerefMut<Target = AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
+    type BlockEntitiesRead: Deref<Target = AHashMap<BlockPos, BlockEntityCell<'w, Cx>>>;
+    type BlockEntitiesWrite: DerefMut<Target = AHashMap<BlockPos, BlockEntityCell<'w, Cx>>>;
+    type BlockEntityNbtsRead: Deref<Target = AHashMap<BlockPos, Cx::Compound>>;
+    type BlockEntityNbtsWrite: DerefMut<Target = AHashMap<BlockPos, Cx::Compound>>;
+    type ChunkSectionRead: Deref<Target = ChunkSection<'w, Cx>>;
+    type ChunkSectionWrite: DerefMut<Target = ChunkSection<'w, Cx>>;
+
+    fn read_heightmaps(self) -> Self::HeighmapsRead;
+    fn write_heightmaps(self) -> Self::HeighmapsWrite;
+    fn read_block_entities(self) -> Self::BlockEntitiesRead;
+    fn write_block_entities(self) -> Self::BlockEntitiesWrite;
+    fn read_block_entity_nbts(self) -> Self::BlockEntityNbtsRead;
+    fn write_block_entity_nbts(self) -> Self::BlockEntityNbtsWrite;
+    fn read_chunk_section(self, index: usize) -> Option<Self::ChunkSectionRead>;
+    fn write_chunk_section(self, index: usize) -> Option<Self::ChunkSectionWrite>;
+}
+
+impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> {
+    type HeighmapsRead =
+        parking_lot::RwLockReadGuard<'a, AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
+    type HeighmapsWrite =
+        parking_lot::RwLockWriteGuard<'a, AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
+    type BlockEntitiesRead = Self::BlockEntitiesWrite;
+    type BlockEntitiesWrite =
+        parking_lot::MutexGuard<'a, AHashMap<BlockPos, BlockEntityCell<'w, Cx>>>;
+    type BlockEntityNbtsRead = Self::BlockEntityNbtsWrite;
+    type BlockEntityNbtsWrite = parking_lot::MutexGuard<'a, AHashMap<BlockPos, Cx::Compound>>;
+    type ChunkSectionRead = Self::ChunkSectionWrite;
+    type ChunkSectionWrite = parking_lot::MutexGuard<'a, ChunkSection<'w, Cx>>;
+
+    #[inline]
+    fn read_heightmaps(self) -> Self::HeighmapsRead {
+        self.heightmaps.read()
+    }
+
+    #[inline]
+    fn write_heightmaps(self) -> Self::HeighmapsWrite {
+        self.heightmaps.write()
+    }
+
+    #[inline]
+    fn read_block_entities(self) -> Self::BlockEntitiesRead {
+        self.write_block_entities()
+    }
+
+    #[inline]
+    fn write_block_entities(self) -> Self::BlockEntitiesWrite {
+        self.block_entities.lock()
+    }
+
+    #[inline]
+    fn read_block_entity_nbts(self) -> Self::BlockEntityNbtsRead {
+        self.write_block_entity_nbts()
+    }
+
+    #[inline]
+    fn write_block_entity_nbts(self) -> Self::BlockEntityNbtsWrite {
+        self.block_entity_nbts.lock()
+    }
+
+    #[inline]
+    fn read_chunk_section(self, index: usize) -> Option<Self::ChunkSectionRead> {
+        self.write_chunk_section(index)
+    }
+
+    #[inline]
+    fn write_chunk_section(self, index: usize) -> Option<Self::ChunkSectionWrite> {
+        self.section_array.get(index).map(Mutex::lock)
+    }
+
+    #[inline]
+    fn bca_as_bc(&self) -> &BaseChunk<'w, Cx> {
+        self
+    }
+
+    #[inline]
+    fn reclaim(&mut self) -> impl BaseChunkAccess<'w, Cx> {
+        *self
+    }
+}
+
+impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, Cx> {
+    type HeighmapsRead = Self::HeighmapsWrite;
+    type HeighmapsWrite = &'a mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>;
+    type BlockEntitiesRead = Self::BlockEntitiesWrite;
+    type BlockEntitiesWrite = &'a mut AHashMap<BlockPos, BlockEntityCell<'w, Cx>>;
+    type BlockEntityNbtsRead = Self::BlockEntityNbtsWrite;
+    type BlockEntityNbtsWrite = &'a mut AHashMap<BlockPos, Cx::Compound>;
+    type ChunkSectionRead = Self::ChunkSectionWrite;
+    type ChunkSectionWrite = &'a mut ChunkSection<'w, Cx>;
+
+    #[inline]
+    fn read_heightmaps(self) -> Self::HeighmapsRead {
+        self.write_heightmaps()
+    }
+
+    #[inline]
+    fn write_heightmaps(self) -> Self::HeighmapsWrite {
+        self.heightmaps.get_mut()
+    }
+
+    #[inline]
+    fn read_block_entities(self) -> Self::BlockEntitiesRead {
+        self.write_block_entities()
+    }
+
+    #[inline]
+    fn write_block_entities(self) -> Self::BlockEntitiesWrite {
+        self.block_entities.get_mut()
+    }
+
+    #[inline]
+    fn read_block_entity_nbts(self) -> Self::BlockEntityNbtsRead {
+        self.write_block_entity_nbts()
+    }
+
+    #[inline]
+    fn write_block_entity_nbts(self) -> Self::BlockEntityNbtsWrite {
+        self.block_entity_nbts.get_mut()
+    }
+
+    #[inline]
+    fn read_chunk_section(self, index: usize) -> Option<Self::ChunkSectionRead> {
+        self.write_chunk_section(index)
+    }
+
+    #[inline]
+    fn write_chunk_section(self, index: usize) -> Option<Self::ChunkSectionWrite> {
+        self.section_array.get_mut(index).map(Mutex::get_mut)
+    }
+
+    #[inline]
+    fn bca_as_bc(&self) -> &BaseChunk<'w, Cx> {
+        self
+    }
+
+    #[inline]
+    fn reclaim(&mut self) -> impl BaseChunkAccess<'w, Cx> {
+        &mut **self
     }
 }
