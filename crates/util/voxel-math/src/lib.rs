@@ -13,7 +13,7 @@ pub mod direction;
 
 pub use bbox::BBox;
 
-pub use glam::{DVec3, IVec3};
+pub use glam;
 
 /// Converts a world coordinate to the corresponding chunk-section
 /// coordinate.

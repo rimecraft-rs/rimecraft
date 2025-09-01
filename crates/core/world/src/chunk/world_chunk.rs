@@ -1,6 +1,7 @@
 //! World chunks.
 
 use dsyn::HoldDescriptors as _;
+use glam::IVec3;
 use ident_hash::IHashMap;
 use local_cx::{LocalContext, dsyn_instanceof, dsyn_ty, dyn_cx::AsDynamicContext};
 use parking_lot::Mutex;
@@ -10,7 +11,7 @@ use rimecraft_block_entity::{
 };
 use rimecraft_fluid::{BsToFs, FluidState};
 use rimecraft_registry::Registry;
-use rimecraft_voxel_math::{BlockPos, IVec3};
+use rimecraft_voxel_math::BlockPos;
 use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{

@@ -27,6 +27,7 @@ pub mod component {
 }
 
 /// A trait for providing fundamental built-in component types.
+#[deprecated = "should be provided by a local context"]
 pub trait ProvideBuiltInComponentTypes<'r>: ProvideIdTy {
     /// The type of block entity data.
     fn block_entity_data() -> ErasedComponentType<'r, Self>;
