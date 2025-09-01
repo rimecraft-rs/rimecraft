@@ -67,6 +67,9 @@ pub struct RefEntry<K, T> {
     pub(crate) value: Option<T>,
     pub(crate) tags: RwLock<HashSet<TagKey<K, T>>>,
     pub(crate) is_default: bool,
+
+    #[cfg(feature = "marking-leaked")]
+    pub(crate) marker: marking::LeakedPtrMarker,
 }
 
 impl<K, T> RefEntry<K, T> {
@@ -100,6 +103,15 @@ impl<K, T> RefEntry<K, T> {
     #[inline]
     pub fn is_default(&self) -> bool {
         self.is_default
+    }
+}
+
+#[cfg(feature = "marking-leaked")]
+impl<K, T> RefEntry<K, T> {
+    /// Gets the leaked marker of this registry.
+    #[inline]
+    pub fn marker_leaked(&self) -> marking::LeakedPtrMarker {
+        self.marker
     }
 }
 

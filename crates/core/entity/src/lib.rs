@@ -14,6 +14,7 @@ use global_cx::{
     GlobalContext, ProvideIdTy, ProvideNbtTy,
     rand::{LockedRng, ProvideRng, Rng as _},
 };
+use local_cx::ProvideLocalCxTy;
 use parking_lot::Mutex;
 use registry::Reg;
 use serde::Serialize;
@@ -30,12 +31,12 @@ const VELOCITY_BOUND: f64 = 10.0;
 
 /// Global context types satisfying use of entities.
 pub trait EntityCx<'a>:
-    ProvideIdTy + ProvideNbtTy + ProvideEntityExtTy + ProvideBlockStateExtTy
+    ProvideIdTy + ProvideNbtTy + ProvideEntityExtTy + ProvideBlockStateExtTy + ProvideLocalCxTy
 {
 }
 
 impl<T> EntityCx<'_> for T where
-    T: ProvideIdTy + ProvideNbtTy + ProvideEntityExtTy + ProvideBlockStateExtTy
+    T: ProvideIdTy + ProvideNbtTy + ProvideEntityExtTy + ProvideBlockStateExtTy + ProvideLocalCxTy
 {
 }
 

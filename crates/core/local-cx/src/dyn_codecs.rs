@@ -78,7 +78,8 @@ pub struct UnsafeSerdeCodec<L, DynS: ?Sized, Dyn: ?Sized = DynS> {
     /// Serialize function.
     pub ser: for<'s, 'o> fn(&'s WithLocalCx<&'o Dyn, L>) -> &'s (dyn Serialize + 'o),
     /// Deserialize function.
-    pub de: fn(&mut dyn erased_serde::Deserializer<'_>, L) -> erased_serde::Result<Box<DynS>>,
+    pub de:
+        fn(&mut (dyn erased_serde::Deserializer<'_> + '_), L) -> erased_serde::Result<Box<DynS>>,
 }
 
 /// Codec for packet encoding and decoding.
@@ -92,9 +93,10 @@ pub struct EdcodeCodec<T, L, DynS: ?Sized, Dyn: ?Sized = DynS> {
 /// Unsafe variant of [`EdcodeCodec`].
 pub struct UnsafeEdcodeCodec<L, DynS: ?Sized, Dyn: ?Sized = DynS> {
     /// Encode function.
-    pub encode: fn(&'_ Dyn, &'_ mut dyn BufMut, L) -> Result<(), edcode2::BoxedError<'static>>,
+    pub encode:
+        fn(&'_ Dyn, &'_ mut (dyn BufMut + '_), L) -> Result<(), edcode2::BoxedError<'static>>,
     /// Decode function.
-    pub decode: fn(&'_ mut dyn Buf, L) -> Result<Box<DynS>, edcode2::BoxedError<'static>>,
+    pub decode: fn(&'_ mut (dyn Buf + '_), L) -> Result<Box<DynS>, edcode2::BoxedError<'static>>,
 }
 
 /// Generates a [`SerdeCodec`].

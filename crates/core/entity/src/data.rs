@@ -1,32 +1,221 @@
 //! Tracked entity data used to being encoded and decoded for networking.
 
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{any::TypeId, fmt::Debug, hash::Hash, marker::PhantomData, sync::OnceLock};
 
-use edcode2::{Buf, BufMut, Decode, Encode};
+use ahash::AHashMap;
+use edcode2::{Buf, BufExt as _, BufMut, BufMutExt as _, Decode, Encode};
+use global_cx::GlobalContext;
 use local_cx::{
-    ProvideLocalCxTy, WithLocalCx,
+    ForwardToWithLocalCx, LocalContext, ProvideLocalCxTy,
     dyn_codecs::{EdcodeCodec, UnsafeEdcodeCodec},
-    edcode_codec,
 };
+use marking::LeakedPtrMarker;
+use maybe::Maybe;
+use parking_lot::Mutex;
+use registry::Reg;
 
-#[doc(hidden)]
-pub trait DynClone<'a>: 'a {
-    fn erased_clone(&self) -> Box<dyn DynClone<'a> + Send + Sync + 'a>;
+use crate::{EntityCx, EntityType};
+
+mod iter;
+
+pub use iter::*;
+
+/// The maximum number of data values.
+pub const MAX_DATA_VALUES: usize = u8::MAX as usize;
+
+/// The maximum data ID.
+pub const MAX_DATA_ID: u32 = MAX_DATA_VALUES as u32 - 1;
+
+static ENTITY_TY_DATA_IDS: OnceLock<Mutex<AHashMap<(TypeId, LeakedPtrMarker), u32>>> =
+    OnceLock::new();
+
+/// A registry of [`Codec`]s.
+pub struct CodecRegistry<'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    codecs: Vec<UnsafeCodec<'a, Cx>>,
 }
 
-impl<'a, T: Clone + Send + Sync + 'a> DynClone<'a> for T {
+/// Unique ID of a [`Codec`] registered in a [`CodecRegistry`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct CodecId(u32);
+
+impl<B> Encode<B> for CodecId
+where
+    B: BufMut,
+{
     #[inline]
-    fn erased_clone(&self) -> Box<dyn DynClone<'a> + Send + Sync + 'a> {
-        Box::new(self.clone())
+    fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
+        buf.put_variable(self.0);
+        Ok(())
     }
 }
 
-impl<'a> Clone for Box<dyn DynClone<'a> + Send + Sync + 'a> {
+impl<'de, B> Decode<'de, B> for CodecId
+where
+    B: Buf,
+{
+    #[inline]
+    fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
+        Ok(CodecId(buf.get_variable::<u32>()))
+    }
+}
+
+impl<'a, Cx> CodecRegistry<'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    /// Creates a new empty registry.
+    #[inline]
+    pub fn new() -> Self {
+        Self { codecs: Vec::new() }
+    }
+
+    /// Registers a new codec and returns its ID.
+    #[inline]
+    pub fn register<T>(&mut self, codec: Codec<'a, T, Cx>) -> CodecId {
+        self.codecs.push(codec.codec);
+        CodecId(self.codecs.len() as u32 - 1)
+    }
+
+    /// Gets a codec by its ID.
+    #[inline]
+    pub fn get_raw(&self, id: CodecId) -> Option<UnsafeCodec<'a, Cx>> {
+        self.codecs.get(id.0 as usize).copied()
+    }
+}
+
+impl<Cx> Default for CodecRegistry<'_, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<Cx> Debug for CodecRegistry<'_, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CodecRegistry")
+            .field("codecs", &self.codecs)
+            .finish()
+    }
+}
+
+/// A protected `u32` type representing ID of a [`TrackedData`].
+///
+/// See [`register_data`] for obtaining one.
+#[derive(Debug)]
+pub struct DataId(u32, TypeId);
+
+/// Registers a [`TrackedData`] by returning its unique ID.
+///
+/// # Panics
+///
+/// Panics if count of data IDs exceeds [`MAX_DATA_ID`].
+pub fn register_data<'a, Cx: EntityCx<'a>>(ty: EntityType<'a, Cx>) -> DataId {
+    let typeid = ty.erased_typeid();
+    let marker = Reg::to_entry(ty).marker_leaked();
+
+    let mut map = ENTITY_TY_DATA_IDS
+        .get_or_init(|| Mutex::new(AHashMap::new()))
+        .lock();
+
+    DataId(
+        match map.entry((typeid, marker)) {
+            std::collections::hash_map::Entry::Occupied(mut e) => {
+                let i = e.get_mut();
+                assert!(
+                    *i < MAX_DATA_ID,
+                    "count of data IDs exceeded for this entity type. expected: <= {}, actual: {}",
+                    MAX_DATA_ID,
+                    *i + 1
+                );
+                *i += 1;
+                *i
+            }
+            std::collections::hash_map::Entry::Vacant(e) => *e.insert(0),
+        },
+        typeid,
+    )
+}
+
+#[doc(hidden)]
+pub trait Value<'a, Cx: 'a>: 'a {
+    fn erased_clone(&self) -> Box<DynValue<'a, Cx>>;
+    fn erased_typeid(&self) -> TypeId;
+
+    unsafe fn swap_entry(&mut self, entry: &mut DataTrackerEntry<'a, DynValue<'a, Cx>, Cx>)
+    where
+        Cx: ProvideLocalCxTy;
+}
+
+type DynValue<'a, Cx> = dyn Value<'a, Cx> + Send + Sync + 'a;
+
+impl<'a, T: Clone + Send + Sync + 'a, Cx: 'a> Value<'a, Cx> for T {
+    #[inline]
+    fn erased_clone(&self) -> Box<DynValue<'a, Cx>> {
+        Box::new(self.clone())
+    }
+
+    #[inline]
+    fn erased_typeid(&self) -> TypeId {
+        typeid::of::<T>()
+    }
+
+    unsafe fn swap_entry(&mut self, entry: &mut DataTrackerEntry<'a, DynValue<'a, Cx>, Cx>)
+    where
+        Cx: ProvideLocalCxTy,
+    {
+        assert_eq!(
+            typeid::of::<T>(),
+            entry.value.erased_typeid(),
+            "type mismatch"
+        );
+
+        //SAFETY: we have the type checked but the lifetime is unsure. so thats why this function is unsafe.
+        let entry =
+            unsafe { &mut *std::ptr::from_mut(entry).cast::<DataTrackerEntry<'a, T, Cx>>() };
+
+        std::mem::swap(self, &mut entry.value);
+    }
+}
+
+impl<'a, Cx: 'a> Clone for Box<DynValue<'a, Cx>> {
     #[inline]
     fn clone(&self) -> Self {
         (**self).erased_clone()
     }
 }
+
+impl<'a, Cx: 'a> ToOwned for DynValue<'a, Cx> {
+    type Owned = Box<Self>;
+
+    #[inline]
+    fn to_owned(&self) -> Self::Owned {
+        self.erased_clone()
+    }
+}
+
+type UnsafeCodec<'a, Cx> = UnsafeEdcodeCodec<
+    <Cx as ProvideLocalCxTy>::LocalContext<'a>,
+    DynValue<'a, Cx>,
+    dyn Value<'a, Cx> + 'a,
+>;
+
+/// A codec used to encode and decode tracked data.
+#[doc(alias = "TrackedDataHandler")]
+pub type Codec<'a, T, Cx> = EdcodeCodec<
+    T,
+    <Cx as ProvideLocalCxTy>::LocalContext<'a>,
+    DynValue<'a, Cx>,
+    dyn Value<'a, Cx> + 'a,
+>;
 
 /// Entity **data accessor** that is held by entities for getting and setting data values.
 #[doc(alias = "EntityDataAccessor")]
@@ -35,20 +224,20 @@ pub struct TrackedData<'a, T, Cx>
 where
     Cx: ProvideLocalCxTy,
 {
-    raw: ErasedTrackedData<'a, Cx>,
-    _marker: PhantomData<T>,
+    raw: RawTrackedData<'a, Cx>,
+
+    // make T invariant
+    _marker: PhantomData<fn(T) -> T>,
 }
 
-struct ErasedTrackedData<'a, Cx>
+struct RawTrackedData<'a, Cx>
 where
     Cx: ProvideLocalCxTy,
 {
     id: u32,
-    codec: UnsafeEdcodeCodec<
-        Cx::LocalContext<'a>,
-        dyn DynClone<'a> + Send + Sync + 'a,
-        dyn DynClone<'a> + 'a,
-    >,
+    entity_ty_typeid: TypeId,
+    codec: UnsafeCodec<'a, Cx>,
+    codec_id: CodecId,
 }
 
 impl<'a, T, Cx> TrackedData<'a, T, Cx>
@@ -57,19 +246,13 @@ where
 {
     /// Creates a new data accessor with the given id and codec.
     #[inline]
-    pub const fn with_codec(
-        id: u32,
-        codec: EdcodeCodec<
-            T,
-            Cx::LocalContext<'a>,
-            dyn DynClone<'a> + Send + Sync + 'a,
-            dyn DynClone<'a> + 'a,
-        >,
-    ) -> Self {
+    pub const fn with_codec(id: DataId, codec: Codec<'a, T, Cx>, codec_id: CodecId) -> Self {
         Self {
-            raw: ErasedTrackedData {
-                id,
+            raw: RawTrackedData {
+                id: id.0,
+                entity_ty_typeid: id.1,
                 codec: codec.codec,
+                codec_id,
             },
             _marker: PhantomData,
         }
@@ -82,25 +265,6 @@ where
     }
 }
 
-impl<'a, T, Cx> TrackedData<'a, T, Cx>
-where
-    Cx: ProvideLocalCxTy,
-    T: Clone
-        + Send
-        + Sync
-        + for<'br, 'buf> Encode<WithLocalCx<&'br mut (dyn BufMut + 'buf), Cx::LocalContext<'a>>>
-        + for<'br, 'buf> Decode<'static, WithLocalCx<&'br mut (dyn Buf + 'buf), Cx::LocalContext<'a>>>
-        + 'a,
-{
-    /// Creates a new data accessor using `T`'s [`Encode`] and [`Decode`] implementations.
-    pub const fn new(id: u32) -> Self {
-        Self::with_codec(
-            id,
-            edcode_codec!(Local<Cx::LocalContext<'a>> T: DynClone + 'a),
-        )
-    }
-}
-
 impl<T, Cx> Hash for TrackedData<'_, T, Cx>
 where
     Cx: ProvideLocalCxTy,
@@ -108,6 +272,7 @@ where
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.raw.id.hash(state);
+        self.raw.entity_ty_typeid.hash(state);
     }
 }
 
@@ -117,13 +282,13 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.raw.id == other.raw.id
+        self.raw.id == other.raw.id && self.raw.entity_ty_typeid == other.raw.entity_ty_typeid
     }
 }
 
 impl<T, Cx> Eq for TrackedData<'_, T, Cx> where Cx: ProvideLocalCxTy {}
 
-impl<Cx> Clone for ErasedTrackedData<'_, Cx>
+impl<Cx> Clone for RawTrackedData<'_, Cx>
 where
     Cx: ProvideLocalCxTy,
 {
@@ -133,7 +298,7 @@ where
     }
 }
 
-impl<Cx> Copy for ErasedTrackedData<'_, Cx> where Cx: ProvideLocalCxTy {}
+impl<Cx> Copy for RawTrackedData<'_, Cx> where Cx: ProvideLocalCxTy {}
 
 impl<T, Cx> Clone for TrackedData<'_, T, Cx>
 where
@@ -147,8 +312,229 @@ where
 
 impl<T, Cx> Copy for TrackedData<'_, T, Cx> where Cx: ProvideLocalCxTy {}
 
-pub struct DataTracker {}
+type ErasedEntry<'a, Cx> = Box<DataTrackerEntry<'a, DynValue<'a, Cx>, Cx>>;
 
+/// Holder of an entity's all [`TrackedData`]s and their values.
+pub struct DataTracker<'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    entries: Box<[ErasedEntry<'a, Cx>]>,
+    entity_ty_typeid: TypeId,
+
+    dirty: bool,
+}
+
+impl<'a, Cx> DataTracker<'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    fn entry<T>(&self, key: &TrackedData<'a, T, Cx>) -> Option<&DataTrackerEntry<'a, T, Cx>> {
+        assert_eq!(
+            key.raw.entity_ty_typeid, self.entity_ty_typeid,
+            "entity class of given tracked data should match with tracker"
+        );
+
+        self.entries.get(key.raw.id as usize).map(|entry| unsafe {
+            //SAFETY: `T` in `key` is invariant and here we have a registry to guarantee that the type and lifetime is the same.
+            &*std::ptr::from_ref(&**entry).cast()
+        })
+    }
+
+    fn entry_mut<T>(
+        &mut self,
+        key: &TrackedData<'a, T, Cx>,
+        set_dirty: bool,
+    ) -> Option<&mut DataTrackerEntry<'a, T, Cx>> {
+        assert_eq!(
+            key.raw.entity_ty_typeid, self.entity_ty_typeid,
+            "entity class of given tracked data should match with tracker"
+        );
+
+        let entry: Option<&mut DataTrackerEntry<'a, T, Cx>> = self
+            .entries
+            .get_mut(key.raw.id as usize)
+            .map(|entry| unsafe {
+                //SAFETY: `T` in `key` is invariant and here we have a registry to guarantee that the type and lifetime is the same.
+                &mut *std::ptr::from_mut(&mut **entry).cast()
+            });
+
+        if set_dirty {
+            #[allow(clippy::manual_inspect)] // takes mutable reference
+            entry.map(|e| {
+                e.set_dirty(true);
+                self.dirty = true;
+                e
+            })
+        } else {
+            entry
+        }
+    }
+
+    /// Gets an immutable reference to the value of the given key.
+    #[inline]
+    pub fn get<'e, T: 'e>(&'e self, key: &TrackedData<'a, T, Cx>) -> Option<&'e T> {
+        self.entry(key).map(DataTrackerEntry::get)
+    }
+
+    /// Gets a mutable reference to the value of the given key.
+    ///
+    /// *This method may comes with side-effects. Use [`Self::get`] when possible.*
+    #[inline]
+    pub fn get_mut<'e, T: 'e>(&'e mut self, key: &TrackedData<'a, T, Cx>) -> Option<&'e mut T> {
+        self.entry_mut(key, true).map(DataTrackerEntry::get_mut)
+    }
+
+    /// Updates this tracker by the given entries which are updated entries of this tracker.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the codec of the serialized entry does not match with the entry.
+    /// - Panics if type mismatch occurs.
+    pub fn update_entries<'borrow, I>(&mut self, entries: I)
+    where
+        I: IntoIterator<Item = SerializedEntry<'borrow, 'a, Cx>>,
+        'a: 'borrow,
+    {
+        for serialized in entries {
+            let Some(entry) = self.entries.get_mut(serialized.id as usize) else {
+                continue;
+            };
+            assert_eq!(
+                entry.data.codec_id, serialized.codec_id,
+                "codec of serialized entry should match with entry"
+            );
+
+            //SAFETY: the data type at least outlives `'a`-lifetime.
+            unsafe { serialized.value.into_owned().swap_entry(entry) };
+            //TODO: call entity
+        }
+        //TODO: call entity
+    }
+
+    /// Gets an iterator over all changed entries of this tracker.
+    #[inline]
+    pub fn changed_entries(&self) -> ChangedEntries<'_, 'a, Cx> {
+        ChangedEntries {
+            inner_iter: self.entries.iter(),
+        }
+    }
+
+    /// Gets an iterator over all dirty entries of this tracker.
+    ///
+    /// This doesn't follow vanilla behavior as it won't clear the dirty flags.
+    /// To make it clear flags automatically, see [`Self::self_cleaning_dirty_entries`].
+    #[inline]
+    pub fn dirty_entries(&self) -> DirtyEntries<'_, 'a, Cx> {
+        DirtyEntries {
+            inner_iter: self.entries.iter(),
+        }
+    }
+
+    /// Gets an iterator over all dirty entries of this tracker that _automatically clears the dirty flag._
+    #[inline]
+    pub fn self_cleaning_dirty_entries(&mut self) -> SelfCleaningDirtyEntries<'_, 'a, Cx> {
+        SelfCleaningDirtyEntries {
+            inner_iter: self.entries.iter_mut(),
+        }
+    }
+}
+
+/// Builder of a [`DataTracker`].
+pub struct DataTrackerBuilder<'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    entries: Box<[Option<ErasedEntry<'a, Cx>>]>,
+    entity_ty_typeid: TypeId,
+}
+
+impl<'a, Cx> DataTrackerBuilder<'a, Cx>
+where
+    Cx: EntityCx<'a>,
+{
+    /// Creates a new data tracker builder from given entity type.
+    pub fn new(ty: EntityType<'a, Cx>) -> Self {
+        let typeid = ty.erased_typeid();
+        let marker = Reg::to_entry(ty).marker_leaked();
+
+        let len = ENTITY_TY_DATA_IDS
+            .get()
+            .and_then(|map| map.lock().get(&(typeid, marker)).copied())
+            .map(|id| id as usize + 1)
+            .unwrap_or_default();
+        let mut vec = Vec::with_capacity(len);
+        vec.resize_with(len, || None);
+
+        Self {
+            entries: vec.into_boxed_slice(),
+            entity_ty_typeid: typeid,
+        }
+    }
+}
+
+impl<'a, Cx> DataTrackerBuilder<'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    /// Inserts a value into this tracker if absent, or returns the given value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the entity type of given tracked data doesn't match the type of this tracker.
+    pub fn insert<T>(&mut self, data: TrackedData<'a, T, Cx>, value: T) -> Option<T>
+    where
+        T: Clone + Send + Sync + 'a,
+    {
+        assert_eq!(
+            data.raw.entity_ty_typeid, self.entity_ty_typeid,
+            "entity type of given tracked data should match this tracker"
+        );
+
+        if let Some(val) = self.entries.get_mut(data.id() as usize)
+            && val.is_none()
+        {
+            *val = Some(Box::new(DataTrackerEntry::new(data, value)));
+            None
+        } else {
+            Some(value)
+        }
+    }
+}
+
+impl<'a, Cx> DataTrackerBuilder<'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    /// Builds a data tracker.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are undefined entries in this builder (left as `None`).
+    pub fn build(self) -> DataTracker<'a, Cx> {
+        DataTracker {
+            entries: self
+                .entries
+                .into_iter()
+                .map(|opt| opt.expect("data value should be defined"))
+                .collect(),
+            entity_ty_typeid: self.entity_ty_typeid,
+            dirty: false,
+        }
+    }
+}
+
+impl<'a, Cx> From<DataTrackerBuilder<'a, Cx>> for DataTracker<'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    #[inline]
+    fn from(builder: DataTrackerBuilder<'a, Cx>) -> Self {
+        builder.build()
+    }
+}
+
+/// Entry of a [`DataTracker`], containing a [`TrackedData`] and its corresponding value.
 pub struct DataTrackerEntry<'a, T: ?Sized, Cx>
 where
     Cx: ProvideLocalCxTy,
@@ -156,8 +542,8 @@ where
     dirty: bool,
     may_changed: bool,
 
-    // erased data so we can make this type exotically sized
-    data: ErasedTrackedData<'a, Cx>,
+    // raw data so we can make this type exotically sized
+    data: RawTrackedData<'a, Cx>,
 
     value: T,
 }
@@ -180,7 +566,7 @@ where
     /// Gets the data accessor.
     #[inline]
     pub fn data(&self) -> &TrackedData<'a, T, Cx> {
-        //SAFETY: ErasedTrackedData and TrackedData are the same ABI (repr transparent).
+        //SAFETY: ErasedTrackedData and TrackedData share the same ABI (repr transparent).
         unsafe { *std::ptr::from_ref(&self.data).cast() }
     }
 }
@@ -201,6 +587,11 @@ where
     #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         self.may_changed = true;
+        self.__get_mut_unaffected()
+    }
+
+    #[inline]
+    fn __get_mut_unaffected(&mut self) -> &mut T {
         &mut self.value
     }
 
@@ -220,6 +611,22 @@ where
     #[inline]
     pub fn is_unchanged(&self) -> bool {
         !self.may_changed
+    }
+}
+
+impl<'a, Cx> DataTrackerEntry<'a, DynValue<'a, Cx>, Cx>
+where
+    Cx: ProvideLocalCxTy + GlobalContext,
+{
+    /// Returns a serialized form of this entry for encoding.
+    #[inline]
+    pub fn as_serialized(&self) -> SerializedEntry<'_, 'a, Cx> {
+        SerializedEntry {
+            id: self.data.id,
+            codec: self.data.codec,
+            codec_id: self.data.codec_id,
+            value: Maybe::Borrowed(&self.value),
+        }
     }
 }
 
@@ -244,5 +651,134 @@ where
         f.debug_tuple("TrackedData")
             .field(&self.raw.id)
             .finish_non_exhaustive()
+    }
+}
+
+impl<Cx: ProvideLocalCxTy> Debug for DataTracker<'_, Cx> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DataTracker")
+            .field(
+                "entries",
+                &self.entries.iter().map(|e| e.data.id).collect::<Vec<_>>(),
+            )
+            .field("dirty", &self.dirty)
+            .finish()
+    }
+}
+
+impl<Cx: ProvideLocalCxTy> Debug for DataTrackerBuilder<'_, Cx> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DataTrackerBuilder")
+            .field(
+                "entries",
+                &self
+                    .entries
+                    .iter()
+                    .filter_map(|e| e.as_ref().map(|e| e.data.id))
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
+    }
+}
+
+/// Serialized form of [`DataTrackerEntry`] for encoding and decoding purposes.
+///
+/// The decoding behavior differs from vanilla implementation as it _decodes the ID byte by its own._
+pub struct SerializedEntry<'borrow, 'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    id: u32,
+    codec: UnsafeCodec<'a, Cx>,
+    codec_id: CodecId,
+    value: Maybe<'borrow, DynValue<'a, Cx>, Box<DynValue<'a, Cx>>>,
+}
+
+impl<'a, Cx, Fw> Encode<Fw> for SerializedEntry<'_, 'a, Cx>
+where
+    Cx: ProvideLocalCxTy,
+    Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx = Cx::LocalContext<'a>>,
+{
+    fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
+        let forwarded = buf.forward();
+        let local_cx = forwarded.local_cx;
+        let mut buf = forwarded.inner;
+
+        if self.id > MAX_DATA_ID {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "invalid data id: expected <= {MAX_DATA_ID}, got {}",
+                    self.id
+                ),
+            )
+            .into());
+        }
+        buf.put_u8(self.id as u8);
+        self.codec_id.encode(&mut buf)?;
+        (self.codec.encode)(&*self.value, &mut buf, local_cx)
+    }
+}
+
+impl<'a, 'de, Cx, Fw> Decode<'de, Fw> for SerializedEntry<'static, 'a, Cx>
+where
+    Cx: ProvideLocalCxTy + GlobalContext,
+    Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'a>>,
+    Cx::LocalContext<'a>: LocalContext<&'a CodecRegistry<'a, Cx>>,
+{
+    fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
+        let forwarded = buf.forward();
+        let local_cx = forwarded.local_cx;
+        let mut buf = forwarded.inner;
+
+        let id = buf.get_u8() as u32;
+        if id > MAX_DATA_ID {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("invalid data id: expected <= {MAX_DATA_ID}, got {id}"),
+            )
+            .into());
+        }
+        let codec_id = CodecId::decode(&mut buf)?;
+        let codec = local_cx.acquire().get_raw(codec_id).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("codec with id {} not found in registry", codec_id.0),
+            )
+        })?;
+
+        (codec.decode)(&mut buf, local_cx).map(|value| Self {
+            id,
+            codec,
+            codec_id,
+            value: Maybe::Owned(value),
+        })
+    }
+}
+
+impl<Cx> Debug for SerializedEntry<'_, '_, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SerializedEntry")
+            .field("id", &self.id)
+            .field("codec", &self.codec)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<Cx> Clone for SerializedEntry<'_, '_, Cx>
+where
+    Cx: ProvideLocalCxTy,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            codec: self.codec,
+            codec_id: self.codec_id,
+            value: self.value.clone(),
+        }
     }
 }
