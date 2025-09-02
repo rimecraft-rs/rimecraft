@@ -183,6 +183,30 @@ directions! {
     },
 }
 
+impl Direction {
+    /// The number of directions.
+    pub const COUNT: usize = 6;
+
+    /// Gets the ordinal of the direction.
+    #[inline]
+    pub fn ordinal(self) -> usize {
+        self as u8 as usize
+    }
+
+    /// Gets the axis of the direction.
+    #[inline]
+    pub fn axis(self) -> Axis {
+        self.into()
+    }
+
+    /// Gets the axis direction of the direction.
+    #[inline]
+    #[doc(alias = "axis_direction")]
+    pub fn axis_dir(self) -> AxisDirection {
+        self.into()
+    }
+}
+
 impl From<(AxisDirection, Axis)> for Direction {
     #[inline]
     fn from((ad, a): (AxisDirection, Axis)) -> Self {
@@ -204,8 +228,11 @@ pub enum Axis {
 }
 
 impl Axis {
+    /// All available values of [`Axis`].
+    pub const VALUES: [Self; 3] = [Self::X, Self::Y, Self::Z];
+
     /// Chooses a value from a position based on the axis.
-    #[inline]
+    #[inline(always)]
     pub fn choose<T>(self, x: T, y: T, z: T) -> T {
         match self {
             Axis::X => x,
