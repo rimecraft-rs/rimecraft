@@ -22,6 +22,8 @@ use serde_update::erased::ErasedUpdate;
 use uuid::Uuid;
 use voxel_math::{BlockPos, ChunkPos};
 
+use crate::data::{DataTracked, DataTracker, DataTrackerBuilder, EntityDataCx, SerializedEntry};
+
 mod _serde;
 pub mod data;
 
@@ -31,16 +33,26 @@ const VELOCITY_BOUND: f64 = 10.0;
 
 /// Global context types satisfying use of entities.
 pub trait EntityCx<'a>:
-    ProvideIdTy + ProvideNbtTy + ProvideEntityExtTy + ProvideBlockStateExtTy + ProvideLocalCxTy
+    ProvideIdTy
+    + ProvideNbtTy
+    + ProvideEntityExtTy
+    + ProvideBlockStateExtTy
+    + ProvideLocalCxTy
+    + EntityDataCx<'a>
 {
 }
 
-impl<T> EntityCx<'_> for T where
-    T: ProvideIdTy + ProvideNbtTy + ProvideEntityExtTy + ProvideBlockStateExtTy + ProvideLocalCxTy
+impl<'a, T> EntityCx<'a> for T where
+    T: ProvideIdTy
+        + ProvideNbtTy
+        + ProvideEntityExtTy
+        + ProvideBlockStateExtTy
+        + ProvideLocalCxTy
+        + EntityDataCx<'a>
 {
 }
 
-/// Global context types providing an extension type to entities.
+/// Global context types providing an extension types to entities.
 pub trait ProvideEntityExtTy: GlobalContext {
     /// The extension type to entities, which will be treated as inlined fields when
     /// serializing and deserializing.
@@ -48,6 +60,51 @@ pub trait ProvideEntityExtTy: GlobalContext {
     /// Fields like `fall_distance`, `Glowing` in vanilla Minecraft should be contained
     /// in here.
     type EntityExt<'a>: Serialize + for<'de> serde_update::Update<'de>;
+}
+
+/// A message sent to the entity manager.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct ChangeMessage {
+    /// The entity being changed.
+    pub entity: *const (),
+    /// The variant of the change message.
+    pub variant: ChangeMessageVariant,
+    /// The chunk section position of the entity.
+    pub section_pos: u64,
+}
+
+unsafe impl Send for ChangeMessage {}
+unsafe impl Sync for ChangeMessage {}
+
+/// A message variant for an [`ChangeMessage`].
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum ChangeMessageVariant {
+    /// The entity's position is updated.
+    UpdatePos,
+    /// The entity is removed.
+    Remove(&'static RemovalReason),
+}
+
+/// A listener for entity changes.
+///
+/// The callback is simulated by a channel sending [`ChangeMessage`]s.
+#[derive(Debug)]
+pub struct ChangeListener {
+    sender: crossbeam_channel::Sender<ChangeMessage>,
+    section_pos: u64,
+}
+
+impl ChangeListener {
+    /// Creates a new change listener.
+    #[inline]
+    pub fn new(sender: crossbeam_channel::Sender<ChangeMessage>, section_pos: u64) -> Self {
+        Self {
+            sender,
+            section_pos,
+        }
+    }
 }
 
 /// Boxed entity cell with internal mutability and reference-counting.
@@ -59,7 +116,7 @@ where
     Cx: EntityCx<'a>,
 {
     /// Data type of the target entity.
-    type Data: Data<'a, Cx>;
+    type Data: Data<'a, Cx, EntityType = Self>;
 
     /// Creates a new entity.
     fn create(&self, this: EntityType<'a, Cx>) -> RawEntity<'a, Self::Data, Cx>;
@@ -119,6 +176,8 @@ where
     ty: EntityType<'a, Cx>,
     uuid: Uuid,
 
+    data_tracker: DataTracker<'a, Cx>,
+
     pos: DVec3,
     vehicle: Option<EntityCell<'a, Cx>>,
     velocity: DVec3,
@@ -137,6 +196,8 @@ where
     last_pos: DVec3,
     last_yaw: f32,
     last_pitch: f32,
+
+    change_listener: Option<ChangeListener>,
 
     custom_compound: Cx::Compound,
     ext: Cx::EntityExt<'a>,
@@ -165,14 +226,23 @@ where
 }
 
 /// A trait for generic entity data types.
-pub trait Data<'a, Cx>
+pub trait Data<'a, Cx>: DataTracked<'a, Cx>
 where
     Cx: EntityCx<'a>,
 {
+    /// The type of the entity.
+    ///
+    /// Used to ensure the uniqueness of entity-data pair.
+    type EntityType: RawEntityType<'a, Cx, Data = Self>;
+
     /// Sets the multi-parted yaw of the entity, usually consists of head and body yaws.
+    #[inline]
     fn set_yaws(&mut self, yaw: f32) {
         let _ = yaw;
     }
+
+    /// Initializes the data tracker.
+    fn init_data_tracker(builder: &mut DataTrackerBuilder<'a, Cx>);
 }
 
 /// The reason for removing an entity.
@@ -194,9 +264,9 @@ pub struct RemovalReason {
 #[allow(missing_docs)]
 pub trait ErasedData<'a, Cx>
 where
-    Self: ErasedSerialize
+    Self: DataTracked<'a, Cx>
+        + ErasedSerialize
         + for<'de> ErasedUpdate<'de>
-        + Data<'a, Cx>
         + Send
         + Sync
         + Debug
@@ -317,10 +387,15 @@ where
 impl<'w, T, Cx> RawEntity<'w, T, Cx>
 where
     Cx: EntityCx<'w, EntityExt<'w>: Default> + ProvideRng,
+    T: Data<'w, Cx>,
 {
     /// Creates a new entity.
     pub fn new(ty: EntityType<'w, Cx>, data: T) -> Self {
+        let mut tracker_builder = DataTrackerBuilder::new(ty);
+        T::init_data_tracker(&mut tracker_builder);
+
         static ID_COUNTER: AtomicU32 = AtomicU32::new(0);
+
         Self {
             net_id: ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             ty,
@@ -329,6 +404,7 @@ where
                 Cx::crypto_rng().lock().fill(&mut bytes);
                 uuid::Builder::from_random_bytes(bytes).into_uuid()
             },
+            data_tracker: tracker_builder.build(),
             pos: DVec3::ZERO,
             vehicle: None,
             velocity: DVec3::ZERO,
@@ -343,6 +419,7 @@ where
             last_pos: DVec3::ZERO,
             last_yaw: 0.0,
             last_pitch: 0.0,
+            change_listener: None,
             custom_compound: Default::default(),
             ext: Default::default(),
             data,
@@ -384,6 +461,12 @@ where
         self.pos
     }
 
+    /// Sets the [`ChangeListener`] of this entity.
+    #[inline]
+    pub fn set_change_listener(&mut self, sender: Option<ChangeListener>) {
+        self.change_listener = sender;
+    }
+
     /// Sets the position of this entity.
     pub fn set_pos(&mut self, pos: DVec3) {
         self.pos = pos;
@@ -394,8 +477,13 @@ where
             self.bs_at_pos = None;
         }
 
-        //TODO: fire change listener
-        //TODO: update server-side waypoint handlers
+        if let Some(ref listener) = self.change_listener {
+            let _ = listener.sender.try_send(ChangeMessage {
+                entity: std::ptr::from_ref(&*self).cast(),
+                variant: ChangeMessageVariant::UpdatePos,
+                section_pos: listener.section_pos,
+            });
+        }
     }
 
     /// Returns the velocity of this entity.
@@ -497,5 +585,27 @@ where
     #[inline]
     pub fn set_net_id(&mut self, net_id: u32) {
         self.net_id = net_id;
+    }
+}
+
+impl<'w, T: ?Sized, Cx> RawEntity<'w, T, Cx>
+where
+    Cx: EntityCx<'w>,
+    T: ErasedData<'w, Cx>,
+    Cx::EntityExt<'w>: DataTracked<'w, Cx>,
+{
+    /// Updates the tracker entries.
+    ///
+    /// This function performs [`DataTracker::update_entries`] internally, while updating data
+    /// nested inside this entity.
+    pub fn update_tracker_entries<'borrow, I, F>(&mut self, entries: I)
+    where
+        I: IntoIterator<Item = SerializedEntry<'borrow, 'w, Cx>>,
+        'w: 'borrow,
+    {
+        self.data_tracker.update_entries(entries, |td| {
+            self.ext.on_tracked_data_set(&td);
+            self.data.on_tracked_data_set(&td);
+        });
     }
 }

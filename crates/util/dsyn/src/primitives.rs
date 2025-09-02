@@ -96,8 +96,6 @@ impl_primitives! {
     #[doc = "Pointer-like bool type."]
     #[derive(Debug, Copy, Default, Clone, PartialEq, Eq)]
     PointerLikeBool(bool);
-
-
 }
 
 #[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]

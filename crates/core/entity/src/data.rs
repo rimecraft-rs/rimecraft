@@ -29,6 +29,23 @@ pub const MAX_DATA_ID: u32 = MAX_DATA_VALUES as u32 - 1;
 static ENTITY_TY_DATA_IDS: OnceLock<Mutex<AHashMap<(TypeId, LeakedPtrMarker), u32>>> =
     OnceLock::new();
 
+/// Global context types satisfying use of entity data.
+pub trait EntityDataCx<'a>: ProvideLocalCxTy + GlobalContext {}
+
+impl<T> EntityDataCx<'_> for T where T: ProvideLocalCxTy + GlobalContext {}
+
+/// A trait implemented by objects whose inner data is tracked by [`DataTracker`].
+pub trait DataTracked<'a, Cx>
+where
+    Cx: EntityDataCx<'a>,
+{
+    /// Called on the client when the tracked data is set.
+    #[inline]
+    fn on_tracked_data_set(&mut self, tracked: &RawTrackedData<'a, Cx>) {
+        let _ = tracked;
+    }
+}
+
 /// A registry of [`Codec`]s.
 pub struct CodecRegistry<'a, Cx>
 where
@@ -152,7 +169,7 @@ pub trait Value<'a, Cx: 'a>: 'a {
 
     unsafe fn swap_entry(&mut self, entry: &mut DataTrackerEntry<'a, DynValue<'a, Cx>, Cx>)
     where
-        Cx: ProvideLocalCxTy;
+        Cx: EntityDataCx<'a>;
 }
 
 type DynValue<'a, Cx> = dyn Value<'a, Cx> + Send + Sync + 'a;
@@ -170,7 +187,7 @@ impl<'a, T: Clone + Send + Sync + 'a, Cx: 'a> Value<'a, Cx> for T {
 
     unsafe fn swap_entry(&mut self, entry: &mut DataTrackerEntry<'a, DynValue<'a, Cx>, Cx>)
     where
-        Cx: ProvideLocalCxTy,
+        Cx: EntityDataCx<'a>,
     {
         assert_eq!(
             typeid::of::<T>(),
@@ -222,7 +239,7 @@ pub type Codec<'a, T, Cx> = EdcodeCodec<
 #[repr(transparent)]
 pub struct TrackedData<'a, T, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     raw: RawTrackedData<'a, Cx>,
 
@@ -230,9 +247,10 @@ where
     _marker: PhantomData<fn(T) -> T>,
 }
 
-struct RawTrackedData<'a, Cx>
+/// Type-erased raw representation of a [`TrackedData`].
+pub struct RawTrackedData<'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     id: u32,
     entity_ty_typeid: TypeId,
@@ -242,7 +260,7 @@ where
 
 impl<'a, T, Cx> TrackedData<'a, T, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     /// Creates a new data accessor with the given id and codec.
     #[inline]
@@ -261,36 +279,69 @@ where
     /// Gets the id of this tracked data.
     #[inline]
     pub const fn id(&self) -> u32 {
-        self.raw.id
+        self.raw.id()
     }
 }
 
-impl<T, Cx> Hash for TrackedData<'_, T, Cx>
+impl<'a, Cx> RawTrackedData<'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
+{
+    /// Gets the id of this tracked data.
+    #[inline]
+    pub const fn id(&self) -> u32 {
+        self.id
+    }
+}
+
+impl<'a, Cx> Hash for RawTrackedData<'a, Cx>
+where
+    Cx: EntityDataCx<'a>,
 {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.raw.id.hash(state);
-        self.raw.entity_ty_typeid.hash(state);
+        self.id.hash(state);
+        self.entity_ty_typeid.hash(state);
     }
 }
 
-impl<T, Cx> PartialEq for TrackedData<'_, T, Cx>
+impl<'a, T, Cx> Hash for TrackedData<'a, T, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
+{
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.raw.hash(state);
+    }
+}
+
+impl<'a, Cx> PartialEq for RawTrackedData<'a, Cx>
+where
+    Cx: EntityDataCx<'a>,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.raw.id == other.raw.id && self.raw.entity_ty_typeid == other.raw.entity_ty_typeid
+        self.id == other.id && self.entity_ty_typeid == other.entity_ty_typeid
     }
 }
 
-impl<T, Cx> Eq for TrackedData<'_, T, Cx> where Cx: ProvideLocalCxTy {}
-
-impl<Cx> Clone for RawTrackedData<'_, Cx>
+impl<'a, T, Cx> PartialEq for TrackedData<'a, T, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.raw == other.raw
+    }
+}
+
+impl<'a, Cx> Eq for RawTrackedData<'a, Cx> where Cx: EntityDataCx<'a> {}
+
+impl<'a, T, Cx> Eq for TrackedData<'a, T, Cx> where Cx: EntityDataCx<'a> {}
+
+impl<'a, Cx> Clone for RawTrackedData<'a, Cx>
+where
+    Cx: EntityDataCx<'a>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -298,11 +349,11 @@ where
     }
 }
 
-impl<Cx> Copy for RawTrackedData<'_, Cx> where Cx: ProvideLocalCxTy {}
+impl<'a, Cx> Copy for RawTrackedData<'a, Cx> where Cx: EntityDataCx<'a> {}
 
-impl<T, Cx> Clone for TrackedData<'_, T, Cx>
+impl<'a, T, Cx> Clone for TrackedData<'a, T, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -310,14 +361,14 @@ where
     }
 }
 
-impl<T, Cx> Copy for TrackedData<'_, T, Cx> where Cx: ProvideLocalCxTy {}
+impl<'a, T, Cx> Copy for TrackedData<'a, T, Cx> where Cx: EntityDataCx<'a> {}
 
 type ErasedEntry<'a, Cx> = Box<DataTrackerEntry<'a, DynValue<'a, Cx>, Cx>>;
 
 /// Holder of an entity's all [`TrackedData`]s and their values.
 pub struct DataTracker<'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     entries: Box<[ErasedEntry<'a, Cx>]>,
     entity_ty_typeid: TypeId,
@@ -327,7 +378,7 @@ where
 
 impl<'a, Cx> DataTracker<'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     fn entry<T>(&self, key: &TrackedData<'a, T, Cx>) -> Option<&DataTrackerEntry<'a, T, Cx>> {
         assert_eq!(
@@ -387,13 +438,18 @@ where
 
     /// Updates this tracker by the given entries which are updated entries of this tracker.
     ///
+    /// This method won't tell the entity to update itself. Instead, you should provide a callback `on_update`
+    /// to make the entity's data update itself. Use [`crate::RawEntity::update_tracker_entries`] if possible.
+    ///
     /// # Panics
     ///
     /// - Panics if the codec of the serialized entry does not match with the entry.
     /// - Panics if type mismatch occurs.
-    pub fn update_entries<'borrow, I>(&mut self, entries: I)
+    #[doc(alias = "write_updated_entries")]
+    pub fn update_entries<'borrow, I, F>(&mut self, entries: I, mut on_update: F)
     where
         I: IntoIterator<Item = SerializedEntry<'borrow, 'a, Cx>>,
+        F: FnMut(RawTrackedData<'a, Cx>),
         'a: 'borrow,
     {
         for serialized in entries {
@@ -404,12 +460,14 @@ where
                 entry.data.codec_id, serialized.codec_id,
                 "codec of serialized entry should match with entry"
             );
+            let data = entry.data;
 
             //SAFETY: the data type at least outlives `'a`-lifetime.
             unsafe { serialized.value.into_owned().swap_entry(entry) };
-            //TODO: call entity
+            let _ = entry;
+
+            on_update(data);
         }
-        //TODO: call entity
     }
 
     /// Gets an iterator over all changed entries of this tracker.
@@ -443,10 +501,11 @@ where
 /// Builder of a [`DataTracker`].
 pub struct DataTrackerBuilder<'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     entries: Box<[Option<ErasedEntry<'a, Cx>>]>,
     entity_ty_typeid: TypeId,
+    len: usize,
 }
 
 impl<'a, Cx> DataTrackerBuilder<'a, Cx>
@@ -469,13 +528,14 @@ where
         Self {
             entries: vec.into_boxed_slice(),
             entity_ty_typeid: typeid,
+            len: 0,
         }
     }
 }
 
 impl<'a, Cx> DataTrackerBuilder<'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     /// Inserts a value into this tracker if absent, or returns the given value.
     ///
@@ -495,16 +555,29 @@ where
             && val.is_none()
         {
             *val = Some(Box::new(DataTrackerEntry::new(data, value)));
+            self.len += 1;
             None
         } else {
             Some(value)
         }
     }
+
+    /// Returns the length of this tracker.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Returns whether this tracker is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
 }
 
 impl<'a, Cx> DataTrackerBuilder<'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     /// Builds a data tracker.
     ///
@@ -524,20 +597,10 @@ where
     }
 }
 
-impl<'a, Cx> From<DataTrackerBuilder<'a, Cx>> for DataTracker<'a, Cx>
-where
-    Cx: ProvideLocalCxTy,
-{
-    #[inline]
-    fn from(builder: DataTrackerBuilder<'a, Cx>) -> Self {
-        builder.build()
-    }
-}
-
 /// Entry of a [`DataTracker`], containing a [`TrackedData`] and its corresponding value.
 pub struct DataTrackerEntry<'a, T: ?Sized, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     dirty: bool,
     may_changed: bool,
@@ -550,7 +613,7 @@ where
 
 impl<'a, T, Cx> DataTrackerEntry<'a, T, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     /// Creates a new entry.
     #[inline]
@@ -571,9 +634,9 @@ where
     }
 }
 
-impl<T: ?Sized, Cx> DataTrackerEntry<'_, T, Cx>
+impl<'a, T: ?Sized, Cx> DataTrackerEntry<'a, T, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     /// Gets the inner value.
     #[inline]
@@ -616,7 +679,7 @@ where
 
 impl<'a, Cx> DataTrackerEntry<'a, DynValue<'a, Cx>, Cx>
 where
-    Cx: ProvideLocalCxTy + GlobalContext,
+    Cx: EntityDataCx<'a>,
 {
     /// Returns a serialized form of this entry for encoding.
     #[inline]
@@ -630,63 +693,12 @@ where
     }
 }
 
-impl<T: ?Sized + Debug, Cx> Debug for DataTrackerEntry<'_, T, Cx>
-where
-    Cx: ProvideLocalCxTy,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DataTrackerEntry")
-            .field("data", &self.data.id)
-            .field("value", &&self.value)
-            .field("dirty", &self.dirty)
-            .finish_non_exhaustive()
-    }
-}
-
-impl<T, Cx> Debug for TrackedData<'_, T, Cx>
-where
-    Cx: ProvideLocalCxTy,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("TrackedData")
-            .field(&self.raw.id)
-            .finish_non_exhaustive()
-    }
-}
-
-impl<Cx: ProvideLocalCxTy> Debug for DataTracker<'_, Cx> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DataTracker")
-            .field(
-                "entries",
-                &self.entries.iter().map(|e| e.data.id).collect::<Vec<_>>(),
-            )
-            .field("dirty", &self.dirty)
-            .finish()
-    }
-}
-
-impl<Cx: ProvideLocalCxTy> Debug for DataTrackerBuilder<'_, Cx> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DataTrackerBuilder")
-            .field(
-                "entries",
-                &self
-                    .entries
-                    .iter()
-                    .filter_map(|e| e.as_ref().map(|e| e.data.id))
-                    .collect::<Vec<_>>(),
-            )
-            .finish()
-    }
-}
-
 /// Serialized form of [`DataTrackerEntry`] for encoding and decoding purposes.
 ///
 /// The decoding behavior differs from vanilla implementation as it _decodes the ID byte by its own._
 pub struct SerializedEntry<'borrow, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     id: u32,
     codec: UnsafeCodec<'a, Cx>,
@@ -696,7 +708,7 @@ where
 
 impl<'a, Cx, Fw> Encode<Fw> for SerializedEntry<'_, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
     Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx = Cx::LocalContext<'a>>,
 {
     fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
@@ -722,7 +734,7 @@ where
 
 impl<'a, 'de, Cx, Fw> Decode<'de, Fw> for SerializedEntry<'static, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy + GlobalContext,
+    Cx: EntityDataCx<'a>,
     Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'a>>,
     Cx::LocalContext<'a>: LocalContext<&'a CodecRegistry<'a, Cx>>,
 {
@@ -756,9 +768,9 @@ where
     }
 }
 
-impl<Cx> Debug for SerializedEntry<'_, '_, Cx>
+impl<'a, Cx> Debug for SerializedEntry<'_, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SerializedEntry")
@@ -768,9 +780,9 @@ where
     }
 }
 
-impl<Cx> Clone for SerializedEntry<'_, '_, Cx>
+impl<'a, Cx> Clone for SerializedEntry<'_, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -780,5 +792,65 @@ where
             codec_id: self.codec_id,
             value: self.value.clone(),
         }
+    }
+}
+
+impl<'a, T: ?Sized + Debug, Cx> Debug for DataTrackerEntry<'a, T, Cx>
+where
+    Cx: EntityDataCx<'a>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DataTrackerEntry")
+            .field("data", &self.data.id)
+            .field("value", &&self.value)
+            .field("dirty", &self.dirty)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a, Cx> Debug for RawTrackedData<'a, Cx>
+where
+    Cx: EntityDataCx<'a>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("TrackedData")
+            .field(&self.id)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a, T, Cx> Debug for TrackedData<'a, T, Cx>
+where
+    Cx: EntityDataCx<'a>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.raw, f)
+    }
+}
+
+impl<'a, Cx: EntityDataCx<'a>> Debug for DataTracker<'a, Cx> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DataTracker")
+            .field(
+                "entries",
+                &self.entries.iter().map(|e| e.data.id).collect::<Vec<_>>(),
+            )
+            .field("dirty", &self.dirty)
+            .finish()
+    }
+}
+
+impl<'a, Cx: EntityDataCx<'a>> Debug for DataTrackerBuilder<'a, Cx> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DataTrackerBuilder")
+            .field(
+                "entries",
+                &self
+                    .entries
+                    .iter()
+                    .filter_map(|e| e.as_ref().map(|e| e.data.id))
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
     }
 }

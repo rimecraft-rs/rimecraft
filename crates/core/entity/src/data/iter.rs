@@ -3,21 +3,21 @@ use std::{fmt::Debug, iter::FusedIterator};
 use global_cx::GlobalContext;
 use local_cx::ProvideLocalCxTy;
 
-use crate::data::{ErasedEntry, SerializedEntry};
+use crate::data::{EntityDataCx, ErasedEntry, SerializedEntry};
 
 /// Iterator over all changed entries of a `DataTracker`.
 pub struct ChangedEntries<'borrow, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     pub(crate) inner_iter: std::slice::Iter<'borrow, ErasedEntry<'a, Cx>>,
 }
 
-impl<Cx> FusedIterator for ChangedEntries<'_, '_, Cx> where Cx: ProvideLocalCxTy + GlobalContext {}
+impl<'a, Cx> FusedIterator for ChangedEntries<'_, 'a, Cx> where Cx: EntityDataCx<'a> {}
 
 impl<'borrow, 'a, Cx> Iterator for ChangedEntries<'borrow, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy + GlobalContext,
+    Cx: EntityDataCx<'a>,
 {
     type Item = SerializedEntry<'borrow, 'a, Cx>;
 
@@ -35,9 +35,9 @@ where
     }
 }
 
-impl<Cx> Debug for ChangedEntries<'_, '_, Cx>
+impl<'a, Cx> Debug for ChangedEntries<'_, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ChangedEntries")
@@ -52,7 +52,7 @@ where
 /// it is done in vanilla.
 pub struct DirtyEntries<'borrow, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     pub(crate) inner_iter: std::slice::Iter<'borrow, ErasedEntry<'a, Cx>>,
 }
@@ -79,9 +79,9 @@ where
     }
 }
 
-impl<Cx> Debug for DirtyEntries<'_, '_, Cx>
+impl<'a, Cx> Debug for DirtyEntries<'_, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DirtyEntries")
@@ -93,19 +93,16 @@ where
 /// Iterator over all dirty entries of a `DataTracker` that _automatically clears the dirty flag._
 pub struct SelfCleaningDirtyEntries<'borrow, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     pub(crate) inner_iter: std::slice::IterMut<'borrow, ErasedEntry<'a, Cx>>,
 }
 
-impl<Cx> FusedIterator for SelfCleaningDirtyEntries<'_, '_, Cx> where
-    Cx: ProvideLocalCxTy + GlobalContext
-{
-}
+impl<'a, Cx> FusedIterator for SelfCleaningDirtyEntries<'_, 'a, Cx> where Cx: EntityDataCx<'a> {}
 
 impl<'borrow, 'a, Cx> Iterator for SelfCleaningDirtyEntries<'borrow, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy + GlobalContext,
+    Cx: EntityDataCx<'a>,
 {
     type Item = SerializedEntry<'borrow, 'a, Cx>;
 
@@ -124,9 +121,9 @@ where
     }
 }
 
-impl<Cx> Debug for SelfCleaningDirtyEntries<'_, '_, Cx>
+impl<'a, Cx> Debug for SelfCleaningDirtyEntries<'_, 'a, Cx>
 where
-    Cx: ProvideLocalCxTy,
+    Cx: EntityDataCx<'a>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SelfCleaningDirtyEntries")
