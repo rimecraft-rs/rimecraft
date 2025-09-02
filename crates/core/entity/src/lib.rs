@@ -586,6 +586,24 @@ where
     pub fn set_net_id(&mut self, net_id: u32) {
         self.net_id = net_id;
     }
+
+    /// Returns the type of this entity.
+    #[inline]
+    pub fn entity_type(&self) -> EntityType<'w, Cx> {
+        self.ty
+    }
+
+    /// Returns the data tracker of this entity.
+    #[inline]
+    pub fn data_tracker(&self) -> &DataTracker<'w, Cx> {
+        &self.data_tracker
+    }
+
+    /// Returns the mutable data tracker of this entity.
+    #[inline]
+    pub fn data_tracker_mut(&mut self) -> &mut DataTracker<'w, Cx> {
+        &mut self.data_tracker
+    }
 }
 
 impl<'w, T: ?Sized, Cx> RawEntity<'w, T, Cx>
