@@ -21,8 +21,6 @@ use std::{
 };
 
 pub use ahash::{AHashMap, AHashSet};
-use parking_lot::Mutex;
-use rimecraft_block_entity::BlockEntity;
 
 /// The default max light level of Minecraft.
 pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
@@ -38,9 +36,6 @@ impl<T> From<T> for Sealed<T> {
         Self(value)
     }
 }
-
-/// Boxed block entity cell with internal mutability and reference-counting.
-pub type BlockEntityCell<'w, Cx> = Arc<Mutex<Box<BlockEntity<'w, Cx>>>>;
 
 //TODO: PLACEHOLDERS
 

@@ -10,6 +10,8 @@ mod simple_registry;
 #[cfg(feature = "simple-registry")]
 pub use simple_registry::SimpleRegistry;
 
+pub mod primitives;
+
 /// The maximum number of elements in a slice or vector before it switches to a map.
 const SLICE_THRESHOLD: usize = 8;
 

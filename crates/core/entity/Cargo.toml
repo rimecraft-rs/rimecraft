@@ -1,0 +1,50 @@
+[package]
+name = "rimecraft-entity"
+version = "0.1.0"
+edition = "2024"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Minecraft Entity primitives"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+crossbeam-channel = "0.5"
+uuid = { version = "1.18", default-features = false }
+erased-serde = "0.4"
+typeid = "1.0"
+parking_lot = "0.12"
+glam = { version = "0.30", features = ["serde"] }
+ahash = "0.8"
+# rimecraft crates
+voxel-math = { path = "../../util/voxel-math", package = "rimecraft-voxel-math" }
+block = { path = "../block", package = "rimecraft-block" }
+marking = { path = "../../util/marking", package = "rimecraft-marking" }
+serde = "1.0"
+serde-update = { path = "../../util/serde-update", features = [
+    "erased",
+], package = "rimecraft-serde-update" }
+serde-compat = { path = "../../util/serde-compat", features = [
+    "uuid",
+], package = "rimecraft-serde-compat" }
+edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2" }
+global-cx = { path = "../global-cx", package = "rimecraft-global-cx", features = [
+    "rand",
+    "nbt",
+] }
+local-cx = { path = "../local-cx", package = "rimecraft-local-cx", features = [
+    "dyn-codecs",
+] }
+registry = { path = "../registry", package = "rimecraft-registry", features = [
+    "marking-leaked",
+] }
+dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
+maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
+
+[features]
+
+[lints]
+workspace = true

@@ -415,10 +415,12 @@ where
     Cx: ChunkCx<'w>,
 {
     serde: UnsafeSerdeCodec<
+        Cx::LocalContext<'w>,
         dyn PositionSource<'w, Cx> + Send + Sync + 'w,
         dyn PositionSource<'w, Cx> + 'w,
     >,
     packet: UnsafeEdcodeCodec<
+        Cx::LocalContext<'w>,
         dyn PositionSource<'w, Cx> + Send + Sync + 'w,
         dyn PositionSource<'w, Cx> + 'w,
     >,
@@ -437,11 +439,13 @@ where
     pub const fn new<T>(
         serde_codec: SerdeCodec<
             T,
+            Cx::LocalContext<'a>,
             dyn PositionSource<'a, Cx> + Send + Sync + 'a,
             dyn PositionSource<'a, Cx> + 'a,
         >,
         packet_codec: EdcodeCodec<
             T,
+            Cx::LocalContext<'a>,
             dyn PositionSource<'a, Cx> + Send + Sync + 'a,
             dyn PositionSource<'a, Cx> + 'a,
         >,
@@ -472,7 +476,7 @@ mod _edcode {
     impl<'w, Cx, Fw> Encode<Fw> for dyn PositionSource<'w, Cx> + 'w
     where
         Cx: ChunkCx<'w>,
-        Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx: AsDynamicContext>,
+        Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx = Cx::LocalContext<'w>>,
     {
         fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
             let WithLocalCx {
@@ -481,16 +485,15 @@ mod _edcode {
             } = buf.forward();
             let ty = self.ty();
             ty.encode(&mut inner)?;
-            let dyn_cx = local_cx.as_dynamic_context();
-            (ty.packet.encode)(self, &mut inner, unsafe { dyn_cx.as_unsafe_cx() })
+            (ty.packet.encode)(self, &mut inner, local_cx)
         }
     }
 
     impl<'de, 'w, Cx, Fw> Decode<'de, Fw> for Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>
     where
         Cx: ChunkCx<'w>,
-        Fw: ForwardToWithLocalCx<Forwarded: Buf>,
-        Fw::LocalCx:
+        Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'w>>,
+        Cx::LocalContext<'w>:
             LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
     {
         fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
@@ -499,8 +502,7 @@ mod _edcode {
                 mut inner,
             } = buf.forward();
             let ty = PositionSourceType::decode(local_cx.with(&mut inner))?;
-            let cx = local_cx.as_dynamic_context();
-            (ty.packet.decode)(&mut inner, unsafe { cx.as_unsafe_cx() })
+            (ty.packet.decode)(&mut inner, local_cx)
         }
     }
 }
@@ -510,7 +512,6 @@ mod _serde {
 
     use local_cx::{
         LocalContext, LocalContextExt, WithLocalCx,
-        dyn_cx::AsDynamicContext,
         serde::{DeserializeWithCx, SerializeWithCx, TYPE_KEY},
     };
     use rimecraft_registry::Registry;
@@ -520,12 +521,14 @@ mod _serde {
 
     use super::{PositionSource, RawPositionSourceType};
 
-    impl<'w, Cx, L> SerializeWithCx<L> for dyn PositionSource<'w, Cx> + 'w
+    impl<'w, Cx> SerializeWithCx<Cx::LocalContext<'w>> for dyn PositionSource<'w, Cx> + 'w
     where
         Cx: ChunkCx<'w, Id: Serialize>,
-        L: AsDynamicContext,
     {
-        fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+        fn serialize_with_cx<S>(
+            &self,
+            serializer: WithLocalCx<S, Cx::LocalContext<'w>>,
+        ) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
@@ -533,9 +536,8 @@ mod _serde {
             let mut map = inner.serialize_map(None)?;
             let ty = self.ty();
             map.serialize_entry(TYPE_KEY, &ty)?;
-            let cx = local_cx.as_dynamic_context();
             erased_serde::serialize(
-                (ty.serde.ser)(&unsafe { cx.as_unsafe_cx() }.with(self)),
+                (ty.serde.ser)(&local_cx.with(self)),
                 serde::__private::ser::FlatMapSerializer(&mut map),
             )?;
             map.end()
@@ -544,9 +546,9 @@ mod _serde {
 
     struct Visitor<'w, L, Cx>(L, PhantomData<&'w Cx>);
 
-    impl<'de, 'w, L, Cx> serde::de::Visitor<'de> for Visitor<'w, L, Cx>
+    impl<'de, 'w, Cx> serde::de::Visitor<'de> for Visitor<'w, Cx::LocalContext<'w>, Cx>
     where
-        L: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
+        Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>>,
         Cx: ChunkCx<'w, Id: Deserialize<'de>>,
     {
         type Value = Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>;
@@ -583,26 +585,27 @@ mod _serde {
                 buf.push((key, map.next_value()?))
             }
             let ty = ty.ok_or_else(|| A::Error::missing_field("type"))?;
-            let cx = self.0.as_dynamic_context();
             (ty.serde.de)(
                 &mut <dyn erased_serde::Deserializer<'de>>::erase(
                     serde::__private::de::ContentDeserializer::<'de, A::Error>::new(Content::Map(
                         buf,
                     )),
                 ),
-                unsafe { cx.as_unsafe_cx() },
+                self.0,
             )
             .map_err(A::Error::custom)
         }
     }
 
-    impl<'de, 'w, Cx, L> DeserializeWithCx<'de, L>
+    impl<'de, 'w, Cx> DeserializeWithCx<'de, Cx::LocalContext<'w>>
         for Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>
     where
-        L: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
+        Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>>,
         Cx: ChunkCx<'w, Id: Deserialize<'de>>,
     {
-        fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, L>) -> Result<Self, D::Error>
+        fn deserialize_with_cx<D>(
+            deserializer: WithLocalCx<D, Cx::LocalContext<'w>>,
+        ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {

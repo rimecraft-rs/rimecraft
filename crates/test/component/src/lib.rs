@@ -1,28 +1,22 @@
-use std::sync::{Arc, LazyLock};
+#![allow(missing_docs)]
+#![cfg(test)]
 
-use bytes::{Buf, BufMut};
-use edcode2::{Decode, Encode};
-use fastnbt::DeOpts;
-use local_cx::{
-    BaseLocalContext, LocalContext, LocalContextExt,
-    dyn_codecs::Any,
-    dyn_cx::{AsDynamicContext, ContextTable, DynamicContext},
-    edcode_codec,
-    serde::DeserializeWithCx,
-    serde_codec,
-};
-use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::{Registry, RegistryKey, RegistryMut};
-use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
-use crate::{
-    ComponentType, PacketCodec, RawErasedComponentType, SerdeCodec, changes::ComponentChanges,
+use component::{
+    Any, ComponentType, PacketCodec, RawErasedComponentType, SerdeCodec, changes::ComponentChanges,
     map::ComponentMap,
 };
+use edcode2::{Buf, BufMut, Decode, Encode};
+use registry::{Registry, RegistryKey};
+use serde::{Deserialize, Serialize};
+use test_global::{
+    Id, LocalTestContext, OwnedLocalTestContext, TestContext,
+    integration::component::REGISTRY_ID,
+    local_cx::{LocalContextExt as _, edcode_codec, serde::DeserializeWithCx as _, serde_codec},
+};
 
-use test_global::TestContext as Context;
-
-type Id = <Context as ProvideIdTy>::Id;
+type Context = TestContext;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct Foo {
@@ -52,43 +46,40 @@ where
     }
 }
 
-const fn packet_codec_edcode<'a>() -> PacketCodec<'a, Foo> {
-    edcode_codec!(Foo: Any + 'a)
+const fn packet_codec_edcode<'a>() -> PacketCodec<'a, Foo, LocalTestContext<'a>> {
+    edcode_codec!(Local<LocalTestContext<'a>> Foo: Any + 'a)
 }
 
-const fn packet_codec_nbt<'a>() -> PacketCodec<'a, Foo> {
+const fn packet_codec_nbt<'a>() -> PacketCodec<'a, Foo, LocalTestContext<'a>> {
     edcode_codec!(Nbt<Context> Foo: Any + 'a)
 }
 
-const fn serde_codec<'a>() -> SerdeCodec<'a, Foo> {
-    serde_codec!(Foo: Any + 'a)
+const fn serde_codec<'a>() -> SerdeCodec<'a, Foo, LocalTestContext<'a>> {
+    serde_codec!(Local<LocalTestContext<'a>> Foo: Any + 'a)
 }
 
 #[test]
 #[should_panic]
 fn type_builder_no_edcode() {
-    let _ty = ComponentType::<'static, Foo>::builder::<Context>().build();
+    let _ty = ComponentType::<'static, Foo, Context>::builder().build();
 }
 
 #[test]
 fn type_transient_check() {
-    let ty = ComponentType::<'_, Foo>::builder::<Context>()
+    let ty = ComponentType::<'_, Foo, Context>::builder()
         .packet_codec(packet_codec_edcode())
         .build();
     assert!(ty.is_transient());
 
-    let ty = ComponentType::<'_, Foo>::builder::<Context>()
+    let ty = ComponentType::<'_, Foo, Context>::builder()
         .packet_codec(packet_codec_edcode())
         .serde_codec(serde_codec())
         .build();
     assert!(!ty.is_transient());
 }
 
-const REGISTRY_ID: Id =
-    unsafe { test_global::integration::registry::id_unchecked("data_component_types") };
-
-const fn type_transient_edcode<'a>() -> ComponentType<'a, Foo> {
-    ComponentType::<'_, Foo>::builder::<Context>()
+const fn type_transient_edcode<'a>() -> ComponentType<'a, Foo, Context> {
+    ComponentType::<'_, Foo, Context>::builder()
         .packet_codec(packet_codec_edcode())
         .build()
 }
@@ -96,8 +87,8 @@ const fn type_transient_edcode_key<'a>() -> RegistryKey<Id, RawErasedComponentTy
     registry_key("foo_transient_edcode")
 }
 
-const fn type_persistent<'a>() -> ComponentType<'a, Foo> {
-    ComponentType::<'_, Foo>::builder::<Context>()
+const fn type_persistent<'a>() -> ComponentType<'a, Foo, Context> {
+    ComponentType::<'_, Foo, Context>::builder()
         .packet_codec(packet_codec_nbt())
         .serde_codec(serde_codec())
         .build()
@@ -113,7 +104,7 @@ const fn registry_key<'a>(
 }
 
 fn init_registry<'a>() -> Registry<Id, RawErasedComponentType<'a, Context>> {
-    let mut registry = RegistryMut::new(RegistryKey::with_root(REGISTRY_ID));
+    let mut registry = test_global::integration::component::default_components_registry_builder();
     registry
         .register(
             type_transient_edcode_key(),
@@ -127,48 +118,17 @@ fn init_registry<'a>() -> Registry<Id, RawErasedComponentType<'a, Context>> {
     registry.into()
 }
 
-struct LocalCx<'a> {
-    component_ty_registry: Registry<Id, RawErasedComponentType<'a, Context>>,
-}
-
-impl BaseLocalContext for &LocalCx<'_> {}
-
-impl<'a, 'c> LocalContext<&'a Registry<Id, RawErasedComponentType<'c, Context>>>
-    for &'a LocalCx<'c>
-{
-    fn acquire(self) -> &'a Registry<Id, RawErasedComponentType<'c, Context>> {
-        &self.component_ty_registry
-    }
-}
-
-impl AsDynamicContext for &LocalCx<'_> {
-    type InnerContext = Self;
-
-    #[allow(clippy::unnecessary_cast)]
-    fn as_dynamic_context(&self) -> DynamicContext<'_, Self::InnerContext> {
-        static TABLE: LazyLock<ContextTable<&'static LocalCx<'static>>> = LazyLock::new(|| {
-            let mut table = ContextTable::new();
-            table.enable::<&Registry<Id, RawErasedComponentType<'static, Context>>>();
-            table
-        });
-
-        DynamicContext::from_borrowed_table(*self, unsafe {
-            &*(std::ptr::from_ref(&*TABLE) as *const ContextTable<&'_ LocalCx<'_>>)
-        })
-    }
-}
-
-fn init_context<'a>() -> LocalCx<'a> {
-    let component_ty_registry = init_registry();
-    LocalCx {
-        component_ty_registry,
-    }
+fn init_context<'a>() -> OwnedLocalTestContext<'a> {
+    let mut cx = OwnedLocalTestContext::default();
+    let reg_components = init_registry();
+    cx.reg_components = reg_components;
+    cx
 }
 
 #[test]
 fn built_map() {
     let cx = init_context();
-    let reg = &cx.component_ty_registry;
+    let reg = &cx.reg_components;
 
     let edcode_ty = reg
         .get(&type_transient_edcode_key())
@@ -232,7 +192,7 @@ fn built_map() {
 #[test]
 fn iter_map() {
     let cx = init_context();
-    let reg = &cx.component_ty_registry;
+    let reg = &cx.reg_components;
 
     let edcode_ty = reg
         .get(&type_transient_edcode_key())
@@ -309,7 +269,7 @@ fn iter_map() {
 #[test]
 fn patched_changes() {
     let cx = init_context();
-    let reg = &cx.component_ty_registry;
+    let reg = &cx.reg_components;
 
     let edcode_ty = reg
         .get(&type_transient_edcode_key())
@@ -357,7 +317,7 @@ fn patched_changes() {
 #[test]
 fn map_serde() {
     let cx = init_context();
-    let reg = &cx.component_ty_registry;
+    let reg = &cx.reg_components;
 
     let edcode_ty = reg
         .get(&type_transient_edcode_key())
@@ -383,7 +343,7 @@ fn map_serde() {
 
     let buf = fastnbt::to_bytes(&cx.with(&map)).expect("serialize failed");
     let new_map = ComponentMap::deserialize_with_cx(cx.with(
-        &mut fastnbt::de::Deserializer::from_bytes(&buf, DeOpts::new()),
+        &mut fastnbt::de::Deserializer::from_bytes(&buf, fastnbt::DeOpts::new()),
     ))
     .expect("deserialize failed");
     assert_eq!(new_map.len(), 1, "map length not intended");
@@ -400,7 +360,7 @@ fn map_serde() {
 #[test]
 fn changes_serde() {
     let cx = init_context();
-    let reg = &cx.component_ty_registry;
+    let reg = &cx.reg_components;
 
     let edcode_ty = reg
         .get(&type_transient_edcode_key())
@@ -444,7 +404,7 @@ fn changes_serde() {
 
         let buf = fastnbt::to_bytes(&cx.with(&changes)).expect("serialize failed");
         let new_changes = ComponentChanges::deserialize_with_cx(cx.with(
-            &mut fastnbt::de::Deserializer::from_bytes(&buf, DeOpts::new()),
+            &mut fastnbt::de::Deserializer::from_bytes(&buf, fastnbt::DeOpts::new()),
         ))
         .expect("deserialize failed");
         assert_eq!(new_changes.len(), 1, "changes length not intended");
@@ -470,7 +430,7 @@ fn changes_serde() {
 
         let buf = fastnbt::to_bytes(&cx.with(&changes)).expect("serialize failed");
         let new_changes = ComponentChanges::deserialize_with_cx(cx.with(
-            &mut fastnbt::de::Deserializer::from_bytes(&buf, DeOpts::new()),
+            &mut fastnbt::de::Deserializer::from_bytes(&buf, fastnbt::DeOpts::new()),
         ))
         .expect("deserialize failed");
         assert_eq!(new_changes.len(), 1, "changes length not intended");
@@ -486,7 +446,7 @@ fn changes_serde() {
 #[test]
 fn changes_edcode() {
     let cx = init_context();
-    let reg = &cx.component_ty_registry;
+    let reg = &cx.reg_components;
 
     let edcode_ty = reg
         .get(&type_transient_edcode_key())

@@ -41,22 +41,17 @@ pub struct Registry<K, T> {
 
     /// The default registration raw id.
     default: Option<usize>,
+
+    #[cfg(all(feature = "marking", not(feature = "marking-leaked")))]
+    marker: marking::PtrMarker,
+    #[cfg(all(feature = "marking", feature = "marking-leaked"))]
+    marker: marking::LeakedPtrMarker,
 }
 
 /// Reference of a registration.
 ///
-/// # Serialization and Deserialization
-///
-/// This type can be serialized and deserialized using `serde` and `edcode2`.
-/// (with `serde` feature and `edcode` feature respectively)
-///
-/// ## Serde
-///
 /// When serializing this reference with `serde`, it will serialize the ID
-/// of the entry, if the serializer is **human readable**. Otherwise, it will
-/// serialize the **raw ID** of the entry.
-///
-/// This corresponds to the `compressed` option in *Mojang Serialization*.
+/// of the entry.
 pub struct Reg<'a, K, T> {
     raw: usize,
     entry: &'a RefEntry<K, T>,
@@ -164,6 +159,26 @@ impl<K, T> Registry<K, T> {
     #[inline]
     pub fn default_entry(&self) -> Option<Reg<'_, K, T>> {
         self.default.and_then(|raw| self.of_raw(raw))
+    }
+}
+
+#[cfg(feature = "marking")]
+impl<K, T> Registry<K, T> {
+    /// Gets the marker of this registry.
+    #[inline]
+    pub fn marker(&self) -> &marking::PtrMarker {
+        #[cfg(feature = "marking-leaked")]
+        return self.marker.as_non_leaked();
+
+        #[cfg(not(feature = "marking-leaked"))]
+        return &self.marker;
+    }
+
+    /// Gets the leaked marker of this registry.
+    #[inline]
+    #[cfg(feature = "marking-leaked")]
+    pub fn marker_leaked(&self) -> marking::LeakedPtrMarker {
+        self.marker
     }
 }
 
@@ -402,17 +417,25 @@ pub struct RegistryMut<K, T> {
     keys: OnceLock<HashSet<K>>,
 
     default: Option<usize>,
+
+    #[cfg(all(feature = "marking", not(feature = "marking-leaked")))]
+    marker: marking::PtrMarker,
+    #[cfg(all(feature = "marking", feature = "marking-leaked"))]
+    marker: marking::LeakedPtrMarker,
 }
 
 impl<K, T> RegistryMut<K, T> {
     /// Creates a new mutable registry.
     #[inline]
-    pub const fn new(key: Key<K, Registry<K, T>>) -> Self {
+    pub fn new(key: Key<K, Registry<K, T>>) -> Self {
         Self {
             key,
             entries: Vec::new(),
             keys: OnceLock::new(),
             default: None,
+
+            #[cfg(feature = "marking")]
+            marker: Default::default(),
         }
     }
 
@@ -461,6 +484,8 @@ where
                 value: None,
                 tags: RwLock::new(HashSet::new()),
                 is_default,
+                #[cfg(feature = "marking-leaked")]
+                marker: self.marker,
             },
         ));
         Ok(raw)
@@ -503,6 +528,8 @@ where
             tv: RwLock::new(HashMap::new()),
             entries,
             default: value.default,
+            #[cfg(feature = "marking")]
+            marker: value.marker,
         }
     }
 }

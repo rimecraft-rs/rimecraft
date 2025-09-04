@@ -4,16 +4,13 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use bitflags::bitflags;
 use component::{RawErasedComponentType, map::ComponentMap};
-use local_cx::{
-    LocalContext, LocalContextExt as _, WithLocalCx, dyn_cx::AsDynamicContext,
-    serde::SerializeWithCx,
-};
+use local_cx::{LocalContext, LocalContextExt as _, WithLocalCx, serde::SerializeWithCx};
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
 use serde::{Deserialize, Serialize, de::DeserializeSeed};
 
-use crate::{BlockEntity, DynErasedRawBlockEntityType, RawBlockEntity};
+use crate::{BlockEntity, BlockEntityCx, DynErasedRawBlockEntityType, RawBlockEntity};
 
 bitflags! {
     /// Essential flags for serializing a block entity.
@@ -47,14 +44,16 @@ impl Default for Flags {
 #[derive(Debug)]
 pub struct Flagged<T>(pub T, pub Flags);
 
-impl<T, Cx, L> SerializeWithCx<L> for Flagged<&RawBlockEntity<'_, T, Cx>>
+impl<'a, T, Cx> SerializeWithCx<Cx::LocalContext<'a>> for Flagged<&RawBlockEntity<'a, T, Cx>>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
     T: ?Sized + Serialize,
     Cx::Id: Serialize,
-    L: AsDynamicContext,
 {
-    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(
+        &self,
+        serializer: WithLocalCx<S, Cx::LocalContext<'a>>,
+    ) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -86,14 +85,16 @@ where
     }
 }
 
-impl<T, Cx, L> SerializeWithCx<L> for Flagged<RawBlockEntity<'_, T, Cx>>
+impl<'a, T, Cx> SerializeWithCx<Cx::LocalContext<'a>> for Flagged<RawBlockEntity<'a, T, Cx>>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
     T: Serialize,
     Cx::Id: Serialize,
-    L: AsDynamicContext,
 {
-    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(
+        &self,
+        serializer: WithLocalCx<S, Cx::LocalContext<'a>>,
+    ) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -179,14 +180,16 @@ impl<'de> Deserialize<'de> for Field<'de> {
 }
 
 /// This serializes the block entity using default value of [`Flags`].
-impl<T, Cx, L> SerializeWithCx<L> for RawBlockEntity<'_, T, Cx>
+impl<'a, T, Cx> SerializeWithCx<Cx::LocalContext<'a>> for RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
     T: ?Sized + Serialize,
     Cx::Id: Serialize,
-    L: AsDynamicContext,
 {
-    fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(
+        &self,
+        serializer: WithLocalCx<S, Cx::LocalContext<'a>>,
+    ) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -208,12 +211,11 @@ where
     pub local_cx: Local,
 }
 
-impl<'a, 'de, Cx, L> DeserializeSeed<'de> for Seed<'a, Cx, L>
+impl<'a, 'de, Cx> DeserializeSeed<'de> for Seed<'a, Cx, Cx::LocalContext<'a>>
 where
-    Cx: ProvideBlockStateExtTy<Id: Deserialize<'de>>,
-    L: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
-        + LocalContext<&'a Registry<Cx::Id, DynErasedRawBlockEntityType<'a, Cx>>>
-        + AsDynamicContext,
+    Cx: BlockEntityCx<'a, Id: Deserialize<'de>>,
+    Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
+        + LocalContext<&'a Registry<Cx::Id, DynErasedRawBlockEntityType<'a, Cx>>>,
 {
     type Value = Box<BlockEntity<'a, Cx>>;
 
@@ -225,11 +227,10 @@ where
         where
             Cx: ProvideBlockStateExtTy;
 
-        impl<'a, 'de, Cx, L> serde::de::Visitor<'de> for Visitor<'a, Cx, L>
+        impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx, Cx::LocalContext<'a>>
         where
-            Cx: ProvideBlockStateExtTy<Id: Deserialize<'de>>,
-            L: AsDynamicContext
-                + LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
+            Cx: BlockEntityCx<'a, Id: Deserialize<'de>>,
+            Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
                 + LocalContext<&'a Registry<Cx::Id, DynErasedRawBlockEntityType<'a, Cx>>>,
         {
             type Value = Box<BlockEntity<'a, Cx>>;
@@ -275,7 +276,7 @@ where
                         serde::de::Error::custom(format!("unknown block entity type {id}"))
                     })?;
                 let mut be = ty
-                    .erased_instantiate(self.0, self.1)
+                    .erased_instantiate(self.0, self.1, ty)
                     .ok_or_else(|| serde::de::Error::custom("failed to create block entity"))?;
                 rimecraft_serde_update::Update::update(
                     &mut *be,
@@ -291,9 +292,9 @@ where
     }
 }
 
-impl<'de, T, Cx> rimecraft_serde_update::Update<'de> for RawBlockEntity<'_, T, Cx>
+impl<'a, 'de, T, Cx> rimecraft_serde_update::Update<'de> for RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
     T: ?Sized + rimecraft_serde_update::Update<'de>,
 {
     #[inline]
@@ -305,9 +306,9 @@ where
     }
 }
 
-impl<Cx, L> Debug for Seed<'_, Cx, L>
+impl<'a, Cx, L> Debug for Seed<'a, Cx, L>
 where
-    Cx: ProvideBlockStateExtTy<Id: Debug, BlockStateExt: Debug> + Debug,
+    Cx: BlockEntityCx<'a, Id: Debug, BlockStateExt: Debug> + Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DeserializeSeed")

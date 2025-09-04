@@ -1,6 +1,6 @@
 //! Rimecraft block entity primitives.
 
-use std::{any::TypeId, fmt::Debug};
+use std::{any::TypeId, fmt::Debug, sync::Arc};
 
 use ::component::{
     ErasedComponentType, RawErasedComponentType, changes::ComponentChanges, map::ComponentMap,
@@ -9,7 +9,8 @@ use ahash::AHashSet;
 use dsyn::HoldDescriptors;
 use erased_serde::{Serialize as ErasedSerialize, serialize_trait_object};
 
-use local_cx::ProvideLocalCxTy;
+use local_cx::{LocalContext, ProvideLocalCxTy};
+use parking_lot::Mutex;
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
@@ -21,42 +22,55 @@ pub mod serde;
 
 pub use components_util::ComponentsAccess;
 
-/// Re-export of `rimecraft-component`
-pub mod component {
-    pub use ::component::*;
-}
+pub use component;
 
-/// A trait for providing fundamental built-in component types.
-#[deprecated = "should be provided by a local context"]
-pub trait ProvideBuiltInComponentTypes<'r>: ProvideIdTy {
-    /// The type of block entity data.
-    fn block_entity_data() -> ErasedComponentType<'r, Self>;
+/// Global context types satisfying use of block entities.
+pub trait BlockEntityCx<'a>: ProvideLocalCxTy + ProvideBlockStateExtTy {}
+
+impl<T> BlockEntityCx<'_> for T where T: ProvideLocalCxTy + ProvideBlockStateExtTy {}
+
+/// Boxed block entity cell with internal mutability and reference-counting.
+pub type BlockEntityCell<'w, Cx> = Arc<Mutex<Box<BlockEntity<'w, Cx>>>>;
+
+/// Newtype wrapper of block entity's component type of its data.
+pub struct BEDataComponentType<'a, Cx>(pub ErasedComponentType<'a, Cx>)
+where
+    Cx: BlockEntityCx<'a>;
+
+impl<'a, Cx> Debug for BEDataComponentType<'a, Cx>
+where
+    Cx: BlockEntityCx<'a, Id: Debug>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.0, f)
+    }
 }
 
 /// A type of [`BlockEntity`].
 pub trait RawBlockEntityType<'a, Cx>: HoldDescriptors<'static, 'a>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
 {
     /// Data type of the target block entities.
-    type Data;
+    type Data: Data<'a, Cx>;
 
     /// Whether the block entity supports the given state.
     fn supports(&self, state: BlockState<'_, Cx>) -> bool;
 
     /// Creates a new instance of the block entity.
-    fn instantiate<'w>(
+    fn instantiate(
         &self,
         pos: BlockPos,
-        state: BlockState<'w, Cx>,
-    ) -> Option<RawBlockEntity<'w, Self::Data, Cx>>;
+        state: BlockState<'a, Cx>,
+        this: BlockEntityType<'a, Cx>,
+    ) -> Option<RawBlockEntity<'a, Self::Data, Cx>>;
 }
 
 /// [`RawBlockEntityType`] with type erased.
 #[allow(missing_docs)]
 pub trait ErasedRawBlockEntityType<'w, Cx>: HoldDescriptors<'static, 'w> + Debug
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'w>,
 {
     fn erased_supports(&self, state: BlockState<'_, Cx>) -> bool;
 
@@ -64,6 +78,7 @@ where
         &self,
         pos: BlockPos,
         state: BlockState<'w, Cx>,
+        this: BlockEntityType<'w, Cx>,
     ) -> Option<Box<BlockEntity<'w, Cx>>>;
 }
 
@@ -71,7 +86,7 @@ impl<'w, T, Cx> ErasedRawBlockEntityType<'w, Cx> for T
 where
     T: RawBlockEntityType<'w, Cx> + Debug,
     T::Data: ErasedData<'w, Cx> + 'w,
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'w>,
 {
     fn erased_supports(&self, state: BlockState<'_, Cx>) -> bool {
         self.supports(state)
@@ -81,8 +96,9 @@ where
         &self,
         pos: BlockPos,
         state: BlockState<'w, Cx>,
+        this: BlockEntityType<'w, Cx>,
     ) -> Option<Box<BlockEntity<'w, Cx>>> {
-        self.instantiate(pos, state).map(|be| {
+        self.instantiate(pos, state, this).map(|be| {
             let boxed: Box<BlockEntity<'w, Cx>> = Box::new(be);
             boxed
         })
@@ -100,7 +116,7 @@ pub type BlockEntityType<'r, Cx> =
 /// An object holding extra data about a block in a world.
 pub struct RawBlockEntity<'a, T: ?Sized, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
 {
     ty: BlockEntityType<'a, Cx>,
     pos: BlockPos,
@@ -113,7 +129,7 @@ where
 
 impl<'a, T, Cx> RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
 {
     /// Creates a new block entity.
     pub fn new(
@@ -135,7 +151,7 @@ where
 
 impl<'a, T: ?Sized, Cx> RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
 {
     /// Returns the type of this block entity.
     #[inline]
@@ -194,16 +210,19 @@ where
 
 impl<'a, T: ?Sized, Cx> RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideBuiltInComponentTypes<'a>,
+    Cx: BlockEntityCx<'a>,
     T: Data<'a, Cx>,
 {
     /// Reads components from given pair of default and changed components.
-    pub fn read_components(
+    pub fn read_components<Local>(
         &mut self,
         default: &'a ComponentMap<'a, Cx>,
         changes: ComponentChanges<'a, '_, Cx>,
-    ) {
-        let mut set: AHashSet<RawErasedComponentType<'a, Cx>> = [*Cx::block_entity_data()].into();
+        local: Local,
+    ) where
+        Local: LocalContext<BEDataComponentType<'a, Cx>>,
+    {
+        let mut set: AHashSet<RawErasedComponentType<'a, Cx>> = [*local.acquire().0].into();
         let mut map = ComponentMap::with_changes(default, changes);
         self.data.read_components(ComponentsAccess {
             set: &mut set,
@@ -222,7 +241,7 @@ where
 
 impl<'a, T: ?Sized, Cx> RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
     T: Data<'a, Cx>,
 {
     /// Creates a component map from the data and inner components
@@ -235,16 +254,16 @@ where
     }
 }
 
-impl<T, Cx> Debug for RawBlockEntity<'_, T, Cx>
+impl<'a, T, Cx> Debug for RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy + Debug,
+    Cx: BlockEntityCx<'a> + Debug,
     Cx::BlockStateExt: Debug,
     Cx::Id: Debug,
     T: Debug + ?Sized,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BlockEntity")
-            .field("type", &Reg::to_id(self.ty))
+            .field("type", &self.ty)
             .field("pos", &self.pos)
             .field("removed", &self.removed)
             .field("cached_state", &self.cached_state)
@@ -256,7 +275,7 @@ where
 /// A trait for generic block entity data types.
 pub trait Data<'a, Cx>
 where
-    Cx: ProvideIdTy,
+    Cx: BlockEntityCx<'a>,
 {
     /// Reads components from the given accessor.
     #[inline]
@@ -283,9 +302,10 @@ where
         + Sync
         + Debug
         + sealed::Sealed,
-    Cx: ProvideIdTy,
+    Cx: BlockEntityCx<'a>,
 {
     /// The [`TypeId`] of this data.
+    #[inline]
     fn type_id(&self) -> TypeId {
         typeid::of::<Self>()
     }
@@ -294,30 +314,30 @@ where
 #[allow(single_use_lifetimes)]
 mod ser_dyn_obj {
     use super::*;
-    serialize_trait_object!(<'a, Cx> ErasedData<'a, Cx> where Cx: ProvideIdTy);
+    serialize_trait_object!(<'a, Cx> ErasedData<'a, Cx> where Cx: BlockEntityCx<'a>);
 }
 
-impl<'de, Cx> rimecraft_serde_update::Update<'de> for dyn ErasedData<'_, Cx> + '_
+impl<'a, 'de, Cx> rimecraft_serde_update::Update<'de> for dyn ErasedData<'a, Cx> + '_
 where
-    Cx: ProvideIdTy,
+    Cx: BlockEntityCx<'a>,
 {
     rimecraft_serde_update::__internal_update_from_erased!();
 }
-impl<'de, Cx> rimecraft_serde_update::Update<'de> for dyn ErasedData<'_, Cx> + Send + '_
+impl<'a, 'de, Cx> rimecraft_serde_update::Update<'de> for dyn ErasedData<'a, Cx> + Send + '_
 where
-    Cx: ProvideIdTy,
+    Cx: BlockEntityCx<'a>,
 {
     rimecraft_serde_update::__internal_update_from_erased!();
 }
-impl<'de, Cx> rimecraft_serde_update::Update<'de> for dyn ErasedData<'_, Cx> + Sync + '_
+impl<'a, 'de, Cx> rimecraft_serde_update::Update<'de> for dyn ErasedData<'a, Cx> + Sync + '_
 where
-    Cx: ProvideIdTy,
+    Cx: BlockEntityCx<'a>,
 {
     rimecraft_serde_update::__internal_update_from_erased!();
 }
-impl<'de, Cx> rimecraft_serde_update::Update<'de> for dyn ErasedData<'_, Cx> + Send + Sync + '_
+impl<'a, 'de, Cx> rimecraft_serde_update::Update<'de> for dyn ErasedData<'a, Cx> + Send + Sync + '_
 where
-    Cx: ProvideIdTy,
+    Cx: BlockEntityCx<'a>,
 {
     rimecraft_serde_update::__internal_update_from_erased!();
 }
@@ -331,12 +351,8 @@ impl<T> sealed::Sealed for T where T: ErasedSerialize + for<'de> ErasedUpdate<'d
 impl<'a, T, Cx> ErasedData<'a, Cx> for T
 where
     T: ErasedSerialize + for<'de> ErasedUpdate<'de> + Data<'a, Cx> + Debug + Send + Sync,
-    Cx: ProvideIdTy,
+    Cx: BlockEntityCx<'a>,
 {
-    #[inline]
-    fn type_id(&self) -> TypeId {
-        typeid::of::<T>()
-    }
 }
 
 /// A type-erased variant of [`RawBlockEntity`].
@@ -344,7 +360,7 @@ pub type BlockEntity<'w, Cx> = RawBlockEntity<'w, dyn ErasedData<'w, Cx> + 'w, C
 
 impl<'w, Cx> BlockEntity<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'w>,
 {
     /// Downcasts this type erased block entity into block entity with a concrete data type.
     ///

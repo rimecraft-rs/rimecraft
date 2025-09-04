@@ -1,7 +1,7 @@
 //! Item stack related types and traits.
 
 use component::map::ComponentMap;
-use local_cx::LocalContext;
+use local_cx::{LocalContext, ProvideLocalCxTy};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::{Reg, Registry};
 
@@ -10,9 +10,9 @@ use std::{fmt::Debug, marker::PhantomData};
 use crate::{Item, ItemSettings, ProvideSettingsTy, RawItem};
 
 /// Global context used for item stacks.
-pub trait ItemStackCx: ProvideIdTy + ProvideSettingsTy {}
+pub trait ItemStackCx: ProvideIdTy + ProvideSettingsTy + ProvideLocalCxTy {}
 
-impl<T> ItemStackCx for T where T: ProvideIdTy + ProvideSettingsTy {}
+impl<T> ItemStackCx for T where T: ProvideIdTy + ProvideSettingsTy + ProvideLocalCxTy {}
 
 /// A stack of items.
 ///
@@ -177,7 +177,6 @@ mod _serde {
     use component::{RawErasedComponentType, changes::ComponentChanges};
     use local_cx::{
         LocalContextExt as _, WithLocalCx,
-        dyn_cx::AsDynamicContext,
         serde::{DeserializeWithCx, SerializeWithCx},
     };
     use rimecraft_registry::entry::RefEntry;
@@ -185,12 +184,14 @@ mod _serde {
 
     use super::*;
 
-    impl<Cx, L> SerializeWithCx<L> for ItemStack<'_, Cx>
+    impl<'a, Cx> SerializeWithCx<Cx::LocalContext<'a>> for ItemStack<'a, Cx>
     where
         Cx: ItemStackCx<Id: Serialize>,
-        L: AsDynamicContext,
     {
-        fn serialize_with_cx<S>(&self, serializer: WithLocalCx<S, L>) -> Result<S::Ok, S::Error>
+        fn serialize_with_cx<S>(
+            &self,
+            serializer: WithLocalCx<S, Cx::LocalContext<'a>>,
+        ) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
@@ -215,15 +216,16 @@ mod _serde {
         }
     }
 
-    impl<'r, 'de, Cx, L> DeserializeWithCx<'de, L> for ItemStack<'r, Cx>
+    impl<'r, 'de, Cx> DeserializeWithCx<'de, Cx::LocalContext<'r>> for ItemStack<'r, Cx>
     where
         Cx: ItemStackCx,
         Cx::Id: Deserialize<'de> + FromStr + Hash + Eq,
-        L: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
-            + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>
-            + AsDynamicContext,
+        Cx::LocalContext<'r>: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
+            + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>,
     {
-        fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, L>) -> Result<Self, D::Error>
+        fn deserialize_with_cx<D>(
+            deserializer: WithLocalCx<D, Cx::LocalContext<'r>>,
+        ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
@@ -232,13 +234,12 @@ mod _serde {
                 cx: L,
             }
 
-            impl<'r, 'de, Cx, L> serde::de::Visitor<'de> for Visitor<'r, Cx, L>
+            impl<'r, 'de, Cx> serde::de::Visitor<'de> for Visitor<'r, Cx, Cx::LocalContext<'r>>
             where
                 Cx: ItemStackCx,
                 Cx::Id: Deserialize<'de> + FromStr + Hash + Eq,
-                L: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
-                    + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>
-                    + AsDynamicContext,
+                Cx::LocalContext<'r>: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
+                    + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>,
             {
                 type Value = ItemStack<'r, Cx>;
 

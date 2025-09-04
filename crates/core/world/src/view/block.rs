@@ -1,12 +1,13 @@
 //! Block views.
 
 use bitflags::bitflags;
+use local_cx::ProvideLocalCxTy;
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
-use rimecraft_block_entity::BlockEntity;
+use rimecraft_block_entity::{BlockEntity, BlockEntityCell};
 use rimecraft_fluid::{FluidState, ProvideFluidStateExtTy};
 use rimecraft_voxel_math::BlockPos;
 
-use crate::{BlockEntityCell, DEFAULT_MAX_LIGHT_LEVEL};
+use crate::DEFAULT_MAX_LIGHT_LEVEL;
 
 use super::StateOption;
 
@@ -127,7 +128,7 @@ where
 /// Mutable variant of [`BlockEntityView`], without internal mutability.
 pub trait BlockEntityViewMut<'w, Cx>: BlockEntityView<'w, Cx> + BlockViewMut<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
 {
     /// Adds a [`BlockEntity`] to this view.
     fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>);
@@ -139,7 +140,7 @@ where
 /// [`BlockViewMut`] with internal mutability.
 pub trait LockedBlockViewMut<'w, Cx>: BlockViewMut<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
 {
     /// Sets the block state at the given position.
     ///
@@ -159,7 +160,7 @@ where
 pub trait LockedBlockEntityViewMut<'w, Cx>:
     BlockEntityViewMut<'w, Cx> + LockedBlockViewMut<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
 {
     /// Removes a [`BlockEntity`] from this view, and returns it if presents.
     fn remove_block_entity_locked(&self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>>;

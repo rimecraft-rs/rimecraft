@@ -27,6 +27,14 @@ impl Id {
             ))
         }
     }
+
+    /// Creates a new identifier.
+    pub fn new(namespace: &str, path: &str) -> Self {
+        Self(identifier::vanilla::Identifier::new(
+            identifier::vanilla::Namespace::new(namespace),
+            identifier::vanilla::Path::new(path),
+        ))
+    }
 }
 
 impl Display for Id {

@@ -26,7 +26,7 @@ serde = ["dep:serde"]
 erased-serde = ["dep:erased-serde", "serde"]
 edcode = ["dep:edcode2", "dep:bytes"]
 dyn-cx = ["dep:typeid", "dep:ahash"]
-dyn-codecs = ["erased-serde", "edcode", "dyn-cx"]
+dyn-codecs = ["erased-serde", "edcode", "dep:typeid"]
 dsyn = ["dep:dsyn"]
 
 [lints]
