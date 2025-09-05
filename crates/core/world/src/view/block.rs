@@ -54,6 +54,7 @@ where
 }
 
 /// Lock-free variant of [`BlockView`].
+#[deprecated]
 pub trait LockFreeBlockView<'w, Cx>: BlockView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
@@ -66,6 +67,7 @@ where
 }
 
 /// Lock-free variant of [`BlockEntityView`].
+#[deprecated]
 pub trait LockFreeBlockEntityView<'w, Cx>:
     BlockEntityView<'w, Cx> + LockFreeBlockView<'w, Cx>
 where
@@ -138,6 +140,7 @@ where
 }
 
 /// [`BlockViewMut`] with internal mutability.
+#[deprecated]
 pub trait LockedBlockViewMut<'w, Cx>: BlockViewMut<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
@@ -157,6 +160,7 @@ where
 }
 
 /// [`BlockEntityViewMut`] with internal mutability.
+#[deprecated]
 pub trait LockedBlockEntityViewMut<'w, Cx>:
     BlockEntityViewMut<'w, Cx> + LockedBlockViewMut<'w, Cx>
 where
