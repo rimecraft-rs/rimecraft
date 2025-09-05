@@ -4,13 +4,11 @@ use rimecraft_packed_int_array::PackedIntArray;
 
 use crate::view::HeightLimit;
 
-/// Bytes stores the maximum sky light that reaches each block,
-/// regardless of current time.
+/// Bytes stores the maximum sky light that reaches each block, regardless of current time.
 #[derive(Debug)]
 pub struct ChunkSkyLight {
     pal: PackedIntArray,
     min_y: i32,
-    // reusable block positions: unneeded in Rust
 }
 
 impl ChunkSkyLight {

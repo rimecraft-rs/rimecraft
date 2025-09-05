@@ -337,16 +337,6 @@ where
     fn section_mut(&mut self, index: usize) -> Option<&mut Mutex<ChunkSection<'w, Cx>>> {
         self.sections_mut().get_mut(index)
     }
-
-    /// Peeks the heightmaps of this chunk.
-    #[inline]
-    #[deprecated]
-    fn peek_heightmaps_mut<F, T>(&mut self, pk: F) -> T
-    where
-        F: for<'a> FnOnce(&'a mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
-    {
-        pk(self.as_base_chunk_mut().0.heightmaps.get_mut())
-    }
 }
 
 #[allow(unused)]

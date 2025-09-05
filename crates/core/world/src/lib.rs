@@ -171,3 +171,38 @@ mod __dsyn_cache {
         b_on_block_added => BlockOnBlockAdded<Cx>,
     }
 }
+
+/// An utility trait for reborrowing value.
+pub trait Reclaim {
+    /// The reborrowed value, which can be reborrowed again infinitely.
+    type Output<'a>: Reclaim<Output<'a> = Self::Output<'a>>
+    where
+        Self: 'a;
+
+    /// Reborrows the value.
+    fn reclaim(&mut self) -> Self::Output<'_>;
+}
+
+impl<'env, T: ?Sized> Reclaim for &'env T {
+    type Output<'a>
+        = &'env T
+    where
+        Self: 'a;
+
+    #[inline]
+    fn reclaim(&mut self) -> Self::Output<'_> {
+        *self
+    }
+}
+
+impl<T: ?Sized> Reclaim for &mut T {
+    type Output<'a>
+        = &'a mut T
+    where
+        Self: 'a;
+
+    #[inline]
+    fn reclaim(&mut self) -> Self::Output<'_> {
+        *self
+    }
+}
