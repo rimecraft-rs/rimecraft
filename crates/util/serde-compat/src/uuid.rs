@@ -5,8 +5,8 @@ use crate::{IntStreamCodec, StringCodec, VanillaCodec};
 
 fn from_ints(ints: [u32; 4]) -> Uuid {
     Uuid::from_u64_pair(
-        (ints[0] << u32::BITS) as u64 | ints[1] as u64,
-        (ints[2] << u32::BITS) as u64 | ints[3] as u64,
+        ((ints[0] as u64) << u32::BITS) | ints[1] as u64,
+        ((ints[2] as u64) << u32::BITS) | ints[3] as u64,
     )
 }
 
