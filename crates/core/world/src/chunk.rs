@@ -24,6 +24,7 @@ use rimecraft_voxel_math::BlockPos;
 
 use crate::{
     Sealed,
+    chunk::light::ChunkSkyLight,
     event::game_event,
     heightmap::{self, Heightmap},
     view::{
@@ -104,6 +105,8 @@ where
     pub inhabited_time: u64,
     /// Whether this chunk needs saving.
     pub needs_saving: bool,
+    /// The propagated sky light levels.
+    pub sky_light: Mutex<ChunkSkyLight>,
 }
 
 impl<'w, Cx> Debug for BaseChunk<'w, Cx>
@@ -191,6 +194,7 @@ where
                         .collect()
                 }
             },
+            sky_light: Mutex::new(ChunkSkyLight::new(height_limit)),
         }
     }
 }
@@ -355,6 +359,8 @@ where
     type BlockEntityNbtsWrite: DerefMut<Target = AHashMap<BlockPos, Cx::Compound>>;
     type ChunkSectionRead: Deref<Target = ChunkSection<'w, Cx>>;
     type ChunkSectionWrite: DerefMut<Target = ChunkSection<'w, Cx>>;
+    type ChunkSkyLightRead: Deref<Target = ChunkSkyLight>;
+    type ChunkSkyLightWrite: DerefMut<Target = ChunkSkyLight>;
 
     fn read_heightmaps(self) -> Self::HeighmapsRead;
     fn write_heightmaps(self) -> Self::HeighmapsWrite;
@@ -364,6 +370,14 @@ where
     fn write_block_entity_nbts(self) -> Self::BlockEntityNbtsWrite;
     fn read_chunk_section(self, index: usize) -> Option<Self::ChunkSectionRead>;
     fn write_chunk_section(self, index: usize) -> Option<Self::ChunkSectionWrite>;
+    fn iter_read_chunk_sections(
+        self,
+    ) -> impl IntoIterator<
+        Item: Deref<Target = ChunkSection<'w, Cx>>,
+        IntoIter: DoubleEndedIterator + ExactSizeIterator,
+    >;
+    fn read_chunk_sky_light(self) -> Self::ChunkSkyLightRead;
+    fn write_chunk_sky_light(self) -> Self::ChunkSkyLightWrite;
 }
 
 impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> {
@@ -378,6 +392,8 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> 
     type BlockEntityNbtsWrite = parking_lot::MutexGuard<'a, AHashMap<BlockPos, Cx::Compound>>;
     type ChunkSectionRead = Self::ChunkSectionWrite;
     type ChunkSectionWrite = parking_lot::MutexGuard<'a, ChunkSection<'w, Cx>>;
+    type ChunkSkyLightRead = Self::ChunkSkyLightWrite;
+    type ChunkSkyLightWrite = parking_lot::MutexGuard<'a, ChunkSkyLight>;
 
     #[inline]
     fn read_heightmaps(self) -> Self::HeighmapsRead {
@@ -420,6 +436,26 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> 
     }
 
     #[inline]
+    fn iter_read_chunk_sections(
+        self,
+    ) -> impl IntoIterator<
+        Item: Deref<Target = ChunkSection<'w, Cx>>,
+        IntoIter: DoubleEndedIterator + ExactSizeIterator,
+    > {
+        self.section_array.iter().map(|section| section.lock())
+    }
+
+    #[inline]
+    fn read_chunk_sky_light(self) -> Self::ChunkSkyLightRead {
+        self.write_chunk_sky_light()
+    }
+
+    #[inline]
+    fn write_chunk_sky_light(self) -> Self::ChunkSkyLightWrite {
+        self.sky_light.lock()
+    }
+
+    #[inline]
     fn bca_as_bc(&self) -> &BaseChunk<'w, Cx> {
         self
     }
@@ -439,6 +475,8 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, 
     type BlockEntityNbtsWrite = &'a mut AHashMap<BlockPos, Cx::Compound>;
     type ChunkSectionRead = Self::ChunkSectionWrite;
     type ChunkSectionWrite = &'a mut ChunkSection<'w, Cx>;
+    type ChunkSkyLightRead = Self::ChunkSkyLightWrite;
+    type ChunkSkyLightWrite = &'a mut ChunkSkyLight;
 
     #[inline]
     fn read_heightmaps(self) -> Self::HeighmapsRead {
@@ -478,6 +516,28 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, 
     #[inline]
     fn write_chunk_section(self, index: usize) -> Option<Self::ChunkSectionWrite> {
         self.section_array.get_mut(index).map(Mutex::get_mut)
+    }
+
+    #[inline]
+    fn read_chunk_sky_light(self) -> Self::ChunkSkyLightRead {
+        self.write_chunk_sky_light()
+    }
+
+    #[inline]
+    fn write_chunk_sky_light(self) -> Self::ChunkSkyLightWrite {
+        self.sky_light.get_mut()
+    }
+
+    #[inline]
+    fn iter_read_chunk_sections(
+        self,
+    ) -> impl IntoIterator<
+        Item: Deref<Target = ChunkSection<'w, Cx>>,
+        IntoIter: DoubleEndedIterator + ExactSizeIterator,
+    > {
+        self.section_array
+            .iter_mut()
+            .map(|section| section.get_mut())
     }
 
     #[inline]

@@ -44,7 +44,6 @@ where
 impl<'w, P, Cx> RawHeightmap<'w, P, Cx>
 where
     Cx: ChunkCx<'w>,
-    P: for<'s> FnMut(Option<BlockState<'w, Cx>>) -> bool,
 {
     /// Returns the highest block at the given coordinate.
     #[inline]
@@ -64,7 +63,13 @@ where
         self.storage
             .set(to_index(x, z), (height - self.hlimit.bottom()) as u32)
     }
+}
 
+impl<'w, P, Cx> RawHeightmap<'w, P, Cx>
+where
+    Cx: ChunkCx<'w>,
+    P: for<'s> FnMut(Option<BlockState<'w, Cx>>) -> bool,
+{
     /// Updates this heightmap when the given [`BlockState`] at the location in this map is updated,
     /// and returns whether there is an update to this heightmap.
     pub fn track_update<'a, Pk>(

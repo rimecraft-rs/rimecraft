@@ -1,4 +1,4 @@
-use crate::{BlockPos, section_coord};
+use crate::{BlockPos, coord_section_from_block};
 
 /// A pair of two integers representing the X and Z coordinates of a chunk.
 ///
@@ -81,8 +81,8 @@ impl From<BlockPos> for ChunkPos {
     #[inline]
     fn from(value: BlockPos) -> Self {
         Self {
-            x: section_coord(value.x()),
-            z: section_coord(value.z()),
+            x: coord_section_from_block(value.x()),
+            z: coord_section_from_block(value.z()),
         }
     }
 }

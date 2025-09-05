@@ -1,6 +1,6 @@
 //! View traits.
 
-use rimecraft_voxel_math::section_coord;
+use rimecraft_voxel_math::coord_section_from_block;
 
 pub mod block;
 pub mod light;
@@ -45,12 +45,12 @@ impl HeightLimit {
 
     /// Returns the bottom section coordinate, inclusive.
     pub const fn bottom_section_coord(self) -> i32 {
-        section_coord(self.bottom())
+        coord_section_from_block(self.bottom())
     }
 
     /// Returns the top section coordinate, exclusive.
     pub const fn top_section_coord(self) -> i32 {
-        section_coord(self.top() - 1) + 1
+        coord_section_from_block(self.top() - 1) + 1
     }
 
     /// Returns the number of sections in the view, vertically.
@@ -65,7 +65,7 @@ impl HeightLimit {
 
     /// Returns a zero-based section index for the given Y level.
     pub const fn section_index(self, y: i32) -> usize {
-        self.section_coord_to_index(section_coord(y)) as usize
+        self.section_coord_to_index(coord_section_from_block(y)) as usize
     }
 
     /// Converts a section coordinate to a zero-based section index.

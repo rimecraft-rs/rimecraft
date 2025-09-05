@@ -63,3 +63,12 @@ pub trait ProvideNbtTy: GlobalContext {
 
 #[deprecated = "use `nbt` feature instead"]
 pub use nbt as nbt_edcode;
+
+/// Trait usually for global-context-provided 'extension types' to represent types that is held.
+pub trait Hold<T> {
+    /// Returns the held value.
+    fn get_held(&self) -> &T;
+
+    /// Returns the held value mutably.
+    fn get_held_mut(&mut self) -> &mut T;
+}
