@@ -28,10 +28,7 @@ use crate::{
     heightmap::{self, Heightmap},
     view::{
         HeightLimit,
-        block::{
-            BlockEntityView, BlockLuminanceView, BlockView, LockedBlockEntityViewMut,
-            LockedBlockViewMut,
-        },
+        block::{BlockEntityView, BlockLuminanceView, BlockView},
     },
 };
 
@@ -239,6 +236,11 @@ where
 }
 
 /// Immutable chunk behaviors.
+///
+/// _Implementation note:_ The default implementation of this trait is based on locking behavior.
+/// Override `highest_non_empty_section`, `peek_heightmaps`, `peek_heightmaps_mut` to avoid it.
+///
+/// You may also want to override [`Chunk::peek_game_event_dispatcher`] in any case.
 pub trait Chunk<'w, Cx>
 where
     Self: AsBaseChunk<'w, Cx>
@@ -268,13 +270,13 @@ where
     /// Returns the index of highest non-empty [`ChunkSection`] in this chunk.
     ///
     /// See [`ChunkSection::is_empty`].
-    fn highest_non_empty_section(&self) -> Option<usize> {
+    fn highest_non_empty_section(self) -> Option<usize> {
         self.sections().iter().rposition(|s| !s.lock().is_empty())
     }
 
     /// Peeks the heightmaps of this chunk.
     #[inline]
-    fn peek_heightmaps<F, T>(&self, pk: F) -> T
+    fn peek_heightmaps<F, T>(self, pk: F) -> T
     where
         F: for<'a> FnOnce(&'a AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
     {
@@ -284,7 +286,7 @@ where
 
     /// Peeks the heightmaps of this chunk.
     #[inline]
-    fn peek_heightmaps_mut_locked<F, T>(&self, pk: F) -> T
+    fn peek_heightmaps_mut<F, T>(self, pk: F) -> T
     where
         F: for<'a> FnOnce(&'a mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
     {
@@ -300,7 +302,7 @@ where
 
     /// Peeks the [`game_event::Dispatcher`] of given Y section coordinate.
     #[inline]
-    fn peek_game_event_dispatcher<F, T>(&self, y_section_coord: i32, f: F) -> Option<T>
+    fn peek_game_event_dispatcher<F, T>(self, y_section_coord: i32, f: F) -> Option<T>
     where
         F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
     {
@@ -312,7 +314,7 @@ where
     /// Gets the [`game_event::Dispatcher`] of given Y section coordinate.
     #[inline]
     fn game_event_dispatcher(
-        &self,
+        self,
         y_section_coord: i32,
     ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
         self.peek_game_event_dispatcher(y_section_coord, Arc::clone)
@@ -320,12 +322,8 @@ where
 }
 
 /// Mutable chunk behaviors.
-pub trait ChunkMut<'w, Cx>
+pub trait ChunkMut<'w, Cx>: Chunk<'w, Cx> + AsBaseChunkMut<'w, Cx>
 where
-    Self: AsBaseChunkMut<'w, Cx>
-        + Chunk<'w, Cx>
-        + LockedBlockViewMut<'w, Cx>
-        + LockedBlockEntityViewMut<'w, Cx>,
     Cx: ChunkCx<'w>,
 {
     /// Returns the array of chunk sections of this chunk.
@@ -342,46 +340,12 @@ where
 
     /// Peeks the heightmaps of this chunk.
     #[inline]
+    #[deprecated]
     fn peek_heightmaps_mut<F, T>(&mut self, pk: F) -> T
     where
         F: for<'a> FnOnce(&'a mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
     {
         pk(self.as_base_chunk_mut().0.heightmaps.get_mut())
-    }
-
-    /// Returns the index of highest non-empty [`ChunkSection`] in this chunk.
-    ///
-    /// This method is the same as [`Chunk::highest_non_empty_section`] but lock-free.
-    ///
-    /// See [`ChunkSection::is_empty`].
-    fn highest_non_empty_section_lf(&mut self) -> Option<usize> {
-        self.sections_mut()
-            .iter_mut()
-            .rposition(|s| !s.get_mut().is_empty())
-    }
-
-    /// Peeks the [`game_event::Dispatcher`] of given Y section coordinate.
-    ///
-    /// This method is the same as [`Chunk::peek_game_event_dispatcher`] but lock-free.
-    #[inline]
-    fn peek_game_event_dispatcher_lf<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>
-    where
-        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
-    {
-        let _ = y_section_coord;
-        drop(f);
-        None
-    }
-
-    /// Gets the [`game_event::Dispatcher`] of given Y section coordinate.
-    ///
-    /// This method is the same as [`Chunk::game_event_dispatcher`] but lock-free.
-    #[inline]
-    fn game_event_dispatcher_lf(
-        &mut self,
-        y_section_coord: i32,
-    ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
-        self.peek_game_event_dispatcher_lf(y_section_coord, Arc::clone)
     }
 }
 
