@@ -1,10 +1,14 @@
 //! Chunk lighting related stuffs.
 
-use rimecraft_block::BlockState;
+use std::sync::Arc;
+
+use rimecraft_block::{BlockState, BlockStateExt};
+use rimecraft_global_cx::Hold;
 use rimecraft_packed_int_array::PackedIntArray;
 use rimecraft_voxel_math::{BlockPos, coord_block_from_section, direction::Direction};
 
 use crate::{
+    NestedBlockStateExt,
     chunk::{BaseChunk, BaseChunkAccess, ChunkCx, section::ComputeIndex},
     view::HeightLimit,
 };
@@ -42,14 +46,24 @@ impl<'w, Cx> BaseChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
 {
-    pub(in crate::chunk) fn __sky_light_refresh_surface_y(mut this: impl BaseChunkAccess<'w, Cx>) {
+    pub(in crate::chunk) fn __csl_sky_light_refresh_surface_y(
+        mut this: impl BaseChunkAccess<'w, Cx>,
+    ) {
         let i = this
             .reclaim()
             .iter_read_chunk_sections()
             .into_iter()
             .rposition(|e| !e.is_empty());
+        let min_y = this.reclaim().read_chunk_sky_light().min_y;
         if let Some(i) = i {
-            todo!()
+            for j in 0..16 {
+                for k in 0..16 {
+                    let l = Self::__csl_calculate_surface_y(this.reclaim(), i as u32, k, j, min_y)
+                        .max(min_y);
+                    //TODO: too many locks. need to do unsafe ops
+                    todo!()
+                }
+            }
         } else {
             let mut skl = this.reclaim().write_chunk_sky_light();
             let min_y = skl.min_y;
@@ -57,7 +71,7 @@ where
         }
     }
 
-    fn __calculate_surface_y(
+    fn __csl_calculate_surface_y(
         mut this: impl BaseChunkAccess<'w, Cx>,
         top_section_index: u32,
         local_x: i32,
@@ -81,7 +95,16 @@ where
                 // why 15?
                 for k in (0..=15).rev() {
                     let bs2 = section.block_state(local_x as u32, k, local_z as u32);
-                    todo!()
+                    if bs.as_ref().map_or_else(
+                        || face_blocks_light_upper_air(&bs2),
+                        |bs| face_blocks_light(bs, &bs2),
+                    ) {
+                        return pos.y();
+                    }
+
+                    bs = Some(bs2);
+                    pos = pos2;
+                    pos2 = pos2.mv(Direction::Down, 1);
                 }
             } else {
                 bs = None;
@@ -91,5 +114,55 @@ where
         }
 
         min_y
+    }
+}
+
+/// Returns the opaque shape of given block state in the specified direction.
+pub fn opaque_shape_of_state<'a, Cx>(
+    state: &BlockState<'a, Cx>,
+    direction: Direction,
+) -> &'a Arc<voxel_shape::Slice<'a>>
+where
+    Cx: ChunkCx<'a>,
+{
+    if is_trivial_for_lighting(state) {
+        voxel_shape::empty()
+    } else {
+        let nested: &NestedBlockStateExt<'_> = state.data().get_held();
+        nested.culling_face(direction)
+    }
+}
+
+#[inline]
+pub(crate) fn is_trivial_for_lighting<'a, Cx>(state: &BlockState<'a, Cx>) -> bool
+where
+    Cx: ChunkCx<'a>,
+{
+    !state.settings().opaque || !state.has_sided_transparency()
+}
+
+fn face_blocks_light<'a, Cx>(upper: &BlockState<'a, Cx>, lower: &BlockState<'a, Cx>) -> bool
+where
+    Cx: ChunkCx<'a>,
+{
+    if lower.data().opacity() == 0 {
+        let shape_up = opaque_shape_of_state(upper, Direction::Down);
+        let shape_down = opaque_shape_of_state(lower, Direction::Up);
+        voxel_shape::union_covers_full_cube(shape_up, shape_down)
+    } else {
+        true
+    }
+}
+
+fn face_blocks_light_upper_air<'a, Cx>(lower: &BlockState<'a, Cx>) -> bool
+where
+    Cx: ChunkCx<'a>,
+{
+    if lower.data().opacity() == 0 {
+        let shape_up = voxel_shape::empty();
+        let shape_down = opaque_shape_of_state(lower, Direction::Up);
+        voxel_shape::union_covers_full_cube(shape_up, shape_down)
+    } else {
+        true
     }
 }

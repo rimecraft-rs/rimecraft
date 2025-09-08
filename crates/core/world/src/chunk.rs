@@ -18,7 +18,7 @@ use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe, container::ProvidePalette,
 };
 use rimecraft_fluid::ProvideFluidStateExtTy;
-use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
+use rimecraft_global_cx::{Hold, ProvideIdTy, ProvideNbtTy};
 use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
 
@@ -64,6 +64,7 @@ where
         + ProvideFluidStateExtTy
         + ProvideIdTy
         + ProvideNbtTy
+        + ProvideBlockStateExtTy<BlockStateExt<'w>: Hold<crate::NestedBlockStateExt<'w>>>
         + GlobalProvideLocalCxTy,
 {
     /// The type of block state id list.
@@ -113,7 +114,7 @@ impl<'w, Cx> Debug for BaseChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + Debug,
     Cx::Id: Debug,
-    Cx::BlockStateExt: Debug,
+    Cx::BlockStateExt<'w>: Debug,
     Cx::BlockStateList: Debug,
     Cx::FluidStateExt: Debug,
     Cx::Biome: Debug,

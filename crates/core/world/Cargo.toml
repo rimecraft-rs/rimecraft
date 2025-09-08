@@ -30,6 +30,7 @@ local-cx = { path = "../local-cx", package = "rimecraft-local-cx", features = [
 maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
 ident-hash = { path = "../../util/ident-hash", package = "rimecraft-ident-hash" }
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
+voxel-shape = { path = "../../util/voxel-shape", package = "rimecraft-voxel-shape" }
 # External utils
 serde = { version = "1.0", features = ["derive"] }
 erased-serde = "0.4"

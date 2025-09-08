@@ -283,7 +283,7 @@ impl<'w, Cx> Debug for ChunkSection<'w, Cx>
 where
     Cx: ChunkCx<'w> + Debug,
     Cx::Id: Debug,
-    Cx::BlockStateExt: Debug,
+    Cx::BlockStateExt<'w>: Debug,
     Cx::BlockStateList: Debug,
     Cx::Biome: Debug,
     Cx::BiomeList: Debug,

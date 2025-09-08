@@ -257,7 +257,7 @@ where
 impl<'a, T, Cx> Debug for RawBlockEntity<'a, T, Cx>
 where
     Cx: BlockEntityCx<'a> + Debug,
-    Cx::BlockStateExt: Debug,
+    Cx::BlockStateExt<'a>: Debug,
     Cx::Id: Debug,
     T: Debug + ?Sized,
 {

@@ -80,7 +80,7 @@ impl<'w, Cx> Debug for WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + Debug,
     Cx::Id: Debug,
-    Cx::BlockStateExt: Debug,
+    Cx::BlockStateExt<'w>: Debug,
     Cx::BlockStateList: Debug,
     Cx::FluidStateExt: Debug,
     Cx::Biome: Debug,

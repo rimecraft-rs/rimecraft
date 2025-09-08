@@ -235,7 +235,7 @@ where
 
 impl<'w, Cx> Debug for Emitter<'_, 'w, Cx>
 where
-    Cx: ChunkCx<'w, Id: Debug, BlockStateExt: Debug> + Debug,
+    Cx: ChunkCx<'w, Id: Debug, BlockStateExt<'w>: Debug> + Debug,
     Entity<'w, Cx>: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

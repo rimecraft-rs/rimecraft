@@ -129,6 +129,7 @@ impl<T> ArcAccess<T> for Weak<T> {
 }
 
 pub(crate) use __dsyn_cache::DsynCache;
+use rimecraft_voxel_math::direction::Direction;
 
 mod __dsyn_cache {
     use crate::behave::*;
@@ -204,5 +205,39 @@ impl<T: ?Sized> Reclaim for &mut T {
     #[inline]
     fn reclaim(&mut self) -> Self::Output<'_> {
         *self
+    }
+}
+
+/// A subset of block state extensions type for use of World OPs.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct NestedBlockStateExt<'a> {
+    /// Culling shape of this block state.
+    pub culling_shape: Arc<voxel_shape::Slice<'a>>,
+    /// Opacity of this block state.
+    pub opacity: u8,
+    culling_faces: [Arc<voxel_shape::Slice<'a>>; Direction::COUNT],
+}
+
+impl<'a> NestedBlockStateExt<'a> {
+    /// Returns the culling face of the given direction.
+    #[inline]
+    pub fn culling_face(&self, direction: Direction) -> &Arc<voxel_shape::Slice<'a>> {
+        &self.culling_faces[direction.ordinal()]
+    }
+
+    /// Initializes the cached shape and friends of this block state.
+    pub fn init_cache(&self) {
+        todo!()
+    }
+}
+
+impl Default for NestedBlockStateExt<'_> {
+    fn default() -> Self {
+        Self {
+            culling_shape: voxel_shape::full_cube().clone(),
+            culling_faces: std::array::from_fn(|_| voxel_shape::full_cube().clone()),
+            opacity: 15,
+        }
     }
 }

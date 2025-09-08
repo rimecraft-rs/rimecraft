@@ -4,6 +4,8 @@ use std::fmt::Display;
 
 use glam::{DVec3, IVec3};
 
+use crate::direction::Direction;
+
 /// A position of a block in a three-dimensional volume.
 ///
 /// The position is integer-valued.
@@ -36,6 +38,13 @@ impl BlockPos {
     #[inline]
     pub const fn z(&self) -> i32 {
         self.0.z
+    }
+
+    /// Moves this block position by the given offset.
+    #[inline]
+    #[doc(alias = "move")]
+    pub fn mv(self, direction: Direction, distance: i32) -> Self {
+        self + direction.offset() * IVec3::splat(distance)
     }
 }
 
