@@ -54,9 +54,7 @@ impl<'w, Cx> BaseChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
 {
-    pub(in crate::chunk) fn __csl_sky_light_refresh_surface_y(
-        mut this: impl BaseChunkAccess<'w, Cx>,
-    ) {
+    pub(in crate::chunk) fn __csl_refresh_surface_y(mut this: impl BaseChunkAccess<'w, Cx>) {
         let i = this
             .reclaim()
             .iter_read_chunk_sections()

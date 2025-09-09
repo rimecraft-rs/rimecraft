@@ -24,7 +24,7 @@ use rimecraft_voxel_math::BlockPos;
 
 use crate::{
     Sealed,
-    chunk::light::ChunkSkyLight,
+    chunk::{light::ChunkSkyLight, section::ComputeIndex},
     event::game_event,
     heightmap::{self, Heightmap},
     view::{
@@ -292,9 +292,18 @@ where
         self.as_base_chunk().pos
     }
 
+    /// Refreshes the surface sky light propagated levels of this chunk.
+    #[inline]
+    fn refresh_surface_y(&mut self)
+    where
+        Cx: ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    {
+        BaseChunk::__csl_refresh_surface_y(self.as_base_chunk_access());
+    }
+
     /// Peeks the [`game_event::Dispatcher`] of given Y section coordinate.
     #[inline]
-    fn peek_game_event_dispatcher<F, T>(self, y_section_coord: i32, f: F) -> Option<T>
+    fn peek_game_event_dispatcher<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>
     where
         F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
     {
@@ -306,7 +315,7 @@ where
     /// Gets the [`game_event::Dispatcher`] of given Y section coordinate.
     #[inline]
     fn game_event_dispatcher(
-        self,
+        &mut self,
         y_section_coord: i32,
     ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
         self.peek_game_event_dispatcher(y_section_coord, Arc::clone)
