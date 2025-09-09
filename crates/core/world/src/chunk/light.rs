@@ -64,6 +64,7 @@ where
             .rposition(|e| !e.is_empty());
 
         //SAFETY: the upcoming OPs involving `this` are all unassociated with chunk sky light
+        //NECESSITY: or we may have 16 * 16 locking operations if not lock free.
         let mut skl = unsafe { &mut *std::ptr::from_mut(&mut this) }
             .reclaim()
             .write_chunk_sky_light();

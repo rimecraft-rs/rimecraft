@@ -15,14 +15,15 @@ use rimecraft_voxel_math::BlockPos;
 use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{
-    DsynCache, Sealed, ServerWorld, World, behave::*, chunk::BaseChunkAccess, event::game_event,
-    heightmap, view::block::*,
+    DsynCache, ServerWorld, World,
+    behave::*,
+    chunk::{AsBaseChunkAccess, BaseChunkAccess},
+    event::game_event,
+    heightmap,
+    view::block::*,
 };
 
-use super::{
-    AsBaseChunk, AsBaseChunkMut, BORDER_LEN, BaseChunk, BlockEntityCell, Chunk, ChunkCx, ChunkMut,
-    section::ComputeIndex,
-};
+use super::{BORDER_LEN, BaseChunk, BlockEntityCell, Chunk, ChunkCx, section::ComputeIndex};
 
 use std::{
     fmt::Debug,
@@ -506,33 +507,43 @@ where
     }
 }
 
-impl<'w, Cx> AsBaseChunk<'w, Cx> for WorldChunk<'w, Cx>
+impl<'r, 'w, Cx> AsBaseChunkAccess<'w, Cx> for &'r WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
+    type Access<'a>
+        = &'r BaseChunk<'w, Cx>
+    where
+        Self: 'a;
+
     #[inline]
-    fn as_base_chunk(&self) -> Sealed<&BaseChunk<'w, Cx>> {
-        (&self.base).into()
+    fn as_base_chunk_access(&mut self) -> Self::Access<'_> {
+        &self.base
+    }
+
+    #[inline]
+    fn as_base_chunk(&self) -> &BaseChunk<'w, Cx> {
+        &self.base
     }
 }
 
-impl<'w, Cx> AsBaseChunkMut<'w, Cx> for WorldChunk<'w, Cx>
+impl<'w, Cx> AsBaseChunkAccess<'w, Cx> for &mut WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    #[inline]
-    fn as_base_chunk_mut(&mut self) -> Sealed<&mut BaseChunk<'w, Cx>> {
-        (&mut self.base).into()
-    }
-}
+    type Access<'a>
+        = &'a mut BaseChunk<'w, Cx>
+    where
+        Self: 'a;
 
-impl<'w, Cx> AsBaseChunkMut<'w, Cx> for &mut WorldChunk<'w, Cx>
-where
-    Cx: ChunkCx<'w>,
-{
     #[inline]
-    fn as_base_chunk_mut(&mut self) -> Sealed<&mut BaseChunk<'w, Cx>> {
-        (&mut self.base).into()
+    fn as_base_chunk_access(&mut self) -> Self::Access<'_> {
+        &mut self.base
+    }
+
+    #[inline]
+    fn as_base_chunk(&self) -> &BaseChunk<'w, Cx> {
+        &self.base
     }
 }
 
@@ -750,43 +761,6 @@ where
     {
         WorldChunk::__peek_game_event_dispatcher(self, y_section_coord, f)
     }
-
-    fn highest_non_empty_section(mut self) -> Option<usize> {
-        self.sections_mut()
-            .iter_mut()
-            .rposition(|s| !s.get_mut().is_empty())
-    }
-
-    #[inline]
-    fn peek_heightmaps<F, T>(self, pk: F) -> T
-    where
-        F: for<'a> FnOnce(
-            &'a ahash::AHashMap<<Cx as ChunkCx<'w>>::HeightmapType, heightmap::Heightmap<'w, Cx>>,
-        ) -> T,
-    {
-        pk(self.base.heightmaps.get_mut())
-    }
-
-    #[inline]
-    fn peek_heightmaps_mut<F, T>(self, pk: F) -> T
-    where
-        F: for<'a> FnOnce(
-            &'a mut ahash::AHashMap<
-                <Cx as ChunkCx<'w>>::HeightmapType,
-                heightmap::Heightmap<'w, Cx>,
-            >,
-        ) -> T,
-    {
-        pk(self.base.heightmaps.get_mut())
-    }
-}
-
-impl<'w, Cx> ChunkMut<'w, Cx> for &mut WorldChunk<'w, Cx>
-where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-    Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
-{
 }
 
 #[allow(unused)]

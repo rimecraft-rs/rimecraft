@@ -201,6 +201,7 @@ where
 }
 
 /// Types that can represent an immutable [`BaseChunk`].
+#[deprecated]
 pub trait AsBaseChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>,
@@ -209,46 +210,29 @@ where
     fn as_base_chunk(&self) -> Sealed<&BaseChunk<'w, Cx>>;
 }
 
-/// Types that can represent a mutable [`BaseChunk`].
-pub trait AsBaseChunkMut<'w, Cx>: AsBaseChunk<'w, Cx>
+/// Types that can represent an access to a [`BaseChunk`].
+pub trait AsBaseChunkAccess<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    /// Returns a [`BaseChunk`].
-    fn as_base_chunk_mut(&mut self) -> Sealed<&mut BaseChunk<'w, Cx>>;
+    /// The accessor type.
+    type Access<'a>: BaseChunkAccess<'w, Cx>
+    where
+        Self: 'a;
+
+    /// Returns an accessor to this chunk.
+    fn as_base_chunk_access(&mut self) -> Self::Access<'_>;
+
+    /// Returns a reference to the chunk.
+    fn as_base_chunk(&self) -> &BaseChunk<'w, Cx>;
 }
 
-impl<'w, Cx, T> AsBaseChunk<'w, Cx> for &T
-where
-    T: AsBaseChunk<'w, Cx>,
-    Cx: ChunkCx<'w>,
-{
-    #[inline]
-    fn as_base_chunk(&self) -> Sealed<&BaseChunk<'w, Cx>> {
-        (**self).as_base_chunk()
-    }
-}
-
-impl<'w, Cx, T> AsBaseChunk<'w, Cx> for &mut T
-where
-    T: AsBaseChunk<'w, Cx>,
-    Cx: ChunkCx<'w>,
-{
-    #[inline]
-    fn as_base_chunk(&self) -> Sealed<&BaseChunk<'w, Cx>> {
-        (**self).as_base_chunk()
-    }
-}
-
-/// Immutable chunk behaviors.
-///
-/// _Implementation note:_ The default implementation of this trait is based on locking behavior.
-/// Override `highest_non_empty_section`, `peek_heightmaps`, `peek_heightmaps_mut` to avoid it.
+/// Chunk behaviors.
 ///
 /// You may also want to override [`Chunk::peek_game_event_dispatcher`] in any case.
 pub trait Chunk<'w, Cx>
 where
-    Self: AsBaseChunk<'w, Cx>
+    Self: AsBaseChunkAccess<'w, Cx>
         + BlockView<'w, Cx>
         + BlockEntityView<'w, Cx>
         + BlockLuminanceView<'w, Cx>,
@@ -257,7 +241,7 @@ where
     /// Returns the array of chunk sections of this chunk.
     #[inline]
     fn sections(&self) -> &[Mutex<ChunkSection<'w, Cx>>] {
-        &self.as_base_chunk().0.section_array
+        &self.as_base_chunk().section_array
     }
 
     /// Gets the [`ChunkSection`] at the given Y index of this chunk.
@@ -269,40 +253,43 @@ where
     /// Returns the [`HeightLimit`] of this chunk.
     #[inline]
     fn height_limit(&self) -> HeightLimit {
-        self.as_base_chunk().0.height_limit
+        self.as_base_chunk().height_limit
     }
 
     /// Returns the index of highest non-empty [`ChunkSection`] in this chunk.
     ///
     /// See [`ChunkSection::is_empty`].
-    fn highest_non_empty_section(self) -> Option<usize> {
-        self.sections().iter().rposition(|s| !s.lock().is_empty())
+    fn highest_non_empty_section(&mut self) -> Option<usize> {
+        self.as_base_chunk_access()
+            .iter_read_chunk_sections()
+            .into_iter()
+            .rposition(|s| !s.is_empty())
     }
 
     /// Peeks the heightmaps of this chunk.
     #[inline]
-    fn peek_heightmaps<F, T>(self, pk: F) -> T
+    fn peek_heightmaps<F, T>(&mut self, pk: F) -> T
     where
         F: for<'a> FnOnce(&'a AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
     {
-        let rg = self.as_base_chunk().0.heightmaps.read();
+        let rg = self.as_base_chunk_access().read_heightmaps();
         pk(&rg)
     }
 
     /// Peeks the heightmaps of this chunk.
     #[inline]
-    fn peek_heightmaps_mut<F, T>(self, pk: F) -> T
+    fn peek_heightmaps_mut<F, T>(&mut self, pk: F) -> T
     where
         F: for<'a> FnOnce(&'a mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
     {
-        let mut rg = self.as_base_chunk().0.heightmaps.write();
+        let mut rg = self.as_base_chunk_access().write_heightmaps();
         pk(&mut rg)
     }
 
     /// Returns the position of this chunk.
     #[inline]
     fn pos(&self) -> ChunkPos {
-        self.as_base_chunk().0.pos
+        self.as_base_chunk().pos
     }
 
     /// Peeks the [`game_event::Dispatcher`] of given Y section coordinate.
@@ -326,26 +313,8 @@ where
     }
 }
 
-/// Mutable chunk behaviors.
-pub trait ChunkMut<'w, Cx>: Chunk<'w, Cx> + AsBaseChunkMut<'w, Cx>
-where
-    Cx: ChunkCx<'w>,
-{
-    /// Returns the array of chunk sections of this chunk.
-    #[inline]
-    fn sections_mut(&mut self) -> &mut [Mutex<ChunkSection<'w, Cx>>] {
-        &mut self.as_base_chunk_mut().0.section_array
-    }
-
-    /// Gets the [`ChunkSection`] at the given Y index of this chunk.
-    #[inline]
-    fn section_mut(&mut self, index: usize) -> Option<&mut Mutex<ChunkSection<'w, Cx>>> {
-        self.sections_mut().get_mut(index)
-    }
-}
-
-#[allow(unused)]
-trait BaseChunkAccess<'w, Cx>
+#[allow(missing_docs)]
+pub trait BaseChunkAccess<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
