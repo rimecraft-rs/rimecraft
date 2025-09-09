@@ -40,6 +40,14 @@ impl ChunkSkyLight {
             self.pal.set(j, i as u32);
         }
     }
+
+    fn set(&mut self, index: usize, y: i32) {
+        self.pal.set(index, (y - self.min_y) as u32);
+    }
+}
+
+fn skl_packed_index(local_x: i32, local_z: i32) -> i32 {
+    local_x + local_z * 16
 }
 
 impl<'w, Cx> BaseChunk<'w, Cx>
@@ -54,18 +62,22 @@ where
             .iter_read_chunk_sections()
             .into_iter()
             .rposition(|e| !e.is_empty());
-        let min_y = this.reclaim().read_chunk_sky_light().min_y;
+
+        //SAFETY: the upcoming OPs involving `this` are all unassociated with chunk sky light
+        let mut skl = unsafe { &mut *std::ptr::from_mut(&mut this) }
+            .reclaim()
+            .write_chunk_sky_light();
+
+        let min_y = skl.min_y;
         if let Some(i) = i {
             for j in 0..16 {
                 for k in 0..16 {
                     let l = Self::__csl_calculate_surface_y(this.reclaim(), i as u32, k, j, min_y)
                         .max(min_y);
-                    //TODO: too many locks. need to do unsafe ops
-                    todo!()
+                    skl.set(skl_packed_index(k, j) as usize, l);
                 }
             }
         } else {
-            let mut skl = this.reclaim().write_chunk_sky_light();
             let min_y = skl.min_y;
             skl.fill(min_y);
         }
