@@ -206,6 +206,18 @@ where
     pub fn is_removed(&self) -> bool {
         self.removed
     }
+
+    /// Returns the cached state of this block entity.
+    #[inline]
+    pub fn cached_state(&self) -> BlockState<'a, Cx> {
+        self.cached_state
+    }
+
+    /// Sets the cached state of this block entity.
+    #[inline]
+    pub fn set_cached_state(&mut self, state: BlockState<'a, Cx>) {
+        self.cached_state = state;
+    }
 }
 
 impl<'a, T: ?Sized, Cx> RawBlockEntity<'a, T, Cx>
@@ -251,6 +263,16 @@ where
         builder.extend(self.components.iter());
         self.data.insert_components(&mut builder);
         builder.build()
+    }
+}
+
+impl<'a, T: ?Sized, Cx> HoldDescriptors<'static, 'a> for RawBlockEntity<'a, T, Cx>
+where
+    Cx: BlockEntityCx<'a>,
+{
+    #[inline]
+    fn descriptors(&self) -> &dsyn::DescriptorSet<'static, 'a> {
+        self.ty.descriptors()
     }
 }
 

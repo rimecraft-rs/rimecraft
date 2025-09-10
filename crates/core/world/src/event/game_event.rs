@@ -4,7 +4,7 @@
 
 //TODO: funtion of dispatch manager, which requires interacting with a world instance.
 
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 use glam::DVec3;
 use ident_hash::{HashTableExt as _, IHashSet};
@@ -54,6 +54,10 @@ pub type GameEvent<'w, Cx> = Reg<'w, <Cx as ProvideIdTy>::Id, RawGameEvent>;
 /// A game event listener listens to [`GameEvent`]s from dispatchers.
 ///
 /// See [`ErasedListener`] for type-erasure.
+///
+/// _Implementation Note: Listeners should validate that the passed block entity is the
+/// block entity for the block as there could be cases here where the block entity is not
+/// the block entity for the listener._
 pub trait Listener<'w, Cx>
 where
     Cx: ChunkCx<'w>,
@@ -63,7 +67,7 @@ where
 
     /// Listens to an incoming game event.
     fn listen(
-        &mut self,
+        &self,
         world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
@@ -246,7 +250,8 @@ where
     }
 }
 
-type BoxedListener<'w, Cx> = Box<dyn ErasedListener<'w, Cx> + Send + Sync + 'w>;
+/// Type-erased event listener type.
+pub type DynListener<'w, Cx> = dyn ErasedListener<'w, Cx> + Send + Sync + 'w;
 
 /// Dispatcher of game events and their listeners.
 ///
@@ -256,7 +261,7 @@ pub struct Dispatcher<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    listeners: Mutex<Vec<BoxedListener<'w, Cx>>>,
+    listeners: Mutex<Vec<Arc<DynListener<'w, Cx>>>>,
     buf: Mutex<DispatcherBuf<'w, Cx>>,
 }
 
@@ -278,7 +283,7 @@ struct DispatcherBuf<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    push: Vec<BoxedListener<'w, Cx>>,
+    push: Vec<Arc<DynListener<'w, Cx>>>,
     pop: IHashSet<ListenerKey>,
 }
 
@@ -302,19 +307,24 @@ where
         self.listeners.lock().is_empty()
     }
 
+    /// Pushes an erased listener to this dispatcher.
+    pub fn push_erased(&self, listener: Arc<DynListener<'w, Cx>>) -> ListenerKey {
+        let ptr = std::ptr::from_ref(&*listener) as *const ();
+        if let Some(mut guard) = self.listeners.try_lock() {
+            guard.push(listener);
+        } else {
+            self.buf.lock().push.push(listener);
+        }
+        ListenerKey(ptr)
+    }
+
     /// Pushes a listener to this dispatcher.
-    pub fn push<T>(&self, listener: T) -> ListenerKey
+    #[inline]
+    pub fn push<T>(&self, listener: Arc<T>) -> ListenerKey
     where
         T: Listener<'w, Cx> + Send + Sync + 'w,
     {
-        let boxed = Box::new(listener);
-        let ptr = std::ptr::from_ref::<T>(&*boxed) as *const ();
-        if let Some(mut guard) = self.listeners.try_lock() {
-            guard.push(boxed);
-        } else {
-            self.buf.lock().push.push(boxed);
-        }
-        ListenerKey(ptr)
+        self.push_erased(listener)
     }
 
     /// Removes a listener from this dispatcher if present.
@@ -340,16 +350,16 @@ where
     /// Returns whether the callback was triggered.
     pub fn dispatch<F>(&self, world: &ServerWorld<'w, Cx>, pos: DVec3, mut callback: F) -> bool
     where
-        F: for<'env> FnMut(&'env mut dyn ErasedListener<'w, Cx>, DVec3),
+        F: for<'env> FnMut(&'env dyn ErasedListener<'w, Cx>, DVec3),
     {
         let mut vg = self.listeners.lock();
         let mut visited = false;
-        for listener in &mut *vg {
+        for listener in &*vg {
             if let Some(sp) = listener._erased_ps_pos(world.as_ref()) {
                 let d = sp.floor().distance_squared(pos.floor());
                 let i = listener._erased_range().pow(2) as f64;
                 if d <= i {
-                    callback(&mut **listener, sp);
+                    callback(&**listener, sp);
                     visited = true;
                 }
             }

@@ -15,6 +15,7 @@ maintenance = { status = "passively-maintained" }
 serde = { version = "1.0", default-features = false, optional = true }
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 rand = { version = "0.9", default-features = false, optional = true }
+smallbox = { version = "0.8", default-features = false, optional = true }
 
 [features]
 default = ["std"]
@@ -23,6 +24,7 @@ serde = ["dep:serde"]
 nbt = ["serde"]
 edcode = ["dep:edcode2", "std"]
 rand = ["dep:rand"]
+smallbox = ["dep:smallbox"]
 
 [lints]
 workspace = true

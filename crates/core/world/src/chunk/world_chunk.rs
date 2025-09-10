@@ -4,14 +4,14 @@ use dsyn::HoldDescriptors as _;
 use glam::IVec3;
 use ident_hash::IHashMap;
 use local_cx::{LocalContext, dsyn_instanceof, dsyn_ty, dyn_cx::AsDynamicContext};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, MutexGuard};
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
     BlockEntity, DynErasedRawBlockEntityType, component::RawErasedComponentType,
 };
 use rimecraft_fluid::{BsToFs, FluidState};
 use rimecraft_registry::Registry;
-use rimecraft_voxel_math::BlockPos;
+use rimecraft_voxel_math::{BlockPos, coord_section_from_block};
 use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{
@@ -42,6 +42,7 @@ pub trait WorldChunkLocalCx<'w, Cx>:
     + LocalContext<dsyn::Type<BlockAlwaysReplaceState>>
     + LocalContext<dsyn::Type<BlockOnStateReplaced<Cx>>>
     + LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>
+    + LocalContext<dsyn::Type<BlockEntityGetGameEventListener<Cx>>>
 where
     Cx: ChunkCx<'w>,
 {
@@ -56,7 +57,8 @@ where
         + LocalContext<dsyn::Type<BlockEntityOnBlockReplaced<Cx>>>
         + LocalContext<dsyn::Type<BlockAlwaysReplaceState>>
         + LocalContext<dsyn::Type<BlockOnStateReplaced<Cx>>>
-        + LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>,
+        + LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityGetGameEventListener<Cx>>>,
 {
 }
 
@@ -113,6 +115,59 @@ where
     #[inline]
     fn can_tick_block_entities(&self) -> bool {
         self.loaded_to_world || self.is_client
+    }
+}
+
+impl<'w, Cx> WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
+{
+    fn __peek_game_event_dispatcher<F, T>(
+        this: impl WorldChunkAccess<'w, Cx>,
+        y_section_coord: i32,
+        f: F,
+    ) -> Option<T>
+    where
+        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
+    {
+        if this.wca_as_wc().is_client {
+            None
+        } else {
+            let mut g = this.write_game_event_dispatchers();
+            if let Some(d) = g.get(&y_section_coord) {
+                Some(f(d))
+            } else {
+                let d = Arc::new(game_event::Dispatcher::new());
+                let result = f(&d);
+                g.insert(y_section_coord, d);
+                Some(result)
+            }
+        }
+    }
+    fn __update_game_event_listener(
+        mut this: impl WorldChunkAccess<'w, Cx>,
+        be_cell: &BlockEntityCell<'w, Cx>,
+        be: impl Deref<Target = BlockEntity<'w, Cx>>,
+    ) {
+        let y = be.pos().y();
+        let listener_fn = dsyn_instanceof!(cached this.dsyn_cache(), this.local_cx(), &*be => export BlockEntityGetGameEventListener<Cx>)
+            .unwrap_or(default_block_entity_get_game_event_listener());
+
+        // release the guard
+        drop(be);
+
+        if let Some(listener) = listener_fn(
+            be_cell,
+            this.local_cx(),
+            BlockEntityGetGameEventListenerMarker,
+        ) {
+            let _ = Self::__peek_game_event_dispatcher(
+                this.reclaim(),
+                coord_section_from_block(y),
+                |d| d.push_erased(listener),
+            );
+        }
     }
 }
 
@@ -180,11 +235,21 @@ where
     }
 
     fn __add_block_entity(
-        this: impl WorldChunkAccess<'w, Cx>,
+        mut this: impl WorldChunkAccess<'w, Cx>,
         block_entity: Box<BlockEntity<'w, Cx>>,
     ) {
-        Self::__set_block_entity(this, block_entity);
-        //TODO: Update tickers and game event listeners
+        if let Some(cell) = Self::__set_block_entity(this.reclaim(), block_entity, true) {
+            if !this.wca_as_wc().is_client {
+                Self::__update_game_event_listener(
+                    this.reclaim(),
+                    &cell,
+                    MutexGuard::map(cell.lock(), |g| &mut **g),
+                );
+            }
+            //PLACEHOLDER
+            let _ = ();
+            //TODO: Update tickers
+        }
     }
 
     /// Adds a block entity to this chunk.
@@ -241,7 +306,8 @@ where
     fn __set_block_entity(
         mut this: impl WorldChunkAccess<'w, Cx>,
         mut block_entity: Box<BlockEntity<'w, Cx>>,
-    ) {
+        return_cell: bool,
+    ) -> Option<BlockEntityCell<'w, Cx>> {
         let dsyn_ty =
             dsyn_ty!(cached this.dsyn_cache(), this.local_cx() => BlockEntityConstructor<Cx>);
         if Self::__block_state(this.reclaim(), block_entity.pos())
@@ -249,11 +315,14 @@ where
             .unwrap_or_default()
         {
             block_entity.cancel_removal();
+            let pos = block_entity.pos();
+            let cell = Arc::new(Mutex::new(block_entity));
+            let return_val = return_cell.then(|| cell.clone());
             let mut be2 = this
                 .reclaim()
                 .bca()
                 .write_block_entities()
-                .insert(block_entity.pos(), Arc::new(Mutex::new(block_entity)));
+                .insert(pos, cell);
             if let Some(be) = &mut be2 {
                 if let Some(be) = Arc::get_mut(be) {
                     be.get_mut().mark_removed();
@@ -261,6 +330,9 @@ where
                     be.lock().mark_removed();
                 }
             }
+            return_val
+        } else {
+            None
         }
     }
 
@@ -282,29 +354,6 @@ where
             be
         } else {
             None
-        }
-    }
-
-    fn __peek_game_event_dispatcher<F, T>(
-        this: impl WorldChunkAccess<'w, Cx>,
-        y_section_coord: i32,
-        f: F,
-    ) -> Option<T>
-    where
-        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
-    {
-        if this.wca_as_wc().is_client {
-            None
-        } else {
-            let mut g = this.write_game_event_dispatchers();
-            if let Some(d) = g.get(&y_section_coord) {
-                Some(f(d))
-            } else {
-                let d = Arc::new(game_event::Dispatcher::new());
-                let result = f(&d);
-                g.insert(y_section_coord, d);
-                Some(result)
-            }
         }
     }
 
@@ -685,7 +734,7 @@ where
 {
     #[inline]
     fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>) {
-        WorldChunk::__set_block_entity(*self, block_entity);
+        WorldChunk::__set_block_entity(*self, block_entity, false);
     }
 
     #[inline]
@@ -702,7 +751,7 @@ where
 {
     #[inline]
     fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>) {
-        WorldChunk::__set_block_entity(self, block_entity);
+        WorldChunk::__set_block_entity(self, block_entity, false);
     }
 
     #[inline]
@@ -827,7 +876,7 @@ where
 
     type GameEventDispatchersRead = Self::GameEventDispatchersWrite;
     type GameEventDispatchersWrite =
-        parking_lot::MutexGuard<'a, IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>;
+        MutexGuard<'a, IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>;
 
     #[inline]
     fn read_game_event_dispatchers(self) -> Self::GameEventDispatchersRead {

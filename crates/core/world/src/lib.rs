@@ -167,6 +167,7 @@ mod __dsyn_cache {
     dsyn_caches_init! {
         be_constructor => BlockEntityConstructor<Cx>,
         be_on_block_replaced => BlockEntityOnBlockReplaced<Cx>,
+        be_get_game_event_listener => BlockEntityGetGameEventListener<Cx>,
         b_always_replace_state => BlockAlwaysReplaceState,
         b_on_state_replaced => BlockOnStateReplaced<Cx>,
         b_on_block_added => BlockOnBlockAdded<Cx>,

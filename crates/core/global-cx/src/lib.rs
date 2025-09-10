@@ -24,6 +24,9 @@ pub mod edcode;
 #[cfg(feature = "rand")]
 pub mod rand;
 
+#[cfg(feature = "smallbox")]
+pub mod smallbox;
+
 /// Marker trait for global contexts.
 ///
 /// # Safety
