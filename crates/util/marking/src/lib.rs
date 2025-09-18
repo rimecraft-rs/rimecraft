@@ -8,6 +8,7 @@ pub struct LeakedPtrMarker(*mut u8);
 impl LeakedPtrMarker {
     /// Creates a new leaked pointer marker.
     #[inline]
+    #[cfg_attr(miri, allow(unreachable_code))]
     pub fn new() -> Self {
         #[cfg(not(miri))]
         {
@@ -21,6 +22,14 @@ impl LeakedPtrMarker {
 
             Self(ATOMIC_COUNTER.fetch_byte_add(1, std::sync::atomic::Ordering::Relaxed))
         }
+    }
+
+    #[cfg(miri)]
+    fn __new_miri() -> Self {
+        static ATOMIC_COUNTER: std::sync::atomic::AtomicPtr<u8> =
+            std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+        Self(ATOMIC_COUNTER.fetch_byte_add(1, std::sync::atomic::Ordering::Relaxed))
     }
 
     /// Gets a non-leaked pointer marker reference from this.
