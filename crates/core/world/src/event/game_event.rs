@@ -269,6 +269,14 @@ where
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct ListenerKey(*const ());
 
+impl ListenerKey {
+    /// Creates a new listener key from a reference-counted pointer.
+    #[inline]
+    pub fn from_arc<'w, Cx: ChunkCx<'w>>(arc: &Arc<DynListener<'w, Cx>>) -> ListenerKey {
+        ListenerKey(Arc::as_ptr(arc).cast())
+    }
+}
+
 unsafe impl Send for ListenerKey {}
 unsafe impl Sync for ListenerKey {}
 

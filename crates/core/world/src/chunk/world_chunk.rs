@@ -165,7 +165,12 @@ where
             let _ = Self::__peek_game_event_dispatcher(
                 this.reclaim(),
                 coord_section_from_block(y),
-                |d| d.push_erased(listener),
+                |d| {
+                    d.push_erased(match listener {
+                        maybe::Maybe::Borrowed(a) => a.clone(),
+                        maybe::Maybe::Owned(maybe::SimpleOwned(a)) => a,
+                    })
+                },
             );
         }
     }

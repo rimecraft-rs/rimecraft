@@ -5,6 +5,7 @@
 use std::sync::Arc;
 
 use local_cx::ProvideLocalCxTy;
+use maybe::Maybe;
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{BlockEntity, BlockEntityCell};
 use rimecraft_voxel_math::BlockPos;
@@ -138,11 +139,12 @@ pub struct BlockEntityGetGameEventListenerMarker;
 /// # Parameters
 ///
 /// 1. The block entity itself.
-pub type BlockEntityGetGameEventListener<Cx> = for<'env> fn(
-    &BlockEntityCell<'env, Cx>,
-    <Cx as ProvideLocalCxTy>::LocalContext<'env>,
-    BlockEntityGetGameEventListenerMarker,
-) -> Option<Arc<DynListener<'env, Cx>>>;
+pub type BlockEntityGetGameEventListener<Cx> =
+    for<'env, 'r> fn(
+        &'r BlockEntityCell<'env, Cx>,
+        <Cx as ProvideLocalCxTy>::LocalContext<'env>,
+        BlockEntityGetGameEventListenerMarker,
+    ) -> Option<Maybe<'r, Arc<DynListener<'env, Cx>>>>;
 
 /// The default implementation of [`BlockEntityGetGameEventListener`].
 pub const fn default_block_entity_get_game_event_listener<'w, Cx>()
