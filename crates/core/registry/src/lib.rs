@@ -426,6 +426,10 @@ pub struct RegistryMut<K, T> {
 
 impl<K, T> RegistryMut<K, T> {
     /// Creates a new mutable registry.
+    #[cfg_attr(
+        feature = "marking-leaked",
+        doc = "\n _Note on feature `marking-leaked`:_ This function introduces tiny memory leaking behavior."
+    )]
     #[inline]
     pub fn new(key: Key<K, Registry<K, T>>) -> Self {
         Self {
