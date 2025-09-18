@@ -146,3 +146,58 @@ fn combine_discrete_cuboid_merged() {
         "mergeable boxes should be an iter with 2 elements"
     );
 }
+
+// Miri workaround tests
+
+/*
+
+// Cursed.
+#[test]
+#[cfg(miri)]
+fn miri_test_alloc_bitvec() {
+    use bitvec::boxed::BitBox;
+    use std::sync::OnceLock;
+
+    static BIT_BOX: OnceLock<BitBox> = OnceLock::new();
+
+    BIT_BOX.set(bitvec::bitbox!(0; 10)).unwrap();
+}
+
+#[test]
+#[cfg(miri)]
+fn miri_test_alloc_mybox() {
+    use std::sync::OnceLock;
+
+    struct MyBox<T> {
+        ptr: std::ptr::NonNull<T>,
+    }
+
+    impl<T> From<Box<T>> for MyBox<T> {
+        fn from(boxed: Box<T>) -> Self {
+            // lost provenance
+            let ptr = Box::into_raw(boxed);
+            let ptr = ptr as usize;
+            let ptr = ptr as *mut T;
+            Self {
+                ptr: std::ptr::NonNull::new(ptr).unwrap(),
+            }
+        }
+    }
+
+    impl<T> Drop for MyBox<T> {
+        fn drop(&mut self) {
+            unsafe {
+                drop(Box::from_raw(self.ptr.as_ptr()));
+            }
+        }
+    }
+
+    unsafe impl<T> Send for MyBox<T> {}
+    unsafe impl<T> Sync for MyBox<T> {}
+
+    static BOXED: OnceLock<MyBox<u8>> = OnceLock::new();
+
+    let _ = BOXED.set(Box::new(0u8).into());
+}
+
+*/
