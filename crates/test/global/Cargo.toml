@@ -22,7 +22,7 @@ identifier = { path = "../../util/identifier", package = "rimecraft-identifier",
     "vanilla",
     "serde",
 ] }
-fastnbt = "2.5"
+fastnbt = "2.6"
 serde = { version = "1.0", features = ["derive"] }
 serde-update = { path = "../../util/serde-update", package = "rimecraft-serde-update" }
 parking_lot = "0.12"
