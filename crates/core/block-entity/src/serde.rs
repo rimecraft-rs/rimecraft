@@ -9,6 +9,7 @@ use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
 use serde::{Deserialize, Serialize, de::DeserializeSeed};
+use serde_private::de::ContentVisitor;
 
 use crate::{BlockEntity, BlockEntityCx, DynErasedRawBlockEntityType, RawBlockEntity};
 
@@ -80,7 +81,7 @@ where
         }
         self.0
             .data
-            .serialize(serde::__private::ser::FlatMapSerializer(&mut map))?;
+            .serialize(serde_private::ser::FlatMapSerializer(&mut map))?;
         map.end()
     }
 }
@@ -110,7 +111,7 @@ enum Field<'de> {
     Y,
     Z,
 
-    Other(serde::__private::de::Content<'de>),
+    Other(serde_private::de::Content<'de>),
 }
 
 impl Serialize for Field<'_> {
@@ -154,7 +155,7 @@ impl<'de> Deserialize<'de> for Field<'de> {
                     "x" => Ok(Field::X),
                     "y" => Ok(Field::Y),
                     "z" => Ok(Field::Z),
-                    other => Ok(Field::Other(serde::__private::de::Content::String(
+                    other => Ok(Field::Other(serde_private::de::Content::String(
                         other.to_owned(),
                     ))),
                 }
@@ -170,7 +171,7 @@ impl<'de> Deserialize<'de> for Field<'de> {
                     "x" => Ok(Field::X),
                     "y" => Ok(Field::Y),
                     "z" => Ok(Field::Z),
-                    other => Ok(Field::Other(serde::__private::de::Content::Str(other))),
+                    other => Ok(Field::Other(serde_private::de::Content::Str(other))),
                 }
             }
         }
@@ -245,7 +246,7 @@ where
             {
                 let mut id: Option<Cx::Id> = None;
                 let mut components: Option<ComponentMap<'a, Cx>> = None;
-                use serde::__private::de::Content;
+                use serde_private::de::Content;
                 let mut collect: Vec<Option<(Content<'de>, Content<'de>)>> =
                     Vec::with_capacity(map.size_hint().map_or(0, |i| i - 1));
 
@@ -260,7 +261,9 @@ where
                         }
                         // Skip position information
                         Field::X | Field::Y | Field::Z => {}
-                        Field::Other(c) => collect.push(Some((c, map.next_value()?))),
+                        Field::Other(c) => {
+                            collect.push(Some((c, map.next_value_seed(ContentVisitor::new())?)))
+                        }
                     }
                 }
 
@@ -280,7 +283,7 @@ where
                     .ok_or_else(|| serde::de::Error::custom("failed to create block entity"))?;
                 rimecraft_serde_update::Update::update(
                     &mut *be,
-                    serde::__private::de::FlatMapDeserializer(&mut collect, PhantomData),
+                    serde_private::de::FlatMapDeserializer(&mut collect, PhantomData),
                 )?;
                 be.components = components;
 

@@ -30,6 +30,7 @@ local-cx = { path = "../local-cx", features = [
 bitflags = "2.6"
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 parking_lot = "0.12"
+serde-private = "1.0"
 
 [features]
 
