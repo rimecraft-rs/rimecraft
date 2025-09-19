@@ -534,6 +534,7 @@ mod _serde {
     };
     use rimecraft_registry::Registry;
     use serde::{Deserialize, Serialize, ser::SerializeMap};
+    use serde_private::de::ContentVisitor;
 
     use crate::{chunk::ChunkCx, event::game_event::PositionSourceType};
 
@@ -556,7 +557,7 @@ mod _serde {
             map.serialize_entry(TYPE_KEY, &ty)?;
             erased_serde::serialize(
                 (ty.serde.ser)(&local_cx.with(self)),
-                serde::__private::ser::FlatMapSerializer(&mut map),
+                serde_private::ser::FlatMapSerializer(&mut map),
             )?;
             map.end()
         }
@@ -579,12 +580,12 @@ mod _serde {
         where
             A: serde::de::MapAccess<'de>,
         {
-            use serde::__private::de::Content;
             use serde::de::Error;
+            use serde_private::de::Content;
             let mut buf: Vec<(Content<'de>, Content<'de>)> =
                 map.size_hint().map_or_else(Vec::new, Vec::with_capacity);
             let mut ty: Option<PositionSourceType<'w, Cx>> = None;
-            while let Some(key) = map.next_key::<Content<'de>>()? {
+            while let Some(key) = map.next_key_seed(ContentVisitor::new())? {
                 match &key {
                     Content::String(val) => {
                         if val == TYPE_KEY {
@@ -600,14 +601,12 @@ mod _serde {
                     }
                     _ => {}
                 }
-                buf.push((key, map.next_value()?))
+                buf.push((key, map.next_value_seed(ContentVisitor::new())?))
             }
             let ty = ty.ok_or_else(|| A::Error::missing_field("type"))?;
             (ty.serde.de)(
                 &mut <dyn erased_serde::Deserializer<'de>>::erase(
-                    serde::__private::de::ContentDeserializer::<'de, A::Error>::new(Content::Map(
-                        buf,
-                    )),
+                    serde_private::de::ContentDeserializer::<'de, A::Error>::new(Content::Map(buf)),
                 ),
                 self.0,
             )

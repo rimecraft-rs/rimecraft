@@ -29,7 +29,7 @@ typeid = "1.0"
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }
-fastnbt = "2.5"
+fastnbt = "2.6"
 test-global = { path = "../../test/global", features = [
     "registry",
 ], package = "rimecraft-test-global" }
