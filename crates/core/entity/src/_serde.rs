@@ -5,6 +5,7 @@ use serde::{
     Deserialize, Serialize,
     ser::{SerializeMap, SerializeSeq},
 };
+use serde_private::de::ContentVisitor;
 use serde_update::Update as _;
 use uuid::Uuid;
 
@@ -151,7 +152,7 @@ where
         map.serialize_entry(KEY_UUID, &serde_compat::IntStreamCodec(this.uuid))?;
         map.serialize_entry(KEY_CUSTOM_COMPONENT, &this.custom_compound)?;
         this.data
-            .serialize(serde::__private::ser::FlatMapSerializer(&mut map))?;
+            .serialize(serde_private::ser::FlatMapSerializer(&mut map))?;
         if this.has_passengers() {
             map.serialize_entry(KEY_PASSENGERS, &SerPassengers(&*this.passengers))?;
         }
@@ -210,7 +211,7 @@ where
             where
                 A: serde::de::MapAccess<'de>,
             {
-                use serde::__private::de::Content;
+                use serde_private::de::Content;
                 let mut collect: Vec<Option<(Content<'de>, Content<'de>)>> =
                     Vec::with_capacity(map.size_hint().map_or(0, |i| i - 1));
                 let this = self.0;
@@ -251,17 +252,17 @@ where
                                 Cow::Borrowed(a) => Content::Str(a),
                                 Cow::Owned(a) => Content::String(a),
                             },
-                            map.next_value()?,
+                            map.next_value_seed(ContentVisitor::new())?,
                         ))),
                     }
                 }
 
-                this.ext.update(serde::__private::de::FlatMapDeserializer(
+                this.ext.update(serde_private::de::FlatMapDeserializer(
                     &mut collect,
                     PhantomData,
                 ))?;
 
-                this.data.update(serde::__private::de::FlatMapDeserializer(
+                this.data.update(serde_private::de::FlatMapDeserializer(
                     &mut collect,
                     PhantomData,
                 ))?;

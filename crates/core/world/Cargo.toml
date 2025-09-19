@@ -32,6 +32,7 @@ ident-hash = { path = "../../util/ident-hash", package = "rimecraft-ident-hash" 
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 # External utils
 serde = { version = "1.0", features = ["derive"] }
+serde-private = "1.0"
 erased-serde = "0.4"
 serde_repr = "0.1"
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }

@@ -24,6 +24,7 @@ voxel-math = { path = "../../util/voxel-math", package = "rimecraft-voxel-math" 
 block = { path = "../block", package = "rimecraft-block" }
 marking = { path = "../../util/marking", package = "rimecraft-marking" }
 serde = "1.0"
+serde-private = "1.0"
 serde-update = { path = "../../util/serde-update", features = [
     "erased",
 ], package = "rimecraft-serde-update" }
