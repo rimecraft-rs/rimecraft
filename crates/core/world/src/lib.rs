@@ -213,11 +213,11 @@ impl<T: ?Sized> Reclaim for &mut T {
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct NestedBlockStateExt<'a> {
-    /// Culling shape of this block state.
-    pub culling_shape: Arc<voxel_shape::Slice<'a>>,
+    culling_shape: Arc<voxel_shape::Slice<'a>>,
     /// Opacity of this block state.
-    pub opacity: u8,
+    opacity: u8,
     culling_faces: [Arc<voxel_shape::Slice<'a>>; Direction::COUNT],
+    luminance: u32,
 }
 
 impl<'a> NestedBlockStateExt<'a> {
@@ -225,6 +225,24 @@ impl<'a> NestedBlockStateExt<'a> {
     #[inline]
     pub fn culling_face(&self, direction: Direction) -> &Arc<voxel_shape::Slice<'a>> {
         &self.culling_faces[direction.ordinal()]
+    }
+
+    /// Returns the culling shape of this block state.
+    #[inline]
+    pub fn culling_shape(&self) -> &Arc<voxel_shape::Slice<'a>> {
+        &self.culling_shape
+    }
+
+    /// Returns the opacity of this block state.
+    #[inline]
+    pub fn opacity(&self) -> u8 {
+        self.opacity
+    }
+
+    /// Returns the luminance of this block state.
+    #[inline]
+    pub fn luminance(&self) -> u32 {
+        self.luminance
     }
 
     /// Initializes the cached shape and friends of this block state.
@@ -239,6 +257,7 @@ impl Default for NestedBlockStateExt<'_> {
             culling_shape: voxel_shape::full_cube().clone(),
             culling_faces: std::array::from_fn(|_| voxel_shape::full_cube().clone()),
             opacity: 15,
+            luminance: 0,
         }
     }
 }

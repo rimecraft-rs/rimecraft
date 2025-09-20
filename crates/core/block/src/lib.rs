@@ -1,6 +1,5 @@
 //! Minecraft block primitives.
 
-use behave::ProvideLuminance;
 use dsyn::{DescriptorSet, HoldDescriptors};
 use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
 use rimecraft_registry::Reg;
@@ -200,14 +199,17 @@ where
     }
 }
 
+#[allow(deprecated)]
 impl<'a, Cx> BlockState<'a, Cx>
 where
     Cx: ProvideBlockStateExtTy,
-    Cx::BlockStateExt<'a>: ProvideLuminance,
+    Cx::BlockStateExt<'a>: behave::ProvideLuminance,
 {
     /// Returns the luminance level of this block state.
     #[inline]
+    #[deprecated = "this function should be provided by the nested block state extension types"]
     pub fn luminance(&self) -> u32 {
+        use behave::ProvideLuminance;
         self.state.data().luminance(self.state)
     }
 }

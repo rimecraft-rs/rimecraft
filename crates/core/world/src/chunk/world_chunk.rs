@@ -10,6 +10,7 @@ use rimecraft_block_entity::{
     BlockEntity, DynErasedRawBlockEntityType, component::RawErasedComponentType,
 };
 use rimecraft_fluid::{BsToFs, FluidState};
+use rimecraft_global_cx::Hold;
 use rimecraft_registry::Registry;
 use rimecraft_voxel_math::{BlockPos, coord_section_from_block};
 use serde::{Deserialize, de::DeserializeSeed};
@@ -635,6 +636,12 @@ where
             }
         })
     }
+
+    fn __luminance(this: impl WorldChunkAccess<'w, Cx>, pos: BlockPos) -> u32 {
+        Self::__block_state(this, pos)
+            .map(|state| state.data().get_held().luminance())
+            .unwrap_or(0)
+    }
 }
 
 impl<'w, Cx> BlockView<'w, Cx> for &WorldChunk<'w, Cx>
@@ -771,8 +778,9 @@ where
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
-    fn luminance(&mut self, pos: BlockPos) -> crate::view::StateOption<u32> {
-        todo!()
+    #[inline]
+    fn luminance(&mut self, pos: BlockPos) -> u32 {
+        WorldChunk::__luminance(*self, pos)
     }
 }
 
@@ -782,8 +790,9 @@ where
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
-    fn luminance(&mut self, pos: BlockPos) -> crate::view::StateOption<u32> {
-        todo!()
+    #[inline]
+    fn luminance(&mut self, pos: BlockPos) -> u32 {
+        WorldChunk::__luminance(self, pos)
     }
 }
 

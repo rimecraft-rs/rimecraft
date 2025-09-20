@@ -23,7 +23,6 @@ rimecraft-block-entity = { path = "../block-entity" }
 rimecraft-voxel-math = { path = "../../util/voxel-math" }
 rimecraft-packed-int-array = { path = "../../util/packed-int-array" }
 local-cx = { path = "../local-cx", package = "rimecraft-local-cx", features = [
-    "dyn-cx",
     "dyn-codecs",
     "dsyn",
 ] }

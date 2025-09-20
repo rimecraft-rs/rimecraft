@@ -42,7 +42,7 @@ where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
     /// Returns the luminance source level of the given position.
-    fn luminance(&mut self, pos: BlockPos) -> StateOption<u32>;
+    fn luminance(&mut self, pos: BlockPos) -> u32;
 
     /// Returns the max light level of this view.
     ///
