@@ -9,8 +9,6 @@ use rimecraft_voxel_math::BlockPos;
 
 use crate::DEFAULT_MAX_LIGHT_LEVEL;
 
-use super::StateOption;
-
 /// A scoped, immutable view of [`BlockState`]s and [`FluidState`]s.
 pub trait BlockView<'w, Cx>: Sized
 where

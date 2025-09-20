@@ -3,7 +3,7 @@
 use dsyn::HoldDescriptors as _;
 use glam::IVec3;
 use ident_hash::IHashMap;
-use local_cx::{LocalContext, dsyn_instanceof, dsyn_ty, dyn_cx::AsDynamicContext};
+use local_cx::{LocalContext, dsyn_instanceof, dsyn_ty};
 use parking_lot::{Mutex, MutexGuard};
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{

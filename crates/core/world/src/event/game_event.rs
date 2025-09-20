@@ -482,9 +482,7 @@ mod sealed {
 
 mod _edcode {
     use edcode2::{Buf, BufMut, Decode, Encode};
-    use local_cx::{
-        ForwardToWithLocalCx, LocalContext, LocalContextExt, WithLocalCx, dyn_cx::AsDynamicContext,
-    };
+    use local_cx::{ForwardToWithLocalCx, LocalContext, LocalContextExt, WithLocalCx};
     use rimecraft_registry::Registry;
 
     use crate::chunk::ChunkCx;
