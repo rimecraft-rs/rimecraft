@@ -180,7 +180,7 @@ impl<'w, Cx> WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     fn __peek_block_entity_typed<F, T>(
         mut this: impl WorldChunkAccess<'w, Cx>,
@@ -671,7 +671,7 @@ impl<'w, Cx> BlockEntityView<'w, Cx> for &WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
     fn peek_block_entity<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
@@ -686,7 +686,7 @@ impl<'w, Cx> BlockEntityView<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
     fn peek_block_entity<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
@@ -701,7 +701,7 @@ impl<'w, Cx> BlockViewMut<'w, Cx> for &WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
     fn set_block_state(
@@ -718,7 +718,7 @@ impl<'w, Cx> BlockViewMut<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
     fn set_block_state(
@@ -735,7 +735,7 @@ impl<'w, Cx> BlockEntityViewMut<'w, Cx> for &WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
     fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>) {
@@ -752,7 +752,7 @@ impl<'w, Cx> BlockEntityViewMut<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
     fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>) {
@@ -769,7 +769,7 @@ impl<'w, Cx> BlockLuminanceView<'w, Cx> for &WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     fn luminance(&mut self, pos: BlockPos) -> crate::view::StateOption<u32> {
         todo!()
@@ -780,7 +780,7 @@ impl<'w, Cx> BlockLuminanceView<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     fn luminance(&mut self, pos: BlockPos) -> crate::view::StateOption<u32> {
         todo!()
@@ -791,7 +791,7 @@ impl<'w, Cx> Chunk<'w, Cx> for &WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
     fn peek_game_event_dispatcher<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>
@@ -806,7 +806,7 @@ impl<'w, Cx> Chunk<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
     fn peek_game_event_dispatcher<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>

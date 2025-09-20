@@ -511,8 +511,7 @@ mod _edcode {
     where
         Cx: ChunkCx<'w>,
         Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'w>>,
-        Cx::LocalContext<'w>:
-            LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
+        Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>>,
     {
         fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
             let WithLocalCx {
