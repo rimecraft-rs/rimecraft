@@ -27,6 +27,7 @@ use crate::data::{DataTracked, DataTracker, DataTrackerBuilder, EntityDataCx, Se
 mod _serde;
 pub mod data;
 
+//TODO: give this to global context for implementation.
 const POS_XZ_BOUND: f64 = 3.0000512e7;
 const POS_Y_BOUND: f64 = 2.0e7;
 const VELOCITY_BOUND: f64 = 10.0;
