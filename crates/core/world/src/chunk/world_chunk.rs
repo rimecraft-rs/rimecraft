@@ -117,6 +117,12 @@ where
     fn can_tick_block_entities(&self) -> bool {
         self.loaded_to_world || self.is_client
     }
+
+    #[inline]
+    fn __mark_needs_saving(this: impl WorldChunkAccess<'w, Cx>) {
+        this.bca().mark_needs_saving();
+        //TODO: call dirty chunk listener
+    }
 }
 
 impl<'w, Cx> WorldChunk<'w, Cx>
@@ -171,6 +177,33 @@ where
                         maybe::Maybe::Borrowed(a) => a.clone(),
                         maybe::Maybe::Owned(maybe::SimpleOwned(a)) => a,
                     })
+                },
+            );
+        }
+    }
+
+    fn __remove_game_event_listener(
+        mut this: impl WorldChunkAccess<'w, Cx>,
+        be_cell: &BlockEntityCell<'w, Cx>,
+        be: impl Deref<Target = BlockEntity<'w, Cx>>,
+    ) {
+        let y = be.pos().y();
+        let listener_fn = dsyn_instanceof!(cached this.dsyn_cache(), this.local_cx(), &*be => export BlockEntityGetGameEventListener<Cx>)
+            .unwrap_or(default_block_entity_get_game_event_listener());
+
+        // release the guard
+        drop(be);
+
+        if let Some(listener) = listener_fn(
+            be_cell,
+            this.local_cx(),
+            BlockEntityGetGameEventListenerMarker,
+        ) {
+            let _ = Self::__peek_game_event_dispatcher(
+                this.reclaim(),
+                coord_section_from_block(y),
+                |d| {
+                    d.remove(game_event::ListenerKey::from_arc(&*listener));
                 },
             );
         }
@@ -249,7 +282,7 @@ where
                 Self::__update_game_event_listener(
                     this.reclaim(),
                     &cell,
-                    MutexGuard::map(cell.lock(), |g| &mut **g),
+                    MutexGuard::map(cell.lock(), Box::deref_mut),
                 );
             }
             //PLACEHOLDER
@@ -316,30 +349,36 @@ where
     ) -> Option<BlockEntityCell<'w, Cx>> {
         let dsyn_ty =
             dsyn_ty!(cached this.dsyn_cache(), this.local_cx() => BlockEntityConstructor<Cx>);
-        if Self::__block_state(this.reclaim(), block_entity.pos())
-            .map(|bs| (*bs.block).descriptors().contains(dsyn_ty))
-            .unwrap_or_default()
-        {
-            block_entity.cancel_removal();
-            let pos = block_entity.pos();
-            let cell = Arc::new(Mutex::new(block_entity));
-            let return_val = return_cell.then(|| cell.clone());
-            let mut be2 = this
-                .reclaim()
-                .bca()
-                .write_block_entities()
-                .insert(pos, cell);
-            if let Some(be) = &mut be2 {
-                if let Some(be) = Arc::get_mut(be) {
-                    be.get_mut().mark_removed();
-                } else {
-                    be.lock().mark_removed();
-                }
+        let bs_w = Self::__block_state(this.reclaim(), block_entity.pos())
+            .filter(|bs| (*bs.block).descriptors().contains(dsyn_ty))?;
+
+        // State checks
+        let bs_be = block_entity.cached_state();
+        if bs_w != bs_be {
+            if !block_entity.ty().erased_supports(bs_w) {
+                return None; // In-world block state does not support this block entity
             }
-            return_val
-        } else {
-            None
+            // Update cached state to in-world state
+            block_entity.set_cached_state(bs_w);
         }
+
+        block_entity.cancel_removal();
+        let pos = block_entity.pos();
+        let cell = Arc::new(Mutex::new(block_entity));
+        let return_val = return_cell.then(|| cell.clone());
+        let mut be2 = this
+            .reclaim()
+            .bca()
+            .write_block_entities()
+            .insert(pos, cell);
+        if let Some(be) = &mut be2 {
+            if let Some(be) = Arc::get_mut(be) {
+                be.get_mut().mark_removed();
+            } else {
+                be.lock().mark_removed();
+            }
+        }
+        return_val
     }
 
     fn __remove_block_entity(
@@ -349,7 +388,13 @@ where
         if this.wca_as_wc().can_tick_block_entities() {
             let mut be = this.reclaim().bca().write_block_entities().remove(&pos);
             if let Some(be) = &mut be {
-                //TODO: remove game event listener
+                if !this.wca_as_wc().is_client {
+                    Self::__remove_game_event_listener(
+                        this.reclaim(),
+                        &*be,
+                        MutexGuard::map(be.lock(), Box::deref_mut),
+                    );
+                }
                 if let Some(raw) = Arc::get_mut(be) {
                     raw.get_mut().mark_removed();
                 } else {
@@ -504,7 +549,7 @@ where
             // Update block entity
             if let Some(be_constructor) = dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*state.block => export BlockEntityConstructor<Cx>)
             {
-                #[derive(Clone, Copy)]
+                #[derive(Clone, Copy, PartialEq, Eq)]
                 enum PeekResult {
                     Update,
                     Remove,
@@ -515,7 +560,7 @@ where
                     this.reclaim(),
                     pos,
                     |be| {
-                        let bg = be.lock();
+                        let mut bg = be.lock();
                         if bg.ty().erased_supports(state) {
                             #[cfg(feature = "tracing")]
                             tracing::warn!(
@@ -523,6 +568,9 @@ where
                                 bg.ty(),
                                 state.block
                             );
+
+                            bg.set_cached_state(state);
+                            //TODO: update ticker of block entity
 
                             PeekResult::Update
                         } else {
@@ -533,15 +581,8 @@ where
                 )
                 .unwrap_or(PeekResult::Create);
 
-                match result {
-                    PeekResult::Remove => {
-                        let _be = Self::__remove_block_entity(this.reclaim(), pos);
-                    }
-                    PeekResult::Update => {
-                        //TODO: set cached state for block entity
-                        //TODO: update ticker of block entity
-                    }
-                    _ => {}
+                if result == PeekResult::Remove {
+                    let _be = Self::__remove_block_entity(this.reclaim(), pos);
                 }
 
                 if matches!(result, PeekResult::Create | PeekResult::Remove) {
@@ -552,8 +593,7 @@ where
                 }
             }
 
-            //TODO: mark needs saving
-
+            Self::__mark_needs_saving(this.reclaim());
             Some(old_state)
         } else {
             // Can this happen at end?

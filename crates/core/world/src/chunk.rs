@@ -6,7 +6,7 @@ use std::{
     fmt::Debug,
     hash::Hash,
     ops::{Deref, DerefMut},
-    sync::Arc,
+    sync::{Arc, atomic::AtomicBool},
 };
 
 use ahash::AHashMap;
@@ -23,7 +23,6 @@ use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
 
 use crate::{
-    Sealed,
     chunk::{light::ChunkSkyLight, section::ComputeIndex},
     event::game_event,
     heightmap::{self, Heightmap},
@@ -105,7 +104,7 @@ where
     /// This is a cumulative measure of time.
     pub inhabited_time: u64,
     /// Whether this chunk needs saving.
-    pub needs_saving: bool,
+    pub needs_saving: AtomicBool,
     /// The propagated sky light levels.
     pub sky_light: Mutex<ChunkSkyLight>,
 }
@@ -169,7 +168,7 @@ where
     {
         Self {
             pos,
-            needs_saving: false,
+            needs_saving: AtomicBool::new(false),
             inhabited_time,
             upgrade_data,
             height_limit,
@@ -198,16 +197,6 @@ where
             sky_light: Mutex::new(ChunkSkyLight::new(height_limit)),
         }
     }
-}
-
-/// Types that can represent an immutable [`BaseChunk`].
-#[deprecated]
-pub trait AsBaseChunk<'w, Cx>
-where
-    Cx: ChunkCx<'w>,
-{
-    /// Returns a [`BaseChunk`].
-    fn as_base_chunk(&self) -> Sealed<&BaseChunk<'w, Cx>>;
 }
 
 /// Types that can represent an access to a [`BaseChunk`].
@@ -357,6 +346,8 @@ where
     >;
     fn read_chunk_sky_light(self) -> Self::ChunkSkyLightRead;
     fn write_chunk_sky_light(self) -> Self::ChunkSkyLightWrite;
+
+    fn mark_needs_saving(self);
 }
 
 impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> {
@@ -443,6 +434,12 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> 
     fn reclaim(&mut self) -> impl BaseChunkAccess<'w, Cx> {
         *self
     }
+
+    #[inline]
+    fn mark_needs_saving(self) {
+        self.needs_saving
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, Cx> {
@@ -527,5 +524,10 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, 
     #[inline]
     fn reclaim(&mut self) -> impl BaseChunkAccess<'w, Cx> {
         &mut **self
+    }
+
+    #[inline]
+    fn mark_needs_saving(self) {
+        *self.needs_saving.get_mut() = true;
     }
 }

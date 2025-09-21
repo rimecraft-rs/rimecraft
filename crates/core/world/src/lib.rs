@@ -25,18 +25,6 @@ pub use ahash::{AHashMap, AHashSet};
 /// The default max light level of Minecraft.
 pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
 
-/// A sealed cell.
-#[derive(Debug)]
-#[repr(transparent)]
-pub struct Sealed<T>(pub(crate) T);
-
-impl<T> From<T> for Sealed<T> {
-    #[inline(always)]
-    fn from(value: T) -> Self {
-        Self(value)
-    }
-}
-
 //TODO: PLACEHOLDERS
 
 /// Placeholder of type `ServerWorld`.
