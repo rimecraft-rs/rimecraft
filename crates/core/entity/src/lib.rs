@@ -395,6 +395,7 @@ where
         let mut tracker_builder = DataTrackerBuilder::new(ty);
         T::init_data_tracker(&mut tracker_builder);
 
+        #[deprecated = "should be implemented by local context"]
         static ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
         Self {
