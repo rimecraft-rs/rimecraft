@@ -14,7 +14,7 @@ use global_cx::{
     GlobalContext, ProvideIdTy, ProvideNbtTy,
     rand::{LockedRng, ProvideRng, Rng as _},
 };
-use local_cx::ProvideLocalCxTy;
+use local_cx::{PeekLocalContext, ProvideLocalCxTy};
 use parking_lot::Mutex;
 use registry::Reg;
 use serde::Serialize;
@@ -385,21 +385,27 @@ where
     }
 }
 
+/// Counter of entity networking ID which should be provided by the local context.
+#[derive(Debug)]
+pub struct IdCounter {
+    inner: AtomicU32,
+}
+
 impl<'w, T, Cx> RawEntity<'w, T, Cx>
 where
     Cx: EntityCx<'w, EntityExt<'w>: Default> + ProvideRng,
     T: Data<'w, Cx>,
 {
     /// Creates a new entity.
-    pub fn new(ty: EntityType<'w, Cx>, data: T) -> Self {
+    pub fn new<L>(ty: EntityType<'w, Cx>, data: T, cx: L) -> Self
+    where
+        L: PeekLocalContext<IdCounter>,
+    {
         let mut tracker_builder = DataTrackerBuilder::new(ty);
         T::init_data_tracker(&mut tracker_builder);
 
-        #[deprecated = "should be implemented by local context"]
-        static ID_COUNTER: AtomicU32 = AtomicU32::new(0);
-
         Self {
-            net_id: ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            net_id: cx.peek_acquire(|c| c.inner.fetch_add(1, std::sync::atomic::Ordering::Relaxed)),
             ty,
             uuid: {
                 let mut bytes = [0u8; 16];

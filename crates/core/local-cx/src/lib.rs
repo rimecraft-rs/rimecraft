@@ -25,6 +25,27 @@ pub trait LocalContext<T>: BaseLocalContext {
     fn acquire(self) -> T;
 }
 
+/// A local context that can be peeked.
+pub trait PeekLocalContext<T>: BaseLocalContext {
+    /// Peek the data from the local context.
+    fn peek_acquire<F, U>(self, f: F) -> U
+    where
+        F: FnOnce(&T) -> U;
+}
+
+impl<'a, L, T: 'a> PeekLocalContext<T> for L
+where
+    L: LocalContext<&'a T>,
+{
+    #[inline(always)]
+    fn peek_acquire<F, U>(self, f: F) -> U
+    where
+        F: FnOnce(&T) -> U,
+    {
+        f(self.acquire())
+    }
+}
+
 /// A general type that provides explicit local context type.
 pub trait ProvideLocalCxTy {
     /// The local context type.
