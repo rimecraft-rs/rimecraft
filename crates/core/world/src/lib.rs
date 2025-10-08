@@ -7,13 +7,16 @@
 //! The world lifetime is `'w`, in common. It is the lifetime of the world itself,
 //! and `BlockState`s, `FluidState`s and the `Biome` registry should be bound to this lifetime.
 
+pub mod behave;
 pub mod chunk;
 pub mod event;
 pub mod heightmap;
 pub mod tick;
 pub mod view;
 
-pub mod behave;
+mod _impl;
+
+pub use _impl::*;
 
 use std::{
     fmt::Debug,

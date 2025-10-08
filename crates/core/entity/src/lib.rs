@@ -3,7 +3,10 @@
 use std::{
     any::TypeId,
     fmt::Debug,
-    sync::{Arc, atomic::AtomicU32},
+    sync::{
+        Arc,
+        atomic::{self, AtomicU32},
+    },
 };
 
 use block::{BlockState, ProvideBlockStateExtTy};
@@ -405,7 +408,7 @@ where
         T::init_data_tracker(&mut tracker_builder);
 
         Self {
-            net_id: cx.peek_acquire(|c| c.inner.fetch_add(1, std::sync::atomic::Ordering::Relaxed)),
+            net_id: cx.peek_acquire(|c| c.inner.fetch_add(1, atomic::Ordering::Relaxed)),
             ty,
             uuid: {
                 let mut bytes = [0u8; 16];

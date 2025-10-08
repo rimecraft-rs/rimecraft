@@ -7,8 +7,6 @@ use rimecraft_block_entity::{BlockEntity, BlockEntityCell};
 use rimecraft_fluid::{FluidState, ProvideFluidStateExtTy};
 use rimecraft_voxel_math::BlockPos;
 
-use crate::DEFAULT_MAX_LIGHT_LEVEL;
-
 /// A scoped, immutable view of [`BlockState`]s and [`FluidState`]s.
 pub trait BlockView<'w, Cx>: Sized
 where
@@ -32,23 +30,6 @@ where
     fn peek_block_entity<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
     where
         F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T;
-}
-
-/// View of block luminance source levels.
-pub trait BlockLuminanceView<'w, Cx>: BlockView<'w, Cx>
-where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
-{
-    /// Returns the luminance source level of the given position.
-    fn luminance(&mut self, pos: BlockPos) -> u32;
-
-    /// Returns the max light level of this view.
-    ///
-    /// The default one is [`DEFAULT_MAX_LIGHT_LEVEL`].
-    #[inline]
-    fn max_light_level(&mut self) -> u32 {
-        DEFAULT_MAX_LIGHT_LEVEL
-    }
 }
 
 bitflags! {

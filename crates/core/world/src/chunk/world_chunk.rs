@@ -21,7 +21,7 @@ use crate::{
     chunk::{AsBaseChunkAccess, BaseChunkAccess},
     event::game_event,
     heightmap,
-    view::block::*,
+    view::{block::*, light::*},
 };
 
 use super::{BORDER_LEN, BaseChunk, BlockEntityCell, Chunk, ChunkCx, section::ComputeIndex};
@@ -33,8 +33,6 @@ use std::{
 };
 
 /// Local context bounds alias for most [`WorldChunk`] operations.
-///
-/// [`AsDynamicContext`] not included so you need to bound yourself.
 pub trait WorldChunkLocalCx<'w, Cx>:
     LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
     + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
@@ -152,6 +150,7 @@ where
             }
         }
     }
+
     fn __update_game_event_listener(
         mut this: impl WorldChunkAccess<'w, Cx>,
         be_cell: &BlockEntityCell<'w, Cx>,

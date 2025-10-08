@@ -9,7 +9,7 @@ use rimecraft_packed_int_array::PackedIntArray;
 use crate::{IndexFromRaw, IndexToRaw, Palette, Strategy};
 
 /// A paletted container stores objects as small integer indices,
-/// governed by palettes that map between these objects and indices.
+/// governed by [`Palette`]s that map between these objects and indices.
 #[derive(Debug)]
 pub struct PalettedContainer<L, T, Cx> {
     list: L,

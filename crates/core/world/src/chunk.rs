@@ -28,7 +28,8 @@ use crate::{
     heightmap::{self, Heightmap},
     view::{
         HeightLimit,
-        block::{BlockEntityView, BlockLuminanceView, BlockView},
+        block::{BlockEntityView, BlockView},
+        light::BlockLuminanceView,
     },
 };
 
@@ -36,6 +37,7 @@ mod internal_types;
 
 mod be_tick;
 pub mod light;
+pub mod manager;
 mod section;
 mod upgrade;
 
