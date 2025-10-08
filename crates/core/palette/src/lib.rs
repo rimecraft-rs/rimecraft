@@ -274,6 +274,24 @@ impl<L, T> Palette<L, T> {
     }
 }
 
+impl<L, T> Palette<L, T>
+where
+    T: Hash + Eq,
+{
+    /// Returns whether the given object is (or may) in the palette.
+    pub fn contains(&self, object: &T) -> bool {
+        match &self.internal {
+            PaletteImpl::Singular(value) => value.as_ref() == Some(object),
+            PaletteImpl::Direct => true,
+            PaletteImpl::Array(items) => items.contains(object),
+            PaletteImpl::BiMap {
+                forward: _,
+                reverse,
+            } => reverse.contains_key(object),
+        }
+    }
+}
+
 impl<'a, L, T> IntoIterator for &'a Palette<L, T>
 where
     &'a L: IntoIterator<Item = &'a T>,

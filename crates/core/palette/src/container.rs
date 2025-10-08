@@ -165,6 +165,17 @@ where
     }
 }
 
+impl<L, T, Cx> PalettedContainer<L, T, Cx>
+where
+    T: Hash + Eq,
+{
+    /// Returns whether the given object is (or may) contained in this container.
+    #[inline]
+    pub fn contains(&self, object: &T) -> bool {
+        self.data.palette.contains(object)
+    }
+}
+
 /// Obtains a compatible data object for the given entry size in bits.
 ///
 /// A new [`Data`] will be returned or `None` will be returned when the previous data can be reused.
