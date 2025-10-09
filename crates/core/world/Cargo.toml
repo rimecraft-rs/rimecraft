@@ -41,6 +41,8 @@ ahash = "0.8"
 glam = "0.30"
 bitflags = "2.9"
 tracing = { version = "0.1", optional = true }
+bitvec = "1.0"
+smallvec = { version = "1.15", features = ["const_generics"] }
 
 [features]
 default = ["edcode"]

@@ -6,7 +6,7 @@ use ahash::AHashMap;
 use rimecraft_maybe::Maybe;
 use rimecraft_packed_int_array::PackedIntArray;
 
-use crate::{IndexFromRaw, IndexToRaw, Palette, Strategy};
+use crate::{IndexFromRaw, IndexToRaw, IntoIteratorRef, Palette, Strategy};
 
 /// A paletted container stores objects as small integer indices,
 /// governed by [`Palette`]s that map between these objects and indices.
@@ -15,6 +15,17 @@ pub struct PalettedContainer<L, T, Cx> {
     list: L,
     data: Data<L, T>,
     _marker: PhantomData<Cx>,
+}
+
+impl<L, T, Cx> PalettedContainer<L, T, Cx>
+where
+    L: for<'a> IntoIteratorRef<'a, Item = &'a T>,
+{
+    /// Iterates over the palette items.
+    #[inline]
+    pub fn iter_palette(&self) -> crate::Iter<'_, <L as IntoIteratorRef<'_>>::IntoIter, T> {
+        self.data.palette.iter()
+    }
 }
 
 impl<L, T, Cx> PalettedContainer<L, T, Cx>
@@ -134,8 +145,8 @@ where
     pub fn count<'a, F>(&'a self, mut counter: F)
     where
         F: FnMut(&T, usize),
-        &'a L: IntoIterator,
-        <&'a L as IntoIterator>::IntoIter: ExactSizeIterator,
+        L: IntoIteratorRef<'a>,
+        <L as IntoIteratorRef<'a>>::IntoIter: ExactSizeIterator,
     {
         if let Some(val) = (self.data.palette.len() == 1)
             .then(|| self.data.palette.get(0))
@@ -467,8 +478,8 @@ mod _serde {
     impl<L, T, Cx> Serialize for PalettedContainer<L, T, Cx>
     where
         L: Clone + for<'a> IndexToRaw<&'a T> + for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
-        for<'a> &'a L: IntoIterator,
-        for<'a> <&'a L as IntoIterator>::IntoIter: ExactSizeIterator,
+        for<'a> L: IntoIteratorRef<'a>,
+        for<'a> <L as IntoIteratorRef<'a>>::IntoIter: ExactSizeIterator,
         T: Clone + Hash + Eq + Serialize,
         Cx: ProvidePalette<L, T>,
     {

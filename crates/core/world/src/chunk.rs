@@ -15,12 +15,13 @@ use parking_lot::{Mutex, RwLock};
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy, RawBlock};
 use rimecraft_block_entity::BlockEntityCell;
 use rimecraft_chunk_palette::{
-    IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe, container::ProvidePalette,
+    IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, IntoIteratorRef, Maybe,
+    container::ProvidePalette,
 };
 use rimecraft_fluid::ProvideFluidStateExtTy;
 use rimecraft_global_cx::{Hold, ProvideIdTy, ProvideNbtTy};
 use rimecraft_registry::Registry;
-use rimecraft_voxel_math::BlockPos;
+use rimecraft_voxel_math::{BlockPos, ChunkSectionPos};
 
 use crate::{
     chunk::{light::ChunkSkyLight, section::ComputeIndex},
@@ -36,6 +37,7 @@ use crate::{
 mod internal_types;
 
 mod be_tick;
+pub mod iter;
 pub mod light;
 pub mod manager;
 mod section;
@@ -54,6 +56,9 @@ pub use internal_types::*;
 /// The length of the border of a chunk.
 pub const BORDER_LEN: u32 = 16;
 
+/// The height of a chunk section.
+pub const SECTION_HEIGHT: u32 = BORDER_LEN;
+
 /// Types associated with a `Chunk`.
 ///
 /// # Generics
@@ -71,7 +76,10 @@ where
     /// The type of block state id list.
     type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>
         + for<'a> PalIndexToRaw<&'a BlockState<'w, Self>>
+        + for<'a> IntoIteratorRef<'a, Item = &'a BlockState<'w, Self>, IntoIter: ExactSizeIterator>
         + Clone;
+    // where
+    //     for<'a> &'a Self::BlockStateList: IntoIterator<Item = &'a BlockState<'w, Self>>;
 
     /// The type of biomes.
     type Biome: 'w;
@@ -178,7 +186,7 @@ where
             block_entities: Mutex::new(AHashMap::new()),
             block_entity_nbts: Mutex::new(AHashMap::new()),
             section_array: {
-                let len = height_limit.count_vertical_sections() as usize;
+                let len = height_limit.count_vertical_sections();
                 if let Some(section_array) = section_array {
                     assert_eq!(
                         section_array.len(),
@@ -218,6 +226,9 @@ where
     fn as_base_chunk(&self) -> &BaseChunk<'w, Cx>;
 }
 
+type SectionReadShorthand<'a, 'w, Chunk, Cx> =
+    <<Chunk as AsBaseChunkAccess<'w, Cx>>::Access<'a> as BaseChunkAccess<'w, Cx>>::ChunkSectionRead;
+
 /// Chunk behaviors.
 ///
 /// You may also want to override [`Chunk::peek_game_event_dispatcher`] in any case.
@@ -254,7 +265,7 @@ where
         self.as_base_chunk_access()
             .iter_read_chunk_sections()
             .into_iter()
-            .rposition(|s| !s.is_empty())
+            .rposition(|(_, s)| !s.is_empty())
     }
 
     /// Peeks the heightmaps of this chunk.
@@ -311,6 +322,20 @@ where
     ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
         self.peek_game_event_dispatcher(y_section_coord, Arc::clone)
     }
+
+    /// Returns an iterator over all blocks in this chunk.
+    #[allow(clippy::type_complexity)] // cant do better. help
+    #[inline]
+    fn blocks(
+        &mut self,
+    ) -> iter::Blocks<
+        'w,
+        impl DoubleEndedIterator<Item = (ChunkSectionPos, SectionReadShorthand<'_, 'w, Self, Cx>)>,
+        SectionReadShorthand<'_, 'w, Self, Cx>,
+        Cx,
+    > {
+        iter::blocks(self.as_base_chunk_access())
+    }
 }
 
 #[allow(missing_docs)]
@@ -319,7 +344,12 @@ where
     Cx: ChunkCx<'w>,
 {
     fn bca_as_bc(&self) -> &BaseChunk<'w, Cx>;
-    fn reclaim(&mut self) -> impl BaseChunkAccess<'w, Cx>;
+
+    type Reclaim<'borrow>: BaseChunkAccess<'w, Cx>
+    where
+        Self: 'borrow;
+
+    fn reclaim(&mut self) -> Self::Reclaim<'_>;
 
     type HeighmapsRead: Deref<Target = AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
     type HeighmapsWrite: DerefMut<Target = AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
@@ -340,12 +370,12 @@ where
     fn write_block_entity_nbts(self) -> Self::BlockEntityNbtsWrite;
     fn read_chunk_section(self, index: usize) -> Option<Self::ChunkSectionRead>;
     fn write_chunk_section(self, index: usize) -> Option<Self::ChunkSectionWrite>;
+    #[allow(clippy::implied_bounds_in_impls)]
     fn iter_read_chunk_sections(
         self,
-    ) -> impl IntoIterator<
-        Item: Deref<Target = ChunkSection<'w, Cx>>,
-        IntoIter: DoubleEndedIterator + ExactSizeIterator,
-    >;
+    ) -> impl Iterator<Item = (ChunkSectionPos, Self::ChunkSectionRead)>
+    + DoubleEndedIterator
+    + ExactSizeIterator;
     fn read_chunk_sky_light(self) -> Self::ChunkSkyLightRead;
     fn write_chunk_sky_light(self) -> Self::ChunkSkyLightWrite;
 
@@ -408,13 +438,15 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> 
     }
 
     #[inline]
+    #[allow(clippy::implied_bounds_in_impls)]
     fn iter_read_chunk_sections(
         self,
-    ) -> impl IntoIterator<
-        Item: Deref<Target = ChunkSection<'w, Cx>>,
-        IntoIter: DoubleEndedIterator + ExactSizeIterator,
-    > {
-        self.section_array.iter().map(|section| section.lock())
+    ) -> impl Iterator<Item = (ChunkSectionPos, Self::ChunkSectionRead)>
+    + DoubleEndedIterator
+    + ExactSizeIterator {
+        (self.height_limit.bottom_section_coord()..self.height_limit.top_section_coord())
+            .zip(self.section_array.iter())
+            .map(|(i, section)| ((self.pos, i).into(), section.lock()))
     }
 
     #[inline]
@@ -432,8 +464,13 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> 
         self
     }
 
+    type Reclaim<'e>
+        = Self
+    where
+        Self: 'e;
+
     #[inline]
-    fn reclaim(&mut self) -> impl BaseChunkAccess<'w, Cx> {
+    fn reclaim(&mut self) -> Self::Reclaim<'_> {
         *self
     }
 
@@ -507,15 +544,15 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, 
     }
 
     #[inline]
+    #[allow(clippy::implied_bounds_in_impls)]
     fn iter_read_chunk_sections(
         self,
-    ) -> impl IntoIterator<
-        Item: Deref<Target = ChunkSection<'w, Cx>>,
-        IntoIter: DoubleEndedIterator + ExactSizeIterator,
-    > {
-        self.section_array
-            .iter_mut()
-            .map(|section| section.get_mut())
+    ) -> impl Iterator<Item = (ChunkSectionPos, Self::ChunkSectionRead)>
+    + DoubleEndedIterator
+    + ExactSizeIterator {
+        (self.height_limit.bottom_section_coord()..self.height_limit.top_section_coord())
+            .zip(self.section_array.iter_mut())
+            .map(|(i, section)| ((self.pos, i).into(), section.get_mut()))
     }
 
     #[inline]
@@ -523,8 +560,13 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, 
         self
     }
 
+    type Reclaim<'borrow>
+        = &'borrow mut BaseChunk<'w, Cx>
+    where
+        Self: 'borrow;
+
     #[inline]
-    fn reclaim(&mut self) -> impl BaseChunkAccess<'w, Cx> {
+    fn reclaim(&mut self) -> Self::Reclaim<'_> {
         &mut **self
     }
 

@@ -9,7 +9,7 @@ use rimecraft_voxel_math::{BlockPos, coord_block_from_section, direction::Direct
 
 use crate::{
     NestedBlockStateExt,
-    chunk::{BaseChunk, BaseChunkAccess, ChunkCx, section::ComputeIndex},
+    chunk::{BORDER_LEN, BaseChunk, BaseChunkAccess, ChunkCx, section::ComputeIndex},
     view::HeightLimit,
 };
 
@@ -47,7 +47,7 @@ impl ChunkSkyLight {
 }
 
 fn skl_packed_index(local_x: i32, local_z: i32) -> i32 {
-    local_x + local_z * 16
+    local_x + local_z * BORDER_LEN as i32
 }
 
 impl<'w, Cx> BaseChunk<'w, Cx>
@@ -59,7 +59,7 @@ where
             .reclaim()
             .iter_read_chunk_sections()
             .into_iter()
-            .rposition(|e| !e.is_empty());
+            .rposition(|(_, e)| !e.is_empty());
 
         //SAFETY: the upcoming OPs involving `this` are all unassociated with chunk sky light
         //NECESSITY: or we may have 16 * 16 locking operations if not lock free.
@@ -69,8 +69,8 @@ where
 
         let min_y = skl.min_y;
         if let Some(i) = i {
-            for j in 0..16 {
-                for k in 0..16 {
+            for j in 0..BORDER_LEN as i32 {
+                for k in 0..BORDER_LEN as i32 {
                     let l = Self::__csl_calculate_surface_y(this.reclaim(), i as u32, k, j, min_y)
                         .max(min_y);
                     skl.set(skl_packed_index(k, j) as usize, l);
@@ -91,7 +91,7 @@ where
     ) -> i32 {
         let height_limit = this.bca_as_bc().height_limit;
         let local_y = coord_block_from_section(
-            height_limit.section_index_to_coord(top_section_index as i32) + 1,
+            height_limit.section_index_to_coord(top_section_index as usize) + 1,
         );
         let mut pos = BlockPos::new(local_x, local_y, local_z);
         let mut pos2 = pos + Direction::Down.offset();
@@ -119,7 +119,7 @@ where
                 }
             } else {
                 bs = None;
-                pos.0.y = coord_block_from_section(height_limit.section_index_to_coord(j as i32));
+                pos.0.y = coord_block_from_section(height_limit.section_index_to_coord(j as usize));
                 pos2.0.y = pos.y() - 1;
             }
         }

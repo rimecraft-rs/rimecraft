@@ -83,35 +83,47 @@ impl From<BlockPos> for (i32, i32, i32) {
     }
 }
 
-impl std::ops::Add<IVec3> for BlockPos {
+impl<T> std::ops::Add<T> for BlockPos
+where
+    T: Into<IVec3>,
+{
     type Output = BlockPos;
 
     #[inline]
-    fn add(self, rhs: IVec3) -> BlockPos {
-        BlockPos(self.0 + rhs)
+    fn add(self, rhs: T) -> BlockPos {
+        BlockPos(self.0 + rhs.into())
     }
 }
 
-impl std::ops::AddAssign<IVec3> for BlockPos {
+impl<T> std::ops::AddAssign<T> for BlockPos
+where
+    T: Into<IVec3>,
+{
     #[inline]
-    fn add_assign(&mut self, rhs: IVec3) {
-        self.0 += rhs;
+    fn add_assign(&mut self, rhs: T) {
+        self.0 += rhs.into();
     }
 }
 
-impl std::ops::Sub<IVec3> for BlockPos {
+impl<T> std::ops::Sub<T> for BlockPos
+where
+    T: Into<IVec3>,
+{
     type Output = BlockPos;
 
     #[inline]
-    fn sub(self, rhs: IVec3) -> BlockPos {
-        BlockPos(self.0 - rhs)
+    fn sub(self, rhs: T) -> BlockPos {
+        BlockPos(self.0 - rhs.into())
     }
 }
 
-impl std::ops::SubAssign<IVec3> for BlockPos {
+impl<T> std::ops::SubAssign<T> for BlockPos
+where
+    T: Into<IVec3>,
+{
     #[inline]
-    fn sub_assign(&mut self, rhs: IVec3) {
-        self.0 -= rhs;
+    fn sub_assign(&mut self, rhs: T) {
+        self.0 -= rhs.into();
     }
 }
 

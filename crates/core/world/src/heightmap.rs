@@ -6,7 +6,10 @@ use rimecraft_block::BlockState;
 use rimecraft_packed_int_array::PackedIntArray;
 use rimecraft_voxel_math::BlockPos;
 
-use crate::{chunk::ChunkCx, view::HeightLimit};
+use crate::{
+    chunk::{BORDER_LEN, ChunkCx},
+    view::HeightLimit,
+};
 
 const STORAGE_LEN: usize = 256;
 
@@ -112,7 +115,7 @@ where
 
 #[inline]
 const fn to_index(x: i32, z: i32) -> usize {
-    (x + z * 16) as usize
+    (x + z * BORDER_LEN as i32) as usize
 }
 
 /// Several different heightmaps check and store highest block of different types,

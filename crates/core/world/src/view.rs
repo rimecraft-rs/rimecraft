@@ -54,8 +54,8 @@ impl HeightLimit {
     }
 
     /// Returns the number of sections in the view, vertically.
-    pub const fn count_vertical_sections(self) -> i32 {
-        self.top_section_coord() - self.bottom_section_coord()
+    pub const fn count_vertical_sections(self) -> usize {
+        (self.top_section_coord() - self.bottom_section_coord()) as usize
     }
 
     /// Whether the given Y level is within the view's height limit.
@@ -74,7 +74,7 @@ impl HeightLimit {
     }
 
     /// Converts a zero-based section index to a section coordinate.
-    pub const fn section_index_to_coord(self, index: i32) -> i32 {
-        index + self.bottom_section_coord()
+    pub const fn section_index_to_coord(self, index: usize) -> i32 {
+        index as i32 + self.bottom_section_coord()
     }
 }

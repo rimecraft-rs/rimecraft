@@ -130,6 +130,12 @@ where
     pub fn has_random_ticks(&self) -> bool {
         self.has_random_tick_blocks() || self.has_random_tick_fluids()
     }
+
+    /// Whether the chunk section contains the given block state.
+    #[inline]
+    pub fn contains(&self, bs: BlockState<'w, Cx>) -> bool {
+        self.bsc.contains(&bs)
+    }
 }
 
 impl<'w, Cx> ChunkSection<'w, Cx>

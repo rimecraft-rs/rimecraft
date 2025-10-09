@@ -58,7 +58,7 @@ where
         Local: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
             + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
     {
-        let indices_len = height_limit.count_vertical_sections() as usize;
+        let indices_len = height_limit.count_vertical_sections();
 
         thread_local! {
             static LENGTH: Cell<usize> = const { Cell::new(0) };
