@@ -1,6 +1,6 @@
 //! Light view traits.
 
-use rimecraft_block::ProvideBlockStateExtTy;
+use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_fluid::ProvideFluidStateExtTy;
 use rimecraft_voxel_math::BlockPos;
 
@@ -33,5 +33,6 @@ where
     where
         F: FnOnce(&ChunkSkyLight) -> U;
 
-    //TODO: light source iterator
+    /// Returns an iterator over the light sources in the chunk.
+    fn light_sources(&mut self) -> impl Iterator<Item = (BlockPos, BlockState<'w, Cx>)>;
 }

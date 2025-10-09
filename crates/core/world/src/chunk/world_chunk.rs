@@ -18,7 +18,7 @@ use serde::{Deserialize, de::DeserializeSeed};
 use crate::{
     DsynCache, ServerWorld, World,
     behave::*,
-    chunk::{AsBaseChunkAccess, BaseChunkAccess},
+    chunk::{AsBaseChunkAccess, BaseChunkAccess, light::ChunkSkyLight},
     event::game_event,
     heightmap,
     view::{block::*, light::*},
@@ -681,6 +681,21 @@ where
             .map(|state| state.data().get_held().luminance())
             .unwrap_or(0)
     }
+
+    #[inline]
+    fn __peek_chunk_sky_light<F, U>(this: impl WorldChunkAccess<'w, Cx>, f: F) -> U
+    where
+        F: FnOnce(&ChunkSkyLight) -> U,
+    {
+        f(&this.bca().read_chunk_sky_light())
+    }
+
+    fn __light_sources(
+        this: &mut impl Chunk<'w, Cx>,
+    ) -> impl Iterator<Item = (BlockPos, BlockState<'w, Cx>)> {
+        this.blocks()
+            .filter(|(_, bs)| bs.data().get_held().luminance() > 0)
+    }
 }
 
 impl<'w, Cx> BlockView<'w, Cx> for &WorldChunk<'w, Cx>
@@ -832,6 +847,46 @@ where
     #[inline]
     fn luminance(&mut self, pos: BlockPos) -> u32 {
         WorldChunk::__luminance(self, pos)
+    }
+}
+
+impl<'w, Cx> LightSourceView<'w, Cx> for &WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
+{
+    #[inline]
+    fn peek_chunk_sky_light<F, U>(&mut self, f: F) -> U
+    where
+        F: FnOnce(&ChunkSkyLight) -> U,
+    {
+        WorldChunk::__peek_chunk_sky_light(*self, f)
+    }
+
+    #[inline]
+    fn light_sources(&mut self) -> impl Iterator<Item = (BlockPos, BlockState<'w, Cx>)> {
+        WorldChunk::__light_sources(self)
+    }
+}
+
+impl<'w, Cx> LightSourceView<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
+{
+    #[inline]
+    fn peek_chunk_sky_light<F, U>(&mut self, f: F) -> U
+    where
+        F: FnOnce(&ChunkSkyLight) -> U,
+    {
+        WorldChunk::__peek_chunk_sky_light(self, f)
+    }
+
+    #[inline]
+    fn light_sources(&mut self) -> impl Iterator<Item = (BlockPos, BlockState<'w, Cx>)> {
+        WorldChunk::__light_sources(self)
     }
 }
 

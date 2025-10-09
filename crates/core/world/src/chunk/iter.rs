@@ -11,6 +11,8 @@ use crate::chunk::{
 };
 
 /// An iterator over all blocks in a chunk.
+///
+/// This is returned by [`super::Chunk::blocks`].
 #[repr(transparent)] // this is important as we need to do some hacks
 pub struct Blocks<'w, I, S, Cx>(BlocksInner<'w, I, S, Cx>)
 where

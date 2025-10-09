@@ -30,7 +30,7 @@ use crate::{
     view::{
         HeightLimit,
         block::{BlockEntityView, BlockView},
-        light::BlockLuminanceView,
+        light::{BlockLuminanceView, LightSourceView},
     },
 };
 
@@ -237,7 +237,8 @@ where
     Self: AsBaseChunkAccess<'w, Cx>
         + BlockView<'w, Cx>
         + BlockEntityView<'w, Cx>
-        + BlockLuminanceView<'w, Cx>,
+        + BlockLuminanceView<'w, Cx>
+        + LightSourceView<'w, Cx>,
     Cx: ChunkCx<'w>,
 {
     /// Returns the array of chunk sections of this chunk.
@@ -324,6 +325,11 @@ where
     }
 
     /// Returns an iterator over all blocks in this chunk.
+    ///
+    /// # Optimization
+    ///
+    /// The returned iterator is optimized for filtering, following vanilla behavior to do chunk section
+    /// palette pre-checks for filtering out those sections that don't contain the desired block at all.
     #[allow(clippy::type_complexity)] // cant do better. help
     #[inline]
     fn blocks(
