@@ -2,22 +2,23 @@ pub mod potential_values_based_callbacks;
 pub mod suppliable_int_callbacks;
 pub mod validating_int_slider_callbacks;
 
-use rimecraft_text::ProvideTextTy;
-
 use crate::SimpleOption;
 
-type ChangeCallback<T> = dyn Fn(Option<T>);
+use rimecraft_math::MathExt as _;
+use rimecraft_text::ProvideTextTy;
 
-type ValueSetter<T, Txt> = fn(&mut SimpleOption<T, Txt>, value: Option<T>);
+pub type ChangeCallback<T> = dyn Fn(Option<T>);
 
-trait Callbacks<T, Txt>
+pub type ValueSetter<T, Txt> = fn(&mut SimpleOption<T, Txt>, value: Option<T>);
+
+pub trait Callbacks<T, Txt>
 where
     Txt: ProvideTextTy,
 {
     fn validate(&self, value: Option<T>) -> Option<T>;
 }
 
-trait CyclingCallbacks<T, Txt>: Callbacks<T, Txt>
+pub trait CyclingCallbacks<T, Txt>: Callbacks<T, Txt>
 where
     Txt: ProvideTextTy,
 {
@@ -28,7 +29,7 @@ where
     }
 }
 
-trait SliderCallbacks<T, Txt>: Callbacks<T, Txt>
+pub trait SliderCallbacks<T, Txt>: Callbacks<T, Txt>
 where
     Txt: ProvideTextTy,
 {
@@ -37,14 +38,15 @@ where
     fn to_value(&self, slider_progress: f32) -> T;
 }
 
-trait TypeChangeableCallbacks<T, Txt>: CyclingCallbacks<T, Txt> + SliderCallbacks<T, Txt>
+pub trait TypeChangeableCallbacks<T, Txt>:
+    CyclingCallbacks<T, Txt> + SliderCallbacks<T, Txt>
 where
     Txt: ProvideTextTy,
 {
     fn is_cycling(&self) -> bool;
 }
 
-trait IntSliderCallbacks<Txt>: SliderCallbacks<i32, Txt>
+pub trait IntSliderCallbacks<Txt>: SliderCallbacks<i32, Txt>
 where
     Txt: ProvideTextTy,
 {
@@ -53,24 +55,19 @@ where
     fn max_inclusive(&self) -> i32;
 
     fn to_slider_progress(&self, value: i32) -> f32 {
-        rimecraft_math::_map(
-            value as f32,
-            self.min_inclusive() as f32,
-            self.max_inclusive() as f32,
-            0.0,
-            1.0,
+        (value as f32).map(
+            self.min_inclusive() as f32..self.max_inclusive() as f32,
+            0.0..1.0,
         )
     }
 
     fn to_value(&self, slider_progress: f32) -> i32 {
-        rimecraft_math::_map(
-            slider_progress,
-            0.0,
-            1.0,
-            self.min_inclusive() as f32,
-            self.max_inclusive() as f32,
-        )
-        .floor() as i32
+        slider_progress
+            .map(
+                0.0..1.0,
+                self.min_inclusive() as f32..self.max_inclusive() as f32,
+            )
+            .floor() as i32
     }
 
     fn i32_validate(&self, value: Option<i32>) -> Option<i32>;

@@ -1,12 +1,13 @@
-//! Minecraft game options
+//! Minecraft game options.
 
-//pub(crate) mod callbacks;
+pub(crate) mod callbacks;
 pub mod enums;
 pub mod tooltip_factory;
 
 use rimecraft_text::{ProvideTextTy, Text};
+use std::fmt::Debug;
 
-struct SimpleOption<T, Cx>
+pub struct SimpleOption<T, Cx>
 where
     Cx: ProvideTextTy,
 {
@@ -16,11 +17,26 @@ where
     change_callback: fn(T),
 }
 
+impl<Cx> Debug for SimpleOption<(), Cx>
+where
+    Cx: ProvideTextTy,
+    Cx::Content: Debug,
+    Cx::StyleExt: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SimpleOption")
+            .field("text", &self.text)
+            .field("value", &self.value)
+            .field("default", &self.default)
+            .finish()
+    }
+}
+
 impl<T, Txt> SimpleOption<T, Txt>
 where
     Txt: ProvideTextTy,
 {
-    fn set_value(&mut self, value: Option<T>) {
+    pub fn set_value(&mut self, value: Option<T>) {
         todo!()
     }
 }

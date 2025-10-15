@@ -36,11 +36,12 @@ where
     }
 
     fn i32_validate(&self, value: Option<i32>) -> Option<i32> {
-        value.map(|value| rimecraft_math::clamp(
-                value as f32,
-                <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::min_inclusive(self) as f32,
-                <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::max_inclusive(self) as f32,
-            ) as i32)
+        value.map(|value| {
+            value.clamp(
+                <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::min_inclusive(self),
+                <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::max_inclusive(self),
+            )
+        })
     }
 }
 
