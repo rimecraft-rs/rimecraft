@@ -1,37 +1,33 @@
+use rimecraft_fmt::Formatting;
+use style::Color;
+
 use crate::*;
 
-struct Content {
-    text: String,
-}
-
-impl From<&str> for Content {
-    #[inline]
-    fn from(value: &str) -> Self {
-        Self {
-            text: value.to_owned(),
-        }
-    }
-}
-
-impl Display for Content {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.text)
-    }
-}
-
 #[test]
-fn display() {
-    let content: Content = "Hello, world! ".into();
-    let mut text: RawText<_, ()> = content.into();
-    let mut sib: RawText<_, ()> = Content::from("Genshin Impact, ").into();
-    sib.push(Content::from("a game by miHoYo, ").into());
-    sib.push(Content::from("boot! ").into());
-    text.push(sib);
-    text.push(Content::from("opssw").into());
-
+fn color_serde() {
+    let color = Color::try_from(Formatting::Aqua).expect("expected to parse aqua color");
+    assert_eq!(color.name().to_string(), "aqua", "name should be 'aqua'");
     assert_eq!(
-        text.to_string(),
-        "Hello, world! Genshin Impact, a game by miHoYo, boot! opssw"
+        color
+            .name()
+            .parse::<Color>()
+            .expect("aqua should be parsed from string correctly"),
+        color,
+        "aqua should be parsed from string correctly"
+    );
+
+    let color: Color = color.rgb().into();
+    assert_ne!(
+        color.name().to_string(),
+        "aqua",
+        "name should not be 'aqua'"
+    );
+    assert_eq!(
+        color
+            .name()
+            .parse::<Color>()
+            .expect("rgb should be parsed from string correctly"),
+        color,
+        "rgb should be parsed from string correctly"
     );
 }

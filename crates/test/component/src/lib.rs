@@ -1,19 +1,22 @@
+#![allow(missing_docs)]
+#![cfg(test)]
+
 use std::sync::Arc;
 
-use bytes::{Buf, BufMut};
-use edcode2::{Decode, Encode};
-use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::RegistryKey;
+use component::{
+    Any, ComponentType, PacketCodec, RawErasedComponentType, SerdeCodec, changes::ComponentChanges,
+    map::ComponentMap,
+};
+use edcode2::{Buf, BufMut, Decode, Encode};
+use registry::{Registry, RegistryKey};
 use serde::{Deserialize, Serialize};
-
-use crate::{
-    changes::ComponentChanges, map::ComponentMap, ComponentType, PacketCodec,
-    RawErasedComponentType, SerdeCodec,
+use test_global::{
+    Id, LocalTestContext, OwnedLocalTestContext, TestContext,
+    integration::component::REGISTRY_ID,
+    local_cx::{LocalContextExt as _, edcode_codec, serde::DeserializeWithCx as _, serde_codec},
 };
 
-use test_global::TestContext as Context;
-
-type Id = <Context as ProvideIdTy>::Id;
+type Context = TestContext;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct Foo {
@@ -43,73 +46,94 @@ where
     }
 }
 
-const PACKET_CODEC_EDCODE: PacketCodec<'static, Foo> = crate::packet_codec_edcode();
-const PACKET_CODEC_NBT: PacketCodec<'static, Foo> = crate::packet_codec_nbt::<'_, _, Context>();
-const SERDE_CODEC: SerdeCodec<'static, Foo> = crate::serde_codec();
+const fn packet_codec_edcode<'a>() -> PacketCodec<'a, Foo, LocalTestContext<'a>> {
+    edcode_codec!(Local<LocalTestContext<'a>> Foo: Any + 'a)
+}
+
+const fn packet_codec_nbt<'a>() -> PacketCodec<'a, Foo, LocalTestContext<'a>> {
+    edcode_codec!(Nbt<Context> Foo: Any + 'a)
+}
+
+const fn serde_codec<'a>() -> SerdeCodec<'a, Foo, LocalTestContext<'a>> {
+    serde_codec!(Local<LocalTestContext<'a>> Foo: Any + 'a)
+}
 
 #[test]
 #[should_panic]
 fn type_builder_no_edcode() {
-    let _ty = ComponentType::<'static, Foo>::builder::<Context>().build();
+    let _ty = ComponentType::<'static, Foo, Context>::builder().build();
 }
 
 #[test]
 fn type_transient_check() {
-    let ty = ComponentType::<'static, Foo>::builder::<Context>()
-        .packet_codec(&PACKET_CODEC_EDCODE)
+    let ty = ComponentType::<'_, Foo, Context>::builder()
+        .packet_codec(packet_codec_edcode())
         .build();
     assert!(ty.is_transient());
 
-    let ty = ComponentType::<'static, Foo>::builder::<Context>()
-        .packet_codec(&PACKET_CODEC_EDCODE)
-        .serde_codec(&SERDE_CODEC)
+    let ty = ComponentType::<'_, Foo, Context>::builder()
+        .packet_codec(packet_codec_edcode())
+        .serde_codec(serde_codec())
         .build();
     assert!(!ty.is_transient());
 }
 
-const TYPE_TRANSIENT_EDCODE: ComponentType<'static, Foo> =
-    ComponentType::<'static, Foo>::builder::<Context>()
-        .packet_codec(&PACKET_CODEC_EDCODE)
-        .build();
-const TYPE_TRANSIENT_EDCODE_KEY: RegistryKey<Id, RawErasedComponentType<'static, Context>> =
-    registry_key("foo_transient_edcode");
-
-const TYPE_PERSISTENT: ComponentType<'static, Foo> =
-    ComponentType::<'static, Foo>::builder::<Context>()
-        .packet_codec(&PACKET_CODEC_NBT)
-        .serde_codec(&SERDE_CODEC)
-        .build();
-const TYPE_PERSISTENT_KEY: RegistryKey<Id, RawErasedComponentType<'static, Context>> =
-    registry_key("foo_persistent");
-
-const fn registry_key(
-    name: &'static str,
-) -> RegistryKey<Id, RawErasedComponentType<'static, Context>> {
-    RegistryKey::new(crate::test_global_integration::REGISTRY_ID, unsafe {
-        Id::const_new("test", name)
-    })
+const fn type_transient_edcode<'a>() -> ComponentType<'a, Foo, Context> {
+    ComponentType::<'_, Foo, Context>::builder()
+        .packet_codec(packet_codec_edcode())
+        .build()
+}
+const fn type_transient_edcode_key<'a>() -> RegistryKey<Id, RawErasedComponentType<'a, Context>> {
+    registry_key("foo_transient_edcode")
 }
 
-fn init_registry() {
-    crate::test_global_integration::peek_registry_mut(|registry| {
-        registry
-            .register(TYPE_TRANSIENT_EDCODE_KEY, (&TYPE_TRANSIENT_EDCODE).into())
-            .expect("register failed");
-        registry
-            .register(TYPE_PERSISTENT_KEY, (&TYPE_PERSISTENT).into())
-            .expect("register failed");
-    });
-    crate::test_global_integration::init_registry();
+const fn type_persistent<'a>() -> ComponentType<'a, Foo, Context> {
+    ComponentType::<'_, Foo, Context>::builder()
+        .packet_codec(packet_codec_nbt())
+        .serde_codec(serde_codec())
+        .build()
+}
+const fn type_persistent_key<'a>() -> RegistryKey<Id, RawErasedComponentType<'a, Context>> {
+    registry_key("foo_persistent")
+}
+
+const fn registry_key<'a>(
+    name: &'static str,
+) -> RegistryKey<Id, RawErasedComponentType<'a, Context>> {
+    RegistryKey::new(REGISTRY_ID, unsafe { Id::const_new("test", name) })
+}
+
+fn init_registry<'a>() -> Registry<Id, RawErasedComponentType<'a, Context>> {
+    let mut registry = test_global::integration::component::default_components_registry_builder();
+    registry
+        .register(
+            type_transient_edcode_key(),
+            (&type_transient_edcode()).into(),
+        )
+        .expect("register failed");
+    registry
+        .register(type_persistent_key(), (&type_persistent()).into())
+        .expect("register failed");
+
+    registry.into()
+}
+
+fn init_context<'a>() -> OwnedLocalTestContext<'a> {
+    let mut cx = OwnedLocalTestContext::default();
+    let reg_components = init_registry();
+    cx.reg_components = reg_components;
+    cx
 }
 
 #[test]
 fn built_map() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.reg_components;
+
     let edcode_ty = reg
-        .get(&TYPE_TRANSIENT_EDCODE_KEY)
+        .get(&type_transient_edcode_key())
         .expect("invalid registry");
-    let persistent_ty = reg.get(&TYPE_PERSISTENT_KEY).expect("invalid registry");
+    let persistent_ty = reg.get(&type_persistent_key()).expect("invalid registry");
 
     let mut builder = ComponentMap::builder();
     builder.insert(
@@ -139,25 +163,25 @@ fn built_map() {
     assert!(map.changes().is_none());
 
     assert_eq!(
-        unsafe { map.get(&TYPE_TRANSIENT_EDCODE) }
+        unsafe { map.get(&type_transient_edcode()) }
             .expect("missing edcode_ty")
             .value,
         514,
         "edcode_ty value mismatch"
     );
     assert_eq!(
-        unsafe { map.get(&TYPE_PERSISTENT) }
+        unsafe { map.get(&type_persistent()) }
             .expect("missing persistent_ty")
             .value,
         1919,
         "persistent_ty value mismatch"
     );
 
-    unsafe { map.get_mut(&TYPE_TRANSIENT_EDCODE) }
+    unsafe { map.get_mut(&type_transient_edcode()) }
         .expect("missing edcode_ty")
         .value = 114;
     assert_eq!(
-        unsafe { map.get(&TYPE_TRANSIENT_EDCODE) }
+        unsafe { map.get(&type_transient_edcode()) }
             .expect("missing edcode_ty")
             .value,
         114,
@@ -167,12 +191,13 @@ fn built_map() {
 
 #[test]
 fn iter_map() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.reg_components;
+
     let edcode_ty = reg
-        .get(&TYPE_TRANSIENT_EDCODE_KEY)
+        .get(&type_transient_edcode_key())
         .expect("invalid registry");
-    let persistent_ty = reg.get(&TYPE_PERSISTENT_KEY).expect("invalid registry");
+    let persistent_ty = reg.get(&type_persistent_key()).expect("invalid registry");
 
     let mut builder = ComponentMap::builder();
     builder.insert(
@@ -196,7 +221,7 @@ fn iter_map() {
     assert_eq!(iter.size_hint(), (2, Some(2)));
     assert_eq!(iter.len(), 2);
     for (ty, obj) in iter {
-        let obj = unsafe { obj.downcast_ref::<Foo>() }.expect("downcast failed");
+        let obj = unsafe { <dyn Any>::downcast_ref::<Foo>(obj) }.expect("downcast failed");
         if ty == edcode_ty {
             assert_eq!(obj.value, 114);
         } else if ty == persistent_ty {
@@ -212,7 +237,7 @@ fn iter_map() {
     let mut patched = ComponentMap::arc_new(arc);
     unsafe {
         patched
-            .remove(&TYPE_PERSISTENT)
+            .remove(&type_persistent())
             .expect("remove persistent component failed");
         patched.insert(
             persistent_ty,
@@ -227,7 +252,7 @@ fn iter_map() {
         assert_eq!(iter.size_hint(), (2, Some(2)));
         assert_eq!(iter.len(), 2);
         for (ty, obj) in iter {
-            let obj = obj.downcast_ref::<Foo>().expect("downcast failed");
+            let obj = <dyn Any>::downcast_ref::<Foo>(obj).expect("downcast failed");
             if ty == edcode_ty {
                 assert_eq!(obj.value, 114);
             } else if ty == persistent_ty {
@@ -243,12 +268,13 @@ fn iter_map() {
 
 #[test]
 fn patched_changes() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.reg_components;
+
     let edcode_ty = reg
-        .get(&TYPE_TRANSIENT_EDCODE_KEY)
+        .get(&type_transient_edcode_key())
         .expect("invalid registry");
-    let persistent_ty = reg.get(&TYPE_PERSISTENT_KEY).expect("invalid registry");
+    let persistent_ty = reg.get(&type_persistent_key()).expect("invalid registry");
 
     let mut builder = ComponentMap::builder();
     builder.insert(
@@ -270,7 +296,7 @@ fn patched_changes() {
     let mut patched = ComponentMap::arc_new(map.clone());
     unsafe {
         patched
-            .remove(&TYPE_TRANSIENT_EDCODE)
+            .remove(&type_transient_edcode())
             .expect("remove transient component failed");
         patched.insert(
             persistent_ty,
@@ -290,12 +316,13 @@ fn patched_changes() {
 
 #[test]
 fn map_serde() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.reg_components;
+
     let edcode_ty = reg
-        .get(&TYPE_TRANSIENT_EDCODE_KEY)
+        .get(&type_transient_edcode_key())
         .expect("invalid registry");
-    let persistent_ty = reg.get(&TYPE_PERSISTENT_KEY).expect("invalid registry");
+    let persistent_ty = reg.get(&type_persistent_key()).expect("invalid registry");
 
     let mut builder = ComponentMap::builder();
     builder.insert(
@@ -314,11 +341,13 @@ fn map_serde() {
     );
     let map = builder.build();
 
-    let buf = fastnbt::to_bytes(&map).expect("serialize failed");
-    let new_map =
-        fastnbt::from_bytes::<ComponentMap<'_, Context>>(&buf).expect("deserialize failed");
+    let buf = fastnbt::to_bytes(&cx.with(&map)).expect("serialize failed");
+    let new_map = ComponentMap::deserialize_with_cx(cx.with(
+        &mut fastnbt::de::Deserializer::from_bytes(&buf, fastnbt::DeOpts::new()),
+    ))
+    .expect("deserialize failed");
     assert_eq!(new_map.len(), 1, "map length not intended");
-    let obj = unsafe { new_map.get(&TYPE_PERSISTENT) }.expect("missing persistent_ty");
+    let obj = unsafe { new_map.get(&type_persistent()) }.expect("missing persistent_ty");
     assert_eq!(
         obj,
         &Foo {
@@ -330,12 +359,13 @@ fn map_serde() {
 
 #[test]
 fn changes_serde() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.reg_components;
+
     let edcode_ty = reg
-        .get(&TYPE_TRANSIENT_EDCODE_KEY)
+        .get(&type_transient_edcode_key())
         .expect("invalid registry");
-    let persistent_ty = reg.get(&TYPE_PERSISTENT_KEY).expect("invalid registry");
+    let persistent_ty = reg.get(&type_persistent_key()).expect("invalid registry");
 
     let mut builder = ComponentMap::builder();
     builder.insert(
@@ -359,7 +389,7 @@ fn changes_serde() {
         let mut patched = ComponentMap::arc_new(map.clone());
         unsafe {
             patched
-                .remove(&TYPE_TRANSIENT_EDCODE)
+                .remove(&type_transient_edcode())
                 .expect("remove transient component failed");
             patched.insert(
                 persistent_ty,
@@ -372,12 +402,14 @@ fn changes_serde() {
 
         let changes = patched.changes().expect("no changes");
 
-        let buf = fastnbt::to_bytes(&changes).expect("serialize failed");
-        let new_changes = fastnbt::from_bytes::<ComponentChanges<'_, 'static, Context>>(&buf)
-            .expect("deserialize failed");
+        let buf = fastnbt::to_bytes(&cx.with(&changes)).expect("serialize failed");
+        let new_changes = ComponentChanges::deserialize_with_cx(cx.with(
+            &mut fastnbt::de::Deserializer::from_bytes(&buf, fastnbt::DeOpts::new()),
+        ))
+        .expect("deserialize failed");
         assert_eq!(new_changes.len(), 1, "changes length not intended");
         assert_eq!(
-            unsafe { new_changes.get(&TYPE_PERSISTENT) }
+            unsafe { new_changes.get(&type_persistent()) }
                 .expect("missing persistent_ty")
                 .expect("persistent_ty is not removed")
                 .value,
@@ -390,18 +422,20 @@ fn changes_serde() {
         let mut patched = ComponentMap::arc_new(map.clone());
         unsafe {
             patched
-                .remove(&TYPE_PERSISTENT)
+                .remove(&type_persistent())
                 .expect("remove persistent component failed");
         }
 
         let changes = patched.changes().expect("no changes");
 
-        let buf = fastnbt::to_bytes(&changes).expect("serialize failed");
-        let new_changes = fastnbt::from_bytes::<ComponentChanges<'_, 'static, Context>>(&buf)
-            .expect("deserialize failed");
+        let buf = fastnbt::to_bytes(&cx.with(&changes)).expect("serialize failed");
+        let new_changes = ComponentChanges::deserialize_with_cx(cx.with(
+            &mut fastnbt::de::Deserializer::from_bytes(&buf, fastnbt::DeOpts::new()),
+        ))
+        .expect("deserialize failed");
         assert_eq!(new_changes.len(), 1, "changes length not intended");
         assert!(
-            unsafe { new_changes.get(&TYPE_PERSISTENT) }
+            unsafe { new_changes.get(&type_persistent()) }
                 .expect("missing persistent_ty")
                 .is_none(),
             "persistent_ty should be removed"
@@ -411,12 +445,13 @@ fn changes_serde() {
 
 #[test]
 fn changes_edcode() {
-    init_registry();
-    let reg = crate::test_global_integration::registry();
+    let cx = init_context();
+    let reg = &cx.reg_components;
+
     let edcode_ty = reg
-        .get(&TYPE_TRANSIENT_EDCODE_KEY)
+        .get(&type_transient_edcode_key())
         .expect("invalid registry");
-    let persistent_ty = reg.get(&TYPE_PERSISTENT_KEY).expect("invalid registry");
+    let persistent_ty = reg.get(&type_persistent_key()).expect("invalid registry");
 
     let mut builder = ComponentMap::builder();
     builder.insert(
@@ -438,7 +473,7 @@ fn changes_edcode() {
     let mut patched = ComponentMap::arc_new(map.clone());
     unsafe {
         patched
-            .remove(&TYPE_TRANSIENT_EDCODE)
+            .remove(&type_transient_edcode())
             .expect("remove transient component failed");
         patched.insert(
             persistent_ty,
@@ -452,18 +487,18 @@ fn changes_edcode() {
     let changes = patched.changes().expect("no changes");
 
     let mut buf = Vec::new();
-    changes.encode(&mut buf).expect("serialize failed");
+    changes.encode(cx.with(&mut buf)).expect("serialize failed");
     let new_changes =
-        ComponentChanges::<'_, 'static, Context>::decode(&buf[..]).expect("deserialize failed");
+        ComponentChanges::<'_, '_, Context>::decode(cx.with(&buf[..])).expect("deserialize failed");
     assert_eq!(new_changes.len(), 2, "changes length not intended");
     assert!(
-        unsafe { new_changes.get(&TYPE_TRANSIENT_EDCODE) }
+        unsafe { new_changes.get(&type_transient_edcode()) }
             .expect("missing edcode_ty")
             .is_none(),
         "edcode_ty is removed"
     );
     assert_eq!(
-        unsafe { new_changes.get(&TYPE_PERSISTENT) }
+        unsafe { new_changes.get(&type_persistent()) }
             .expect("missing persistent_ty")
             .expect("persistent_ty is not removed")
             .value,

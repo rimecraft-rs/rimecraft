@@ -99,8 +99,8 @@ where
                 _ => false,
             },
             (Ref::Strong(s1), Ref::Strong(s2)) => s1 == s2,
-            (Ref::Strong(s1), Ref::Weak(w2)) => w2.upgrade().map_or(false, |s2| *s2 == **s1),
-            (Ref::Weak(w1), Ref::Strong(s2)) => w1.upgrade().map_or(false, |s1| *s1 == **s2),
+            (Ref::Strong(s1), Ref::Weak(w2)) => w2.upgrade().is_some_and(|s2| *s2 == **s1),
+            (Ref::Weak(w1), Ref::Strong(s2)) => w1.upgrade().is_some_and(|s1| *s1 == **s2),
         }
     }
 }

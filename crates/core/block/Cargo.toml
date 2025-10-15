@@ -1,7 +1,7 @@
 [package]
 name = "rimecraft-block"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Minecraft block primitives"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
@@ -16,6 +16,7 @@ rimecraft-global-cx = { path = "../global-cx" }
 rimecraft-registry = { path = "../registry" }
 rimecraft-state = { path = "../state" }
 rimecraft-voxel-math = { path = "../../util/voxel-math" }
+dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 
 [features]
 

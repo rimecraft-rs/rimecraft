@@ -25,12 +25,12 @@ impl std::fmt::Display for Error {
                 )
             }
             Error::ColorValueOutOfRange(value) => {
-                write!(f, "the color value is out of range: {}", value)
+                write!(f, "the color value is out of range: {value}")
             }
             Error::InvalidColor(value) => {
-                write!(f, "the color is invalid: {}", value)
+                write!(f, "the color is invalid: {value}")
             }
-            Error::Formatting(err) => write!(f, "formatting error: {}", err),
+            Error::Formatting(err) => write!(f, "formatting error: {err}"),
         }
     }
 }

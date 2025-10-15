@@ -1,9 +1,10 @@
 //! Minecraft block primitives.
 
 use behave::ProvideLuminance;
+use dsyn::{DescriptorSet, HoldDescriptors};
 use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
-use rimecraft_registry::{ProvideRegistry, Reg};
-use rimecraft_state::{State, States, StatesMut};
+use rimecraft_registry::Reg;
+use rimecraft_state::{State, States};
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
@@ -20,6 +21,7 @@ where
     settings: Settings,
     states: States<'a, Cx::BlockStateExt>,
     _marker: PhantomData<Cx>,
+    descriptors: DescriptorSet<'static, 'a>,
 }
 
 impl<'a, Cx> RawBlock<'a, Cx>
@@ -28,11 +30,16 @@ where
 {
     /// Creates a new block with the given settings.
     #[inline]
-    pub const fn new(settings: Settings, states: States<'a, Cx::BlockStateExt>) -> Self {
+    pub const fn new(
+        settings: Settings,
+        states: States<'a, Cx::BlockStateExt>,
+        descriptors: DescriptorSet<'static, 'a>,
+    ) -> Self {
         Self {
             settings,
             states,
             _marker: PhantomData,
+            descriptors,
         }
     }
 
@@ -49,23 +56,13 @@ where
     }
 }
 
-impl<Cx> From<Settings> for RawBlock<'_, Cx>
+impl<'a, Cx> HoldDescriptors<'static, 'a> for RawBlock<'a, Cx>
 where
     Cx: ProvideBlockStateExtTy,
-    Cx::BlockStateExt: Default + Clone,
 {
-    fn from(settings: Settings) -> Self {
-        Self::new(settings, StatesMut::new(Default::default()).freeze())
-    }
-}
-
-impl<'r, K, Cx> ProvideRegistry<'r, K, Self> for RawBlock<'r, Cx>
-where
-    Cx: ProvideBlockStateExtTy + ProvideRegistry<'r, K, Self>,
-{
-    #[inline(always)]
-    fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
-        Cx::registry()
+    #[inline]
+    fn descriptors(&self) -> &DescriptorSet<'static, 'a> {
+        &self.descriptors
     }
 }
 
@@ -98,6 +95,7 @@ pub use Settings as BlockSettings;
 /// # MCJE Reference
 ///
 /// This is the equivalent of `net.minecraft.block.Block.STATE_IDS` in MCJE.
+#[deprecated = "this should be provided by local contexts"]
 pub trait ProvideStateIds: GlobalContext {
     /// The type of the state IDs.
     type List;
@@ -105,7 +103,6 @@ pub trait ProvideStateIds: GlobalContext {
     /// Returns the state IDs.
     fn state_ids() -> Self::List;
 }
-
 /// Global contexts providing block state extensions.
 pub trait ProvideBlockStateExtTy: ProvideIdTy {
     /// The type of the block state extension.
@@ -152,16 +149,15 @@ where
     }
 }
 
+impl<Cx> Copy for BlockState<'_, Cx> where Cx: ProvideBlockStateExtTy {}
+
 impl<Cx> Clone for BlockState<'_, Cx>
 where
     Cx: ProvideBlockStateExtTy,
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            block: self.block,
-            state: self.state,
-        }
+        *self
     }
 }
 

@@ -66,6 +66,10 @@ pub struct RefEntry<K, T> {
     pub(crate) key: Key<K, T>,
     pub(crate) value: Option<T>,
     pub(crate) tags: RwLock<HashSet<TagKey<K, T>>>,
+    pub(crate) is_default: bool,
+
+    #[cfg(feature = "marking-leaked")]
+    pub(crate) marker: marking::LeakedPtrMarker,
 }
 
 impl<K, T> RefEntry<K, T> {
@@ -94,6 +98,21 @@ impl<K, T> RefEntry<K, T> {
             inner: self.tags.read(),
         }
     }
+
+    /// Whether this entry is the default entry.
+    #[inline]
+    pub fn is_default(&self) -> bool {
+        self.is_default
+    }
+}
+
+#[cfg(feature = "marking-leaked")]
+impl<K, T> RefEntry<K, T> {
+    /// Gets the leaked marker of this registry.
+    #[inline]
+    pub fn marker_leaked(&self) -> marking::LeakedPtrMarker {
+        self.marker
+    }
 }
 
 /// Guard of tags.
@@ -120,7 +139,9 @@ impl<K: std::fmt::Debug, T> std::fmt::Debug for TagsGuard<'_, K, T> {
 mod serde {
     use std::hash::Hash;
 
-    use crate::ProvideRegistry;
+    use local_cx::{LocalContext, serde::DeserializeWithCx};
+
+    use crate::{Reg, Registry};
 
     use super::RefEntry;
 
@@ -138,20 +159,22 @@ mod serde {
         }
     }
 
-    impl<'a, 'de, K, T> serde::Deserialize<'de> for &'a RefEntry<K, T>
+    impl<'a, 'de, K, T: 'a, Cx> DeserializeWithCx<'de, Cx> for &'a RefEntry<K, T>
     where
-        K: serde::Deserialize<'de> + Hash + Eq + 'a,
-        T: ProvideRegistry<'a, K, T> + 'a,
+        K: DeserializeWithCx<'de, Cx> + Hash + Eq + 'a,
+        Cx: LocalContext<&'a Registry<K, T>>,
     {
-        /// Deserializes the registry entry using the ID.
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        fn deserialize_with_cx<D>(
+            deserializer: local_cx::WithLocalCx<D, Cx>,
+        ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
-            let id = K::deserialize(deserializer)?;
-            T::registry()
+            let cx = deserializer.local_cx;
+            let id = K::deserialize_with_cx(deserializer)?;
+            cx.acquire()
                 .get(&id)
-                .map(From::from)
+                .map(Reg::to_entry)
                 .ok_or_else(|| serde::de::Error::custom("unknown registry key"))
         }
     }
@@ -162,19 +185,23 @@ mod edcode {
     use std::{fmt::Display, hash::Hash};
 
     use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
+    use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 
-    use crate::{ProvideRegistry, Reg};
+    use crate::{Reg, Registry};
 
     use super::{Entry, RefEntry};
 
-    impl<'r, K, T, B> Encode<B> for RefEntry<K, T>
+    impl<'r, K, T: 'r, Fw> Encode<Fw> for RefEntry<K, T>
     where
         K: Hash + Eq + Clone + Display + 'r,
-        T: ProvideRegistry<'r, K, T> + 'r,
-        B: BufMut,
+        Fw: ForwardToWithLocalCx<Forwarded: BufMut>,
+        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
     {
-        fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
-            let id = Reg::raw_id(T::registry().get(self.key()).ok_or_else(|| {
+        fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
+            let buf = buf.forward();
+            let registry = buf.local_cx.acquire();
+            let mut buf = buf.inner;
+            let id = Reg::to_raw_id(registry.get(self.key()).ok_or_else(|| {
                 edcode2::BoxedError::<'static>::from(format!(
                     "unknown registry id {}",
                     self.key().value()
@@ -185,32 +212,35 @@ mod edcode {
         }
     }
 
-    impl<'a, 'r, 'de, K, T, B> Decode<'de, B> for &'a RefEntry<K, T>
+    impl<'a, 'r, 'de, K: 'r, T: 'r, Fw> Decode<'de, Fw> for &'a RefEntry<K, T>
     where
         'r: 'a,
-        K: 'r,
-        T: ProvideRegistry<'r, K, T> + 'r,
-        B: Buf,
+        Fw: ForwardToWithLocalCx<Forwarded: Buf>,
+        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
     {
-        fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
-            let id = buf.get_variable::<u32>() as usize - 1;
-            T::registry()
+        fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
+            let mut buf = buf.forward();
+            let id = buf.inner.get_variable::<u32>() as usize - 1;
+            buf.local_cx
+                .acquire()
                 .of_raw(id)
-                .map(From::from)
-                .ok_or_else(|| format!("unknown registry id: {}", id).into())
+                .map(Reg::to_entry)
+                .ok_or_else(|| format!("unknown registry id: {id}").into())
         }
     }
 
-    impl<'r, K, T, B> Encode<B> for Entry<'_, K, T>
+    impl<'r, K, T, Fw> Encode<Fw> for Entry<'_, K, T>
     where
         K: Hash + Eq + Clone + Display + 'r,
-        T: ProvideRegistry<'r, K, T> + Encode<B> + 'r,
-        B: BufMut,
+        T: Encode<WithLocalCx<Fw::Forwarded, Fw::LocalCx>> + 'r,
+        Fw: ForwardToWithLocalCx<Forwarded: BufMut>,
+        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
     {
-        fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
+        fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
+            let mut buf = buf.forward();
             match self {
                 Entry::Direct(value) => {
-                    buf.put_variable(0i32);
+                    buf.inner.put_variable(0i32);
                     value.encode(buf)
                 }
                 Entry::Ref(entry) => entry.encode(buf),
@@ -218,21 +248,26 @@ mod edcode {
         }
     }
 
-    impl<'a, 'r, 'de, K, T, B> Decode<'de, B> for Entry<'a, K, T>
+    impl<'a, 'r, 'de, K, T, Fw> Decode<'de, Fw> for Entry<'a, K, T>
     where
         'r: 'a,
         K: 'r,
-        T: ProvideRegistry<'r, K, T> + Decode<'de, B> + 'r,
-        B: Buf,
+        T: Decode<'de, WithLocalCx<Fw::Forwarded, Fw::LocalCx>> + 'r,
+        Fw: ForwardToWithLocalCx<Forwarded: Buf>,
+        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
     {
-        fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
-            let id = buf.get_variable::<u32>() as usize;
+        fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
+            let mut buf = buf.forward();
+            let id = buf.inner.get_variable::<u32>() as usize;
             match id {
                 0 => T::decode(buf).map(Entry::Direct),
-                id => T::registry()
-                    .of_raw(id - 1)
-                    .map(|r| Entry::Ref(r.into()))
-                    .ok_or_else(|| format!("unknown registry id: {}", id - 1).into()),
+                id => {
+                    let registry = buf.local_cx.acquire();
+                    registry
+                        .of_raw(id - 1)
+                        .map(|r| Entry::Ref(Reg::to_entry(r)))
+                        .ok_or_else(|| format!("unknown registry id: {}", id - 1).into())
+                }
             }
         }
     }

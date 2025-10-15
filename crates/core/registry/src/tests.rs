@@ -5,19 +5,27 @@ fn register() {
     let mut registry: RegistryMut<&'static str, i32> =
         RegistryMut::new(Key::new("root", "integer"));
 
-    assert!(registry
-        .register(Key::new(registry.key().value(), "one"), 1)
-        .is_ok());
-    assert!(registry
-        .register(Key::new(registry.key().value(), "one"), 1)
-        .is_err());
+    assert!(
+        registry
+            .register(Key::new(registry.key().value(), "one"), 1)
+            .is_ok()
+    );
+    assert!(
+        registry
+            .register(Key::new(registry.key().value(), "one"), 1)
+            .is_err()
+    );
 
-    assert!(registry
-        .register(Key::new(registry.key().value(), "two"), 2)
-        .is_ok());
-    assert!(registry
-        .register(Key::new(registry.key().value(), "another_one"), 1)
-        .is_ok());
+    assert!(
+        registry
+            .register(Key::new(registry.key().value(), "two"), 2)
+            .is_ok()
+    );
+    assert!(
+        registry
+            .register(Key::new(registry.key().value(), "another_one"), 1)
+            .is_ok()
+    );
 }
 
 #[test]
@@ -25,12 +33,16 @@ fn freeze() {
     let mut registry: RegistryMut<&'static str, i32> =
         RegistryMut::new(Key::new("root", "integer"));
 
-    assert!(registry
-        .register(Key::new(registry.key().value(), "one"), 1)
-        .is_ok());
-    assert!(registry
-        .register(Key::new(registry.key().value(), "two"), 2)
-        .is_ok());
+    assert!(
+        registry
+            .register(Key::new(registry.key().value(), "one"), 1)
+            .is_ok()
+    );
+    assert!(
+        registry
+            .register(Key::new(registry.key().value(), "two"), 2)
+            .is_ok()
+    );
 
     let registry: Registry<_, _> = registry.into();
 

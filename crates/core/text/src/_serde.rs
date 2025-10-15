@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{style::Style, Plain, RawText};
+use crate::{Plain, RawText, style::Style};
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
@@ -14,11 +14,11 @@ enum Component<'a, T, StyleExt> {
     Integer(i64),
     Float(f64),
     Object {
-        #[serde(flatten)]
-        content: T,
+        extra: Vec<RawText<T, StyleExt>>,
         #[serde(flatten)]
         style: Style<StyleExt>,
-        extra: Vec<RawText<T, StyleExt>>,
+        #[serde(flatten)]
+        content: T,
     },
 }
 
@@ -34,17 +34,17 @@ where
     {
         #[derive(Serialize)]
         struct Component<'a, T, StyleExt> {
-            #[serde(flatten)]
-            content: &'a T,
+            extra: &'a [RawText<T, StyleExt>],
             #[serde(flatten)]
             style: &'a Style<StyleExt>,
-            sibs: &'a [RawText<T, StyleExt>],
+            #[serde(flatten)]
+            content: &'a T,
         }
 
         Component {
             content: &self.content,
             style: &self.style,
-            sibs: &self.sibs,
+            extra: &self.sibs,
         }
         .serialize(serializer)
     }

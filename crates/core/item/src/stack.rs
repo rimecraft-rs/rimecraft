@@ -1,17 +1,18 @@
 //! Item stack related types and traits.
 
 use component::map::ComponentMap;
+use local_cx::{LocalContext, ProvideLocalCxTy};
 use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::{ProvideRegistry, Reg};
+use rimecraft_registry::{Reg, Registry};
 
 use std::{fmt::Debug, marker::PhantomData};
 
 use crate::{Item, ItemSettings, ProvideSettingsTy, RawItem};
 
 /// Global context used for item stacks.
-pub trait ItemStackCx: ProvideIdTy + ProvideSettingsTy {}
+pub trait ItemStackCx: ProvideIdTy + ProvideSettingsTy + ProvideLocalCxTy {}
 
-impl<T> ItemStackCx for T where T: ProvideIdTy + ProvideSettingsTy {}
+impl<T> ItemStackCx for T where T: ProvideIdTy + ProvideSettingsTy + ProvideLocalCxTy {}
 
 /// A stack of items.
 ///
@@ -36,7 +37,7 @@ where
         Self::with_component(
             item,
             count,
-            ComponentMap::new(Reg::into_inner(item).settings().components()),
+            ComponentMap::new(Reg::to_value(item).settings().components()),
         )
     }
 
@@ -52,22 +53,29 @@ where
             components,
         }
     }
-}
 
-impl<'r, Cx> ItemStack<'r, Cx>
-where
-    Cx: ItemStackCx + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>,
-{
     /// Creates an empty item stack.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the registry does not have a default entry.
     #[inline]
-    pub fn empty() -> Self {
-        Self::new(Item::default(), 0)
+    pub fn empty<Local>(cx: Local) -> Self
+    where
+        Local: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>,
+    {
+        Self::new(
+            cx.acquire()
+                .default_entry()
+                .expect("default item not found in the registry"),
+            0,
+        )
     }
 
     /// Returns whether the stack is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.count == 0 || self.item == Item::default()
+        self.count == 0 || Reg::to_entry(self.item).is_default()
     }
 }
 
@@ -103,16 +111,6 @@ where
     #[inline]
     pub fn set_count(&mut self, count: u32) {
         self.count = count;
-    }
-}
-
-impl<'r, Cx> Default for ItemStack<'r, Cx>
-where
-    Cx: ItemStackCx + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>> + 'r,
-{
-    #[inline]
-    fn default() -> Self {
-        Self::new(Item::default(), 1)
     }
 }
 
@@ -176,60 +174,72 @@ where
 mod _serde {
     use std::{hash::Hash, str::FromStr};
 
-    use component::{changes::ComponentChanges, RawErasedComponentType};
+    use component::{RawErasedComponentType, changes::ComponentChanges};
+    use local_cx::{
+        LocalContextExt as _, WithLocalCx,
+        serde::{DeserializeWithCx, SerializeWithCx},
+    };
     use rimecraft_registry::entry::RefEntry;
     use serde::{Deserialize, Serialize};
 
     use super::*;
 
-    impl<Cx> Serialize for ItemStack<'_, Cx>
+    impl<'a, Cx> SerializeWithCx<Cx::LocalContext<'a>> for ItemStack<'a, Cx>
     where
         Cx: ItemStackCx<Id: Serialize>,
     {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        fn serialize_with_cx<S>(
+            &self,
+            serializer: WithLocalCx<S, Cx::LocalContext<'a>>,
+        ) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
             use serde::ser::SerializeStruct;
 
+            let cx = serializer.local_cx;
             let mut state = serializer
+                .inner
                 .serialize_struct("ItemStack", 2 + self.components.is_empty() as usize)?;
-            let entry: &RefEntry<_, _> = self.item.into();
+            let entry = Item::to_entry(self.item);
             state.serialize_field("id", entry)?;
             state.serialize_field("count", &self.count)?;
             state.serialize_field(
                 "components",
-                &self
-                    .components
-                    .changes()
-                    .ok_or_else(|| serde::ser::Error::custom("components not patched"))?,
+                &cx.with(
+                    self.components
+                        .changes()
+                        .ok_or_else(|| serde::ser::Error::custom("components not patched"))?,
+                ),
             )?;
             state.end()
         }
     }
 
-    impl<'r, 'de, Cx> Deserialize<'de> for ItemStack<'r, Cx>
+    impl<'r, 'de, Cx> DeserializeWithCx<'de, Cx::LocalContext<'r>> for ItemStack<'r, Cx>
     where
-        Cx: ItemStackCx
-            + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>
-            + ProvideRegistry<'r, Cx::Id, RawErasedComponentType<'r, Cx>>,
+        Cx: ItemStackCx,
         Cx::Id: Deserialize<'de> + FromStr + Hash + Eq,
+        Cx::LocalContext<'r>: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
+            + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>,
     {
-        #[inline]
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        fn deserialize_with_cx<D>(
+            deserializer: WithLocalCx<D, Cx::LocalContext<'r>>,
+        ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
-            struct Visitor<'r, Cx> {
+            struct Visitor<'r, Cx, L> {
                 _marker: PhantomData<fn(&'r Cx)>,
+                cx: L,
             }
 
-            impl<'r, 'de, Cx> serde::de::Visitor<'de> for Visitor<'r, Cx>
+            impl<'r, 'de, Cx> serde::de::Visitor<'de> for Visitor<'r, Cx, Cx::LocalContext<'r>>
             where
-                Cx: ItemStackCx
-                    + ProvideRegistry<'r, Cx::Id, RawItem<'r, Cx>>
-                    + ProvideRegistry<'r, Cx::Id, RawErasedComponentType<'r, Cx>>,
+                Cx: ItemStackCx,
                 Cx::Id: Deserialize<'de> + FromStr + Hash + Eq,
+                Cx::LocalContext<'r>: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
+                    + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>,
             {
                 type Value = ItemStack<'r, Cx>;
 
@@ -293,8 +303,18 @@ mod _serde {
                                 if id.is_some() {
                                     return Err(serde::de::Error::duplicate_field("id"));
                                 }
-                                let entry: &RefEntry<Cx::Id, RawItem<'r, Cx>> = map.next_value()?;
-                                id = Some(Cx::registry().of_raw(entry.raw_id()).unwrap());
+                                let entry: &RefEntry<Cx::Id, RawItem<'r, Cx>> = map
+                                    .next_value_seed(WithLocalCx {
+                                        inner: PhantomData,
+                                        local_cx: self.cx,
+                                    })?;
+                                id = Some(
+                                    std::convert::identity::<&Registry<_, RawItem<'_, _>>>(
+                                        self.cx.acquire(),
+                                    )
+                                    .of_raw(entry.raw_id())
+                                    .unwrap(),
+                                );
                             }
                             Field::Count => {
                                 count = map.next_value::<u32>()?;
@@ -303,7 +323,10 @@ mod _serde {
                                 if components.is_some() {
                                     return Err(serde::de::Error::duplicate_field("components"));
                                 }
-                                components = Some(map.next_value()?);
+                                components = Some(map.next_value_seed(WithLocalCx {
+                                    inner: PhantomData,
+                                    local_cx: self.cx,
+                                })?);
                             }
                         }
                     }
@@ -313,7 +336,7 @@ mod _serde {
                         item,
                         count,
                         components: ComponentMap::with_changes(
-                            Reg::into_inner(item).settings().components(),
+                            Reg::to_value(item).settings().components(),
                             components
                                 .ok_or_else(|| serde::de::Error::missing_field("components"))?,
                         ),
@@ -321,11 +344,13 @@ mod _serde {
                 }
             }
 
-            deserializer.deserialize_struct(
+            let cx = deserializer.local_cx;
+            deserializer.inner.deserialize_struct(
                 "ItemStack",
                 &["id", "count", "components"],
                 Visitor {
                     _marker: PhantomData,
+                    cx,
                 },
             )
         }

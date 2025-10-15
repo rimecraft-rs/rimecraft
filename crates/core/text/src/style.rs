@@ -8,10 +8,11 @@ use std::{
     str::FromStr,
 };
 
-use rgb::RGB8;
-use rimecraft_fmt::Formatting;
+use rgb::{RGB8, alt::ARGB8};
 
 use crate::Error;
+
+pub use rimecraft_fmt::Formatting;
 
 /// An RGB color of a text.
 #[derive(Debug, Clone, Copy)]
@@ -108,6 +109,54 @@ impl FromStr for Color {
     }
 }
 
+/// A shadow color, wrapping an [`ARGB8`] inside.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ShadowColor {
+    argb: ARGB8,
+}
+
+impl ShadowColor {
+    /// Creates a new shadow color from an [`ARGB8`].
+    #[inline]
+    pub const fn new(argb: ARGB8) -> Self {
+        Self { argb }
+    }
+
+    /// Gets the inner [`ARGB8`] of this shadow color.
+    #[inline]
+    pub const fn into_inner(self) -> ARGB8 {
+        self.argb
+    }
+}
+
+impl From<ARGB8> for ShadowColor {
+    #[inline]
+    fn from(argb: ARGB8) -> Self {
+        Self::new(argb)
+    }
+}
+
+impl From<ShadowColor> for ARGB8 {
+    #[inline]
+    fn from(color: ShadowColor) -> Self {
+        color.argb
+    }
+}
+
+impl From<u32> for ShadowColor {
+    #[inline]
+    fn from(value: u32) -> Self {
+        Self::new(ARGB8::from(value.to_be_bytes()))
+    }
+}
+
+impl From<ShadowColor> for u32 {
+    #[inline]
+    fn from(color: ShadowColor) -> Self {
+        u32::from_be_bytes(color.argb.into())
+    }
+}
+
 /// Style of a text, representing cosmetic attributes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 #[cfg_attr(
@@ -115,6 +164,7 @@ impl FromStr for Color {
     derive(serde::Serialize, serde::Deserialize),
     serde(rename_all = "camelCase")
 )]
+#[non_exhaustive]
 pub struct Style<Ext> {
     /// Color of the text.
     #[cfg_attr(
@@ -123,6 +173,14 @@ pub struct Style<Ext> {
         serde(default)
     )]
     pub color: Option<Color>,
+
+    /// Shadow color of the text.
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none"),
+        serde(default)
+    )]
+    pub shadow_color: Option<ShadowColor>,
 
     /// Whether the text is bold.
     #[cfg_attr(
@@ -178,6 +236,7 @@ where
     fn add(self, rhs: Self) -> Self::Output {
         Self {
             color: rhs.color.or(self.color),
+            shadow_color: rhs.shadow_color.or(self.shadow_color),
             bold: rhs.bold.or(self.bold),
             italic: rhs.italic.or(self.italic),
             underlined: rhs.underlined.or(self.underlined),
@@ -194,6 +253,7 @@ where
 {
     fn add_assign(&mut self, rhs: Self) {
         self.color = rhs.color.or(self.color);
+        self.shadow_color = rhs.shadow_color.or(self.shadow_color);
         self.bold = rhs.bold.or(self.bold);
         self.italic = rhs.italic.or(self.italic);
         self.underlined = rhs.underlined.or(self.underlined);
@@ -228,6 +288,38 @@ mod _serde {
             <&str>::deserialize(deserializer)?
                 .parse()
                 .map_err(serde::de::Error::custom)
+        }
+    }
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    #[allow(variant_size_differences)]
+    enum ARGB8Repr {
+        Int(u32),
+        Vec4f([f32; 4]),
+    }
+
+    impl Serialize for ShadowColor {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            u32::from(*self).serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for ShadowColor {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            Ok(match ARGB8Repr::deserialize(deserializer)? {
+                ARGB8Repr::Int(i) => i,
+                ARGB8Repr::Vec4f(arr) => {
+                    u32::from_be_bytes(arr.map(|f| (f * 255.0f32).floor() as u8))
+                }
+            }
+            .into())
         }
     }
 }

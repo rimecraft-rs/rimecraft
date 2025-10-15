@@ -5,6 +5,9 @@ use std::hash::Hash;
 pub mod container;
 mod iter;
 
+#[cfg(test)]
+mod tests;
+
 use ahash::AHashMap;
 pub use iter::Iter;
 use iter::IterImpl;
@@ -79,8 +82,7 @@ where
             Strategy::Singular => {
                 debug_assert_eq!(
                     bits_size, 0,
-                    "illegal index bits for SingularPalette: {}",
-                    bits_size
+                    "illegal index bits for SingularPalette: {bits_size}"
                 );
                 assert!(
                     entries.len() <= 1,
@@ -146,9 +148,7 @@ where
     /// Returns the ID of an object in the palette.
     pub fn index(&self, object: &T) -> Option<usize> {
         match &self.internal {
-            PaletteImpl::Singular(value) => {
-                value.as_ref().map_or(false, |v| v == object).then_some(0)
-            }
+            PaletteImpl::Singular(value) => (value.as_ref() == Some(object)).then_some(0),
             PaletteImpl::Array(array) => array.iter().position(|val| val == object),
             PaletteImpl::BiMap { reverse, .. } => reverse.get(object).copied(),
             PaletteImpl::Direct => Some(self.list.raw_id(object).unwrap_or(0)),
@@ -244,7 +244,7 @@ impl<L, T> Palette<L, T> {
     }
 
     /// Returns an iterator over the palette.
-    pub fn iter<'a, I>(&'a self) -> Iter<'_, I, T>
+    pub fn iter<'a, I>(&'a self) -> Iter<'a, I, T>
     where
         &'a L: IntoIterator<Item = &'a T, IntoIter = I>,
     {
@@ -289,7 +289,6 @@ where
 
 #[cfg(feature = "edcode")]
 mod _edcode {
-
     use std::io::{self, ErrorKind};
 
     use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
@@ -352,7 +351,7 @@ mod _edcode {
 
         #[inline]
         fn decode(_buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
-            Err("palettes does not support non-in-place decoding".into())
+            panic!("palettes do not support non-in-place decoding")
         }
 
         const SUPPORT_NON_IN_PLACE: bool = false;
@@ -408,7 +407,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::Uninitialized => write!(f, "use of an uninitialized palette"),
             Error::UnknownEntry => write!(f, "unknown entry"),
-            Error::UnknownId(id) => write!(f, "unknown id: {}", id),
+            Error::UnknownId(id) => write!(f, "unknown id: {id}"),
         }
     }
 }

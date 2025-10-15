@@ -2,39 +2,63 @@
 
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicU64, LazyLock},
+    sync::{LazyLock, atomic::AtomicU64},
     thread::ThreadId,
 };
 
 use global_cx::{
-    nbt::{ReadNbt, UpdateNbt, WriteNbt},
     GlobalContext, ProvideIdTy, ProvideNbtTy, ProvideVersionTy,
+    nbt::{ReadNbt, UpdateNbt, WriteNbt},
+};
+use local_cx::{
+    BaseLocalContext, LocalContextExt as _, ProvideLocalCxTy, WithLocalCx,
+    nbt::{ReadNbtWithCx, UpdateNbtWithCx, WriteNbtWithCx},
+    serde::{DeserializeWithCx, SerializeWithCx},
 };
 use parking_lot::Mutex;
 
-mod identifier;
+pub mod identifier;
 pub mod pool;
 
-#[doc(hidden)]
-pub use ::freezer as __priv_freezer;
-#[doc(hidden)]
-pub use ::identifier as __priv_identifier;
-
-#[cfg(feature = "registry")]
-#[doc(hidden)]
-pub use ::registry as __priv_registry;
+pub use global_cx;
+pub use local_cx;
 
 /// Integration with several Rimecraft crates.
 pub mod integration {
+    pub mod component;
     pub mod registry;
+    pub mod text;
 }
 
 pub use identifier::Id;
+#[cfg(feature = "component")]
+use registry::Registry;
 
 /// The global context.
 #[derive(Debug)]
 #[allow(clippy::exhaustive_enums)]
 pub enum TestContext {}
+
+/// The owned local context.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct OwnedLocalTestContext<'a> {
+    /// The component registry.
+    #[cfg(feature = "component")]
+    pub reg_components: Registry<Id, component::RawErasedComponentType<'a, TestContext>>,
+}
+
+impl Default for OwnedLocalTestContext<'_> {
+    fn default() -> Self {
+        Self {
+            #[cfg(feature = "component")]
+            reg_components: integration::component::default_components_registry_builder().into(),
+        }
+    }
+}
+
+/// The local context.
+pub type LocalTestContext<'a> = &'a OwnedLocalTestContext<'a>;
 
 unsafe impl GlobalContext for TestContext {}
 
@@ -45,6 +69,12 @@ impl ProvideIdTy for TestContext {
 impl ProvideVersionTy for TestContext {
     type Version = String;
 }
+
+impl ProvideLocalCxTy for TestContext {
+    type LocalContext<'cx> = LocalTestContext<'cx>;
+}
+
+impl BaseLocalContext for LocalTestContext<'_> {}
 
 /// A integer array.
 #[derive(Debug)]
@@ -78,17 +108,29 @@ impl From<NbtLongArray> for Box<[i64]> {
     }
 }
 
+/// A NBT compound.
+#[derive(Debug)]
+#[repr(transparent)]
+// Because the function `compound_to_deserializer` returns a `impl Deserializer<'_>`, we need to
+// use a value type here, instead of a hash map.
+pub struct NbtCompound(fastnbt::Value);
+
+impl Default for NbtCompound {
+    #[inline]
+    fn default() -> Self {
+        Self(fastnbt::Value::Compound(Default::default()))
+    }
+}
+
 impl ProvideNbtTy for TestContext {
-    // Because the function `compound_to_deserializer` returns a `impl Deserializer<'_>`, we need to
-    // use a value type here, instead of a hash map.
-    type Compound = fastnbt::Value;
+    type Compound = NbtCompound;
 
     type IntArray = NbtIntArray;
 
     type LongArray = NbtLongArray;
 
     fn compound_to_deserializer(compound: &Self::Compound) -> impl serde::Deserializer<'_> {
-        compound
+        &compound.0
     }
 }
 
@@ -100,8 +142,28 @@ where
     where
         W: std::io::Write,
     {
-        fastnbt::to_writer(writer, &value)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        fastnbt::to_writer(writer, &value).map_err(std::io::Error::other)
+    }
+}
+
+impl<T, Cx> WriteNbtWithCx<T, Cx> for TestContext
+where
+    T: SerializeWithCx<Cx>,
+    Cx: BaseLocalContext,
+{
+    fn write_nbt<W>(value: T, writer: WithLocalCx<W, Cx>) -> Result<(), std::io::Error>
+    where
+        W: std::io::Write,
+    {
+        let cx = writer.local_cx;
+        fastnbt::to_writer(
+            writer.inner,
+            &WithLocalCx {
+                inner: value,
+                local_cx: cx,
+            },
+        )
+        .map_err(std::io::Error::other)
     }
 }
 
@@ -113,7 +175,25 @@ where
     where
         R: std::io::Read,
     {
-        fastnbt::from_reader(reader).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        fastnbt::from_reader(reader).map_err(std::io::Error::other)
+    }
+}
+
+impl<T, Cx> ReadNbtWithCx<T, Cx> for TestContext
+where
+    T: for<'de> DeserializeWithCx<'de, Cx>,
+    Cx: BaseLocalContext,
+{
+    fn read_nbt<R>(reader: WithLocalCx<R, Cx>) -> Result<T, std::io::Error>
+    where
+        R: std::io::Read,
+    {
+        let cx = reader.local_cx;
+        T::deserialize_with_cx(cx.with(&mut fastnbt::de::Deserializer::from_reader(
+            reader.inner,
+            fastnbt::DeOpts::new(),
+        )))
+        .map_err(std::io::Error::other)
     }
 }
 
@@ -129,7 +209,28 @@ where
             value,
             &mut fastnbt::de::Deserializer::from_reader(reader, fastnbt::DeOpts::new()),
         )
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .map_err(std::io::Error::other)
+    }
+}
+
+impl<T, Cx> UpdateNbtWithCx<T, Cx> for TestContext
+where
+    T: for<'de> DeserializeWithCx<'de, Cx>,
+    Cx: BaseLocalContext,
+{
+    fn update_nbt<R>(value: &mut T, reader: WithLocalCx<R, Cx>) -> Result<(), std::io::Error>
+    where
+        R: std::io::Read,
+    {
+        let cx = reader.local_cx;
+        T::deserialize_in_place_with_cx(
+            value,
+            cx.with(&mut fastnbt::de::Deserializer::from_reader(
+                reader.inner,
+                fastnbt::DeOpts::new(),
+            )),
+        )
+        .map_err(std::io::Error::other)
     }
 }
 
@@ -146,7 +247,7 @@ impl TestId {
     /// Get the test ID of the current thread.
     ///
     /// If the test ID is not set for this thread, a new one will be generated.
-    /// See [`capture`] for setting the test ID manually.
+    /// See [`Self::capture`] for setting the test ID manually.
     pub fn current() -> Self {
         let thread_id = std::thread::current().id();
         let mut tests = TESTS.lock();

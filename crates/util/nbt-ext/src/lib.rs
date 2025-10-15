@@ -58,7 +58,7 @@ pub trait CompoundExt {
     /// Checks if the compound contains a tag with the specified key and matching type.
     #[inline]
     fn contains(&self, key: &str, tag: Tag) -> bool {
-        self.get_tag(key).map_or(false, |e| e == tag)
+        self.get_tag(key) == Some(tag)
     }
 
     /// Retrieves an `i8` value from the compound with the specified key.

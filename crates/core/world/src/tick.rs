@@ -139,11 +139,7 @@ where
     /// Compares ordered ticks by their trigger ticks, or else by [`Ord`].
     pub fn trigger_tick_cmp(&self, other: &Self) -> std::cmp::Ordering {
         let cmp = self.trigger_tick.cmp(&other.trigger_tick);
-        if cmp.is_eq() {
-            self.cmp(other)
-        } else {
-            cmp
-        }
+        if cmp.is_eq() { self.cmp(other) } else { cmp }
     }
 }
 

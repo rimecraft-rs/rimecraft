@@ -3,13 +3,15 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use bitflags::bitflags;
-use component::{map::ComponentMap, RawErasedComponentType};
+use component::{RawErasedComponentType, map::ComponentMap};
+use local_cx::{LocalContext, LocalContextExt as _, WithLocalCx, serde::SerializeWithCx};
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
-use rimecraft_registry::ProvideRegistry;
+use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
-use serde::{de::DeserializeSeed, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeSeed};
+use serde_private::de::ContentVisitor;
 
-use crate::{BlockEntity, DynRawBlockEntityType, RawBlockEntity};
+use crate::{BlockEntity, BlockEntityCx, DynErasedRawBlockEntityType, RawBlockEntity};
 
 bitflags! {
     /// Essential flags for serializing a block entity.
@@ -39,27 +41,31 @@ impl Default for Flags {
     }
 }
 
-/// Data flagged by [`SerializeFlags`], for serialization.
+/// Data flagged by [`Flags`], for serialization.
 #[derive(Debug)]
 pub struct Flagged<T>(pub T, pub Flags);
 
-impl<T, Cx> Serialize for Flagged<&RawBlockEntity<'_, T, Cx>>
+impl<'a, T, Cx> SerializeWithCx<Cx::LocalContext<'a>> for Flagged<&RawBlockEntity<'a, T, Cx>>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
     T: ?Sized + Serialize,
     Cx::Id: Serialize,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(
+        &self,
+        serializer: WithLocalCx<S, Cx::LocalContext<'a>>,
+    ) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         use serde::ser::SerializeMap;
-        let mut map = serializer.serialize_map(None)?;
+        let cx = serializer.local_cx;
+        let mut map = serializer.inner.serialize_map(None)?;
         for flag in self.1.iter() {
             match flag {
                 Flags::COMPONENTS => {
                     if !self.0.components.is_empty() {
-                        map.serialize_entry(&Field::Components, &self.0.components)?
+                        map.serialize_entry(&Field::Components, &cx.with(&self.0.components))?
                     }
                 }
                 Flags::ID => {
@@ -75,22 +81,25 @@ where
         }
         self.0
             .data
-            .serialize(serde::__private::ser::FlatMapSerializer(&mut map))?;
+            .serialize(serde_private::ser::FlatMapSerializer(&mut map))?;
         map.end()
     }
 }
 
-impl<T, Cx> Serialize for Flagged<RawBlockEntity<'_, T, Cx>>
+impl<'a, T, Cx> SerializeWithCx<Cx::LocalContext<'a>> for Flagged<RawBlockEntity<'a, T, Cx>>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
     T: Serialize,
     Cx::Id: Serialize,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(
+        &self,
+        serializer: WithLocalCx<S, Cx::LocalContext<'a>>,
+    ) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        Flagged(&self.0, self.1).serialize(serializer)
+        Flagged(&self.0, self.1).serialize_with_cx(serializer)
     }
 }
 
@@ -102,7 +111,7 @@ enum Field<'de> {
     Y,
     Z,
 
-    Other(serde::__private::de::Content<'de>),
+    Other(serde_private::de::Content<'de>),
 }
 
 impl Serialize for Field<'_> {
@@ -146,7 +155,7 @@ impl<'de> Deserialize<'de> for Field<'de> {
                     "x" => Ok(Field::X),
                     "y" => Ok(Field::Y),
                     "z" => Ok(Field::Z),
-                    other => Ok(Field::Other(serde::__private::de::Content::String(
+                    other => Ok(Field::Other(serde_private::de::Content::String(
                         other.to_owned(),
                     ))),
                 }
@@ -162,7 +171,7 @@ impl<'de> Deserialize<'de> for Field<'de> {
                     "x" => Ok(Field::X),
                     "y" => Ok(Field::Y),
                     "z" => Ok(Field::Z),
-                    other => Ok(Field::Other(serde::__private::de::Content::Str(other))),
+                    other => Ok(Field::Other(serde_private::de::Content::Str(other))),
                 }
             }
         }
@@ -171,23 +180,26 @@ impl<'de> Deserialize<'de> for Field<'de> {
     }
 }
 
-/// This serializes the block entity using default value of [`SerializeFlags`].
-impl<T, Cx> Serialize for RawBlockEntity<'_, T, Cx>
+/// This serializes the block entity using default value of [`Flags`].
+impl<'a, T, Cx> SerializeWithCx<Cx::LocalContext<'a>> for RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
     T: ?Sized + Serialize,
     Cx::Id: Serialize,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize_with_cx<S>(
+        &self,
+        serializer: WithLocalCx<S, Cx::LocalContext<'a>>,
+    ) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        Flagged(self, Flags::default()).serialize(serializer)
+        Flagged(self, Flags::default()).serialize_with_cx(serializer)
     }
 }
 
 /// Seed for deserializing a block state.
-pub struct Seed<'a, Cx>
+pub struct Seed<'a, Cx, Local>
 where
     Cx: ProvideBlockStateExtTy,
 {
@@ -195,13 +207,16 @@ where
     pub pos: BlockPos,
     /// State of the block.
     pub state: BlockState<'a, Cx>,
+
+    /// The local context.
+    pub local_cx: Local,
 }
 
-impl<'a, 'de, Cx> DeserializeSeed<'de> for Seed<'a, Cx>
+impl<'a, 'de, Cx> DeserializeSeed<'de> for Seed<'a, Cx, Cx::LocalContext<'a>>
 where
-    Cx: ProvideBlockStateExtTy<Id: Deserialize<'de>>
-        + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>
-        + ProvideRegistry<'a, Cx::Id, DynRawBlockEntityType<'a, Cx>>,
+    Cx: BlockEntityCx<'a, Id: Deserialize<'de>>,
+    Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
+        + LocalContext<&'a Registry<Cx::Id, DynErasedRawBlockEntityType<'a, Cx>>>,
 {
     type Value = Box<BlockEntity<'a, Cx>>;
 
@@ -209,15 +224,15 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        struct Visitor<'a, Cx>(BlockPos, BlockState<'a, Cx>)
+        struct Visitor<'a, Cx, L>(BlockPos, BlockState<'a, Cx>, L)
         where
             Cx: ProvideBlockStateExtTy;
 
-        impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
+        impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx, Cx::LocalContext<'a>>
         where
-            Cx: ProvideBlockStateExtTy<Id: Deserialize<'de>>
-                + ProvideRegistry<'a, Cx::Id, RawErasedComponentType<'a, Cx>>
-                + ProvideRegistry<'a, Cx::Id, DynRawBlockEntityType<'a, Cx>>,
+            Cx: BlockEntityCx<'a, Id: Deserialize<'de>>,
+            Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
+                + LocalContext<&'a Registry<Cx::Id, DynErasedRawBlockEntityType<'a, Cx>>>,
         {
             type Value = Box<BlockEntity<'a, Cx>>;
 
@@ -231,34 +246,44 @@ where
             {
                 let mut id: Option<Cx::Id> = None;
                 let mut components: Option<ComponentMap<'a, Cx>> = None;
-                use serde::__private::de::Content;
+                use serde_private::de::Content;
                 let mut collect: Vec<Option<(Content<'de>, Content<'de>)>> =
                     Vec::with_capacity(map.size_hint().map_or(0, |i| i - 1));
 
                 while let Some(field) = map.next_key::<Field<'de>>()? {
                     match field {
                         Field::Id => id = Some(map.next_value()?),
-                        Field::Components => components = Some(map.next_value()?),
+                        Field::Components => {
+                            components = Some(map.next_value_seed(WithLocalCx {
+                                inner: PhantomData,
+                                local_cx: self.2,
+                            })?)
+                        }
                         // Skip position information
                         Field::X | Field::Y | Field::Z => {}
-                        Field::Other(c) => collect.push(Some((c, map.next_value()?))),
+                        Field::Other(c) => {
+                            collect.push(Some((c, map.next_value_seed(ContentVisitor::new())?)))
+                        }
                     }
                 }
 
                 let id = id.ok_or_else(|| serde::de::Error::missing_field("id"))?;
                 let components = components.unwrap_or(ComponentMap::EMPTY);
 
-                let ty = <Cx as ProvideRegistry<'_, _, DynRawBlockEntityType<'_, _>>>::registry()
+                let ty =
+                    std::convert::identity::<&Registry<_, DynErasedRawBlockEntityType<'_, _>>>(
+                        self.2.acquire(),
+                    )
                     .get(&id)
                     .ok_or_else(|| {
-                        serde::de::Error::custom(format!("unknown block entity type {}", id))
+                        serde::de::Error::custom(format!("unknown block entity type {id}"))
                     })?;
                 let mut be = ty
-                    .instantiate(self.0, self.1)
+                    .erased_instantiate(self.0, self.1, ty)
                     .ok_or_else(|| serde::de::Error::custom("failed to create block entity"))?;
                 rimecraft_serde_update::Update::update(
                     &mut *be,
-                    serde::__private::de::FlatMapDeserializer(&mut collect, PhantomData),
+                    serde_private::de::FlatMapDeserializer(&mut collect, PhantomData),
                 )?;
                 be.components = components;
 
@@ -266,13 +291,13 @@ where
             }
         }
 
-        deserializer.deserialize_map(Visitor(self.pos, self.state.clone()))
+        deserializer.deserialize_map(Visitor(self.pos, self.state, self.local_cx))
     }
 }
 
-impl<'de, T, Cx> rimecraft_serde_update::Update<'de> for RawBlockEntity<'_, T, Cx>
+impl<'a, 'de, T, Cx> rimecraft_serde_update::Update<'de> for RawBlockEntity<'a, T, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: BlockEntityCx<'a>,
     T: ?Sized + rimecraft_serde_update::Update<'de>,
 {
     #[inline]
@@ -284,14 +309,14 @@ where
     }
 }
 
-impl<Cx> Debug for Seed<'_, Cx>
+impl<'a, Cx, L> Debug for Seed<'a, Cx, L>
 where
-    Cx: ProvideBlockStateExtTy<Id: Debug, BlockStateExt: Debug> + Debug,
+    Cx: BlockEntityCx<'a, Id: Debug, BlockStateExt: Debug> + Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DeserializeSeed")
             .field("pos", &self.pos)
             .field("state", &self.state)
-            .finish()
+            .finish_non_exhaustive()
     }
 }

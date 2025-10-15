@@ -1,41 +1,79 @@
 //! World chunks.
 
-use parking_lot::RwLock;
+use dsyn::HoldDescriptors as _;
+use glam::IVec3;
+use ident_hash::IHashMap;
+use local_cx::{LocalContext, dsyn_instanceof, dsyn_ty, dyn_cx::AsDynamicContext};
+use parking_lot::Mutex;
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
-    component::RawErasedComponentType, BlockEntity, DynRawBlockEntityType, ProvideBlockEntity,
+    BlockEntity, DynErasedRawBlockEntityType, component::RawErasedComponentType,
 };
-use rimecraft_chunk_palette::{Maybe, SimpleOwned};
 use rimecraft_fluid::{BsToFs, FluidState};
-use rimecraft_registry::ProvideRegistry;
-use rimecraft_voxel_math::{BlockPos, IVec3};
-use serde::{de::DeserializeSeed, Deserialize};
+use rimecraft_registry::Registry;
+use rimecraft_voxel_math::BlockPos;
+use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{
-    heightmap,
-    view::block::{
-        BlockLuminanceView, BlockView, BlockViewMut, LockFreeBlockView, LockedBlockViewMut,
-    },
-    Sealed,
+    DsynCache, Sealed, ServerWorld, World, behave::*, chunk::BaseChunkAccess, event::game_event,
+    heightmap, view::block::*,
 };
 
 use super::{
-    section::ComputeIndex, AsBaseChunk, AsBaseChunkMut, BaseChunk, BlockEntityCell, Chunk, ChunkCx,
-    ChunkMut, BORDER_LEN,
+    AsBaseChunk, AsBaseChunkMut, BORDER_LEN, BaseChunk, BlockEntityCell, Chunk, ChunkCx, ChunkMut,
+    section::ComputeIndex,
 };
 
-use std::{fmt::Debug, sync::Arc};
+use std::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+    sync::{Arc, Weak},
+};
+
+/// Local context bounds alias for most [`WorldChunk`] operations.
+///
+/// [`AsDynamicContext`] not included so you need to bound yourself.
+pub trait WorldChunkLocalCx<'w, Cx>:
+    LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
+    + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
+    + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
+    + LocalContext<dsyn::Type<BlockEntityOnBlockReplaced<Cx>>>
+    + LocalContext<dsyn::Type<BlockAlwaysReplaceState>>
+    + LocalContext<dsyn::Type<BlockOnStateReplaced<Cx>>>
+    + LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>
+where
+    Cx: ChunkCx<'w>,
+{
+}
+
+impl<'w, Cx, L> WorldChunkLocalCx<'w, Cx> for L
+where
+    Cx: ChunkCx<'w>,
+    L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityOnBlockReplaced<Cx>>>
+        + LocalContext<dsyn::Type<BlockAlwaysReplaceState>>
+        + LocalContext<dsyn::Type<BlockOnStateReplaced<Cx>>>
+        + LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>,
+{
+}
 
 /// Chunk for worlds.
 pub struct WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    /// The [`BaseChunk`].
+    /// The `BaseChunk`.
     pub base: BaseChunk<'w, Cx>,
 
     is_client: bool,
     loaded_to_world: bool,
+    game_event_dispatchers: Mutex<IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>,
+    world_ptr: Weak<World<'w, Cx>>,
+
+    local_cx: Cx::LocalContext<'w>,
+    dsyn_cache: Arc<DsynCache<'w, Cx>>,
 }
 
 impl<'w, Cx> Debug for WorldChunk<'w, Cx>
@@ -71,44 +109,46 @@ impl<'w, Cx> WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    /// Whether this chunk can tick [`BlockEntity`]s.
-    #[inline(always)]
-    fn can_tick_be_glob(&self) -> bool {
+    #[inline]
+    fn can_tick_block_entities(&self) -> bool {
         self.loaded_to_world || self.is_client
     }
 }
 
 impl<'w, Cx> WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>
-        + ProvideRegistry<'w, Cx::Id, RawErasedComponentType<'w, Cx>>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
 {
-    /// Peeks a [`BlockEntity`] at the target location, with given [`CreationType`].
-    pub fn peek_block_entity_typed<F, T>(&self, pos: BlockPos, pk: F, ty: CreationType) -> Option<T>
+    fn __peek_block_entity_typed<F, T>(
+        mut this: impl WorldChunkAccess<'w, Cx>,
+        pos: BlockPos,
+        pk: F,
+        ty: CreationType,
+    ) -> Option<T>
     where
         F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
     {
-        let be = self.base.block_entities.read().get(&pos).cloned();
+        let mut bes = this.reclaim().bca().write_block_entities();
+        let be = bes.get(&pos).cloned();
         if let Some(ref be) = be {
-            if be.read().is_removed() {
-                self.base.block_entities.write().remove(&pos);
+            if be.lock().is_removed() {
+                bes.remove(&pos);
                 return None;
             }
         } else {
-            if let Some(nbt) = self.base.block_entity_nbts.lock().remove(&pos) {
-                if let Some(be2) = self.load_block_entity_locked(pos, nbt) {
-                    return Some(pk(&be2));
-                }
+            drop(bes);
+            let nbt_opt = this.reclaim().bca().write_block_entity_nbts().remove(&pos);
+            if let Some(nbt) = nbt_opt
+                && let Some(be2) = Self::__load_block_entity(this.reclaim(), pos, nbt)
+            {
+                return Some(pk(&be2));
             }
-            if ty == CreationType::Immediate {
-                if let Some(be) = self.create_block_entity(pos) {
-                    self.add_block_entity_locked(be)
-                }
+            if ty == CreationType::Immediate
+                && let Some(be) = Self::__create_block_entity(this.reclaim(), pos)
+            {
+                Self::__add_block_entity(this.reclaim(), be)
             }
         }
 
@@ -116,6 +156,16 @@ where
     }
 
     /// Peeks a [`BlockEntity`] at the target location, with given [`CreationType`].
+    #[inline]
+    pub fn peek_block_entity_typed<F, T>(&self, pos: BlockPos, pk: F, ty: CreationType) -> Option<T>
+    where
+        F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
+    {
+        Self::__peek_block_entity_typed(self, pos, pk, ty)
+    }
+
+    /// Peeks a [`BlockEntity`] at the target location, with given [`CreationType`].
+    #[inline]
     pub fn peek_block_entity_typed_lf<F, T>(
         &mut self,
         pos: BlockPos,
@@ -125,60 +175,50 @@ where
     where
         F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
     {
-        let be = self.base.block_entities.get_mut().get(&pos).cloned();
-        if let Some(ref be) = be {
-            if be.read().is_removed() {
-                self.base.block_entities.get_mut().remove(&pos);
-                return None;
-            }
-        } else {
-            if let Some(nbt) = self.base.block_entity_nbts.get_mut().remove(&pos) {
-                if let Some(be2) = self.load_block_entity(pos, nbt) {
-                    return Some(pk(&be2));
-                }
-            }
-            if ty == CreationType::Immediate {
-                if let Some(be) = self.create_block_entity_lf(pos) {
-                    self.add_block_entity(be)
-                }
-            }
-        }
+        Self::__peek_block_entity_typed(self, pos, pk, ty)
+    }
 
-        be.as_ref().map(pk)
+    fn __add_block_entity(
+        this: impl WorldChunkAccess<'w, Cx>,
+        block_entity: Box<BlockEntity<'w, Cx>>,
+    ) {
+        Self::__set_block_entity(this, block_entity);
+        //TODO: Update tickers and game event listeners
     }
 
     /// Adds a block entity to this chunk.
+    #[inline]
     pub fn add_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>) {
-        self.set_block_entity(block_entity);
-        //TODO: Update tickers and game event listeners
+        Self::__add_block_entity(self, block_entity);
     }
 
     /// Adds a block entity to this chunk.
+    #[inline]
     pub fn add_block_entity_locked(&self, block_entity: Box<BlockEntity<'w, Cx>>) {
-        self.set_block_entity_locked(block_entity);
-        //TODO: Update tickers and game event listeners
+        Self::__add_block_entity(self, block_entity);
     }
 
-    fn load_block_entity(
-        &mut self,
+    fn __load_block_entity(
+        mut this: impl WorldChunkAccess<'w, Cx>,
         pos: BlockPos,
         nbt: Cx::Compound,
     ) -> Option<BlockEntityCell<'w, Cx>> {
         let be = DeserializeSeed::deserialize(
             rimecraft_block_entity::serde::Seed {
                 pos,
-                state: self.peek_block_state_lf(pos, BlockState::clone).unwrap(),
+                state: Self::__block_state(this.reclaim(), pos).unwrap(),
+                local_cx: this.wca_as_wc().local_cx,
             },
             Cx::compound_to_deserializer(&nbt),
         )
         .ok();
 
         if let Some(be) = be {
-            self.add_block_entity(be);
+            Self::__add_block_entity(this.reclaim(), be);
             Some(
-                self.base
-                    .block_entities
-                    .get_mut()
+                this.reclaim()
+                    .bca()
+                    .read_block_entities()
                     .get(&pos)
                     .expect("block entity should be inserted into this chunk")
                     .clone(),
@@ -188,49 +228,281 @@ where
         }
     }
 
-    fn load_block_entity_locked(
-        &self,
+    fn __create_block_entity(
+        mut this: impl WorldChunkAccess<'w, Cx>,
         pos: BlockPos,
-        nbt: Cx::Compound,
-    ) -> Option<BlockEntityCell<'w, Cx>> {
-        let be = DeserializeSeed::deserialize(
-            rimecraft_block_entity::serde::Seed {
-                pos,
-                state: self.peek_block_state(pos, BlockState::clone).unwrap(),
-            },
-            Cx::compound_to_deserializer(&nbt),
-        )
-        .ok();
+    ) -> Option<Box<BlockEntity<'w, Cx>>> {
+        let bs = Self::__block_state(this.reclaim(), pos)?;
+        dsyn_instanceof!(cached this.dsyn_cache(), this.local_cx(), &*bs.block => export BlockEntityConstructor<Cx>)
+                .map(|f| f(pos, bs, this.local_cx(), BlockEntityConstructorMarker))
+    }
 
-        if let Some(be) = be {
-            self.add_block_entity_locked(be);
-            Some(
-                self.base
-                    .block_entities
-                    .read()
-                    .get(&pos)
-                    .expect("block entity should be inserted into this chunk")
-                    .clone(),
-            )
+    fn __set_block_entity(
+        mut this: impl WorldChunkAccess<'w, Cx>,
+        mut block_entity: Box<BlockEntity<'w, Cx>>,
+    ) {
+        let dsyn_ty =
+            dsyn_ty!(cached this.dsyn_cache(), this.local_cx() => BlockEntityConstructor<Cx>);
+        if Self::__block_state(this.reclaim(), block_entity.pos())
+            .map(|bs| (*bs.block).descriptors().contains(dsyn_ty))
+            .unwrap_or_default()
+        {
+            block_entity.cancel_removal();
+            let mut be2 = this
+                .reclaim()
+                .bca()
+                .write_block_entities()
+                .insert(block_entity.pos(), Arc::new(Mutex::new(block_entity)));
+            if let Some(be) = &mut be2 {
+                if let Some(be) = Arc::get_mut(be) {
+                    be.get_mut().mark_removed();
+                } else {
+                    be.lock().mark_removed();
+                }
+            }
+        }
+    }
+
+    fn __remove_block_entity(
+        mut this: impl WorldChunkAccess<'w, Cx>,
+        pos: BlockPos,
+    ) -> Option<BlockEntityCell<'w, Cx>> {
+        if this.wca_as_wc().can_tick_block_entities() {
+            let mut be = this.reclaim().bca().write_block_entities().remove(&pos);
+            if let Some(be) = &mut be {
+                //TODO: remove game event listener
+                if let Some(raw) = Arc::get_mut(be) {
+                    raw.get_mut().mark_removed();
+                } else {
+                    be.lock().mark_removed();
+                }
+            }
+            //TODO: remove ticker
+            be
         } else {
             None
         }
     }
 
-    #[inline]
-    fn create_block_entity(&self, pos: BlockPos) -> Option<Box<BlockEntity<'w, Cx>>> {
-        self.peek_block_state(pos, |be| {
-            be.state.data().block_entity_constructor().map(|f| f(pos))
-        })
-        .flatten()
+    fn __peek_game_event_dispatcher<F, T>(
+        this: impl WorldChunkAccess<'w, Cx>,
+        y_section_coord: i32,
+        f: F,
+    ) -> Option<T>
+    where
+        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
+    {
+        if this.wca_as_wc().is_client {
+            None
+        } else {
+            let mut g = this.write_game_event_dispatchers();
+            if let Some(d) = g.get(&y_section_coord) {
+                Some(f(d))
+            } else {
+                let d = Arc::new(game_event::Dispatcher::new());
+                let result = f(&d);
+                g.insert(y_section_coord, d);
+                Some(result)
+            }
+        }
     }
 
-    #[inline]
-    fn create_block_entity_lf(&mut self, pos: BlockPos) -> Option<Box<BlockEntity<'w, Cx>>> {
-        self.peek_block_state_lf(pos, |be| {
-            be.state.data().block_entity_constructor().map(|f| f(pos))
-        })
-        .flatten()
+    fn __set_block_state(
+        mut this: impl WorldChunkAccess<'w, Cx>,
+        pos: BlockPos,
+        state: BlockState<'w, Cx>,
+        flags: SetBlockStateFlags,
+    ) -> Option<BlockState<'w, Cx>> {
+        #[cfg(feature = "tracing")]
+        let _span =
+            tracing::trace_span!("set block state", pos = %pos, block = %state.block).entered();
+
+        let local_cx = this.local_cx();
+        let is_client = this.wca_as_wc().is_client;
+
+        let section_index = this.wca_as_bc().height_limit.section_index(pos.y());
+        let mut section = this.reclaim().bca().write_chunk_section(section_index)?;
+
+        // Skip setting empty block (eg air) inside empty sections.
+        if section.is_empty() && state.block.settings().is_empty {
+            return None;
+        }
+
+        // Set state inside chunk section.
+        let pos_sec = pos.0 & (BORDER_LEN as i32 - 1);
+        let old_state =
+            section.set_block_state(pos_sec.x as u32, pos_sec.y as u32, pos_sec.z as u32, state);
+
+        drop(section);
+
+        // Aftermath
+
+        // Skip handling identical state
+        if std::ptr::eq(old_state.state, state.state) {
+            return None;
+        }
+
+        // Update height maps
+        // (vanilla) MOTION_BLOCKING,MOTION_BLOCKING_NO_LEAVES, OCEAN_FLOOR, OCEAN_FLOOR, WORLD_SURFACE.
+        for ty in <Cx::HeightmapType as heightmap::Type<'w, Cx>>::iter_block_update_types_wc() {
+            //SAFETY: This is safe because the `hms` is a valid pointer, and `__block_state` does not interact with heightmaps.
+            let mut this_short_life = unsafe { this.reclaim_unsafe() };
+            if let Some(hm) = this.reclaim().bca().write_heightmaps().get_mut(ty) {
+                hm.track_update(pos_sec.x, pos.y(), pos_sec.z, state, |pos, pred| {
+                    pred(Self::__block_state(this_short_life.reclaim(), pos))
+                });
+            }
+        }
+
+        //TODO: update chunk manager
+        //TODO: update lighting
+
+        // Remove old block entity if present
+        if old_state.block != state.block
+            && dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*old_state.block => BlockEntityConstructor<Cx>)
+        {
+            if !is_client
+                && !flags.contains(SetBlockStateFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK)
+            {
+                let ty =
+                    dsyn_ty!(cached this.dsyn_cache(), local_cx => BlockEntityOnBlockReplaced<Cx>);
+                let wa = this.wca_as_wc().world_ptr.clone();
+
+                Self::__peek_block_entity_typed(
+                    this.reclaim(),
+                    pos,
+                    |cell| {
+                        let mut guard = cell.lock();
+                        let f = (**guard.ty())
+                            .descriptors()
+                            .get(ty)
+                            .unwrap_or(default_block_entity_on_block_replaced());
+                        f(
+                            &mut **guard,
+                            &wa,
+                            pos,
+                            old_state,
+                            local_cx,
+                            BlockEntityOnBlockReplacedMarker,
+                        );
+                    },
+                    CreationType::Immediate,
+                );
+            }
+            Self::__remove_block_entity(this.reclaim(), pos);
+        }
+
+        // Generic callback
+        if !is_client
+            && (old_state.block != state.block
+                || {
+                    bool::from(
+                dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*state.block => export BlockAlwaysReplaceState)
+                    .unwrap_or(default_block_always_replace_state())
+                )
+                })
+            && (flags.contains(SetBlockStateFlags::NOTIFY_NEIGHBORS)
+                || flags.contains(SetBlockStateFlags::MOVED))
+            && let Some(server_w) = ServerWorld::downcast_arc_from_world(
+                this.wca_as_wc()
+                    .world_ptr
+                    .upgrade()
+                    .expect("world vanished"),
+            )
+        {
+            let f = dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*old_state.block => export BlockOnStateReplaced<Cx>)
+                .unwrap_or(default_block_on_state_replaced());
+            f(
+                old_state,
+                &server_w,
+                pos,
+                flags.contains(SetBlockStateFlags::MOVED),
+                local_cx,
+                BlockOnStateReplacedMarker,
+            );
+        }
+
+        let section = this.reclaim().bca().read_chunk_section(section_index)?;
+        #[allow(clippy::if_then_some_else_none)] // too complex
+        if section
+            .block_state(pos_sec.x as u32, pos_sec.y as u32, pos_sec.z as u32)
+            .block
+            == state.block
+        {
+            drop(section);
+            // Generic callback
+            if !is_client && !flags.contains(SetBlockStateFlags::SKIP_BlOCK_ADDED_CALLBACK) {
+                let f = dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*state.block => export BlockOnBlockAdded<Cx>)
+                    .unwrap_or(default_block_on_block_added());
+                f(
+                    state,
+                    old_state,
+                    &this.wca_as_wc().world_ptr,
+                    pos,
+                    flags.contains(SetBlockStateFlags::MOVED),
+                    local_cx,
+                    BlockOnBlockAddedMarker,
+                );
+            }
+
+            // Update block entity
+            if let Some(be_constructor) = dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*state.block => export BlockEntityConstructor<Cx>)
+            {
+                #[derive(Clone, Copy)]
+                enum PeekResult {
+                    Update,
+                    Remove,
+                    Create,
+                }
+
+                let result = Self::__peek_block_entity_typed(
+                    this.reclaim(),
+                    pos,
+                    |be| {
+                        let bg = be.lock();
+                        if bg.ty().erased_supports(state) {
+                            #[cfg(feature = "tracing")]
+                            tracing::warn!(
+                                "found mismatched block entity {} at {pos} for block {}",
+                                bg.ty(),
+                                state.block
+                            );
+
+                            PeekResult::Update
+                        } else {
+                            PeekResult::Remove
+                        }
+                    },
+                    CreationType::Check,
+                )
+                .unwrap_or(PeekResult::Create);
+
+                match result {
+                    PeekResult::Remove => {
+                        let _be = Self::__remove_block_entity(this.reclaim(), pos);
+                    }
+                    PeekResult::Update => {
+                        //TODO: set cached state for block entity
+                        //TODO: update ticker of block entity
+                    }
+                    _ => {}
+                }
+
+                if matches!(result, PeekResult::Create | PeekResult::Remove) {
+                    Self::__add_block_entity(
+                        this.reclaim(),
+                        be_constructor(pos, state, local_cx, BlockEntityConstructorMarker),
+                    );
+                }
+            }
+
+            //TODO: mark needs saving
+
+            Some(old_state)
+        } else {
+            // Can this happen at end?
+            None
+        }
     }
 }
 
@@ -254,56 +526,63 @@ where
     }
 }
 
+impl<'w, Cx> WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+{
+    fn __block_state(
+        this: impl WorldChunkAccess<'w, Cx>,
+        pos: BlockPos,
+    ) -> Option<BlockState<'w, Cx>> {
+        let index = this.wca_as_bc().height_limit.section_index(pos.y());
+        this.bca().read_chunk_section(index).and_then(|section| {
+            if section.is_empty() {
+                None
+            } else {
+                let IVec3 { x, y, z } = pos.0 & (BORDER_LEN - 1) as i32;
+                Some(section.block_state(x as u32, y as u32, z as u32))
+            }
+        })
+    }
+
+    fn __fluid_state(
+        this: impl WorldChunkAccess<'w, Cx>,
+        pos: BlockPos,
+    ) -> Option<FluidState<'w, Cx>> {
+        let bca = this.bca();
+        let index = bca.bca_as_bc().height_limit.section_index(pos.y());
+        bca.read_chunk_section(index).and_then(|section| {
+            if section.is_empty() {
+                None
+            } else {
+                let IVec3 { x, y, z } = pos.0 & (BORDER_LEN - 1) as i32;
+                Some(section.fluid_state(x as u32, y as u32, z as u32))
+            }
+        })
+    }
+}
+
 impl<'w, Cx> BlockView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>
-        + ProvideRegistry<'w, Cx::Id, RawErasedComponentType<'w, Cx>>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
-    Cx::Id: for<'de> Deserialize<'de>,
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
 {
-    fn peek_block_state<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
-    where
-        F: for<'s> FnOnce(&'s BlockState<'w, Cx>) -> T,
-    {
-        self.base
-            .section_array
-            .get(self.base.height_limit.section_index(pos.y()))
-            .and_then(|section| {
-                let rg = section.read();
-                if rg.is_empty() {
-                    None
-                } else {
-                    let IVec3 { x, y, z } = pos.0 & (BORDER_LEN - 1) as i32;
-                    rg.block_state(x as u32, y as u32, z as u32)
-                        .as_deref()
-                        .map(pk)
-                }
-            })
+    #[inline]
+    fn block_state(&self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
+        Self::__block_state(self, pos)
     }
 
-    fn peek_fluid_state<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
-    where
-        F: for<'s> FnOnce(&'s FluidState<'w, Cx>) -> T,
-    {
-        self.base
-            .section_array
-            .get(self.base.height_limit.section_index(pos.y()))
-            .and_then(|section| {
-                let rg = section.read();
-                if rg.is_empty() {
-                    None
-                } else {
-                    let IVec3 { x, y, z } = pos.0 & (BORDER_LEN - 1) as i32;
-                    rg.fluid_state(x as u32, y as u32, z as u32)
-                        .as_deref()
-                        .map(pk)
-                }
-            })
+    #[inline]
+    fn fluid_state(&self, pos: BlockPos) -> Option<FluidState<'w, Cx>> {
+        Self::__fluid_state(self, pos)
     }
+}
 
+impl<'w, Cx> BlockEntityView<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+{
     #[inline(always)]
     fn peek_block_entity<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
     where
@@ -315,54 +594,25 @@ where
 
 impl<'w, Cx> LockFreeBlockView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>
-        + ProvideRegistry<'w, Cx::Id, RawErasedComponentType<'w, Cx>>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
-    Cx::Id: for<'de> Deserialize<'de>,
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
 {
-    fn peek_block_state_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
-    where
-        F: for<'s> FnOnce(&'s BlockState<'w, Cx>) -> T,
-    {
-        self.base
-            .section_array
-            .get_mut(self.base.height_limit.section_index(pos.y()))
-            .and_then(|section| {
-                let rg = section.get_mut();
-                if rg.is_empty() {
-                    None
-                } else {
-                    let IVec3 { x, y, z } = pos.0 & (BORDER_LEN - 1) as i32;
-                    rg.block_state(x as u32, y as u32, z as u32)
-                        .as_deref()
-                        .map(pk)
-                }
-            })
+    #[inline]
+    fn block_state_lf(&mut self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
+        Self::__block_state(self, pos)
     }
 
-    fn peek_fluid_state_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
-    where
-        F: for<'s> FnOnce(&'s FluidState<'w, Cx>) -> T,
-    {
-        self.base
-            .section_array
-            .get_mut(self.base.height_limit.section_index(pos.y()))
-            .and_then(|section| {
-                let rg = section.get_mut();
-                if rg.is_empty() {
-                    None
-                } else {
-                    let IVec3 { x, y, z } = pos.0 & (BORDER_LEN - 1) as i32;
-                    rg.fluid_state(x as u32, y as u32, z as u32)
-                        .as_deref()
-                        .map(pk)
-                }
-            })
+    #[inline]
+    fn fluid_state_lf(&mut self, pos: BlockPos) -> Option<FluidState<'w, Cx>> {
+        Self::__fluid_state(self, pos)
     }
+}
 
+impl<'w, Cx> LockFreeBlockEntityView<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+{
     #[inline(always)]
     fn peek_block_entity_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
     where
@@ -374,169 +624,77 @@ where
 
 impl<'w, Cx> BlockViewMut<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>
-        + ProvideRegistry<'w, Cx::Id, RawErasedComponentType<'w, Cx>>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
 {
+    #[inline]
     fn set_block_state(
         &mut self,
         pos: BlockPos,
         state: BlockState<'w, Cx>,
-        moved: bool,
+        flags: SetBlockStateFlags,
     ) -> Option<BlockState<'w, Cx>> {
-        let section = self
-            .section_mut(self.height_limit().section_index(pos.y()))?
-            .get_mut();
-        let sec_is_empty = section.is_empty();
-        if sec_is_empty && state.block.settings().is_empty {
-            return None;
-        }
+        Self::__set_block_state(self, pos, state, flags)
+    }
+}
 
-        let bs;
-        let pos_alt = pos.0 & (BORDER_LEN as i32 - 1);
-        {
-            let IVec3 { x, y, z } = pos_alt;
-            bs = section
-                .set_block_state(x as u32, y as u32, z as u32, state.clone())
-                .map(|maybe| match maybe {
-                    Maybe::Borrowed(bs) => bs.clone(),
-                    Maybe::Owned(SimpleOwned(bs)) => bs,
-                });
-        }
-
-        if bs
-            .as_ref()
-            .map_or(false, |s| std::ptr::eq(s.state, state.state))
-        {
-            return None;
-        }
-
-        {
-            let IVec3 { x, y, z } = IVec3 {
-                y: pos.y(),
-                ..pos_alt
-            };
-            let this_ptr = self as *mut WorldChunk<'w, Cx>;
-            for ty in <Cx::HeightmapType as heightmap::Type<'w, Cx>>::iter_block_update_types_wc() {
-                // SAFETY: This is safe because the `hms` is a valid pointer, and `peek_block_state_lf` does not interact with heightmaps.
-                unsafe {
-                    if let Some(hm) = self.base.heightmaps.get_mut().get_mut(ty) {
-                        hm.track_update(x, y, z, &state, |pos, pred| {
-                            (*this_ptr)
-                                .peek_block_state_lf(pos, |bs| pred(Some(bs)))
-                                .unwrap_or_else(|| pred(None))
-                        });
-                    }
-                }
-            }
-        }
-
-        //TODO: update lighting
-        //TODO: update profiler
-
-        if let Some(ref bs) = bs {
-            let has_be = bs.state.data().has_block_entity();
-            if !self.is_client {
-                //TODO: call `on_state_replaced`.
-            } else if bs.block != state.block && has_be {
-                self.remove_block_entity(pos);
-            }
-        }
-
-        todo!()
+impl<'w, Cx> BlockEntityViewMut<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+{
+    #[inline]
+    fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>) {
+        Self::__set_block_entity(self, block_entity);
     }
 
-    fn set_block_entity(&mut self, mut block_entity: Box<BlockEntity<'w, Cx>>) {
-        if self
-            .peek_block_state_lf(block_entity.pos(), |bs| bs.state.data().has_block_entity())
-            .unwrap_or_default()
-        {
-            //TODO: set world for block entity if necessary.
-            block_entity.cancel_removal();
-            let mut be2 = self
-                .base
-                .block_entities
-                .get_mut()
-                .insert(block_entity.pos(), Arc::new(RwLock::new(block_entity)));
-            if let Some(be) = &mut be2 {
-                if let Some(be) = Arc::get_mut(be) {
-                    be.get_mut().mark_removed();
-                } else {
-                    be.write().mark_removed();
-                }
-            }
-        }
-    }
-
+    #[inline]
     fn remove_block_entity(&mut self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>> {
-        if self.can_tick_be_glob() {
-            let mut be = self.base.block_entities.get_mut().remove(&pos);
-            if let Some(be) = &mut be {
-                //TODO: remove game event listener
-                if let Some(raw) = Arc::get_mut(be) {
-                    raw.get_mut().mark_removed();
-                } else {
-                    be.write().mark_removed();
-                }
-            }
-            //TODO: remove ticker
-            be
-        } else {
-            None
-        }
+        Self::__remove_block_entity(self, pos)
     }
 }
 
 impl<'w, Cx> LockedBlockViewMut<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>
-        + ProvideRegistry<'w, Cx::Id, RawErasedComponentType<'w, Cx>>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
 {
+    #[inline]
     fn set_block_state_locked(
         &self,
         pos: BlockPos,
         state: BlockState<'w, Cx>,
-        moved: bool,
+        flags: SetBlockStateFlags,
     ) -> Option<BlockState<'w, Cx>> {
-        todo!()
+        Self::__set_block_state(self, pos, state, flags)
     }
 
-    fn set_block_entity_locked(&self, mut block_entity: Box<BlockEntity<'w, Cx>>) {
-        //TODO: set world for block entity if necessary.
-        block_entity.cancel_removal();
-        let mut be2 = self
-            .base
-            .block_entities
-            .write()
-            .insert(block_entity.pos(), Arc::new(RwLock::new(block_entity)));
-        if let Some(be) = &mut be2 {
-            be.write().mark_removed();
-        }
+    #[inline]
+    fn set_block_entity_locked(&self, block_entity: Box<BlockEntity<'w, Cx>>) {
+        Self::__set_block_entity(self, block_entity);
     }
+}
 
+impl<'w, Cx> LockedBlockEntityViewMut<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
+{
+    #[inline]
     fn remove_block_entity_locked(&self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>> {
-        todo!()
+        Self::__remove_block_entity(self, pos)
     }
 }
 
 impl<'w, Cx> BlockLuminanceView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>
-        + ProvideRegistry<'w, Cx::Id, RawErasedComponentType<'w, Cx>>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
 {
     fn luminance(&self, pos: BlockPos) -> crate::view::StateOption<u32> {
         todo!()
@@ -545,24 +703,151 @@ where
 
 impl<'w, Cx> Chunk<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>
-        + ProvideRegistry<'w, Cx::Id, RawErasedComponentType<'w, Cx>>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
 {
+    #[inline]
+    fn peek_game_event_dispatcher<F, T>(&self, y_section_coord: i32, f: F) -> Option<T>
+    where
+        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
+    {
+        Self::__peek_game_event_dispatcher(self, y_section_coord, f)
+    }
 }
 
 impl<'w, Cx> ChunkMut<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + ProvideRegistry<'w, Cx::Id, DynRawBlockEntityType<'w, Cx>>
-        + ProvideRegistry<'w, Cx::Id, RawErasedComponentType<'w, Cx>>,
-    Cx::BlockStateExt: ProvideBlockEntity<'w, Cx>,
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx> + AsDynamicContext,
 {
+    #[inline]
+    fn peek_game_event_dispatcher_lf<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>
+    where
+        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
+    {
+        Self::__peek_game_event_dispatcher(self, y_section_coord, f)
+    }
+}
+
+#[allow(unused)]
+trait WorldChunkAccess<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    fn wca_as_wc(&self) -> &WorldChunk<'w, Cx>;
+    fn wca_as_bc(&self) -> &BaseChunk<'w, Cx>;
+    fn bca(self) -> impl BaseChunkAccess<'w, Cx>;
+
+    fn reclaim(&mut self) -> impl WorldChunkAccess<'w, Cx>;
+    unsafe fn reclaim_unsafe(&mut self) -> impl WorldChunkAccess<'w, Cx> + 'w;
+
+    type GameEventDispatchersRead: Deref<
+        Target = IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>,
+    >;
+    type GameEventDispatchersWrite: DerefMut<
+        Target = IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>,
+    >;
+
+    fn read_game_event_dispatchers(self) -> Self::GameEventDispatchersRead;
+    fn write_game_event_dispatchers(self) -> Self::GameEventDispatchersWrite;
+
+    #[inline]
+    fn dsyn_cache(&self) -> &DsynCache<'w, Cx> {
+        &self.wca_as_wc().dsyn_cache
+    }
+
+    #[inline]
+    fn local_cx(&self) -> Cx::LocalContext<'w> {
+        self.wca_as_wc().local_cx
+    }
+}
+
+impl<'a, 'w, Cx> WorldChunkAccess<'w, Cx> for &'a WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    #[inline]
+    unsafe fn reclaim_unsafe(&mut self) -> impl WorldChunkAccess<'w, Cx> + 'w {
+        unsafe { &*std::ptr::from_ref(&**self) }
+    }
+
+    #[inline]
+    fn wca_as_wc(&self) -> &WorldChunk<'w, Cx> {
+        self
+    }
+
+    #[inline]
+    fn wca_as_bc(&self) -> &BaseChunk<'w, Cx> {
+        &self.base
+    }
+
+    #[inline]
+    fn bca(self) -> impl BaseChunkAccess<'w, Cx> {
+        &self.base
+    }
+
+    #[inline]
+    fn reclaim(&mut self) -> impl WorldChunkAccess<'w, Cx> {
+        *self
+    }
+
+    type GameEventDispatchersRead = Self::GameEventDispatchersWrite;
+    type GameEventDispatchersWrite =
+        parking_lot::MutexGuard<'a, IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>;
+
+    #[inline]
+    fn read_game_event_dispatchers(self) -> Self::GameEventDispatchersRead {
+        self.write_game_event_dispatchers()
+    }
+
+    #[inline]
+    fn write_game_event_dispatchers(self) -> Self::GameEventDispatchersWrite {
+        self.game_event_dispatchers.lock()
+    }
+}
+
+impl<'a, 'w, Cx> WorldChunkAccess<'w, Cx> for &'a mut WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    #[inline]
+    unsafe fn reclaim_unsafe(&mut self) -> impl WorldChunkAccess<'w, Cx> + 'w {
+        unsafe { &mut *std::ptr::from_mut(&mut **self) }
+    }
+
+    #[inline]
+    fn wca_as_wc(&self) -> &WorldChunk<'w, Cx> {
+        self
+    }
+
+    #[inline]
+    fn wca_as_bc(&self) -> &BaseChunk<'w, Cx> {
+        &self.base
+    }
+
+    #[inline]
+    fn bca(self) -> impl BaseChunkAccess<'w, Cx> {
+        &mut self.base
+    }
+
+    #[inline]
+    fn reclaim(&mut self) -> impl WorldChunkAccess<'w, Cx> {
+        &mut **self
+    }
+
+    type GameEventDispatchersRead = Self::GameEventDispatchersWrite;
+
+    type GameEventDispatchersWrite = &'a mut IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>;
+
+    #[inline]
+    fn read_game_event_dispatchers(self) -> Self::GameEventDispatchersRead {
+        self.write_game_event_dispatchers()
+    }
+
+    #[inline]
+    fn write_game_event_dispatchers(self) -> Self::GameEventDispatchersWrite {
+        self.game_event_dispatchers.get_mut()
+    }
 }

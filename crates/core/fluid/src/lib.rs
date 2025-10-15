@@ -2,8 +2,7 @@
 
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_maybe::Maybe;
-use rimecraft_registry::{ProvideRegistry, Reg};
+use rimecraft_registry::Reg;
 use rimecraft_state::{State, States};
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
@@ -45,16 +44,6 @@ where
     #[inline]
     pub fn settings(&self) -> &Settings {
         &self.settings
-    }
-}
-
-impl<'r, K, Cx> ProvideRegistry<'r, K, Self> for RawFluid<'r, Cx>
-where
-    Cx: ProvideFluidStateExtTy + ProvideRegistry<'r, K, Self>,
-{
-    #[inline(always)]
-    fn registry() -> &'r rimecraft_registry::Registry<K, Self> {
-        Cx::registry()
     }
 }
 
@@ -145,36 +134,24 @@ where
     Self: ProvideFluidStateExtTy + ProvideBlockStateExtTy,
 {
     /// Converts a block state to a fluid state.
-    fn block_to_fluid_state<'a>(
-        bs: Maybe<'a, BlockState<'w, Self>>,
-    ) -> Maybe<'a, FluidState<'w, Self>>;
+    fn block_to_fluid_state(bs: BlockState<'w, Self>) -> FluidState<'w, Self>;
 }
 
 /// Extenstions to the `Maybe<'_, IBlockState<'_, _>>`.
-pub trait BlockStateExt<'a, 'w, Cx>
+pub trait BlockStateExt<'w, Cx>
 where
     Cx: ProvideFluidStateExtTy,
 {
     /// Converts this block state to fluid state.
-    fn to_fluid_state(self) -> Maybe<'a, FluidState<'w, Cx>>;
+    fn to_fluid_state(self) -> FluidState<'w, Cx>;
 }
 
-impl<'a, 'w, Cx> BlockStateExt<'a, 'w, Cx> for Maybe<'a, BlockState<'w, Cx>>
+impl<'w, Cx> BlockStateExt<'w, Cx> for BlockState<'w, Cx>
 where
     Cx: BsToFs<'w>,
 {
     #[inline]
-    fn to_fluid_state(self) -> Maybe<'a, FluidState<'w, Cx>> {
+    fn to_fluid_state(self) -> FluidState<'w, Cx> {
         Cx::block_to_fluid_state(self)
-    }
-}
-
-impl<'a, 'w, Cx> BlockStateExt<'a, 'w, Cx> for &'a BlockState<'w, Cx>
-where
-    Cx: BsToFs<'w>,
-{
-    #[inline]
-    fn to_fluid_state(self) -> Maybe<'a, FluidState<'w, Cx>> {
-        Cx::block_to_fluid_state(Maybe::Borrowed(self))
     }
 }

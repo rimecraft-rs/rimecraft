@@ -1,0 +1,27 @@
+[package]
+name = "rimecraft-test-component"
+version = "0.1.0"
+edition = "2024"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "essential tests for rimecraft-component that require a context"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+component = { path = "../../core/component", package = "rimecraft-component" }
+test-global = { path = "../global", package = "rimecraft-test-global", features = [
+    "component",
+] }
+fastnbt = "2.6"
+serde = { version = "1.0", features = ["derive"] }
+edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2" }
+registry = { path = "../../core/registry", package = "rimecraft-registry" }
+
+[features]
+
+[lints]
+workspace = true

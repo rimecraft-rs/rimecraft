@@ -1,7 +1,7 @@
 [package]
 name = "rimecraft-interner"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Safe reference-counted interners"
 repository = "https://github.com/rimecraft-rs/rimecraft/"
@@ -12,7 +12,7 @@ categories = ["data-structure"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-dashmap = "5.5"
+dashmap = "6.1"
 
 [lints]
 workspace = true

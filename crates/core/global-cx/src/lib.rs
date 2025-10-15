@@ -21,6 +21,9 @@ pub mod nbt;
 #[cfg(feature = "edcode")]
 pub mod edcode;
 
+#[cfg(feature = "rand")]
+pub mod rand;
+
 /// Marker trait for global contexts.
 ///
 /// # Safety
@@ -46,7 +49,7 @@ pub trait ProvideVersionTy: GlobalContext {
 #[cfg(feature = "nbt")]
 pub trait ProvideNbtTy: GlobalContext {
     /// NBT compound type.
-    type Compound;
+    type Compound: Default;
 
     /// [`i32`] array type.
     type IntArray: Into<alloc::boxed::Box<[i32]>> + From<alloc::boxed::Box<[i32]>>;

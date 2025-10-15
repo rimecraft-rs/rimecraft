@@ -1,9 +1,13 @@
+//! Identifier wrappers.
+
 use std::{
     fmt::{Debug, Display},
     str::FromStr,
 };
 
 use serde::Serialize;
+
+pub use identifier as raw;
 
 /// An identifier.
 #[derive(PartialEq, Eq, Clone, Hash)]
@@ -16,9 +20,19 @@ impl Id {
     ///
     /// The namespace and path should be valid in vanilla minecraft.
     pub const unsafe fn const_new(namespace: &'static str, path: &'static str) -> Self {
+        unsafe {
+            Self(identifier::vanilla::Identifier::new(
+                identifier::vanilla::Namespace::new_unchecked(namespace),
+                identifier::vanilla::Path::new_unchecked(path),
+            ))
+        }
+    }
+
+    /// Creates a new identifier.
+    pub fn new(namespace: &str, path: &str) -> Self {
         Self(identifier::vanilla::Identifier::new(
-            identifier::vanilla::Namespace::new_unchecked(namespace),
-            identifier::vanilla::Path::new_unchecked(path),
+            identifier::vanilla::Namespace::new(namespace),
+            identifier::vanilla::Path::new(path),
         ))
     }
 }

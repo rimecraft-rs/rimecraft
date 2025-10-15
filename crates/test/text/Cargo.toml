@@ -1,0 +1,27 @@
+[package]
+name = "rimecraft-test-text"
+version = "0.1.0"
+edition = "2024"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "essential tests for rimecraft-text that require a context"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+test-global = { path = "../global", package = "rimecraft-test-global", features = [
+    "text",
+] }
+fastnbt = "2.6"
+serde = "1.0"
+text = { path = "../../core/text", package = "rimecraft-text", features = [
+    "serde",
+] }
+
+[features]
+
+[lints]
+workspace = true
