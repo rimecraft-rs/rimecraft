@@ -1,11 +1,18 @@
 use enum_iterator::Sequence;
 
-pub mod attack_indicator;
-pub mod cloud_render_mode;
-pub mod graphics_mode;
-pub mod narrator_mode;
-pub mod particles_mode;
-pub mod perspective;
+mod attack_indicator;
+mod cloud_render_mode;
+mod graphics_mode;
+mod narrator_mode;
+mod particles_mode;
+mod perspective;
+
+pub use attack_indicator::*;
+pub use cloud_render_mode::*;
+pub use graphics_mode::*;
+pub use narrator_mode::*;
+pub use particles_mode::*;
+pub use perspective::*;
 
 /// If a [`Sequence`], often enums, implements this, it will be allowed to get items directly through [`usize`] indexes. Wrapping behavior is configurable.
 pub trait ByUSizeId: Sequence {

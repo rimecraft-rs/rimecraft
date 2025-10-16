@@ -1,7 +1,7 @@
 //! Minecraft game options.
 
 pub(crate) mod callbacks;
-pub mod enums;
+pub mod content;
 pub mod tooltip_factory;
 
 use rimecraft_text::{ProvideTextTy, Text};
