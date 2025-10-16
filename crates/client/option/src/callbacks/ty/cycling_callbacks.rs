@@ -8,7 +8,7 @@ where
 {
     fn get_values(&self); // CyclingButtonWidget.Values<T>
 
-    fn value_setter(&self) -> Box<ValueSetter<T, Txt>> {
-        Box::new(|option, value| option.set_value(value))
+    fn value_setter(&self) -> &ValueSetter<T, Txt> {
+        &|option, value| option.set_value(value)
     }
 }

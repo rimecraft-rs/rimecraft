@@ -1,8 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use rimecraft_text::ProvideTextTy;
 
-use crate::{SimpleOption, callbacks::ValueSetter};
+use crate::{
+    SimpleOption,
+    callbacks::{Callbacks, ValueSetter, ty::CyclingCallbacks},
+};
 
 pub struct AlternateValuesSupportingCyclingCallbacks<K, T, Txt>
 where
@@ -61,5 +64,40 @@ where
             value_setter: Box::new(value_setter),
             _phantom: std::marker::PhantomData,
         }
+    }
+}
+
+impl<K, T, Txt> Callbacks<T, Txt> for AlternateValuesSupportingCyclingCallbacks<K, T, Txt>
+where
+    K: Hash + Eq,
+    Txt: ProvideTextTy,
+    T: PartialEq,
+{
+    fn validate(&self, value: Option<T>) -> Option<T> {
+        let key = (self.condition)();
+        match self.values.get(&key) {
+            Some(values) => match value {
+                Some(ref v) if values.contains(v) => value,
+                _ => None,
+            },
+            None => None,
+        }
+    }
+}
+
+impl<K, T, Txt> CyclingCallbacks<T, Txt> for AlternateValuesSupportingCyclingCallbacks<K, T, Txt>
+where
+    K: Hash + Eq,
+    Txt: ProvideTextTy,
+    T: PartialEq,
+{
+    fn get_values(&self) {
+        let key = (self.condition)();
+        self.values.get(&key);
+        todo!()
+    }
+
+    fn value_setter(&self) -> &ValueSetter<T, Txt> {
+        self.value_setter.as_ref()
     }
 }
