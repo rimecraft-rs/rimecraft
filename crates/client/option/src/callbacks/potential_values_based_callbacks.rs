@@ -1,4 +1,6 @@
-use super::*;
+use rimecraft_text::ProvideTextTy;
+
+use crate::callbacks::{Callbacks, ty::CyclingCallbacks};
 
 pub struct PotentialValuesBasedCallbacks<T> {
     values: Vec<T>,

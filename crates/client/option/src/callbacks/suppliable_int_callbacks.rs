@@ -1,4 +1,9 @@
-use super::*;
+use rimecraft_text::ProvideTextTy;
+
+use crate::callbacks::{
+    Callbacks,
+    ty::{CyclingCallbacks, IntSliderCallbacks, SliderCallbacks, TypeChangeableCallbacks},
+};
 
 pub struct SuppliableIntCallbacks {
     min_boundary: fn() -> i32,
