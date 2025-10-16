@@ -1,9 +1,11 @@
+mod lazy_cycling_callbacks;
 mod potential_values_based_callbacks;
 mod suppliable_int_callbacks;
 mod validating_int_slider_callbacks;
 
 pub mod ty;
 
+pub use lazy_cycling_callbacks::*;
 pub use potential_values_based_callbacks::*;
 pub use suppliable_int_callbacks::*;
 pub use validating_int_slider_callbacks::*;
