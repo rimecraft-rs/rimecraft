@@ -1,4 +1,4 @@
-//! Minecraft game options.
+//! Minecraft client game options.
 
 pub(crate) mod callbacks;
 pub mod content;
