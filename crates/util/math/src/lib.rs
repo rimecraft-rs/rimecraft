@@ -1,19 +1,15 @@
 //! Math library for Rimecraft.
 
-use std::ops::{Add, Div, Mul, Range, Sub};
+use std::ops::Range;
+
+use num_traits::Num;
 
 pub mod int;
 
 /// Extension trait for common mathematical operations.
 pub trait MathExt
 where
-    Self: Sized
-        + Copy
-        + PartialOrd
-        + Add<Output = Self>
-        + Sub<Output = Self>
-        + Mul<Output = Self>
-        + Div<Output = Self>,
+    Self: Copy + Num,
 {
     /// The type used as interpolation factors.
     type Factor: Sized + Copy;
