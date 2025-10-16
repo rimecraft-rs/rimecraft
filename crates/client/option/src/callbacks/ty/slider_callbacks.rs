@@ -9,4 +9,8 @@ where
     fn to_slider_progress(&self, value: T) -> f32;
 
     fn to_value(&self, slider_progress: f32) -> T;
+
+    fn applies_values_immediately(&self) -> bool {
+        true
+    }
 }

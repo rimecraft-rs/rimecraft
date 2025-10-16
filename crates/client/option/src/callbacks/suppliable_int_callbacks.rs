@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::{
@@ -6,8 +8,50 @@ use crate::callbacks::{
 };
 
 pub struct SuppliableIntCallbacks {
-    min_boundary: fn() -> i32,
-    max_boundary: fn() -> i32,
+    pub min_boundary: Box<dyn Fn() -> i32>,
+    pub max_boundary: Box<dyn Fn() -> i32>,
+}
+
+impl Debug for SuppliableIntCallbacks {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SuppliableIntCallbacks")
+            .field("min_boundary", &"<function>")
+            .field("max_boundary", &"<function>")
+            .finish()
+    }
+}
+
+impl SuppliableIntCallbacks {
+    pub fn new<Min, Max>(min_boundary: Min, max_boundary: Max) -> Self
+    where
+        Min: Fn() -> i32 + 'static,
+        Max: Fn() -> i32 + 'static,
+    {
+        Self {
+            min_boundary: Box::new(min_boundary),
+            max_boundary: Box::new(max_boundary),
+        }
+    }
+
+    pub fn with_fixed_min_boundary<F>(min: i32, max_boundary: F) -> Self
+    where
+        F: Fn() -> i32 + 'static,
+    {
+        Self {
+            min_boundary: Box::new(move || min),
+            max_boundary: Box::new(max_boundary),
+        }
+    }
+
+    pub fn with_fixed_max_boundary<F>(max: i32, min_boundary: F) -> Self
+    where
+        F: Fn() -> i32 + 'static,
+    {
+        Self {
+            min_boundary: Box::new(min_boundary),
+            max_boundary: Box::new(move || max),
+        }
+    }
 }
 
 impl<Txt> TypeChangeableCallbacks<i32, Txt> for SuppliableIntCallbacks

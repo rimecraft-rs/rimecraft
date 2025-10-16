@@ -7,6 +7,8 @@ pub mod tooltip_factory;
 use rimecraft_text::{ProvideTextTy, Text};
 use std::fmt::Debug;
 
+pub type ChangeCallback<T> = dyn Fn(Option<T>);
+
 pub struct SimpleOption<T, Cx>
 where
     Cx: ProvideTextTy,
@@ -14,7 +16,7 @@ where
     pub(crate) text: Text<Cx>,
     pub(crate) value: Option<T>,
     default: T,
-    change_callback: fn(T),
+    change_callback: Box<ChangeCallback<T>>,
 }
 
 impl<Cx> Debug for SimpleOption<(), Cx>

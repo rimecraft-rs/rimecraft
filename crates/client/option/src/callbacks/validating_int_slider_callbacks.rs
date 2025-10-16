@@ -6,9 +6,22 @@ use crate::callbacks::{
     ty::{IntSliderCallbacks, SliderCallbacks},
 };
 
+#[derive(Debug, Clone, Copy)]
 pub struct ValidatingIntSliderCallbacks {
     min: i32,
     max: i32,
+    pub applies_values_immediately: bool,
+}
+
+impl ValidatingIntSliderCallbacks {
+    pub fn new(min: i32, max: i32, applies_values_immediately: bool) -> Self {
+        assert!(min <= max, "min ({}) must be <= max ({})", min, max);
+        Self {
+            min,
+            max,
+            applies_values_immediately,
+        }
+    }
 }
 
 impl<Txt> IntSliderCallbacks<Txt> for ValidatingIntSliderCallbacks
@@ -23,8 +36,8 @@ where
         self.max
     }
 
-    fn i32_validate(&self, value: Option<i32>) -> Option<i32> {
-        value.filter(|&value| value >= self.min && value <= self.max)
+    fn applies_values_immediately(&self) -> bool {
+        self.applies_values_immediately
     }
 
     fn to_slider_progress(&self, value: i32) -> f32 {
@@ -51,6 +64,10 @@ where
                         + 1.0,
             )
             .floor() as i32
+    }
+
+    fn i32_validate(&self, value: Option<i32>) -> Option<i32> {
+        value.filter(|&value| value >= self.min && value <= self.max)
     }
 
     fn with_modifier<R, IR, RI, F, ToP, ToV>(

@@ -11,6 +11,10 @@ where
 
     fn max_inclusive(&self) -> i32;
 
+    fn applies_values_immediately(&self) -> bool {
+        true
+    }
+
     fn to_slider_progress(&self, value: i32) -> f32 {
         (value as f32 + 0.5)
             .map(

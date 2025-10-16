@@ -23,7 +23,7 @@ where
             .floor()
     }
 
-    fn i32_validate(&self, value: Option<f32>) -> Option<f32>;
+    fn f32_validate(&self, value: Option<f32>) -> Option<f32>;
 
     fn with_modifier<R, IR, RI, F, ToP, ToV>(
         &self,
@@ -84,7 +84,7 @@ where
         Impl {
             value_to_progress,
             progress_to_value,
-            i32_validate: |value| self.i32_validate(value),
+            i32_validate: |value| self.f32_validate(value),
             to_slider_progress: |value| DoubleSliderCallbacks::to_slider_progress(self, value),
             to_value: |value| DoubleSliderCallbacks::to_value(self, value),
         }
