@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["KrLite"]
 description = "Minecraft client game options"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
 
