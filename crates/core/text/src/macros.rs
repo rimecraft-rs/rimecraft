@@ -33,9 +33,12 @@ macro_rules! format_localization_key {
 /// ```
 /// iter_text! {
 ///     <StyleExt> where StyleExt: Clone;
-///         (c: char, style: Style<StyleExt>) => {
-///         std::iter::once((c.to_owned(), style.ext.clone()))
-///     }
+///     (c: char, style: Style<StyleExt>) -> StyleExt;
+///     std::iter::once(IterTextItem {
+///         index: 0,
+///         c: c.to_owned(),
+///         style: style.to_owned(),
+///     })
 /// }
 /// ```
 ///
@@ -44,17 +47,21 @@ macro_rules! format_localization_key {
 /// ```
 /// struct Impl<StyleExt> {
 ///     c: char,
-///     style: Style<StyleExt>,
+///     style: crate::Style<StyleExt>,
 /// }
 ///
 /// impl<StyleExt> crate::iter_text::IterText<StyleExt> for Impl<StyleExt>
 /// where
 ///     StyleExt: Clone,
 /// {
-///     fn iter_text(&self) -> impl Iterator<Item = (char, StyleExt)> + '_ {
+///     fn iter_text(&self) -> impl Iterator<Item = crate::iter_text::IterTextItem<StyleExt>> + '_ {
 ///         let c = &self.c;
 ///         let style = &self.style;
-///         std::iter::once((c.to_owned(), style.ext.clone()))
+///         std::iter::once(IterTextItem {
+///             index: 0,
+///             c: c.to_owned(),
+///             style: style.to_owned(),
+///         })
 ///     }
 /// }
 /// ```
