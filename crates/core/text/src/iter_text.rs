@@ -75,7 +75,7 @@ where
     }
 }
 
-pub fn formatted<StyleExt>(
+pub fn iter_formatted<StyleExt>(
     str: &str,
     start_index: usize,
     starting_style: Style<StyleExt>,
@@ -93,7 +93,7 @@ where
     }
 }
 
-pub fn formatted_unified<StyleExt>(
+pub fn iter_formatted_unified<StyleExt>(
     str: &str,
     start_index: usize,
     style: Style<StyleExt>,
@@ -101,17 +101,17 @@ pub fn formatted_unified<StyleExt>(
 where
     StyleExt: Clone,
 {
-    formatted(str, start_index, style.clone(), style)
+    iter_formatted(str, start_index, style.clone(), style)
 }
 
-pub fn formatted_unified_from_start<StyleExt>(
+pub fn iter_formatted_unified_from_start<StyleExt>(
     str: &str,
     style: Style<StyleExt>,
 ) -> impl IterText<StyleExt>
 where
     StyleExt: Clone,
 {
-    formatted_unified(str, 0, style)
+    iter_formatted_unified(str, 0, style)
 }
 
 fn format<StyleExt>(
@@ -158,4 +158,17 @@ where
         }
         None
     })
+}
+
+pub fn remove_formatting_codes(str: &str) -> String {
+    let iter = iter_formatted_unified_from_start(str, Style::default());
+    iter.iter_text()
+        .map(
+            |IterTextItem::<()> {
+                 index: _,
+                 c,
+                 style: _,
+             }| c,
+        )
+        .collect()
 }
