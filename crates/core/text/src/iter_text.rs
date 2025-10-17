@@ -32,11 +32,11 @@ where
 impl<T, Cx> IterText<Cx> for T
 where
     Cx: ProvideTextTy,
-    for<'a> &'a T: IntoIterator<Item = IterTextItem<Cx>> + Clone,
+    T: IntoIterator<Item = IterTextItem<Cx>> + Clone,
 {
     #[inline]
     fn iter_text(&self) -> impl Iterator<Item = IterTextItem<Cx>> + '_ {
-        self.into_iter()
+        self.clone().into_iter()
     }
 }
 
