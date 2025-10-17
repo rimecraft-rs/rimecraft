@@ -2,33 +2,43 @@ use rimecraft_fmt::Formatting;
 
 use crate::{Style, iter_text};
 
-pub trait IterText<StyleExt> {
-    fn iter_text(&self) -> impl Iterator<Item = (char, StyleExt)> + '_;
+pub struct IterTextItem<StyleExt> {
+    pub index: usize,
+    pub c: char,
+    pub style: Style<StyleExt>,
 }
 
-pub fn empty<StyleExt: 'static>() -> impl IterText<Style<StyleExt>> {
+pub trait IterText<StyleExt> {
+    fn iter_text(&self) -> impl Iterator<Item = IterTextItem<StyleExt>> + '_;
+}
+
+pub fn empty<StyleExt: 'static>() -> impl IterText<StyleExt> {
     iter_text! {
         <StyleExt> where StyleExt: 'static;
-        () -> Style<StyleExt>;
-        std::iter::empty::<(char, Style<StyleExt>)>()
+        () -> StyleExt;
+        std::iter::empty()
     }
 }
 
-pub fn styled<StyleExt>(c: char, style: Style<StyleExt>) -> impl IterText<Style<StyleExt>>
+pub fn styled<StyleExt>(c: char, style: Style<StyleExt>) -> impl IterText<StyleExt>
 where
     StyleExt: Clone,
 {
     iter_text! {
         <StyleExt> where StyleExt: Clone;
-        (c: char, style: Style<StyleExt>) -> Style<StyleExt>;
-        std::iter::once((c.to_owned(), style.clone()))
+        (c: char, style: Style<StyleExt>) -> StyleExt;
+        std::iter::once(IterTextItem {
+            index: 0,
+            c: c.to_owned(),
+            style: style.to_owned(),
+        })
     }
 }
 
 pub fn styled_forwards_visited_string<StyleExt>(
     s: &str,
     style: Style<StyleExt>,
-) -> impl IterText<Style<StyleExt>>
+) -> impl IterText<StyleExt>
 where
     StyleExt: Clone,
 {
@@ -36,15 +46,19 @@ where
 
     iter_text! {
         <StyleExt> where StyleExt: Clone;
-        (s: String, style: Style<StyleExt>) -> Style<StyleExt>;
-        s.chars().map(move |c| (c, style.clone()))
+        (s: String, style: Style<StyleExt>) -> StyleExt;
+        s.chars().enumerate().map(move |(i, c)| IterTextItem {
+            index: i,
+            c,
+            style: style.clone(),
+        })
     }
 }
 
 pub fn styled_backwards_visited_string<StyleExt>(
     s: &str,
     style: Style<StyleExt>,
-) -> impl IterText<Style<StyleExt>>
+) -> impl IterText<StyleExt>
 where
     StyleExt: Clone,
 {
@@ -52,8 +66,12 @@ where
 
     iter_text! {
         <StyleExt> where StyleExt: Clone;
-        (s: String, style: Style<StyleExt>) -> Style<StyleExt>;
-        s.chars().rev().map(move |c| (c, style.clone()))
+        (s: String, style: Style<StyleExt>) -> StyleExt;
+        s.chars().rev().enumerate().map(move |(i, c)| IterTextItem {
+            index: i,
+            c,
+            style: style.clone(),
+        })
     }
 }
 
@@ -62,7 +80,7 @@ pub fn formatted<StyleExt>(
     start_index: usize,
     starting_style: Style<StyleExt>,
     reset_style: Style<StyleExt>,
-) -> impl IterText<Style<StyleExt>>
+) -> impl IterText<StyleExt>
 where
     StyleExt: Clone,
 {
@@ -70,7 +88,7 @@ where
 
     iter_text! {
         <StyleExt> where StyleExt: Clone;
-        (s: String, start_index: usize, starting_style: Style<StyleExt>, reset_style: Style<StyleExt>) -> Style<StyleExt>;
+        (s: String, start_index: usize, starting_style: Style<StyleExt>, reset_style: Style<StyleExt>) -> StyleExt;
         format(s, start_index.to_owned(), starting_style.to_owned(), reset_style.to_owned())
     }
 }
@@ -79,7 +97,7 @@ pub fn formatted_unified<StyleExt>(
     str: &str,
     start_index: usize,
     style: Style<StyleExt>,
-) -> impl IterText<Style<StyleExt>>
+) -> impl IterText<StyleExt>
 where
     StyleExt: Clone,
 {
@@ -89,7 +107,7 @@ where
 pub fn formatted_unified_from_start<StyleExt>(
     str: &str,
     style: Style<StyleExt>,
-) -> impl IterText<Style<StyleExt>>
+) -> impl IterText<StyleExt>
 where
     StyleExt: Clone,
 {
@@ -101,7 +119,7 @@ fn format<StyleExt>(
     start_index: usize,
     starting_style: Style<StyleExt>,
     reset_style: Style<StyleExt>,
-) -> impl Iterator<Item = (char, Style<StyleExt>)>
+) -> impl Iterator<Item = IterTextItem<StyleExt>>
 where
     StyleExt: Clone,
 {
@@ -132,7 +150,11 @@ where
             }
 
             // Regular character - yield it
-            return Some((c, style.clone()));
+            return Some(IterTextItem {
+                index: chars.clone().count() + start_index - 1,
+                c,
+                style: style.clone(),
+            });
         }
         None
     })

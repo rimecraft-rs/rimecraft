@@ -75,7 +75,7 @@ macro_rules! iter_text {
             where
                     $($($bound_id: $bound),*)?
             {
-                fn iter_text(&self) -> impl Iterator<Item = (char, $res_ty)> + '_ {
+                fn iter_text(&self) -> impl Iterator<Item = $crate::iter_text::IterTextItem<$res_ty>> + '_ {
                     $(let $name = &self.$name; )*
                     $body
                 }
