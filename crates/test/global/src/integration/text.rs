@@ -61,7 +61,10 @@ impl Display for TextContent {
 
 mod sealed {
     use serde::{Deserialize, Serialize};
+    use text::style::Formattable;
 
     #[derive(Debug, Serialize, Deserialize, Default)]
     pub struct EmptyStyleExt {}
+
+    impl Formattable for EmptyStyleExt {}
 }

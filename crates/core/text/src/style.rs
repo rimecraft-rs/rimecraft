@@ -157,6 +157,21 @@ impl From<ShadowColor> for u32 {
     }
 }
 
+/// A formattable type that can have [`Formatting`] applied to it.
+///
+/// All formatting operations take ownership of `self` and return a new instance with the formatting applied.
+pub trait Formattable: Sized {
+    /// Returns a new instance with the formatting applied.
+    fn with_formatting(self, _formatting: Formatting) -> Self {
+        self
+    }
+
+    /// Returns a new instance with the formatting applied exclusively.
+    fn with_exclusive_formatting(self, _formatting: Formatting) -> Self {
+        self
+    }
+}
+
 /// Style of a text, representing cosmetic attributes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 #[cfg_attr(
@@ -264,10 +279,31 @@ where
 }
 
 impl<Ext> Style<Ext> {
+    /// Creates a new [`Style`] with the given extra data, with all other attributes unset.
+    #[inline]
+    pub fn new(ext: Ext) -> Self {
+        Self {
+            color: None,
+            shadow_color: None,
+            bold: None,
+            italic: None,
+            underlined: None,
+            strikethrough: None,
+            obfuscated: None,
+            ext,
+        }
+    }
+}
+
+impl<Ext> Formattable for Style<Ext>
+where
+    Ext: Formattable,
+{
     /// Returns a new [`Style`] with the formatting provided and all other attributes of this style.
     #[inline]
-    pub fn with_formatting(self, formatting: Formatting) -> Self {
+    fn with_formatting(self, formatting: Formatting) -> Self {
         let mut style = self;
+        style.ext = style.ext.with_formatting(formatting);
         match formatting {
             Formatting::Bold => style.bold = Some(true),
             Formatting::Italic => style.italic = Some(true),
@@ -276,16 +312,7 @@ impl<Ext> Style<Ext> {
             Formatting::Obfuscated => style.obfuscated = Some(true),
             Formatting::Reset => {
                 // Reset clears everything
-                return Self {
-                    color: None,
-                    shadow_color: None,
-                    bold: None,
-                    italic: None,
-                    underlined: None,
-                    strikethrough: None,
-                    obfuscated: None,
-                    ext: style.ext,
-                };
+                return Self::new(style.ext);
             }
             _ => {
                 style.color = formatting.try_into().ok();
@@ -297,22 +324,17 @@ impl<Ext> Style<Ext> {
     /// Returns a new [`Style`] with the formatting provided and some applicable attributes of this style.
     /// When a color formatting is passed for formatting, the other formattings, including bold, italic, strikethrough, underlined, and obfuscated, are all removed.
     #[inline]
-    pub fn with_exclusive_formatting(self, formatting: Formatting) -> Self {
+    fn with_exclusive_formatting(self, formatting: Formatting) -> Self {
         if formatting.is_color() {
             // Color formatting clears all modifiers
             Self {
                 color: formatting.try_into().ok(),
-                shadow_color: None,
-                bold: None,
-                italic: None,
-                underlined: None,
-                strikethrough: None,
-                obfuscated: None,
-                ext: self.ext,
+                ..Self::new(self.ext.with_formatting(formatting))
             }
         } else {
             // Modifier formatting
             let mut style = self;
+            style.ext = style.ext.with_formatting(formatting);
             match formatting {
                 Formatting::Bold => style.bold = Some(true),
                 Formatting::Italic => style.italic = Some(true),
@@ -321,16 +343,7 @@ impl<Ext> Style<Ext> {
                 Formatting::Obfuscated => style.obfuscated = Some(true),
                 Formatting::Reset => {
                     // Reset clears everything
-                    return Self {
-                        color: None,
-                        shadow_color: None,
-                        bold: None,
-                        italic: None,
-                        underlined: None,
-                        strikethrough: None,
-                        obfuscated: None,
-                        ext: style.ext,
-                    };
+                    return Self::new(style.ext);
                 }
                 _ => {
                     style.color = formatting.try_into().ok();
