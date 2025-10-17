@@ -58,6 +58,14 @@ impl Narration<String> {
             transformer: Box::new(|f, v| f(&v)),
         }
     }
+
+    /// Creates a [`Narration`] from a string slice.
+    pub fn str(value: &str) -> Self {
+        Self {
+            value: value.to_owned(),
+            transformer: Box::new(|f, v| f(&v)),
+        }
+    }
 }
 
 impl Narration<()> {
