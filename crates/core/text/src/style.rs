@@ -263,6 +263,84 @@ where
     }
 }
 
+impl<Ext> Style<Ext> {
+    /// Returns a new [`Style`] with the formatting provided and all other attributes of this style.
+    #[inline]
+    pub fn with_formatting(self, formatting: Formatting) -> Self {
+        let mut style = self;
+        match formatting {
+            Formatting::Bold => style.bold = Some(true),
+            Formatting::Italic => style.italic = Some(true),
+            Formatting::Underline => style.underlined = Some(true),
+            Formatting::Strikethrough => style.strikethrough = Some(true),
+            Formatting::Obfuscated => style.obfuscated = Some(true),
+            Formatting::Reset => {
+                // Reset clears everything
+                return Self {
+                    color: None,
+                    shadow_color: None,
+                    bold: None,
+                    italic: None,
+                    underlined: None,
+                    strikethrough: None,
+                    obfuscated: None,
+                    ext: style.ext,
+                };
+            }
+            _ => {
+                style.color = formatting.try_into().ok();
+            }
+        }
+        style
+    }
+
+    /// Returns a new [`Style`] with the formatting provided and some applicable attributes of this style.
+    /// When a color formatting is passed for formatting, the other formattings, including bold, italic, strikethrough, underlined, and obfuscated, are all removed.
+    #[inline]
+    pub fn with_exclusive_formatting(self, formatting: Formatting) -> Self {
+        if formatting.is_color() {
+            // Color formatting clears all modifiers
+            Self {
+                color: formatting.try_into().ok(),
+                shadow_color: None,
+                bold: None,
+                italic: None,
+                underlined: None,
+                strikethrough: None,
+                obfuscated: None,
+                ext: self.ext,
+            }
+        } else {
+            // Modifier formatting
+            let mut style = self;
+            match formatting {
+                Formatting::Bold => style.bold = Some(true),
+                Formatting::Italic => style.italic = Some(true),
+                Formatting::Underline => style.underlined = Some(true),
+                Formatting::Strikethrough => style.strikethrough = Some(true),
+                Formatting::Obfuscated => style.obfuscated = Some(true),
+                Formatting::Reset => {
+                    // Reset clears everything
+                    return Self {
+                        color: None,
+                        shadow_color: None,
+                        bold: None,
+                        italic: None,
+                        underlined: None,
+                        strikethrough: None,
+                        obfuscated: None,
+                        ext: style.ext,
+                    };
+                }
+                _ => {
+                    style.color = formatting.try_into().ok();
+                }
+            }
+            style
+        }
+    }
+}
+
 #[cfg(feature = "serde")]
 mod _serde {
     use super::*;
