@@ -1,3 +1,5 @@
+//! Various option content types.
+
 use enum_iterator::Sequence;
 
 mod attack_indicator;

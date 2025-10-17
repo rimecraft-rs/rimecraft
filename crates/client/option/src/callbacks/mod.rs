@@ -1,3 +1,5 @@
+//! Callback implementations and traits.
+
 mod alternate_values_supporting_cycling_callbacks;
 mod lazy_cycling_callbacks;
 mod potential_values_based_callbacks;

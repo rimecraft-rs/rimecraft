@@ -39,17 +39,13 @@ impl Display for Perspective {
 }
 
 impl Perspective {
+    /// Returns whether the perspective is first person.
     pub fn is_first_person(&self) -> bool {
-        match self {
-            Perspective::FirstPerson => true,
-            _ => false,
-        }
+        matches!(self, Perspective::FirstPerson)
     }
 
+    /// Returns whether the perspective is front view (first person or third person front).
     pub fn is_front_view(&self) -> bool {
-        match self {
-            Perspective::ThirdPersonBack => false,
-            _ => true,
-        }
+        !matches!(self, Perspective::ThirdPersonBack)
     }
 }

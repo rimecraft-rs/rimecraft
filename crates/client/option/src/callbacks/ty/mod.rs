@@ -1,3 +1,5 @@
+//! Callback traits.
+
 mod cycling_callbacks;
 mod double_slider_callbacks;
 mod int_slider_callbacks;

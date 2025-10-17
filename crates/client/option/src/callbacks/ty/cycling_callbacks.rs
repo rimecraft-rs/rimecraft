@@ -8,7 +8,10 @@ where
 {
     fn get_values(&self); // CyclingButtonWidget.Values<T>
 
-    fn value_setter(&self) -> &ValueSetter<V, Cx> {
+    fn value_setter(&self) -> &ValueSetter<V, Cx>
+    where
+        V: Clone + PartialEq,
+    {
         &|option, value| option.set_value(value)
     }
 }

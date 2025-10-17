@@ -3,7 +3,7 @@
 use std::{borrow::Cow, fmt::Display};
 
 use enum_iterator::Sequence;
-use rimecraft_text::{format_localization_key, Localize};
+use rimecraft_text::{Localize, format_localization_key};
 
 use super::ByUSizeId;
 
@@ -43,18 +43,19 @@ impl Display for NarratorMode {
 }
 
 impl NarratorMode {
+    /// Returns whether **chat messages** should be narrated.
     pub fn should_narrate_chat(&self) -> bool {
-        match self {
-            NarratorMode::All | NarratorMode::Chat => true,
-            _ => false,
-        }
+        matches!(self, NarratorMode::All | NarratorMode::Chat)
     }
 
+    /// Returns whether **system messages** should be narrated.
     pub fn should_narrate_system(&self) -> bool {
-        match self {
-            NarratorMode::All | NarratorMode::System => true,
-            _ => false,
-        }
+        matches!(self, NarratorMode::All | NarratorMode::System)
+    }
+
+    /// Returns whether **any messages** should be narrated.
+    pub fn should_narrate(&self) -> bool {
+        !matches!(self, NarratorMode::Off)
     }
 }
 
