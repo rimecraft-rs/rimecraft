@@ -84,13 +84,13 @@ where
         (self.max_boundary)()
     }
 
-    fn i32_validate(&self, value: Option<i32>) -> Option<i32> {
-        value.map(|value| {
-            value.clamp(
+    fn i32_validate(&self, value: i32) -> Option<i32> {
+        value
+            .clamp(
                 <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::min_inclusive(self),
                 <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::max_inclusive(self),
             )
-        })
+            .into()
     }
 }
 
@@ -111,7 +111,7 @@ impl<Cx> Callbacks<i32, Cx> for SuppliableIntCallbacks
 where
     Cx: ProvideTextTy,
 {
-    fn validate(&self, value: Option<i32>) -> Option<i32> {
-        <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::i32_validate(self, value)
+    fn validate(&self, value: &i32) -> Option<i32> {
+        <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::i32_validate(self, *value)
     }
 }

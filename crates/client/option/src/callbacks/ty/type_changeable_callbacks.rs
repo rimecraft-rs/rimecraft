@@ -2,7 +2,7 @@ use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::ty::{CyclingCallbacks, SliderCallbacks};
 
-pub trait TypeChangeableCallbacks<T, Cx>: CyclingCallbacks<T, Cx> + SliderCallbacks<T, Cx>
+pub trait TypeChangeableCallbacks<V, Cx>: CyclingCallbacks<V, Cx> + SliderCallbacks<V, Cx>
 where
     Cx: ProvideTextTy,
 {

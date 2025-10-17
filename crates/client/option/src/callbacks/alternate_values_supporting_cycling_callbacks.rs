@@ -17,17 +17,17 @@ where
     _phantom: std::marker::PhantomData<Cx>,
 }
 
-impl<K, T, Cx> AlternateValuesSupportingCyclingCallbacks<K, T, Cx>
+impl<K, V, Cx> AlternateValuesSupportingCyclingCallbacks<K, V, Cx>
 where
     Cx: ProvideTextTy,
 {
     pub fn new<Condition, F>(
-        values: HashMap<K, Vec<T>>,
+        values: HashMap<K, Vec<V>>,
         condition: Condition,
         value_setter: F,
     ) -> Self
     where
-        F: Fn(&mut SimpleOption<T, Cx>, Option<T>) + 'static,
+        F: Fn(&mut SimpleOption<V, Cx>, &V) + 'static,
         Condition: Fn() -> K + 'static,
     {
         Self {
@@ -39,18 +39,18 @@ where
     }
 }
 
-impl<T, Cx> AlternateValuesSupportingCyclingCallbacks<bool, T, Cx>
+impl<V, Cx> AlternateValuesSupportingCyclingCallbacks<bool, V, Cx>
 where
     Cx: ProvideTextTy,
 {
     pub fn new_binary<Condition, F>(
-        true_values: Vec<T>,
-        false_values: Vec<T>,
+        true_values: Vec<V>,
+        false_values: Vec<V>,
         condition: Condition,
         value_setter: F,
     ) -> Self
     where
-        F: Fn(&mut SimpleOption<T, Cx>, Option<T>) + 'static,
+        F: Fn(&mut SimpleOption<V, Cx>, &V) + 'static,
         Condition: Fn() -> bool + 'static,
     {
         let mut values = HashMap::new();
@@ -67,29 +67,26 @@ where
     }
 }
 
-impl<K, T, Cx> Callbacks<T, Cx> for AlternateValuesSupportingCyclingCallbacks<K, T, Cx>
+impl<K, V, Cx> Callbacks<V, Cx> for AlternateValuesSupportingCyclingCallbacks<K, V, Cx>
 where
     K: Hash + Eq,
     Cx: ProvideTextTy,
-    T: PartialEq,
+    V: PartialEq + Clone,
 {
-    fn validate(&self, value: Option<T>) -> Option<T> {
+    fn validate(&self, value: &V) -> Option<V> {
         let key = (self.condition)();
         match self.values.get(&key) {
-            Some(values) => match value {
-                Some(ref v) if values.contains(v) => value,
-                _ => None,
-            },
-            None => None,
+            Some(values) if values.contains(value) => Some(value.clone()),
+            _ => None,
         }
     }
 }
 
-impl<K, T, Cx> CyclingCallbacks<T, Cx> for AlternateValuesSupportingCyclingCallbacks<K, T, Cx>
+impl<K, V, Cx> CyclingCallbacks<V, Cx> for AlternateValuesSupportingCyclingCallbacks<K, V, Cx>
 where
     K: Hash + Eq,
     Cx: ProvideTextTy,
-    T: PartialEq,
+    V: PartialEq + Clone,
 {
     fn get_values(&self) {
         let key = (self.condition)();
@@ -97,7 +94,7 @@ where
         todo!()
     }
 
-    fn value_setter(&self) -> &ValueSetter<T, Cx> {
+    fn value_setter(&self) -> &ValueSetter<V, Cx> {
         self.value_setter.as_ref()
     }
 }

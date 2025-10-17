@@ -10,25 +10,31 @@ use rimecraft_text::{ProvideTextTy, Text, iter_text::IterText};
 pub trait ProvideTooltipTy: GlobalContext {
     /// The number of characters per row in the tooltip.
     const ROW_LENGTH: usize;
+
+    /// The ordered text type used for tooltip lines.
+    ///
+    /// See: [`IterText`]
+    type OrderedText: IterText<Self>
+    where
+        Self: ProvideTextTy;
 }
 
 /// Displays a tooltip with text content and optional narration.
-pub struct Tooltip<Cx, IText>
+pub struct Tooltip<Cx>
 where
     Cx: ProvideTooltipTy + ProvideTextTy,
-    IText: IterText<Cx>,
 {
     content: Text<Cx>,
     narration: Option<Text<Cx>>,
-    lines: Vec<IText>,
+    lines: Vec<Cx::OrderedText>,
 }
 
-impl<Cx, IT> Debug for Tooltip<Cx, IT>
+impl<Cx> Debug for Tooltip<Cx>
 where
     Cx: ProvideTooltipTy + ProvideTextTy,
     <Cx as ProvideTextTy>::Content: Debug,
     <Cx as ProvideTextTy>::StyleExt: Debug,
-    IT: IterText<Cx> + Debug,
+    <Cx as ProvideTooltipTy>::OrderedText: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Tooltip")
@@ -39,10 +45,9 @@ where
     }
 }
 
-impl<Cx, IText> Tooltip<Cx, IText>
+impl<Cx> Tooltip<Cx>
 where
     Cx: ProvideTooltipTy + ProvideTextTy,
-    IText: IterText<Cx>,
 {
     /// Creates a new [`Tooltip`] with the given content and optional narration.
     pub fn new(content: Text<Cx>, narration: Option<Text<Cx>>) -> Self {
@@ -63,16 +68,15 @@ where
     }
 
     /// Returns the tooltip lines.
-    pub fn get_lines(&self) -> &Vec<IText> {
+    pub fn get_lines(&self) -> &Vec<Cx::OrderedText> {
         &self.lines
     }
 }
 
-impl<Cx, IText> Narratable for Tooltip<Cx, IText>
+impl<Cx> Narratable for Tooltip<Cx>
 where
     Cx: ProvideTooltipTy + ProvideTextTy,
     <Cx as ProvideTextTy>::Content: Display,
-    IText: IterText<Cx>,
 {
     fn append_narrations<B>(&self, builder: &mut B)
     where

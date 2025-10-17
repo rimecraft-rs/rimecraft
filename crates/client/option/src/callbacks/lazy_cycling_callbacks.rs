@@ -2,8 +2,8 @@ use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::{Callbacks, ty::CyclingCallbacks};
 
-type ValuesFn<T> = Box<dyn Fn() -> Vec<T>>;
-type ValidateFn<T> = Box<dyn Fn(Option<&T>) -> bool>;
+type ValuesFn<V> = Box<dyn Fn() -> Vec<V>>;
+type ValidateFn<V> = Box<dyn Fn(&V) -> bool>;
 
 pub struct LazyCyclingCallbacks<T, Cx>
 where
@@ -14,14 +14,14 @@ where
     _phantom: std::marker::PhantomData<Cx>,
 }
 
-impl<T, Cx> LazyCyclingCallbacks<T, Cx>
+impl<V, Cx> LazyCyclingCallbacks<V, Cx>
 where
     Cx: ProvideTextTy,
 {
     pub fn new<Values, Validate>(values: Values, validate: Validate) -> Self
     where
-        Values: Fn() -> Vec<T> + 'static,
-        Validate: Fn(Option<&T>) -> bool + 'static,
+        Values: Fn() -> Vec<V> + 'static,
+        Validate: Fn(&V) -> bool + 'static,
     {
         Self {
             values: Box::new(values),
@@ -31,23 +31,20 @@ where
     }
 }
 
-impl<T, Cx> Callbacks<T, Cx> for LazyCyclingCallbacks<T, Cx>
+impl<V, Cx> Callbacks<V, Cx> for LazyCyclingCallbacks<V, Cx>
 where
     Cx: ProvideTextTy,
+    V: Clone,
 {
-    fn validate(&self, value: Option<T>) -> Option<T> {
-        match value {
-            Some(ref v) if (self.validate)(Some(v)) => value,
-            Some(_) => None,
-            None if (self.validate)(None) => None,
-            None => None,
-        }
+    fn validate(&self, value: &V) -> Option<V> {
+        (self.validate)(value).then(|| value.clone())
     }
 }
 
-impl<T, Cx> CyclingCallbacks<T, Cx> for LazyCyclingCallbacks<T, Cx>
+impl<V, Cx> CyclingCallbacks<V, Cx> for LazyCyclingCallbacks<V, Cx>
 where
     Cx: ProvideTextTy,
+    V: Clone,
 {
     fn get_values(&self) {
         (self.values)();

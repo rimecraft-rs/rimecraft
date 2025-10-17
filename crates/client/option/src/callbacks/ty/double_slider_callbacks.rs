@@ -23,7 +23,7 @@ where
             .floor()
     }
 
-    fn f32_validate(&self, value: Option<f32>) -> Option<f32>;
+    fn f32_validate(&self, value: f32) -> Option<f32>;
 
     fn with_modifier<R, IR, RI, F, ToP, ToV>(
         &self,
@@ -32,15 +32,15 @@ where
     ) -> impl SliderCallbacks<R, Cx>
     where
         IR: Fn(Option<f32>) -> Option<R>,
-        RI: Fn(Option<R>) -> Option<f32>,
-        F: Fn(Option<f32>) -> Option<f32>,
+        RI: Fn(Option<&R>) -> Option<f32>,
+        F: Fn(f32) -> Option<f32>,
         ToP: Fn(f32) -> f32,
         ToV: Fn(f32) -> f32,
     {
         struct Impl<IR, RI, F, ToP, ToV> {
             progress_to_value: IR,
             value_to_progress: RI,
-            i32_validate: F,
+            f32_validate: F,
             to_slider_progress: ToP,
             to_value: ToV,
         }
@@ -49,13 +49,13 @@ where
         where
             Cx: ProvideTextTy,
             IR: Fn(Option<f32>) -> Option<R>,
-            RI: Fn(Option<R>) -> Option<f32>,
-            F: Fn(Option<f32>) -> Option<f32>,
+            RI: Fn(Option<&R>) -> Option<f32>,
+            F: Fn(f32) -> Option<f32> + Clone,
             ToP: Fn(f32) -> f32,
             ToV: Fn(f32) -> f32,
         {
             fn to_slider_progress(&self, value: R) -> f32 {
-                let progress = (self.value_to_progress)(Some(value)).unwrap();
+                let progress = (self.value_to_progress)(Some(&value)).unwrap();
                 (self.to_slider_progress)(progress)
             }
 
@@ -69,22 +69,22 @@ where
         where
             Cx: ProvideTextTy,
             IR: Fn(Option<f32>) -> Option<R>,
-            RI: Fn(Option<R>) -> Option<f32>,
-            F: Fn(Option<f32>) -> Option<f32>,
+            RI: Fn(Option<&R>) -> Option<f32>,
+            F: Fn(f32) -> Option<f32> + Clone,
             ToP: Fn(f32) -> f32,
             ToV: Fn(f32) -> f32,
         {
-            fn validate(&self, value: Option<R>) -> Option<R> {
-                let i = (self.value_to_progress)(value);
-                let invalidated = (self.i32_validate)(i);
-                (self.progress_to_value)(invalidated)
+            fn validate(&self, value: &R) -> Option<R> {
+                let i = (self.value_to_progress)(Some(value));
+                let validated = i.and_then(self.f32_validate.clone());
+                (self.progress_to_value)(validated)
             }
         }
 
         Impl {
             value_to_progress,
             progress_to_value,
-            i32_validate: |value| self.f32_validate(value),
+            f32_validate: |value| self.f32_validate(value),
             to_slider_progress: |value| DoubleSliderCallbacks::to_slider_progress(self, value),
             to_value: |value| DoubleSliderCallbacks::to_value(self, value),
         }

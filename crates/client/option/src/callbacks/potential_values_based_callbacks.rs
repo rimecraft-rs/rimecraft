@@ -3,35 +3,32 @@ use rimecraft_text::ProvideTextTy;
 use crate::callbacks::{Callbacks, ty::CyclingCallbacks};
 
 #[derive(Debug, Default, Clone)]
-pub struct PotentialValuesBasedCallbacks<T> {
-    pub values: Vec<T>,
+pub struct PotentialValuesBasedCallbacks<V> {
+    pub values: Vec<V>,
 }
 
-impl<T> PotentialValuesBasedCallbacks<T> {
-    pub fn new(values: Vec<T>) -> Self {
+impl<V> PotentialValuesBasedCallbacks<V> {
+    pub fn new(values: Vec<V>) -> Self {
         Self { values }
     }
 }
 
-impl<T, Cx> CyclingCallbacks<T, Cx> for PotentialValuesBasedCallbacks<T>
+impl<V, Cx> CyclingCallbacks<V, Cx> for PotentialValuesBasedCallbacks<V>
 where
     Cx: ProvideTextTy,
-    T: PartialEq,
+    V: PartialEq + Clone,
 {
     fn get_values(&self) {
         todo!()
     }
 }
 
-impl<T, Cx> Callbacks<T, Cx> for PotentialValuesBasedCallbacks<T>
+impl<V, Cx> Callbacks<V, Cx> for PotentialValuesBasedCallbacks<V>
 where
     Cx: ProvideTextTy,
-    T: PartialEq,
+    V: PartialEq + Clone,
 {
-    fn validate(&self, value: Option<T>) -> Option<T> {
-        match value {
-            Some(ref v) if self.values.contains(v) => value,
-            _ => None,
-        }
+    fn validate(&self, value: &V) -> Option<V> {
+        self.values.contains(value).then(|| value.clone())
     }
 }

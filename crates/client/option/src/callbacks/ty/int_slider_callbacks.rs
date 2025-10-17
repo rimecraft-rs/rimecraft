@@ -33,7 +33,7 @@ where
             .floor() as i32
     }
 
-    fn i32_validate(&self, value: Option<i32>) -> Option<i32>;
+    fn i32_validate(&self, value: i32) -> Option<i32>;
 
     fn with_modifier<R, IR, RI, F, ToP, ToV>(
         &self,
@@ -42,8 +42,8 @@ where
     ) -> impl SliderCallbacks<R, Cx>
     where
         IR: Fn(Option<i32>) -> Option<R>,
-        RI: Fn(Option<R>) -> Option<i32>,
-        F: Fn(Option<i32>) -> Option<i32>,
+        RI: Fn(Option<&R>) -> Option<i32>,
+        F: Fn(i32) -> Option<i32>,
         ToP: Fn(i32) -> f32,
         ToV: Fn(f32) -> i32,
     {
@@ -59,13 +59,13 @@ where
         where
             Cx: ProvideTextTy,
             IR: Fn(Option<i32>) -> Option<R>,
-            RI: Fn(Option<R>) -> Option<i32>,
-            F: Fn(Option<i32>) -> Option<i32>,
+            RI: Fn(Option<&R>) -> Option<i32>,
+            F: Fn(i32) -> Option<i32> + Clone,
             ToP: Fn(i32) -> f32,
             ToV: Fn(f32) -> i32,
         {
             fn to_slider_progress(&self, value: R) -> f32 {
-                let progress = (self.value_to_progress)(Some(value)).unwrap();
+                let progress = (self.value_to_progress)(Some(&value)).unwrap();
                 (self.to_slider_progress)(progress)
             }
 
@@ -79,15 +79,15 @@ where
         where
             Cx: ProvideTextTy,
             IR: Fn(Option<i32>) -> Option<R>,
-            RI: Fn(Option<R>) -> Option<i32>,
-            F: Fn(Option<i32>) -> Option<i32>,
+            RI: Fn(Option<&R>) -> Option<i32>,
+            F: Fn(i32) -> Option<i32> + Clone,
             ToP: Fn(i32) -> f32,
             ToV: Fn(f32) -> i32,
         {
-            fn validate(&self, value: Option<R>) -> Option<R> {
-                let i = (self.value_to_progress)(value);
-                let invalidated = (self.i32_validate)(i);
-                (self.progress_to_value)(invalidated)
+            fn validate(&self, value: &R) -> Option<R> {
+                let i = (self.value_to_progress)(Some(value));
+                let validated = i.and_then(self.i32_validate.clone());
+                (self.progress_to_value)(validated)
             }
         }
 
