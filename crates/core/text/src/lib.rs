@@ -2,6 +2,7 @@
 
 mod error;
 mod iter;
+pub mod iter_text;
 pub mod style;
 
 #[cfg(feature = "serde")]
@@ -13,6 +14,8 @@ pub use error::Error;
 pub use iter::{Iter, StyledIter};
 use rimecraft_global_cx::GlobalContext;
 pub use style::Style;
+
+use crate::style::Formattable;
 
 /// A raw text component.
 ///
@@ -188,7 +191,7 @@ pub trait ProvideTextTy: GlobalContext {
     type Content: Plain;
 
     /// Generic `StyleExt` that should be applied to [`Text`].
-    type StyleExt;
+    type StyleExt: Formattable;
 }
 
 /// Context type decorated [`RawText`].
