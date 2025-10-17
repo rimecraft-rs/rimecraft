@@ -183,7 +183,7 @@ where
     }
 }
 
-/// Global context for text.
+/// Global context for [`Text`].
 ///
 /// The associated type `Content` and `StyleExt` should be applied to [`Text`] when used.
 pub trait ProvideTextTy: GlobalContext {

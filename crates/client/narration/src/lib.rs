@@ -70,7 +70,7 @@ impl Narration<String> {
 
 impl Narration<()> {
     /// Creates a [`Narration`] from a single [`Text`] sentence.
-    pub fn text<Cx>(value: Text<Cx>) -> Narration<Text<Cx>>
+    pub fn text<Cx>(value: &Text<Cx>) -> Narration<&Text<Cx>>
     where
         Cx: ProvideTextTy,
         <Cx as ProvideTextTy>::Content: Display,
@@ -82,7 +82,7 @@ impl Narration<()> {
     }
 
     /// Creates a [`Narration`] from a list of [`Text`] sentences.
-    pub fn texts<Cx>(value: Vec<Text<Cx>>) -> Narration<Vec<Text<Cx>>>
+    pub fn texts<Cx>(value: Vec<&Text<Cx>>) -> Narration<Vec<&Text<Cx>>>
     where
         Cx: ProvideTextTy,
         <Cx as ProvideTextTy>::Content: Display,
@@ -139,7 +139,7 @@ pub trait NarrationMessageBuilder {
     }
 
     /// Adds a [`Text`] narration to this builder, replacing any existing narration for that [`NarrationPart`].
-    fn put_text<Cx>(&mut self, part: NarrationPart, text: Text<Cx>)
+    fn put_text<Cx>(&mut self, part: NarrationPart, text: &Text<Cx>)
     where
         Cx: ProvideTextTy,
         <Cx as ProvideTextTy>::Content: Display,
@@ -148,7 +148,7 @@ pub trait NarrationMessageBuilder {
     }
 
     /// Adds an array of [`Text`] narrations to this builder, replacing any existing narration for that [`NarrationPart`].
-    fn put_texts<Cx>(&mut self, part: NarrationPart, texts: Vec<Text<Cx>>)
+    fn put_texts<Cx>(&mut self, part: NarrationPart, texts: Vec<&Text<Cx>>)
     where
         Cx: ProvideTextTy,
         <Cx as ProvideTextTy>::Content: Display,
