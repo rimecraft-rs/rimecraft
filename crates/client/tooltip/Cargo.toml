@@ -1,0 +1,18 @@
+[package]
+name = "rimecraft-client-tooltip"
+version = "0.1.0"
+edition = "2024"
+authors = ["KrLite"]
+description = "Minecraft client tooltip components"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+rimecraft-text = { path = "../../core/text" }
+
+[lints]
+workspace = true

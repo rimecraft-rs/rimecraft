@@ -1,9 +1,9 @@
 [package]
-name = "rimecraft-client-component"
+name = "rimecraft-client-narration"
 version = "0.1.0"
 edition = "2024"
 authors = ["KrLite"]
-description = "Minecraft client components"
+description = "Minecraft client narration components"
 repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
@@ -12,6 +12,7 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+rimecraft-text = { path = "../../core/text" }
 
 [lints]
 workspace = true

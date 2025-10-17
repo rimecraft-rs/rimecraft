@@ -1,1 +1,0 @@
-//! Minecraft client components.
