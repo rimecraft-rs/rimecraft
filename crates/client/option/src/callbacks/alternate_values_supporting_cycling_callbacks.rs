@@ -17,9 +17,9 @@ where
     _phantom: std::marker::PhantomData<Txt>,
 }
 
-impl<K, T, Txt> AlternateValuesSupportingCyclingCallbacks<K, T, Txt>
+impl<K, T, Cx> AlternateValuesSupportingCyclingCallbacks<K, T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     pub fn new<Condition, F>(
         values: HashMap<K, Vec<T>>,
@@ -27,7 +27,7 @@ where
         value_setter: F,
     ) -> Self
     where
-        F: Fn(&mut SimpleOption<T, Txt>, Option<T>) + 'static,
+        F: Fn(&mut SimpleOption<T, Cx>, Option<T>) + 'static,
         Condition: Fn() -> K + 'static,
     {
         Self {
@@ -39,9 +39,9 @@ where
     }
 }
 
-impl<T, Txt> AlternateValuesSupportingCyclingCallbacks<bool, T, Txt>
+impl<T, Cx> AlternateValuesSupportingCyclingCallbacks<bool, T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     pub fn new_binary<Condition, F>(
         true_values: Vec<T>,
@@ -50,7 +50,7 @@ where
         value_setter: F,
     ) -> Self
     where
-        F: Fn(&mut SimpleOption<T, Txt>, Option<T>) + 'static,
+        F: Fn(&mut SimpleOption<T, Cx>, Option<T>) + 'static,
         Condition: Fn() -> bool + 'static,
     {
         let mut values = HashMap::new();
@@ -67,10 +67,10 @@ where
     }
 }
 
-impl<K, T, Txt> Callbacks<T, Txt> for AlternateValuesSupportingCyclingCallbacks<K, T, Txt>
+impl<K, T, Cx> Callbacks<T, Cx> for AlternateValuesSupportingCyclingCallbacks<K, T, Cx>
 where
     K: Hash + Eq,
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
     T: PartialEq,
 {
     fn validate(&self, value: Option<T>) -> Option<T> {
@@ -85,10 +85,10 @@ where
     }
 }
 
-impl<K, T, Txt> CyclingCallbacks<T, Txt> for AlternateValuesSupportingCyclingCallbacks<K, T, Txt>
+impl<K, T, Cx> CyclingCallbacks<T, Cx> for AlternateValuesSupportingCyclingCallbacks<K, T, Cx>
 where
     K: Hash + Eq,
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
     T: PartialEq,
 {
     fn get_values(&self) {
@@ -97,7 +97,7 @@ where
         todo!()
     }
 
-    fn value_setter(&self) -> &ValueSetter<T, Txt> {
+    fn value_setter(&self) -> &ValueSetter<T, Cx> {
         self.value_setter.as_ref()
     }
 }

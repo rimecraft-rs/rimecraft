@@ -9,11 +9,11 @@ use std::fmt::Debug;
 
 pub type ChangeCallback<T> = dyn Fn(Option<T>);
 
-pub struct SimpleOption<T, Txt>
+pub struct SimpleOption<T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
-    pub(crate) text: Text<Txt>,
+    pub(crate) text: Text<Cx>,
     pub(crate) value: Option<T>,
     default: T,
     change_callback: Box<ChangeCallback<T>>,
@@ -34,9 +34,9 @@ where
     }
 }
 
-impl<T, Txt> SimpleOption<T, Txt>
+impl<T, Cx> SimpleOption<T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     pub fn set_value(&mut self, value: Option<T>) {
         todo!()

@@ -16,11 +16,11 @@ use crate::SimpleOption;
 
 use rimecraft_text::ProvideTextTy;
 
-pub type ValueSetter<T, Txt> = dyn Fn(&mut SimpleOption<T, Txt>, Option<T>);
+pub type ValueSetter<T, Cx> = dyn Fn(&mut SimpleOption<T, Cx>, Option<T>);
 
-pub trait Callbacks<T, Txt>
+pub trait Callbacks<T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn validate(&self, value: Option<T>) -> Option<T>;
 }

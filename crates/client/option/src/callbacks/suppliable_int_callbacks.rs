@@ -54,27 +54,27 @@ impl SuppliableIntCallbacks {
     }
 }
 
-impl<Txt> TypeChangeableCallbacks<i32, Txt> for SuppliableIntCallbacks
+impl<Cx> TypeChangeableCallbacks<i32, Cx> for SuppliableIntCallbacks
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn is_cycling(&self) -> bool {
         true
     }
 }
 
-impl<Txt> CyclingCallbacks<i32, Txt> for SuppliableIntCallbacks
+impl<Cx> CyclingCallbacks<i32, Cx> for SuppliableIntCallbacks
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn get_values(&self) {
         todo!()
     }
 }
 
-impl<Txt> IntSliderCallbacks<Txt> for SuppliableIntCallbacks
+impl<Cx> IntSliderCallbacks<Cx> for SuppliableIntCallbacks
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn min_inclusive(&self) -> i32 {
         (self.min_boundary)()
@@ -87,31 +87,31 @@ where
     fn i32_validate(&self, value: Option<i32>) -> Option<i32> {
         value.map(|value| {
             value.clamp(
-                <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::min_inclusive(self),
-                <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::max_inclusive(self),
+                <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::min_inclusive(self),
+                <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::max_inclusive(self),
             )
         })
     }
 }
 
-impl<Txt> SliderCallbacks<i32, Txt> for SuppliableIntCallbacks
+impl<Cx> SliderCallbacks<i32, Cx> for SuppliableIntCallbacks
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn to_slider_progress(&self, value: i32) -> f32 {
-        <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::to_slider_progress(self, value)
+        <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::to_slider_progress(self, value)
     }
 
     fn to_value(&self, slider_progress: f32) -> i32 {
-        <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::to_value(self, slider_progress)
+        <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::to_value(self, slider_progress)
     }
 }
 
-impl<Txt> Callbacks<i32, Txt> for SuppliableIntCallbacks
+impl<Cx> Callbacks<i32, Cx> for SuppliableIntCallbacks
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn validate(&self, value: Option<i32>) -> Option<i32> {
-        <SuppliableIntCallbacks as IntSliderCallbacks<Txt>>::i32_validate(self, value)
+        <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::i32_validate(self, value)
     }
 }

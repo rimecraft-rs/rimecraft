@@ -13,9 +13,9 @@ impl<T> PotentialValuesBasedCallbacks<T> {
     }
 }
 
-impl<T, Txt> CyclingCallbacks<T, Txt> for PotentialValuesBasedCallbacks<T>
+impl<T, Cx> CyclingCallbacks<T, Cx> for PotentialValuesBasedCallbacks<T>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
     T: PartialEq,
 {
     fn get_values(&self) {
@@ -23,9 +23,9 @@ where
     }
 }
 
-impl<T, Txt> Callbacks<T, Txt> for PotentialValuesBasedCallbacks<T>
+impl<T, Cx> Callbacks<T, Cx> for PotentialValuesBasedCallbacks<T>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
     T: PartialEq,
 {
     fn validate(&self, value: Option<T>) -> Option<T> {

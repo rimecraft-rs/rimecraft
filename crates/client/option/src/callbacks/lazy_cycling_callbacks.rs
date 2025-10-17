@@ -5,18 +5,18 @@ use crate::callbacks::{Callbacks, ty::CyclingCallbacks};
 type ValuesFn<T> = Box<dyn Fn() -> Vec<T>>;
 type ValidateFn<T> = Box<dyn Fn(Option<&T>) -> bool>;
 
-pub struct LazyCyclingCallbacks<T, Txt>
+pub struct LazyCyclingCallbacks<T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     pub values: ValuesFn<T>,
     pub validate: ValidateFn<T>,
-    _phantom: std::marker::PhantomData<Txt>,
+    _phantom: std::marker::PhantomData<Cx>,
 }
 
-impl<T, Txt> LazyCyclingCallbacks<T, Txt>
+impl<T, Cx> LazyCyclingCallbacks<T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     pub fn new<Values, Validate>(values: Values, validate: Validate) -> Self
     where
@@ -31,9 +31,9 @@ where
     }
 }
 
-impl<T, Txt> Callbacks<T, Txt> for LazyCyclingCallbacks<T, Txt>
+impl<T, Cx> Callbacks<T, Cx> for LazyCyclingCallbacks<T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn validate(&self, value: Option<T>) -> Option<T> {
         match value {
@@ -45,9 +45,9 @@ where
     }
 }
 
-impl<T, Txt> CyclingCallbacks<T, Txt> for LazyCyclingCallbacks<T, Txt>
+impl<T, Cx> CyclingCallbacks<T, Cx> for LazyCyclingCallbacks<T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn get_values(&self) {
         (self.values)();

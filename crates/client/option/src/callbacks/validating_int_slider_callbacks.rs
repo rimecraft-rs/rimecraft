@@ -24,9 +24,9 @@ impl ValidatingIntSliderCallbacks {
     }
 }
 
-impl<Txt> IntSliderCallbacks<Txt> for ValidatingIntSliderCallbacks
+impl<Cx> IntSliderCallbacks<Cx> for ValidatingIntSliderCallbacks
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn min_inclusive(&self) -> i32 {
         self.min
@@ -43,9 +43,8 @@ where
     fn to_slider_progress(&self, value: i32) -> f32 {
         (value as f32 + 0.5)
             .map(
-                <ValidatingIntSliderCallbacks as IntSliderCallbacks<Txt>>::min_inclusive(self)
-                    as f32
-                    ..<ValidatingIntSliderCallbacks as IntSliderCallbacks<Txt>>::max_inclusive(self)
+                <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
+                    ..<ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::max_inclusive(self)
                         as f32
                         + 1.0,
                 0.0..1.0,
@@ -57,9 +56,8 @@ where
         slider_progress
             .map(
                 0.0..1.0,
-                <ValidatingIntSliderCallbacks as IntSliderCallbacks<Txt>>::min_inclusive(self)
-                    as f32
-                    ..<ValidatingIntSliderCallbacks as IntSliderCallbacks<Txt>>::max_inclusive(self)
+                <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
+                    ..<ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::max_inclusive(self)
                         as f32
                         + 1.0,
             )
@@ -74,7 +72,7 @@ where
         &self,
         progress_to_value: IR,
         value_to_progress: RI,
-    ) -> impl SliderCallbacks<R, Txt>
+    ) -> impl SliderCallbacks<R, Cx>
     where
         IR: Fn(Option<i32>) -> Option<R>,
         RI: Fn(Option<R>) -> Option<i32>,
@@ -90,9 +88,9 @@ where
             to_value: ToV,
         }
 
-        impl<R, IR, RI, F, ToP, ToV, Txt> SliderCallbacks<R, Txt> for Impl<IR, RI, F, ToP, ToV>
+        impl<R, IR, RI, F, ToP, ToV, Cx> SliderCallbacks<R, Cx> for Impl<IR, RI, F, ToP, ToV>
         where
-            Txt: ProvideTextTy,
+            Cx: ProvideTextTy,
             IR: Fn(Option<i32>) -> Option<R>,
             RI: Fn(Option<R>) -> Option<i32>,
             F: Fn(Option<i32>) -> Option<i32>,
@@ -110,9 +108,9 @@ where
             }
         }
 
-        impl<R, IR, RI, F, ToP, ToV, Txt> Callbacks<R, Txt> for Impl<IR, RI, F, ToP, ToV>
+        impl<R, IR, RI, F, ToP, ToV, Cx> Callbacks<R, Cx> for Impl<IR, RI, F, ToP, ToV>
         where
-            Txt: ProvideTextTy,
+            Cx: ProvideTextTy,
             IR: Fn(Option<i32>) -> Option<R>,
             RI: Fn(Option<R>) -> Option<i32>,
             F: Fn(Option<i32>) -> Option<i32>,
@@ -130,32 +128,32 @@ where
             value_to_progress,
             progress_to_value,
             i32_validate: |value| {
-                <ValidatingIntSliderCallbacks as IntSliderCallbacks<Txt>>::i32_validate(self, value)
+                <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::i32_validate(self, value)
             },
-            to_slider_progress: |value| IntSliderCallbacks::<Txt>::to_slider_progress(self, value),
-            to_value: |value| IntSliderCallbacks::<Txt>::to_value(self, value),
+            to_slider_progress: |value| IntSliderCallbacks::<Cx>::to_slider_progress(self, value),
+            to_value: |value| IntSliderCallbacks::<Cx>::to_value(self, value),
         }
     }
 }
 
-impl<Txt> SliderCallbacks<i32, Txt> for ValidatingIntSliderCallbacks
+impl<Cx> SliderCallbacks<i32, Cx> for ValidatingIntSliderCallbacks
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn to_slider_progress(&self, value: i32) -> f32 {
-        <ValidatingIntSliderCallbacks as IntSliderCallbacks<Txt>>::to_slider_progress(self, value)
+        <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::to_slider_progress(self, value)
     }
 
     fn to_value(&self, slider_progress: f32) -> i32 {
-        <ValidatingIntSliderCallbacks as IntSliderCallbacks<Txt>>::to_value(self, slider_progress)
+        <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::to_value(self, slider_progress)
     }
 }
 
-impl<Txt> Callbacks<i32, Txt> for ValidatingIntSliderCallbacks
+impl<Cx> Callbacks<i32, Cx> for ValidatingIntSliderCallbacks
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn validate(&self, value: Option<i32>) -> Option<i32> {
-        <ValidatingIntSliderCallbacks as IntSliderCallbacks<Txt>>::i32_validate(self, value)
+        <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::i32_validate(self, value)
     }
 }
