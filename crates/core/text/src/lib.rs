@@ -4,7 +4,6 @@ mod error;
 mod iter;
 pub mod iter_text;
 pub mod style;
-pub mod visit;
 
 #[cfg(feature = "serde")]
 mod _serde;

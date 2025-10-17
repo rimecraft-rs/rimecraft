@@ -60,25 +60,29 @@ macro_rules! format_localization_key {
 /// ```
 #[macro_export]
 macro_rules! iter_text {
-    (<$generic_ext:ident $(,)? $($generic:ident),*> $(where $($bound_id:ident: $bound:tt),*)? ;
-
-    ($($name:ident: $type:ty),*) => $body:expr) => {
+    (
+        $(<$($generic:ident),*>)? $(where $($bound_id:ident: $bound:tt),*)? ;
+        ($($name:ident: $type:ty),*) -> $res_ty:ty;
+        $body:expr
+    ) => {
         {
-            struct Impl<$generic_ext, $($($generic),*)?> {
+            struct Impl<$($($generic),*)?> {
+                _phantom: std::marker::PhantomData<$res_ty>,
                 $($name: $type),*
             }
 
-            impl<$generic_ext, $($($generic),*)?> $crate::iter_text::IterText<$generic_ext> for Impl<$generic_ext, $($($generic),*)?>
+            impl<$($($generic),*)?> $crate::iter_text::IterText<$res_ty> for Impl<$($($generic),*)?>
             where
                     $($($bound_id: $bound),*)?
             {
-                fn iter_text(&self) -> impl Iterator<Item = (char, $generic_ext)> + '_ {
+                fn iter_text(&self) -> impl Iterator<Item = (char, $res_ty)> + '_ {
                     $(let $name = &self.$name; )*
                     $body
                 }
             }
 
             Impl {
+                _phantom: std::marker::PhantomData,
                 $($name),*
             }
         }
