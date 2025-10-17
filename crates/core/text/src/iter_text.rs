@@ -2,7 +2,7 @@
 
 use rimecraft_fmt::Formatting;
 
-use crate::{Style, iter_text};
+use crate::Style;
 
 /// An item in an iterator over text items with associated [`Style`]s.
 ///
@@ -23,13 +23,18 @@ pub trait IterText<StyleExt> {
     fn iter_text(&self) -> impl Iterator<Item = IterTextItem<StyleExt>> + '_;
 }
 
+impl<T, StyleExt> IterText<StyleExt> for T
+where
+    T: Iterator<Item = IterTextItem<StyleExt>> + Clone,
+{
+    fn iter_text(&self) -> impl Iterator<Item = IterTextItem<StyleExt>> + '_ {
+        self.clone()
+    }
+}
+
 /// Returns an empty [`IterText`] over text items with associated [`Style`]s.
 pub fn empty<StyleExt: 'static>() -> impl IterText<StyleExt> {
-    iter_text! {
-        <StyleExt> where StyleExt: 'static;
-        () -> StyleExt;
-        std::iter::empty()
-    }
+    std::iter::empty()
 }
 
 /// Returns a single-character [`IterText`] with the given [`char`] and [`Style`].
@@ -37,15 +42,7 @@ pub fn styled_char<StyleExt>(c: char, style: Style<StyleExt>) -> impl IterText<S
 where
     StyleExt: Clone,
 {
-    iter_text! {
-        <StyleExt> where StyleExt: Clone;
-        (c: char, style: Style<StyleExt>) -> StyleExt;
-        std::iter::once(IterTextItem {
-            index: 0,
-            c: c.to_owned(),
-            style: style.to_owned(),
-        })
-    }
+    std::iter::once(IterTextItem { index: 0, c, style })
 }
 
 /// Returns a forward [`IterText`] over the characters of the given string with the given [`Style`].
@@ -53,17 +50,11 @@ pub fn styled_str<StyleExt>(s: &str, style: Style<StyleExt>) -> impl IterText<St
 where
     StyleExt: Clone,
 {
-    let s = s.to_owned();
-
-    iter_text! {
-        <StyleExt> where StyleExt: Clone;
-        (s: String, style: Style<StyleExt>) -> StyleExt;
-        s.chars().enumerate().map(move |(i, c)| IterTextItem {
-            index: i,
-            c,
-            style: style.clone(),
-        })
-    }
+    s.chars().enumerate().map(move |(i, c)| IterTextItem {
+        index: i,
+        c,
+        style: style.clone(),
+    })
 }
 
 /// Returns a backward [`IterText`] over the characters of the given string with the given [`Style`].
@@ -71,17 +62,11 @@ pub fn styled_str_rev<StyleExt>(s: &str, style: Style<StyleExt>) -> impl IterTex
 where
     StyleExt: Clone,
 {
-    let s = s.to_owned();
-
-    iter_text! {
-        <StyleExt> where StyleExt: Clone;
-        (s: String, style: Style<StyleExt>) -> StyleExt;
-        s.chars().rev().enumerate().map(move |(i, c)| IterTextItem {
-            index: i,
-            c,
-            style: style.clone(),
-        })
-    }
+    s.chars().rev().enumerate().map(move |(i, c)| IterTextItem {
+        index: i,
+        c,
+        style: style.clone(),
+    })
 }
 
 /// Returns an [`IterText`] over the characters of the given formatted string,
@@ -93,54 +78,6 @@ pub fn iter_formatted<StyleExt>(
     starting_style: Style<StyleExt>,
     reset_style: Style<StyleExt>,
 ) -> impl IterText<StyleExt>
-where
-    StyleExt: Clone,
-{
-    let s = str.to_owned();
-
-    iter_text! {
-        <StyleExt> where StyleExt: Clone;
-        (s: String, start_index: usize, starting_style: Style<StyleExt>, reset_style: Style<StyleExt>) -> StyleExt;
-        format(s, start_index.to_owned(), starting_style.to_owned(), reset_style.to_owned())
-    }
-}
-
-/// Returns an [`IterText`] over the characters of the given formatted string,
-/// starting from the given index, applying formatting codes as specified,
-/// with a unified [`Style`] for starting and reset.
-pub fn iter_formatted_unified<StyleExt>(
-    str: &str,
-    start_index: usize,
-    style: Style<StyleExt>,
-) -> impl IterText<StyleExt>
-where
-    StyleExt: Clone,
-{
-    iter_formatted(str, start_index, style.clone(), style)
-}
-
-/// Returns an [`IterText`] over the characters of the given formatted string,
-/// starting from index `0`, applying formatting codes as specified,
-/// with a unified [`Style`] for starting and reset.
-pub fn iter_formatted_unified_from_start<StyleExt>(
-    str: &str,
-    style: Style<StyleExt>,
-) -> impl IterText<StyleExt>
-where
-    StyleExt: Clone,
-{
-    iter_formatted_unified(str, 0, style)
-}
-
-/// Formats the given string into an iterator over [`IterTextItem`]s,
-/// starting from the given index, applying formatting codes as specified,
-/// with the given starting and reset [`Style`]s.
-fn format<StyleExt>(
-    str: &str,
-    start_index: usize,
-    starting_style: Style<StyleExt>,
-    reset_style: Style<StyleExt>,
-) -> impl Iterator<Item = IterTextItem<StyleExt>>
 where
     StyleExt: Clone,
 {
@@ -179,6 +116,33 @@ where
         }
         None
     })
+}
+
+/// Returns an [`IterText`] over the characters of the given formatted string,
+/// starting from the given index, applying formatting codes as specified,
+/// with a unified [`Style`] for starting and reset.
+pub fn iter_formatted_unified<StyleExt>(
+    str: &str,
+    start_index: usize,
+    style: Style<StyleExt>,
+) -> impl IterText<StyleExt>
+where
+    StyleExt: Clone,
+{
+    iter_formatted(str, start_index, style.clone(), style)
+}
+
+/// Returns an [`IterText`] over the characters of the given formatted string,
+/// starting from index `0`, applying formatting codes as specified,
+/// with a unified [`Style`] for starting and reset.
+pub fn iter_formatted_unified_from_start<StyleExt>(
+    str: &str,
+    style: Style<StyleExt>,
+) -> impl IterText<StyleExt>
+where
+    StyleExt: Clone,
+{
+    iter_formatted_unified(str, 0, style)
 }
 
 /// Removes formatting codes from the given string and returns the plain text.
