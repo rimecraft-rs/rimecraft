@@ -2,9 +2,9 @@
 
 mod error;
 mod iter;
-pub mod ordered_text;
+pub mod iter_text;
 pub mod style;
-pub mod visitor;
+pub mod visit;
 
 #[cfg(feature = "serde")]
 mod _serde;

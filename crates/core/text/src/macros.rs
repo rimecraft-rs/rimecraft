@@ -28,12 +28,13 @@ macro_rules! format_localization_key {
 ///
 /// # Examples
 ///
-/// A simple example from [`crate::ordered_text::empty`]:
+/// A simple example from [`crate::iter_text::styled`]:
 ///
 /// ```
-/// ordered_text! {
-///     _visitor => {
-///         VisitResult::Continue
+/// iter_text! {
+///     <StyleExt> where StyleExt: Clone;
+///         (c: char, style: Style<StyleExt>) => {
+///         std::iter::once((c.to_owned(), style.ext.clone()))
 ///     }
 /// }
 /// ```
@@ -41,85 +42,44 @@ macro_rules! format_localization_key {
 /// ...will expand to something like:
 ///
 /// ```
-/// struct Impl; // Hygienic name
-///
-/// impl crate::ordered_text::OrderedText for Impl {
-///     fn accept<V>(&self, _visitor: &mut V) -> crate::visitor::VisitResult
-///     where
-///         V: crate::visitor::CharVisitor
-///     {
-///         VisitResult::Continue
-///     }
-/// }
-/// ```
-///
-/// You can also define fields and generics like in [`crate::ordered_text::styled`]:
-///
-/// ```
-/// ordered_text! {
-///     <Ext> {
-///         c: char,
-///         style: Style<Ext>,
-///     } where Ext: Clone;
-///     visitor => {
-///         visitor.visit(0, style.clone(), c)
-///     }
-/// }
-/// ```
-///
-/// ...will expand to something like:
-///
-/// ```
-/// struct Impl<Ext> {
+/// struct Impl<StyleExt> {
 ///     c: char,
-///     style: Style<Ext>,
+///     style: Style<StyleExt>,
 /// }
 ///
-/// impl<Ext> crate::ordered_text::OrderedText for Impl<Ext>
+/// impl<StyleExt> crate::iter_text::IterText<StyleExt> for Impl<StyleExt>
 /// where
-///     Ext: Clone,
+///     StyleExt: Clone,
 /// {
-///     fn accept<V>(&self, visitor: &mut V) -> crate::visitor::VisitResult
-///     where
-///         V: crate::visitor::CharVisitor
-///     {
+///     fn iter_text(&self) -> impl Iterator<Item = (char, StyleExt)> + '_ {
 ///         let c = &self.c;
 ///         let style = &self.style;
-///         visitor.visit(0, style.clone(), c)
+///         std::iter::once((c.to_owned(), style.ext.clone()))
 ///     }
 /// }
 /// ```
 #[macro_export]
-macro_rules! ordered_text {
-    ($($(<$($generic:ident),*>)? {
-        $($name:ident: $type:ty),* $(,)?
-    } $(where $($bound_id:ident: $bound:tt),*)? ;)?
+macro_rules! iter_text {
+    (<$generic_ext:ident $(,)? $($generic:ident),*> $(where $($bound_id:ident: $bound:tt),*)? ;
 
-    $visitor:ident => {
-        $($body:expr)*
-    }) => {
+    ($($name:ident: $type:ty),*) => $body:expr) => {
         {
-            struct Impl<$($($($generic),*)?)?> {
-                $($($name: $type),*)?
+            struct Impl<$generic_ext, $($($generic),*)?> {
+                $($name: $type),*
             }
 
-            impl<$($($($generic),*)?)?> $crate::ordered_text::OrderedText for Impl<$($($($generic),*)?)?>
+            impl<$generic_ext, $($($generic),*)?> $crate::iter_text::IterText<$generic_ext> for Impl<$generic_ext, $($($generic),*)?>
             where
-                    $($($($bound_id: $bound),*)?)?
+                    $($($bound_id: $bound),*)?
             {
-                fn accept<V>(&self, $visitor: &mut V) -> $crate::visitor::VisitResult
-                where
-                    V: $crate::visitor::CharVisitor
-                {
-                    $(
-                        $(let $name = &self.$name; )*
-                    )?
-                    $($body)*
+                fn iter_text(&self) -> impl Iterator<Item = (char, $generic_ext)> + '_ {
+                    $(let $name = &self.$name; )*
+                    $body
                 }
             }
 
             Impl {
-                $($($name),*)?
+                $($name),*
             }
         }
     };

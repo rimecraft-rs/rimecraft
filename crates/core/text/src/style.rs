@@ -265,6 +265,7 @@ where
 
 impl<Ext> Style<Ext> {
     /// Returns a new [`Style`] with the formatting provided and all other attributes of this style.
+    #[inline]
     pub fn with_formatting(self, formatting: Formatting) -> Self {
         let mut style = self;
         match formatting {
