@@ -162,12 +162,14 @@ impl From<ShadowColor> for u32 {
 /// All formatting operations take ownership of `self` and return a new instance with the formatting applied.
 pub trait Formattable: Sized {
     /// Returns a new instance with the formatting applied.
-    fn with_formatting(self, _formatting: Formatting) -> Self {
+    fn with_formatting(self, formatting: Formatting) -> Self {
+        let _ = formatting;
         self
     }
 
     /// Returns a new instance with the formatting applied exclusively.
-    fn with_exclusive_formatting(self, _formatting: Formatting) -> Self {
+    fn with_exclusive_formatting(self, formatting: Formatting) -> Self {
+        let _ = formatting;
         self
     }
 }
