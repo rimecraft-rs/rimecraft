@@ -1,6 +1,6 @@
 //! Minecraft client game options.
 
-pub(crate) mod callbacks;
+pub mod callbacks;
 pub mod content;
 pub mod tooltip_factory;
 

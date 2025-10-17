@@ -7,14 +7,14 @@ use crate::{
     callbacks::{Callbacks, ValueSetter, ty::CyclingCallbacks},
 };
 
-pub struct AlternateValuesSupportingCyclingCallbacks<K, T, Txt>
+pub struct AlternateValuesSupportingCyclingCallbacks<K, T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     pub values: HashMap<K, Vec<T>>,
     pub condition: Box<dyn Fn() -> K>,
-    pub value_setter: Box<ValueSetter<T, Txt>>,
-    _phantom: std::marker::PhantomData<Txt>,
+    pub value_setter: Box<ValueSetter<T, Cx>>,
+    _phantom: std::marker::PhantomData<Cx>,
 }
 
 impl<K, T, Cx> AlternateValuesSupportingCyclingCallbacks<K, T, Cx>

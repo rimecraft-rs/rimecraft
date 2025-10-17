@@ -2,13 +2,13 @@ use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::{Callbacks, ValueSetter};
 
-pub trait CyclingCallbacks<T, Txt>: Callbacks<T, Txt>
+pub trait CyclingCallbacks<T, Cx>: Callbacks<T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn get_values(&self); // CyclingButtonWidget.Values<T>
 
-    fn value_setter(&self) -> &ValueSetter<T, Txt> {
+    fn value_setter(&self) -> &ValueSetter<T, Cx> {
         &|option, value| option.set_value(value)
     }
 }

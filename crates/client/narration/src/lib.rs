@@ -70,10 +70,10 @@ impl Narration<String> {
 
 impl Narration<()> {
     /// Creates a [`Narration`] from a single [`Text`] sentence.
-    pub fn text<Txt>(value: Text<Txt>) -> Narration<Text<Txt>>
+    pub fn text<Cx>(value: Text<Cx>) -> Narration<Text<Cx>>
     where
-        Txt: ProvideTextTy,
-        <Txt as ProvideTextTy>::Content: Display,
+        Cx: ProvideTextTy,
+        <Cx as ProvideTextTy>::Content: Display,
     {
         Narration {
             value,
@@ -82,10 +82,10 @@ impl Narration<()> {
     }
 
     /// Creates a [`Narration`] from a list of [`Text`] sentences.
-    pub fn texts<Txt>(value: Vec<Text<Txt>>) -> Narration<Vec<Text<Txt>>>
+    pub fn texts<Cx>(value: Vec<Text<Cx>>) -> Narration<Vec<Text<Cx>>>
     where
-        Txt: ProvideTextTy,
-        <Txt as ProvideTextTy>::Content: Display,
+        Cx: ProvideTextTy,
+        <Cx as ProvideTextTy>::Content: Display,
     {
         Narration {
             value,
@@ -139,21 +139,21 @@ pub trait NarrationMessageBuilder {
     }
 
     /// Adds a [`Text`] narration to this builder, replacing any existing narration for that [`NarrationPart`].
-    fn put_text<Txt>(&mut self, part: NarrationPart, text: Text<Txt>)
+    fn put_text<Cx>(&mut self, part: NarrationPart, text: Text<Cx>)
     where
-        Txt: ProvideTextTy,
-        <Txt as ProvideTextTy>::Content: Display,
+        Cx: ProvideTextTy,
+        <Cx as ProvideTextTy>::Content: Display,
     {
-        self.put(part, Narration::text::<Txt>(text));
+        self.put(part, Narration::text::<Cx>(text));
     }
 
     /// Adds an array of [`Text`] narrations to this builder, replacing any existing narration for that [`NarrationPart`].
-    fn put_texts<Txt>(&mut self, part: NarrationPart, texts: Vec<Text<Txt>>)
+    fn put_texts<Cx>(&mut self, part: NarrationPart, texts: Vec<Text<Cx>>)
     where
-        Txt: ProvideTextTy,
-        <Txt as ProvideTextTy>::Content: Display,
+        Cx: ProvideTextTy,
+        <Cx as ProvideTextTy>::Content: Display,
     {
-        self.put(part, Narration::texts::<Txt>(texts));
+        self.put(part, Narration::texts::<Cx>(texts));
     }
 
     /// Creates a [`NarrationMessageBuilder`] for a submessage.

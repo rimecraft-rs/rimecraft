@@ -14,6 +14,7 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 rimecraft-client-narration = { path = "../narration" }
 rimecraft-text = { path = "../../core/text" }
+rimecraft-global-cx = { path = "../../core/global-cx" }
 
 [lints]
 workspace = true

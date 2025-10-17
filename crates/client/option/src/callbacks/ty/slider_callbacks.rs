@@ -2,9 +2,9 @@ use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::Callbacks;
 
-pub trait SliderCallbacks<T, Txt>: Callbacks<T, Txt>
+pub trait SliderCallbacks<T, Cx>: Callbacks<T, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn to_slider_progress(&self, value: T) -> f32;
 

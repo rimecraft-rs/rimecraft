@@ -3,9 +3,9 @@ use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::{Callbacks, ty::SliderCallbacks};
 
-pub trait DoubleSliderCallbacks<Txt>: SliderCallbacks<f32, Txt>
+pub trait DoubleSliderCallbacks<Cx>: SliderCallbacks<f32, Cx>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
 {
     fn min_inclusive(&self) -> f32;
 
@@ -29,7 +29,7 @@ where
         &self,
         progress_to_value: IR,
         value_to_progress: RI,
-    ) -> impl SliderCallbacks<R, Txt>
+    ) -> impl SliderCallbacks<R, Cx>
     where
         IR: Fn(Option<f32>) -> Option<R>,
         RI: Fn(Option<R>) -> Option<f32>,
@@ -45,9 +45,9 @@ where
             to_value: ToV,
         }
 
-        impl<R, IR, RI, F, ToP, ToV, Txt> SliderCallbacks<R, Txt> for Impl<IR, RI, F, ToP, ToV>
+        impl<R, IR, RI, F, ToP, ToV, Cx> SliderCallbacks<R, Cx> for Impl<IR, RI, F, ToP, ToV>
         where
-            Txt: ProvideTextTy,
+            Cx: ProvideTextTy,
             IR: Fn(Option<f32>) -> Option<R>,
             RI: Fn(Option<R>) -> Option<f32>,
             F: Fn(Option<f32>) -> Option<f32>,
@@ -65,9 +65,9 @@ where
             }
         }
 
-        impl<R, IR, RI, F, ToP, ToV, Txt> Callbacks<R, Txt> for Impl<IR, RI, F, ToP, ToV>
+        impl<R, IR, RI, F, ToP, ToV, Cx> Callbacks<R, Cx> for Impl<IR, RI, F, ToP, ToV>
         where
-            Txt: ProvideTextTy,
+            Cx: ProvideTextTy,
             IR: Fn(Option<f32>) -> Option<R>,
             RI: Fn(Option<R>) -> Option<f32>,
             F: Fn(Option<f32>) -> Option<f32>,
