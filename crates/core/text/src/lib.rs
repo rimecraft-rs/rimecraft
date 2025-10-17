@@ -15,6 +15,8 @@ pub use iter::{Iter, StyledIter};
 use rimecraft_global_cx::GlobalContext;
 pub use style::Style;
 
+use crate::style::Formattable;
+
 /// A raw text component.
 ///
 /// Each text has a tree structure, embodying all its siblings.
@@ -189,7 +191,7 @@ pub trait ProvideTextTy: GlobalContext {
     type Content: Plain;
 
     /// Generic `StyleExt` that should be applied to [`Text`].
-    type StyleExt;
+    type StyleExt: Formattable;
 }
 
 /// Context type decorated [`RawText`].
