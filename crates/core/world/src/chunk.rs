@@ -39,19 +39,18 @@ mod internal_types;
 mod be_tick;
 pub mod iter;
 pub mod light;
-pub mod manager;
 mod section;
 mod upgrade;
 
-pub mod world_chunk;
+mod world_chunk;
 
 pub use rimecraft_voxel_math::ChunkPos;
 
 pub use section::ChunkSection;
 pub use upgrade::UpgradeData;
-pub use world_chunk::WorldChunk;
 
 pub use internal_types::*;
+pub use world_chunk::*;
 
 /// The length of the border of a chunk.
 pub const BORDER_LEN: u32 = 16;
@@ -330,6 +329,10 @@ where
     ///
     /// The returned iterator is optimized for filtering, following vanilla behavior to do chunk section
     /// palette pre-checks for filtering out those sections that don't contain the desired block at all.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the chunk has zero sections, which is not an intended state.
     #[allow(clippy::type_complexity)] // cant do better. help
     #[inline]
     fn blocks(

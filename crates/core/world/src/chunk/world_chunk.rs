@@ -28,6 +28,7 @@ use super::{BORDER_LEN, BaseChunk, BlockEntityCell, Chunk, ChunkCx, section::Com
 
 use std::{
     fmt::Debug,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
     sync::{Arc, Weak},
 };
@@ -76,6 +77,8 @@ where
 
     local_cx: Cx::LocalContext<'w>,
     dsyn_cache: Arc<DsynCache<'w, Cx>>,
+
+    _invariant_marker: PhantomData<fn(&'w ()) -> &'w ()>,
 }
 
 impl<'w, Cx> Debug for WorldChunk<'w, Cx>
@@ -120,6 +123,33 @@ where
     fn __mark_needs_saving(this: impl WorldChunkAccess<'w, Cx>) {
         this.bca().mark_needs_saving();
         //TODO: call dirty chunk listener
+    }
+
+    /// Downcasts a [`Chunk`] to a [`WorldChunk`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the chunk if it is not a [`WorldChunk`], or it is **a reference of it.**
+    #[inline]
+    pub fn downcast<C: Chunk<'w, Cx>>(value: C) -> Result<Self, C> {
+        //SAFETY: 'w is invariant here. won't produce lifetime soundness issues
+        unsafe { rcutil::try_cast(value) }
+    }
+
+    /// Downcasts a [`Chunk`] to a [`WorldChunk`] by reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns the chunk if it is not a [`WorldChunk`].
+    #[inline]
+    pub fn downcast_ref<C: Chunk<'w, Cx>>(value: &C) -> Option<&Self> {
+        unsafe {
+            //SAFETY: 'w is invariant here. won't produce lifetime soundness issues
+            rcutil::try_cast::<_, &&Self>(value)
+                .copied()
+                .or_else(|value| rcutil::try_cast::<_, &Self>(value))
+                .ok()
+        }
     }
 }
 

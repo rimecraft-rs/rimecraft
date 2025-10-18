@@ -1,6 +1,6 @@
 //! Iterator implementations for chunk.
 
-use std::{fmt::Debug, iter::FusedIterator, marker::PhantomData, mem::MaybeUninit, ops::Deref};
+use std::{fmt::Debug, iter::FusedIterator, marker::PhantomData, ops::Deref};
 
 use glam::UVec3;
 use rimecraft_block::BlockState;
@@ -48,13 +48,6 @@ where
         section,
         _marker: PhantomData,
     })
-}
-
-unsafe fn transmute_unchecked<L, R>(value: L) -> R {
-    let mut r = MaybeUninit::<R>::uninit();
-    unsafe { &mut *std::ptr::from_mut(&mut r).cast::<MaybeUninit<L>>() }.write(value);
-    //SAFETY: we have already written to the uninit memory
-    unsafe { r.assume_init() }
 }
 
 impl<'w, I, S, Cx> FusedIterator for Blocks<'w, I, S, Cx>
@@ -120,7 +113,7 @@ where
             self.0.filter(predicate);
         //SAFETY: transparent representation guarantees this to be safe in low-level
         let filter: std::iter::Filter<Blocks<'w, I, S, Cx>, P> =
-            unsafe { transmute_unchecked(filter_inner) };
+            unsafe { rcutil::transmute(filter_inner) };
         filter
     }
 
@@ -134,7 +127,7 @@ where
             self.0.filter_map(f);
         //SAFETY: transparent representation guarantees this to be safe in low-level
         let filter_map: std::iter::FilterMap<Blocks<'w, I, S, Cx>, F> =
-            unsafe { transmute_unchecked(filter_map_inner) };
+            unsafe { rcutil::transmute(filter_map_inner) };
         filter_map
     }
 

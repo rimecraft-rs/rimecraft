@@ -30,6 +30,7 @@ maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
 ident-hash = { path = "../../util/ident-hash", package = "rimecraft-ident-hash" }
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 voxel-shape = { path = "../../util/voxel-shape", package = "rimecraft-voxel-shape" }
+rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }
 # External utils
 serde = { version = "1.0", features = ["derive"] }
 serde-private = "1.0"
@@ -41,8 +42,6 @@ ahash = "0.8"
 glam = "0.30"
 bitflags = "2.9"
 tracing = { version = "0.1", optional = true }
-bitvec = "1.0"
-smallvec = { version = "1.15", features = ["const_generics"] }
 
 [features]
 default = ["edcode"]
