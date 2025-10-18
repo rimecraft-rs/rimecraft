@@ -1,11 +1,14 @@
 //! `rimecraft-client-mouse` integrations.
 
 #![cfg(feature = "mouse")]
+#![allow(missing_docs)]
 
 use mouse::{ProvideMouseTy, button::MouseButton};
 
 use crate::TestContext;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum TestButton {
     Left,
     Right,

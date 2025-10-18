@@ -1,6 +1,7 @@
 //! `rimecraft-client-keyboard` integrations.
 
 #![cfg(feature = "keyboard")]
+#![allow(missing_docs)]
 
 use keyboard::{
     ProvideKeyboardTy,
@@ -12,6 +13,8 @@ use keyboard::{
 
 use crate::TestContext;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum TestKey {
     Num0,
     Num1,

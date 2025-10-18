@@ -16,6 +16,10 @@ rimecraft-keyboard = { path = "../../util/keyboard" }
 rimecraft-mouse = { path = "../../util/mouse" }
 
 [dev-dependencies]
+rimecraft-test-global = { path = "../../test/global", package = "rimecraft-test-global", features = [
+    "keyboard",
+    "mouse",
+] }
 rimecraft-global-cx = { path = "../../core/global-cx" }
 
 [lints]

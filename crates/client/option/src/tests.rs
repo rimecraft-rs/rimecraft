@@ -14,9 +14,9 @@ fn test_callbacks() {
 fn test_simple_options() {
     let bool_option = bool::<TestContext>(
         TextContent::from("test_bool_option").into(),
-        Box::new(|text, &b: &bool| TextContent::from(&b.to_string()[..]).into()),
+        Box::new(|_, b: &bool| TextContent::from(&b.to_string()[..]).into()),
         true,
         Box::new(|_| None),
-        Box::new(|&b: &bool| println!("Bool option changed to: {}", b)),
+        Box::new(|b: &bool| println!("Bool option changed to: {}", b)),
     );
 }
