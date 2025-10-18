@@ -1,4 +1,4 @@
-//! Integration tests for the Localize derive macro.
+//! Integration tests for the [`Localize`] derive macro.
 
 #![allow(unused)]
 
@@ -163,31 +163,35 @@ fn test_camel_case_conversion() {
 }
 
 #[derive(Localize)]
-enum EnumWithData {
-    #[localize(variant, unit)]
+#[localize(prefix = "variant", suffix = "end")]
+enum EnumWithDataAndPrefixSuffix {
+    #[localize(unit)]
     Unit,
 
-    #[localize(variant, tuple)]
+    #[localize(tuple)]
     Tuple(i32, String),
 
-    #[localize(variant, named)]
+    #[localize(named)]
     Named { x: i32, y: String },
 }
 
 #[test]
-fn test_enum_with_data() {
-    assert_eq!(EnumWithData::Unit.localization_key(), "variant.unit");
+fn test_enum_with_data_and_prefix_suffix() {
     assert_eq!(
-        EnumWithData::Tuple(42, "test".to_owned()).localization_key(),
-        "variant.tuple"
+        EnumWithDataAndPrefixSuffix::Unit.localization_key(),
+        "variant.unit.end"
     );
     assert_eq!(
-        EnumWithData::Named {
+        EnumWithDataAndPrefixSuffix::Tuple(42, "test".to_owned()).localization_key(),
+        "variant.tuple.end"
+    );
+    assert_eq!(
+        EnumWithDataAndPrefixSuffix::Named {
             x: 42,
             y: "test".to_owned()
         }
         .localization_key(),
-        "variant.named"
+        "variant.named.end"
     );
 }
 
