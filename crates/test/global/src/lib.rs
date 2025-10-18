@@ -26,8 +26,11 @@ pub use local_cx;
 /// Integration with several Rimecraft crates.
 pub mod integration {
     pub mod component;
+    pub mod keyboard;
+    pub mod mouse;
     pub mod registry;
     pub mod text;
+    pub mod tooltip;
 }
 
 pub use identifier::Id;

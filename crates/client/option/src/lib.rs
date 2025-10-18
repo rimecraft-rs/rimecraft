@@ -155,3 +155,26 @@ where
         &*self.callbacks
     }
 }
+
+/// Creates a boolean [`SimpleOption`] with the specified parameters.
+///
+/// See: [`callbacks::bool`]
+pub fn bool<Cx>(
+    text: Text<Cx>,
+    value_text_getter: Box<dyn ValueTextGetter<bool, Cx>>,
+    default: bool,
+    tooltip_factory: Box<dyn TooltipFactory<bool, Cx>>,
+    change_callback: Box<dyn Fn(&bool)>,
+) -> SimpleOption<bool, Cx>
+where
+    Cx: ProvideTextTy,
+{
+    SimpleOption::new(
+        text,
+        value_text_getter,
+        default,
+        Box::new(callbacks::bool()),
+        tooltip_factory,
+        change_callback,
+    )
+}

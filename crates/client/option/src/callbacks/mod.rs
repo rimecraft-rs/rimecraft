@@ -32,3 +32,13 @@ where
     /// This function takes ownership of `value` to allow for more flexible validation logic.
     fn validate(&self, value: V) -> Option<V>;
 }
+
+/// Creates a boolean [`Callbacks`] instance that supports `true` and `false` values.
+pub fn bool<Cx>() -> impl Callbacks<bool, Cx>
+where
+    Cx: ProvideTextTy,
+{
+    PotentialValuesBasedCallbacks {
+        values: vec![true, false],
+    }
+}

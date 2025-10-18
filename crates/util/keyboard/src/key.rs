@@ -106,10 +106,10 @@ define_key_trait! {
 define_key_trait! {
     "Arrow keys.";
     pub KeyArrow {
-        UP: "Up arrow key.",
-        DOWN: "Down arrow key.",
-        LEFT: "Left arrow key.",
-        RIGHT: "Right arrow key.",
+        ARROW_UP: "Up arrow key.",
+        ARROW_DOWN: "Down arrow key.",
+        ARROW_LEFT: "Left arrow key.",
+        ARROW_RIGHT: "Right arrow key.",
     }
 }
 
@@ -132,12 +132,12 @@ define_key_trait! {
 define_key_trait! {
     "Extended numpad keys.";
     pub KeyNumpadExt {
-        DECIMAL: "Numpad decimal key.",
-        DIVIDE: "Numpad divide key.",
-        MULTIPLY: "Numpad multiply key.",
-        SUBTRACT: "Numpad subtract key.",
-        ADD: "Numpad add key.",
-        ENTER: "Numpad enter key.",
+        NUMPAD_DECIMAL: "Numpad decimal key.",
+        NUMPAD_DIVIDE: "Numpad divide key.",
+        NUMPAD_MULTIPLY: "Numpad multiply key.",
+        NUMPAD_SUBTRACT: "Numpad subtract key.",
+        NUMPAD_ADD: "Numpad add key.",
+        NUMPAD_ENTER: "Numpad enter key.",
     }
 }
 
@@ -145,12 +145,12 @@ define_key_trait! {
     "Modifier keys.";
     pub KeyModifier {
         LEFT_SHIFT: "Left shift key.",
-        RIGHT_SHIFT: "Right shift key.",
         LEFT_CTRL: "Left control key.",
-        RIGHT_CTRL: "Right control key.",
         LEFT_ALT: "Left alt key.",
-        RIGHT_ALT: "Right alt key.",
         LEFT_META: "Left meta key.",
+        RIGHT_SHIFT: "Right shift key.",
+        RIGHT_CTRL: "Right control key.",
+        RIGHT_ALT: "Right alt key.",
         RIGHT_META: "Right meta key.",
     }
 }
