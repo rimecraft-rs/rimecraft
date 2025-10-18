@@ -1,3 +1,8 @@
+//! Defines traits for keyboard keys.
+//!
+//! All traits defined in this module are implemented for the unit type `()`,
+//! allowing users to opt out of specifying concrete key types when they are not needed.
+
 use rimecraft_global_cx::GlobalContext;
 
 /// Provides associated types for keyboard keys.
