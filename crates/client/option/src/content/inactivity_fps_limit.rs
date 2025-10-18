@@ -1,14 +1,15 @@
 //! Inactivity FPS limit choices.
 
-use std::{borrow::Cow, fmt::Display};
+use std::fmt::Display;
 
 use enum_iterator::Sequence;
-use rimecraft_text::{Localize, format_localization_key};
+use rimecraft_text::Localize;
 
 use super::ByUSizeId;
 
 /// Represents FPS limit behavior when inactive or minimized.
-#[derive(Debug, Sequence)]
+#[derive(Debug, Sequence, Localize)]
+#[localize(prefix = [option, _])]
 #[non_exhaustive]
 pub enum InactivityFpsLimit {
     /// When window is minimized.
@@ -29,15 +30,5 @@ impl Display for InactivityFpsLimit {
                 InactivityFpsLimit::Afk => "afk",
             }
         )
-    }
-}
-
-impl Localize for InactivityFpsLimit {
-    fn localization_key(&self) -> Cow<'_, str> {
-        Cow::Owned(format_localization_key![
-            "options",
-            "inactivity",
-            &format!("{}", self)
-        ])
     }
 }

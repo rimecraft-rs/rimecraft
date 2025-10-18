@@ -82,6 +82,7 @@ fn test_underscore_placeholder() {
 }
 
 #[derive(Localize)]
+#[localize(prefix = [mixed])]
 enum MixedFormats {
     #[localize(category, _, suffix)]
     First,
@@ -99,11 +100,14 @@ enum MixedFormats {
 fn test_mixed_formats() {
     assert_eq!(
         MixedFormats::First.localization_key(),
-        "category.first.suffix"
+        "mixed.category.first.suffix"
     );
-    assert_eq!(MixedFormats::Second.localization_key(), "custom.static.key");
-    assert_eq!(MixedFormats::Third.localization_key(), "third");
-    assert_eq!(MixedFormats::Default.localization_key(), "default");
+    assert_eq!(
+        MixedFormats::Second.localization_key(),
+        "mixed.custom.static.key"
+    );
+    assert_eq!(MixedFormats::Third.localization_key(), "mixed.third");
+    assert_eq!(MixedFormats::Default.localization_key(), "mixed.default");
 }
 
 #[derive(Localize)]
@@ -163,7 +167,7 @@ fn test_camel_case_conversion() {
 }
 
 #[derive(Localize)]
-#[localize(prefix = "variant", suffix = "end")]
+#[localize(prefix = "variant", suffix = [_, end])]
 enum EnumWithDataAndPrefixSuffix {
     #[localize(unit)]
     Unit,
@@ -179,11 +183,11 @@ enum EnumWithDataAndPrefixSuffix {
 fn test_enum_with_data_and_prefix_suffix() {
     assert_eq!(
         EnumWithDataAndPrefixSuffix::Unit.localization_key(),
-        "variant.unit.end"
+        "variant.unit.enum_with_data_and_prefix_suffix.end"
     );
     assert_eq!(
         EnumWithDataAndPrefixSuffix::Tuple(42, "test".to_owned()).localization_key(),
-        "variant.tuple.end"
+        "variant.tuple.enum_with_data_and_prefix_suffix.end"
     );
     assert_eq!(
         EnumWithDataAndPrefixSuffix::Named {
@@ -191,7 +195,7 @@ fn test_enum_with_data_and_prefix_suffix() {
             y: "test".to_owned()
         }
         .localization_key(),
-        "variant.named.end"
+        "variant.named.enum_with_data_and_prefix_suffix.end"
     );
 }
 

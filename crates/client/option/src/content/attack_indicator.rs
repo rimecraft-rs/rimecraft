@@ -1,14 +1,15 @@
 //! Enum for attack indicator.
 
-use std::{borrow::Cow, fmt::Display};
+use std::fmt::Display;
 
 use enum_iterator::Sequence;
-use rimecraft_text::{Localize, format_localization_key};
+use rimecraft_text::Localize;
 
 use super::ByUSizeId;
 
 /// Represents the position of the attack indicator.
-#[derive(Debug, Sequence)]
+#[derive(Debug, Sequence, Localize)]
+#[localize(prefix = [option, _])]
 #[non_exhaustive]
 pub enum AttackIndicator {
     /// Attack indicator off.
@@ -32,17 +33,5 @@ impl Display for AttackIndicator {
                 AttackIndicator::Hotbar => "hotbar",
             }
         )
-    }
-}
-
-impl Localize for AttackIndicator {
-    fn localization_key(&self) -> Cow<'_, str> {
-        Cow::Owned(format_localization_key![
-            "options",
-            match self {
-                AttackIndicator::Off => "off".into(),
-                _ => format_localization_key!["attack", format!("{}", self)],
-            }
-        ])
     }
 }

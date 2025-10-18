@@ -1,9 +1,9 @@
 //! Enum for graphics mode.
 
-use std::{borrow::Cow, fmt::Display};
+use std::fmt::Display;
 
 use enum_iterator::Sequence;
-use rimecraft_text::{Localize, format_localization_key};
+use rimecraft_text::Localize;
 
 use super::ByUSizeId;
 
@@ -12,7 +12,8 @@ use super::ByUSizeId;
 /// # MCJE Reference
 ///
 /// This type represents `net.minecraft.client.option.GraphicsMode` (yarn).
-#[derive(Debug, Sequence)]
+#[derive(Debug, Sequence, Localize)]
+#[localize(prefix = [option, graphics])]
 #[non_exhaustive]
 pub enum GraphicsMode {
     /// The fastest rendering speed with the worst picture.
@@ -36,15 +37,5 @@ impl Display for GraphicsMode {
                 GraphicsMode::Fabulous => "fabulous",
             }
         )
-    }
-}
-
-impl Localize for GraphicsMode {
-    fn localization_key(&self) -> Cow<'_, str> {
-        Cow::Owned(format_localization_key!(
-            "options",
-            "graphics",
-            &format!("{}", self)
-        ))
     }
 }

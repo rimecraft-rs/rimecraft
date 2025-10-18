@@ -1,14 +1,15 @@
 //! Enum for cloud render mode.
 
-use std::{borrow::Cow, fmt::Display};
+use std::fmt::Display;
 
 use enum_iterator::Sequence;
-use rimecraft_text::{Localize, format_localization_key};
+use rimecraft_text::Localize;
 
 use super::ByUSizeId;
 
 /// Represents the rendering mode of clouds.
-#[derive(Debug, Sequence)]
+#[derive(Debug, Sequence, Localize)]
+#[localize(prefix = [option, clouds])]
 #[non_exhaustive]
 pub enum CloudRenderMode {
     /// Doesn't render clouds.
@@ -32,17 +33,5 @@ impl Display for CloudRenderMode {
                 CloudRenderMode::Fancy => "fancy",
             }
         )
-    }
-}
-
-impl Localize for CloudRenderMode {
-    fn localization_key(&self) -> Cow<'_, str> {
-        Cow::Owned(format_localization_key![
-            "options",
-            match self {
-                CloudRenderMode::Off => "off".into(),
-                _ => format_localization_key!["clouds", format!("{}", self)],
-            }
-        ])
     }
 }

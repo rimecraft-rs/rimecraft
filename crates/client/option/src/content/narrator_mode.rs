@@ -1,9 +1,9 @@
 //! Enum for narrator mode.
 
-use std::{borrow::Cow, fmt::Display};
+use std::fmt::Display;
 
 use enum_iterator::Sequence;
-use rimecraft_text::{Localize, format_localization_key};
+use rimecraft_text::Localize;
 
 use super::ByUSizeId;
 
@@ -12,7 +12,8 @@ use super::ByUSizeId;
 /// # MCJE Reference
 ///
 /// This type represents `net.minecraft.client.option.NarratorMode` (yarn).
-#[derive(Debug, Sequence)]
+#[derive(Debug, Sequence, Localize)]
+#[localize(prefix = [option, narrator])]
 #[non_exhaustive]
 pub enum NarratorMode {
     /// Narrator off.
@@ -56,15 +57,5 @@ impl NarratorMode {
     /// Returns whether **any messages** should be narrated.
     pub fn should_narrate(&self) -> bool {
         !matches!(self, NarratorMode::Off)
-    }
-}
-
-impl Localize for NarratorMode {
-    fn localization_key(&self) -> Cow<'_, str> {
-        Cow::Owned(format_localization_key!(
-            "options",
-            "narrator",
-            &format!("{}", self)
-        ))
     }
 }

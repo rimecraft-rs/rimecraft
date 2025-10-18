@@ -28,8 +28,7 @@ fn impl_localize(input: &DeriveInput) -> syn::Result<TokenStream> {
         }
     };
 
-    // Parse optional enum-level prefix/suffix: #[localize(prefix = "...", suffix = "...")]
-    let (enum_prefix, enum_suffix) = parse_enum_level_prefix_suffix(&input.attrs)?;
+    let (enum_prefix, enum_suffix) = parse_enum_level_prefix_suffix(&input.attrs, ident)?;
 
     let mut arms = Vec::new();
 
@@ -59,9 +58,9 @@ fn impl_localize(input: &DeriveInput) -> syn::Result<TokenStream> {
     Ok(expanded.into())
 }
 
-/// Parse enum-level `#[localize(prefix = "...", suffix = "...")]`.
 fn parse_enum_level_prefix_suffix(
     attrs: &[Attribute],
+    enum_ident: &syn::Ident,
 ) -> syn::Result<(Option<String>, Option<String>)> {
     let mut prefix: Option<String> = None;
     let mut suffix: Option<String> = None;
@@ -72,7 +71,6 @@ fn parse_enum_level_prefix_suffix(
         }
 
         if let Meta::List(list) = &attr.meta {
-            // Try parse name-value pairs: prefix = "...", suffix = "..."
             let pairs =
                 syn::punctuated::Punctuated::<MetaNameValue, syn::Token![,]>::parse_terminated
                     .parse2(list.tokens.clone());
@@ -80,37 +78,9 @@ fn parse_enum_level_prefix_suffix(
             if let Ok(pairs) = pairs {
                 for nv in pairs {
                     if nv.path.is_ident("prefix") {
-                        if let Expr::Lit(el) = nv.value {
-                            if let Lit::Str(s) = el.lit {
-                                prefix = Some(s.value());
-                            } else {
-                                return Err(syn::Error::new(
-                                    el.lit.span(),
-                                    "prefix must be a string literal",
-                                ));
-                            }
-                        } else {
-                            return Err(syn::Error::new(
-                                nv.value.span(),
-                                "prefix must be a string literal",
-                            ));
-                        }
+                        prefix = Some(parse_prefix_suffix_value(&nv.value, enum_ident)?);
                     } else if nv.path.is_ident("suffix") {
-                        if let Expr::Lit(el) = nv.value {
-                            if let Lit::Str(s) = el.lit {
-                                suffix = Some(s.value());
-                            } else {
-                                return Err(syn::Error::new(
-                                    el.lit.span(),
-                                    "suffix must be a string literal",
-                                ));
-                            }
-                        } else {
-                            return Err(syn::Error::new(
-                                nv.value.span(),
-                                "suffix must be a string literal",
-                            ));
-                        }
+                        suffix = Some(parse_prefix_suffix_value(&nv.value, enum_ident)?);
                     }
                 }
             }
@@ -118,6 +88,57 @@ fn parse_enum_level_prefix_suffix(
     }
 
     Ok((prefix, suffix))
+}
+
+fn parse_prefix_suffix_value(value: &Expr, enum_ident: &syn::Ident) -> syn::Result<String> {
+    match value {
+        Expr::Lit(el) => {
+            if let Lit::Str(s) = &el.lit {
+                let raw = s.value();
+                let enum_snake = to_snake_case_ident(&enum_ident.to_string());
+                Ok(raw.replace('_', &enum_snake))
+            } else {
+                Err(syn::Error::new(
+                    el.lit.span(),
+                    "prefix/suffix must be a string literal or array",
+                ))
+            }
+        }
+        Expr::Array(arr) => {
+            let mut segs = Vec::new();
+            for elem in &arr.elems {
+                match elem {
+                    Expr::Path(p) => {
+                        segs.push(path_to_ident_str(&p.path));
+                    }
+                    Expr::Infer(_) => {
+                        segs.push(to_snake_case_ident(&enum_ident.to_string()));
+                    }
+                    Expr::Lit(el) => {
+                        if let Lit::Str(s) = &el.lit {
+                            segs.push(s.value());
+                        } else {
+                            return Err(syn::Error::new(
+                                el.lit.span(),
+                                "only string literals, identifiers, and _ are supported in array syntax",
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Err(syn::Error::new(
+                            elem.span(),
+                            "only identifiers, string literals, and _ are supported in array syntax",
+                        ));
+                    }
+                }
+            }
+            Ok(segs.join("."))
+        }
+        _ => Err(syn::Error::new(
+            value.span(),
+            "prefix/suffix must be a string literal or array like [a, b, _, c]",
+        )),
+    }
 }
 
 fn parse_variant_localize_segments(

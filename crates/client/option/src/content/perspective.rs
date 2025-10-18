@@ -3,6 +3,7 @@
 use std::fmt::Display;
 
 use enum_iterator::Sequence;
+use rimecraft_text::Localize;
 
 use super::ByUSizeId;
 
@@ -11,7 +12,8 @@ use super::ByUSizeId;
 /// # MCJE Reference
 ///
 /// This type represents `net.minecraft.client.option.Perspective` (yarn).
-#[derive(Debug, Sequence, PartialEq)]
+#[derive(Debug, Sequence, PartialEq, Localize)]
+#[localize(prefix = [option, _])]
 #[non_exhaustive]
 pub enum Perspective {
     /// 1st person perspective.

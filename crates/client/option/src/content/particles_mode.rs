@@ -1,9 +1,9 @@
 //! Enum for particles mode.
 
-use std::{borrow::Cow, fmt::Display};
+use std::fmt::Display;
 
 use enum_iterator::Sequence;
-use rimecraft_text::{format_localization_key, Localize};
+use rimecraft_text::Localize;
 
 use super::ByUSizeId;
 
@@ -12,8 +12,9 @@ use super::ByUSizeId;
 /// # MCJE Reference
 ///
 /// This type represents `net.minecraft.client.option.ParticlesMode` (yarn).
-#[derive(Debug, Sequence, PartialEq)]
-#[allow(clippy::exhaustive_enums)]
+#[derive(Debug, Sequence, PartialEq, Localize)]
+#[localize(prefix = [option, particles])]
+#[non_exhaustive]
 pub enum ParticlesMode {
     /// Renders all particles.
     All,
@@ -36,15 +37,5 @@ impl Display for ParticlesMode {
                 ParticlesMode::Minimal => "minimal",
             }
         )
-    }
-}
-
-impl Localize for ParticlesMode {
-    fn localization_key(&self) -> Cow<'_, str> {
-        Cow::Owned(format_localization_key!(
-            "options",
-            "particles",
-            &format!("{}", self)
-        ))
     }
 }
