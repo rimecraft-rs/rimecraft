@@ -17,7 +17,7 @@ quote = "1"
 syn = { version = "2", features = ["full", "extra-traits"] }
 
 [dev-dependencies]
-rimecraft-text = { path = "../text", features = ["macros"] }
+rimecraft-text = { path = "../../core/text", features = ["macros"] }
 
 [lints]
 workspace = true
