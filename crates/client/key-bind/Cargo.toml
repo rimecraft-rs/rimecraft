@@ -1,0 +1,17 @@
+[package]
+name = "rimecraft-client-key-bind"
+version = "0.1.0"
+edition = "2024"
+authors = ["KrLite"]
+description = "Minecraft client key binds"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+
+[lints]
+workspace = true
