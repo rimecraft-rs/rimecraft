@@ -64,6 +64,6 @@ impl Display for TextContent {
 mod sealed {
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Serialize, Deserialize, Default)]
+    #[derive(Debug, Default, Serialize, Deserialize, Clone)]
     pub struct EmptyStyleExt {}
 }

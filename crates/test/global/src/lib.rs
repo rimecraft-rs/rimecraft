@@ -38,7 +38,7 @@ pub use identifier::Id;
 use registry::Registry;
 
 /// The global context.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(clippy::exhaustive_enums)]
 pub enum TestContext {}
 
