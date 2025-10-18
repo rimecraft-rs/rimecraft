@@ -12,6 +12,8 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+rimecraft-keyboard = { path = "../../util/keyboard" }
+rimecraft-mouse = { path = "../../util/mouse" }
 
 [lints]
 workspace = true

@@ -2,9 +2,48 @@
 
 use std::fmt::Debug;
 
-use crate::key::ProvideKeyTy;
+use rimecraft_global_cx::GlobalContext;
+
+use key::*;
 
 pub mod key;
+
+/// Provides associated types for keyboard input.
+pub trait ProvideKeyboardTy: GlobalContext {
+    /// The key type used for keyboard input.
+    type Key: KeyNum
+        + KeyAlphabet
+        + KeyFunction
+        + KeyFunctionExt
+        + KeyArrow
+        + KeyNumpad
+        + KeyNumpadExt
+        + KeyModifier
+        + KeySpecial
+        + KeyExt;
+}
+
+/// Represents the state of a key, useful for querying key states.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum KeyState {
+    /// The key is not pressed.
+    Idle,
+    /// The key is pressed down.
+    Pressed,
+}
+
+impl KeyState {
+    /// Returns `true` if the key is currently idle.
+    pub fn is_idle(&self) -> bool {
+        matches!(self, KeyState::Idle)
+    }
+
+    /// Returns `true` if the key is currently pressed.
+    pub fn is_pressed(&self) -> bool {
+        matches!(self, KeyState::Pressed)
+    }
+}
 
 /// Different keyboard input types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,7 +60,7 @@ pub enum InputType {
 /// Represents a keyboard input event.
 pub struct Input<Cx>
 where
-    Cx: ProvideKeyTy,
+    Cx: ProvideKeyboardTy,
 {
     /// The [`InputType`] of the input.
     pub ty: InputType,
@@ -31,8 +70,8 @@ where
 
 impl<Cx> Debug for Input<Cx>
 where
-    Cx: ProvideKeyTy,
-    <Cx as ProvideKeyTy>::Key: Debug,
+    Cx: ProvideKeyboardTy,
+    <Cx as ProvideKeyboardTy>::Key: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Input")

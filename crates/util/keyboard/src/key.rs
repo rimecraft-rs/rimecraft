@@ -3,21 +3,6 @@
 //! All traits defined in this module are implemented for unit type `()`,
 //! allowing users to opt out of specifying concrete key types when they are not needed.
 
-use rimecraft_global_cx::GlobalContext;
-
-/// Provides associated types for keyboard keys.
-pub trait ProvideKeyTy: GlobalContext {
-    type Key: KeyNum
-        + KeyAlphabet
-        + KeyFunction
-        + KeyFunctionExt
-        + KeyArrow
-        + KeyNumpad
-        + KeyNumpadExt
-        + KeyModifier
-        + KeySpecial;
-}
-
 macro_rules! define_key_trait {
     ($($($doc:expr)* ;)? $vis:vis $name:ident { $($variant:ident $(: $variant_doc:expr)?),* $(,)? }) => {
         $($(#[doc = $doc])*)?
@@ -32,6 +17,11 @@ macro_rules! define_key_trait {
             $(const $variant: Self = ();)*
         }
     };
+}
+
+define_key_trait! {
+    "Extended keys.";
+    pub KeyExt {}
 }
 
 define_key_trait! {
