@@ -1,16 +1,13 @@
 //! Enum for cloud render mode.
 
-use std::fmt::Display;
+use std::{borrow::Cow, fmt::Display};
 
 use enum_iterator::Sequence;
+use rimecraft_text::{Localize, format_localization_key};
 
 use super::ByUSizeId;
 
 /// Represents the rendering mode of clouds.
-///
-/// # MCJE Reference
-///
-/// This type represents `net.minecraft.client.option.CloudRenderMode` (yarn).
 #[derive(Debug, Sequence)]
 #[non_exhaustive]
 pub enum CloudRenderMode {
@@ -35,5 +32,17 @@ impl Display for CloudRenderMode {
                 CloudRenderMode::Fancy => "fancy",
             }
         )
+    }
+}
+
+impl Localize for CloudRenderMode {
+    fn localization_key(&self) -> Cow<'_, str> {
+        Cow::Owned(format_localization_key![
+            "options",
+            match self {
+                CloudRenderMode::Off => "off".into(),
+                _ => format_localization_key!["clouds", format!("{}", self)],
+            }
+        ])
     }
 }

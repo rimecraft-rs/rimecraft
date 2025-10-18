@@ -212,3 +212,6 @@ mod tests;
 
 #[cfg(feature = "macros")]
 mod macros;
+
+#[cfg(feature = "macros")]
+pub use rimecraft_text_derive::Localize;

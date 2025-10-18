@@ -8,10 +8,6 @@ use rimecraft_text::{Localize, format_localization_key};
 use super::ByUSizeId;
 
 /// Represents the position of the attack indicator.
-///
-/// # MCJE Reference
-///
-/// This type represents `net.minecraft.client.option.AttackIndicator` (yarn).
 #[derive(Debug, Sequence)]
 #[non_exhaustive]
 pub enum AttackIndicator {
@@ -41,10 +37,12 @@ impl Display for AttackIndicator {
 
 impl Localize for AttackIndicator {
     fn localization_key(&self) -> Cow<'_, str> {
-        Cow::Owned(format_localization_key!(
+        Cow::Owned(format_localization_key![
             "options",
-            "attack",
-            &format!("{}", self)
-        ))
+            match self {
+                AttackIndicator::Off => "off".into(),
+                _ => format_localization_key!["attack", format!("{}", self)],
+            }
+        ])
     }
 }

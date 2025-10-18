@@ -5,6 +5,7 @@ use enum_iterator::Sequence;
 mod attack_indicator;
 mod cloud_render_mode;
 mod graphics_mode;
+mod inactivity_fps_limit;
 mod narrator_mode;
 mod particles_mode;
 mod perspective;
@@ -12,6 +13,7 @@ mod perspective;
 pub use attack_indicator::*;
 pub use cloud_render_mode::*;
 pub use graphics_mode::*;
+pub use inactivity_fps_limit::*;
 pub use narrator_mode::*;
 pub use particles_mode::*;
 pub use perspective::*;
@@ -40,5 +42,13 @@ pub trait ByUSizeId: Sequence {
         } else {
             None
         }
+    }
+
+    /// Gets the next item. If not exist, the first item is returned.
+    fn wrapping_next(&self) -> Self
+    where
+        Self: PartialEq,
+    {
+        self.next().unwrap_or(Self::first().unwrap())
     }
 }

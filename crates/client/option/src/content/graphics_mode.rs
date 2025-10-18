@@ -3,7 +3,7 @@
 use std::{borrow::Cow, fmt::Display};
 
 use enum_iterator::Sequence;
-use rimecraft_text::{format_localization_key, Localize};
+use rimecraft_text::{Localize, format_localization_key};
 
 use super::ByUSizeId;
 

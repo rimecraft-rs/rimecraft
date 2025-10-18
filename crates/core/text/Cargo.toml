@@ -17,11 +17,12 @@ rgb = "0.8"
 rimecraft-fmt = { path = "../../util/fmt" }
 serde = { version = "1.0", features = ["derive"], optional = true }
 edcode2 = { path = "../../util/edcode2", optional = true, package = "rimecraft-edcode2" }
+rimecraft-text-derive = { path = "../text-derive", optional = true }
 
 [features]
 default = ["macros", "rgb/argb"]
 serde = ["dep:serde"]
-macros = []
+macros = ["dep:rimecraft-text-derive"]
 edcode = ["dep:edcode2", "rimecraft-global-cx/edcode", "serde"]
 
 [lints]

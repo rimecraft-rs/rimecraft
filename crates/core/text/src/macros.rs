@@ -13,9 +13,7 @@
 /// ```
 #[macro_export]
 macro_rules! format_localization_key {
-	($($word:expr),*) => {
-		{
-			[$($word),*].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(".")
-		}
-	};
+    ($($word:expr),* $(,)?) => {{
+        [$($word.to_string()),*].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(".")
+    }};
 }
