@@ -23,6 +23,7 @@ serde = ["dep:serde"]
 nbt = ["serde"]
 edcode = ["dep:edcode2", "std"]
 rand = ["dep:rand"]
+unit = []
 
 [lints]
 workspace = true

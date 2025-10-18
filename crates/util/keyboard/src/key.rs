@@ -1,30 +1,21 @@
 //! Defines traits for keyboard keys.
 //!
-//! All traits defined in this module are implemented for the unit type `()`,
+//! All traits defined in this module are implemented for unit type `()`,
 //! allowing users to opt out of specifying concrete key types when they are not needed.
 
 use rimecraft_global_cx::GlobalContext;
 
 /// Provides associated types for keyboard keys.
 pub trait ProvideKeyTy: GlobalContext {
-    /// Numeric keys `0-9`.
-    type Num: KeyNum;
-    /// Alphabet keys `A-Z`.
-    type Alphabet: KeyAlphabet;
-    /// Function keys `F1-F12`.
-    type Function: KeyFunction;
-    /// Extended function keys `F13-F25`.
-    type FunctionExt: KeyFunctionExt;
-    /// Arrow keys.
-    type Arrow: KeyArrow;
-    /// Numpad keys.
-    type Numpad: KeyNumpad;
-    /// Extended numpad keys.
-    type NumpadExt: KeyNumpadExt;
-    /// Modifier keys.
-    type Modifier: KeyModifier;
-    /// Special keys.
-    type Special: KeySpecial;
+    type Key: KeyNum
+        + KeyAlphabet
+        + KeyFunction
+        + KeyFunctionExt
+        + KeyArrow
+        + KeyNumpad
+        + KeyNumpadExt
+        + KeyModifier
+        + KeySpecial;
 }
 
 macro_rules! define_key_trait {
