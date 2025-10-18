@@ -3,18 +3,18 @@ use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::{Callbacks, ty::SliderCallbacks};
 
+/// A slider callback for [`i32`] values.
 pub trait IntSliderCallbacks<Cx>: SliderCallbacks<i32, Cx>
 where
     Cx: ProvideTextTy,
 {
+    /// Returns the minimum inclusive value for the slider.
     fn min_inclusive(&self) -> i32;
 
+    /// Returns the maximum inclusive value for the slider.
     fn max_inclusive(&self) -> i32;
 
-    fn applies_values_immediately(&self) -> bool {
-        true
-    }
-
+    /// Converts a value to slider progress (0.0 to 1.0).
     fn to_slider_progress(&self, value: i32) -> f32 {
         (value as f32 + 0.5)
             .map(
@@ -24,6 +24,7 @@ where
             .clamp(0.0, 1.0)
     }
 
+    /// Converts slider progress (0.0 to 1.0) to a value.
     fn to_value(&self, slider_progress: f32) -> i32 {
         slider_progress
             .map(
@@ -33,16 +34,18 @@ where
             .floor() as i32
     }
 
+    /// Validates the given `i32` value, returning `Some(validated_value)` if valid,
     fn i32_validate(&self, value: i32) -> Option<i32>;
 
+    /// Returns a new [`IntSliderCallbacks`] with the given modifier functions applied.
     fn with_modifier<R, IR, RI, F, ToP, ToV>(
         &self,
         progress_to_value: IR,
         value_to_progress: RI,
     ) -> impl SliderCallbacks<R, Cx>
     where
-        IR: Fn(Option<i32>) -> Option<R>,
-        RI: Fn(Option<&R>) -> Option<i32>,
+        IR: Fn(i32) -> Option<R> + Clone,
+        RI: Fn(R) -> Option<i32>,
         F: Fn(i32) -> Option<i32>,
         ToP: Fn(i32) -> f32,
         ToV: Fn(f32) -> i32,
@@ -58,36 +61,36 @@ where
         impl<R, IR, RI, F, ToP, ToV, Cx> SliderCallbacks<R, Cx> for Impl<IR, RI, F, ToP, ToV>
         where
             Cx: ProvideTextTy,
-            IR: Fn(Option<i32>) -> Option<R>,
-            RI: Fn(Option<&R>) -> Option<i32>,
+            IR: Fn(i32) -> Option<R> + Clone,
+            RI: Fn(R) -> Option<i32>,
             F: Fn(i32) -> Option<i32> + Clone,
             ToP: Fn(i32) -> f32,
             ToV: Fn(f32) -> i32,
         {
             fn to_slider_progress(&self, value: R) -> f32 {
-                let progress = (self.value_to_progress)(Some(&value)).unwrap();
+                let progress = (self.value_to_progress)(value).unwrap();
                 (self.to_slider_progress)(progress)
             }
 
             fn to_value(&self, slider_progress: f32) -> R {
                 let value = (self.to_value)(slider_progress);
-                (self.progress_to_value)(Some(value)).unwrap()
+                (self.progress_to_value)(value).unwrap()
             }
         }
 
         impl<R, IR, RI, F, ToP, ToV, Cx> Callbacks<R, Cx> for Impl<IR, RI, F, ToP, ToV>
         where
             Cx: ProvideTextTy,
-            IR: Fn(Option<i32>) -> Option<R>,
-            RI: Fn(Option<&R>) -> Option<i32>,
+            IR: Fn(i32) -> Option<R> + Clone,
+            RI: Fn(R) -> Option<i32>,
             F: Fn(i32) -> Option<i32> + Clone,
             ToP: Fn(i32) -> f32,
             ToV: Fn(f32) -> i32,
         {
-            fn validate(&self, value: &R) -> Option<R> {
-                let i = (self.value_to_progress)(Some(value));
+            fn validate(&self, value: R) -> Option<R> {
+                let i = (self.value_to_progress)(value);
                 let validated = i.and_then(self.i32_validate.clone());
-                (self.progress_to_value)(validated)
+                validated.and_then(self.progress_to_value.clone())
             }
         }
 

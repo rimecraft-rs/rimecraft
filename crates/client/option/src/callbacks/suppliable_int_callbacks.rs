@@ -4,11 +4,17 @@ use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::{
     Callbacks,
-    ty::{CyclingCallbacks, IntSliderCallbacks, SliderCallbacks, TypeChangeableCallbacks},
+    ty::{
+        CyclingCallbacks, IntSliderCallbacks, SliderCallbacks, TypeChangeableCallbacks,
+        TypeChangeableMode,
+    },
 };
 
+/// A set of callbacks for options with `i32` values and dynamic slider boundaries.
 pub struct SuppliableIntCallbacks {
+    /// A function that provides the minimum inclusive boundary for the slider.
     pub min_boundary: Box<dyn Fn() -> i32>,
+    /// A function that provides the maximum inclusive boundary for the slider.
     pub max_boundary: Box<dyn Fn() -> i32>,
 }
 
@@ -22,6 +28,7 @@ impl Debug for SuppliableIntCallbacks {
 }
 
 impl SuppliableIntCallbacks {
+    /// Creates a new [`SuppliableIntCallbacks`] with the given boundary supplier functions.
     pub fn new<Min, Max>(min_boundary: Min, max_boundary: Max) -> Self
     where
         Min: Fn() -> i32 + 'static,
@@ -33,6 +40,7 @@ impl SuppliableIntCallbacks {
         }
     }
 
+    /// Creates a new [`SuppliableIntCallbacks`] with a fixed minimum boundary.
     pub fn with_fixed_min_boundary<F>(min: i32, max_boundary: F) -> Self
     where
         F: Fn() -> i32 + 'static,
@@ -43,6 +51,7 @@ impl SuppliableIntCallbacks {
         }
     }
 
+    /// Creates a new [`SuppliableIntCallbacks`] with a fixed maximum boundary.
     pub fn with_fixed_max_boundary<F>(max: i32, min_boundary: F) -> Self
     where
         F: Fn() -> i32 + 'static,
@@ -58,8 +67,8 @@ impl<Cx> TypeChangeableCallbacks<i32, Cx> for SuppliableIntCallbacks
 where
     Cx: ProvideTextTy,
 {
-    fn is_cycling(&self) -> bool {
-        true
+    fn type_changeable_mode(&self) -> TypeChangeableMode {
+        TypeChangeableMode::Cycling
     }
 }
 
@@ -111,7 +120,7 @@ impl<Cx> Callbacks<i32, Cx> for SuppliableIntCallbacks
 where
     Cx: ProvideTextTy,
 {
-    fn validate(&self, value: &i32) -> Option<i32> {
-        <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::i32_validate(self, *value)
+    fn validate(&self, value: i32) -> Option<i32> {
+        <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::i32_validate(self, value)
     }
 }

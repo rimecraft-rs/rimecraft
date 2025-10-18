@@ -2,12 +2,15 @@ use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::{Callbacks, ty::CyclingCallbacks};
 
+/// A callback that provides cycling behavior based on a set of potential values.
 #[derive(Debug, Default, Clone)]
 pub struct PotentialValuesBasedCallbacks<V> {
+    /// The potential values for the option.
     pub values: Vec<V>,
 }
 
 impl<V> PotentialValuesBasedCallbacks<V> {
+    /// Creates a new [`PotentialValuesBasedCallbacks`] with the given potential values.
     pub fn new(values: Vec<V>) -> Self {
         Self { values }
     }
@@ -16,7 +19,7 @@ impl<V> PotentialValuesBasedCallbacks<V> {
 impl<V, Cx> CyclingCallbacks<V, Cx> for PotentialValuesBasedCallbacks<V>
 where
     Cx: ProvideTextTy,
-    V: PartialEq + Clone,
+    V: PartialEq,
 {
     fn get_values(&self) {
         todo!()
@@ -26,9 +29,9 @@ where
 impl<V, Cx> Callbacks<V, Cx> for PotentialValuesBasedCallbacks<V>
 where
     Cx: ProvideTextTy,
-    V: PartialEq + Clone,
+    V: PartialEq,
 {
-    fn validate(&self, value: &V) -> Option<V> {
-        self.values.contains(value).then(|| value.clone())
+    fn validate(&self, value: V) -> Option<V> {
+        self.values.contains(&value).then_some(value)
     }
 }

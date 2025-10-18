@@ -137,7 +137,7 @@ where
     V: Clone + PartialEq,
 {
     /// Sets the value of the option, invoking the change callback if the value changes.
-    pub fn set_value(&mut self, value: &V) {
+    pub fn set_value(&mut self, value: V) {
         let value = self
             .callbacks
             .validate(value)

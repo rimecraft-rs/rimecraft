@@ -18,11 +18,17 @@ use crate::SimpleOption;
 
 use rimecraft_text::ProvideTextTy;
 
-pub type ValueSetter<V, Cx> = dyn Fn(&mut SimpleOption<V, Cx>, &V);
+/// A function that sets the value of a [`SimpleOption`].
+pub type ValueSetter<V, Cx> = dyn Fn(&mut SimpleOption<V, Cx>, V);
 
+/// A trait for option callbacks.
 pub trait Callbacks<V, Cx>
 where
     Cx: ProvideTextTy,
 {
-    fn validate(&self, value: &V) -> Option<V>;
+    /// Validates the given value, returning `Some(validated_value)` if valid,
+    /// or `None` if invalid.
+    ///
+    /// This function takes ownership of `value` to allow for more flexible validation logic.
+    fn validate(&self, value: V) -> Option<V>;
 }
