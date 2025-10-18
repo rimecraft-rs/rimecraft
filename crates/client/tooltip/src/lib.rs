@@ -4,19 +4,12 @@ use std::fmt::{Debug, Display};
 
 use rimecraft_client_narration::{Narratable, NarrationPart};
 use rimecraft_global_cx::GlobalContext;
-use rimecraft_text::{ProvideTextTy, Text, iter_text::IterText};
+use rimecraft_text::{ProvideTextTy, Text, ordered_text::OrderedText};
 
 /// Global context for [`Tooltip`].
 pub trait ProvideTooltipTy: GlobalContext {
     /// The number of characters per row in the tooltip.
     const ROW_LENGTH: usize;
-
-    /// The ordered text type used for tooltip lines.
-    ///
-    /// See: [`IterText`]
-    type OrderedText: IterText<Self>
-    where
-        Self: ProvideTextTy;
 }
 
 /// Displays a tooltip with text content and optional narration.
@@ -26,7 +19,7 @@ where
 {
     content: Text<Cx>,
     narration: Option<Text<Cx>>,
-    lines: Vec<Cx::OrderedText>,
+    lines: Vec<OrderedText<Cx>>,
 }
 
 impl<Cx> Debug for Tooltip<Cx>
@@ -34,7 +27,6 @@ where
     Cx: ProvideTooltipTy + ProvideTextTy,
     <Cx as ProvideTextTy>::Content: Debug,
     <Cx as ProvideTextTy>::StyleExt: Debug,
-    <Cx as ProvideTooltipTy>::OrderedText: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Tooltip")
@@ -68,7 +60,7 @@ where
     }
 
     /// Returns the tooltip lines.
-    pub fn get_lines(&self) -> &Vec<Cx::OrderedText> {
+    pub fn get_lines(&self) -> &Vec<OrderedText<Cx>> {
         &self.lines
     }
 }
