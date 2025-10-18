@@ -15,5 +15,8 @@ maintenance = { status = "passively-maintained" }
 rimecraft-keyboard = { path = "../../util/keyboard" }
 rimecraft-mouse = { path = "../../util/mouse" }
 
+[dev-dependencies]
+rimecraft-global-cx = { path = "../../core/global-cx" }
+
 [lints]
 workspace = true

@@ -1,7 +1,6 @@
 //! Defines traits for mouse buttons.
 //!
-//! All traits defined in this module are implemented for unit type `()`,
-//! allowing users to opt out of specifying concrete button types when they are not needed.
+//! All traits defined in this module are implemented for unit type `()`.
 
 macro_rules! define_button_trait {
     ($($($doc:expr)* ;)? $vis:vis $name:ident { $($variant:ident $(: $variant_doc:expr)?),* $(,)? }) => {
@@ -20,15 +19,10 @@ macro_rules! define_button_trait {
 }
 
 define_button_trait! {
-    "Extended buttons.";
-    pub ButtonExt {}
-}
-
-define_button_trait! {
     "Mouse buttons.";
-    pub Button {
-        LEFT: "Left mouse button, or the primary button.",
-        RIGHT: "Right mouse button, or the secondary button.",
-        MIDDLE: "Middle mouse button, or the scroll wheel button.",
+    pub MouseButton {
+        BUTTON_PRIMARY: "The primary button, typically the left mouse button.",
+        BUTTON_SECONDARY: "The secondary button, typically the right mouse button.",
+        BUTTON_SCROLL_WHEEL: "The scroll wheel button, typically the middle mouse button.",
     }
 }

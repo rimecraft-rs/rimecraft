@@ -2,14 +2,14 @@
 
 pub mod button;
 
-use button::*;
-
 use rimecraft_global_cx::GlobalContext;
 
 /// Provides associated types for mouse input.
 pub trait ProvideMouseTy: GlobalContext {
     /// The button type used for mouse input.
-    type Button: Button + ButtonExt;
+    ///
+    /// See: [`button` module](crate::button) for predefined button traits.
+    type Button;
 }
 
 /// Represents the state of a button, useful for querying button states.

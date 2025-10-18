@@ -1,7 +1,6 @@
 //! Defines traits for keyboard keys.
 //!
-//! All traits defined in this module are implemented for unit type `()`,
-//! allowing users to opt out of specifying concrete key types when they are not needed.
+//! All traits defined in this module are implemented for unit type `()`.
 
 macro_rules! define_key_trait {
     ($($($doc:expr)* ;)? $vis:vis $name:ident { $($variant:ident $(: $variant_doc:expr)?),* $(,)? }) => {
@@ -17,11 +16,6 @@ macro_rules! define_key_trait {
             $(const $variant: Self = ();)*
         }
     };
-}
-
-define_key_trait! {
-    "Extended keys.";
-    pub KeyExt {}
 }
 
 define_key_trait! {

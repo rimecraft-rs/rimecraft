@@ -1,5 +1,8 @@
 //! Minecraft client game options.
 
+#[cfg(test)]
+mod tests;
+
 pub mod callbacks;
 
 use rimecraft_client_tooltip::{ProvideTooltipTy, Tooltip};
