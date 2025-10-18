@@ -130,6 +130,11 @@ where
             self.state = KeyState::Idle;
         }
     }
+
+    /// Resets the key to idle state.
+    pub fn reset_to_idle(&mut self) {
+        self.state = KeyState::Idle;
+    }
 }
 
 /// A handle that releases the [`KeyBind`] when dropped.
