@@ -23,7 +23,7 @@ where
 impl<V, Cx, T> TooltipFactory<V, Cx> for T
 where
     Cx: ProvideTooltipTy + ProvideTextTy,
-    T: Fn(V) -> Option<Tooltip<Cx>>,
+    T: Fn(V) -> Option<Tooltip<Cx>> + ?Sized,
 {
     fn apply(&self, value: V) -> Option<Tooltip<Cx>> {
         (self)(value)
@@ -60,7 +60,7 @@ where
 impl<V, Cx, T> ValueTextGetter<V, Cx> for T
 where
     Cx: ProvideTextTy,
-    T: Fn(&Text<Cx>, &V) -> Text<Cx>,
+    T: Fn(&Text<Cx>, &V) -> Text<Cx> + ?Sized,
 {
     fn get_value_text(&self, option_text: &Text<Cx>, value: &V) -> Text<Cx> {
         (self)(option_text, value)
