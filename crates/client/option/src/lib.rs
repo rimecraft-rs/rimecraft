@@ -1,7 +1,6 @@
 //! Minecraft client game options.
 
 pub mod callbacks;
-pub mod content;
 
 use rimecraft_client_tooltip::{ProvideTooltipTy, Tooltip};
 use rimecraft_text::{ProvideTextTy, Text};
