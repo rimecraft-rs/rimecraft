@@ -1,18 +1,27 @@
 //! Macro rules.
 
-/// Creates a new localization key with runtime expressions.
+/// Creates a new localization key with expressions.
 ///
 /// # Examples
 ///
 /// ```
 /// # use rimecraft_text::format_localization_key;
+/// const KEY: &str = format_localization_key!["category", "id", "path"];
+/// assert_eq!("category.id.path", KEY);
+///
 /// let key = format_localization_key![
-///     "category", "id", "path"
+///     "category", "id", { let path = "path"; path }
 /// ];
 /// assert_eq!("category.id.path", key);
 /// ```
 #[macro_export]
 macro_rules! format_localization_key {
+    ($(,)?) => {
+        ""
+    };
+    ($($word:literal),*$(,)?) => {
+        $crate::__priv_macro_use::strip_dot_prefix($crate::__priv_macro_use::concat!($('.', $word),*))
+    };
     ($($word:expr),*$(,)?) => {{
         let mut parts = $crate::__priv_macro_use::Vec::<$crate::__priv_macro_use::String>::new();
         $({
@@ -23,28 +32,4 @@ macro_rules! format_localization_key {
         })*
         <[$crate::__priv_macro_use::String]>::join::<&str>(&parts, ".")
     }};
-}
-
-/// Creates a new localization key with literals.
-///
-/// # Examples
-///
-/// ```
-/// # use rimecraft_text::format_localization_key_literal;
-/// let key = format_localization_key_literal![
-///     "category", "id", "path"
-/// ];
-/// assert_eq!("category.id.path", key);
-///
-/// let key = format_localization_key_literal![];
-/// assert_eq!("", key);
-/// ```
-#[macro_export]
-macro_rules! format_localization_key_literal {
-    ($(,)?) => {
-        ""
-    };
-    ($($word:literal),*$(,)?) => {
-        &$crate::__priv_macro_use::concat!($('.', $word),*)[1..]
-    };
 }
