@@ -1,6 +1,9 @@
 //! Minecraft client tooltip components.
 
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 
 use rimecraft_client_narration::{Narratable, NarrationPart};
 use rimecraft_global_cx::GlobalContext;
@@ -20,8 +23,8 @@ pub struct Tooltip<'t, Cx>
 where
     Cx: TooltipCx + ProvideTextTy,
 {
-    content: Text<Cx>,
-    narration: Option<Text<Cx>>,
+    content: Arc<Text<Cx>>,
+    narration: Option<Arc<Text<Cx>>>,
     lines: Vec<OrderedText<'t, Cx>>,
 }
 
@@ -47,8 +50,8 @@ where
     /// Creates a new [`Tooltip`] with the given content and optional narration.
     pub fn new(content: Text<Cx>, narration: Option<Text<Cx>>) -> Self {
         Self {
-            content,
-            narration,
+            content: Arc::new(content),
+            narration: narration.map(Arc::new),
             lines: Vec::new(),
         }
     }
@@ -63,7 +66,7 @@ where
     }
 
     /// Returns the tooltip lines.
-    pub fn lines(&self) -> &Vec<OrderedText<'t, Cx>> {
+    pub fn lines(&self) -> &[OrderedText<'t, Cx>] {
         &self.lines
     }
 
