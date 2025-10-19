@@ -12,13 +12,45 @@ fn test_callbacks() {
 
 #[test]
 fn test_simple_options() {
-    let bool_option = bool::<TestContext>(
+    let mut bool_option = bool::<TestContext>(
         TextContent::from("test_bool_option").into(),
-        Box::new(|_: &Text<TestContext>, b: &bool| {
-            TextContent::from(b.to_string().as_str()).into()
-        }),
+        Box::new(|_: &Text<TestContext>, b: &bool| TextContent::from(b.to_string()).into()),
         true,
-        Box::new(|_| None),
+        Box::new(DynamicTooltipFactory::new(|b: &bool| {
+            Some(Tooltip::from(Text::<TestContext>::from(TextContent::from(
+                b.to_string(),
+            ))))
+        })),
         Box::new(|b: &bool| println!("Bool option changed to: {}", b)),
     );
+
+    assert_eq!(
+        bool_option
+            .value_text_getter
+            .get_value_text(&bool_option.text, &true)
+            .to_string(),
+        "true"
+    );
+
+    assert_eq!(
+        bool_option
+            .tooltip_factory
+            .apply(&true)
+            .map(|t| t.to_items()),
+        Some(Tooltip::from(Text::<TestContext>::from(TextContent::from("true"))).to_items())
+    );
+
+    // Change the value and check the callback
+
+    println!("Setting bool_option to false:");
+    bool_option.set_value(false);
+    println!("(should have printed the change callback above)");
+    assert!(!bool_option.value);
+
+    println!();
+
+    println!("Setting bool_option to false:");
+    bool_option.set_value(false);
+    println!("(should NOT have printed the change callback above)");
+    assert!(!bool_option.value);
 }

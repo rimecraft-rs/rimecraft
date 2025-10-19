@@ -9,7 +9,7 @@ use crate::{ProvideTextTy, Style, style::Formattable};
 /// An item in an iterator over text items with associated [`Style`]s.
 ///
 /// See: [`OrderedText`]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedTextItem<Cx>
 where
     Cx: ProvideTextTy,
@@ -23,23 +23,11 @@ where
 }
 
 /// An iterator over indexed [`char`]s with associated [`Style`]s.
-pub struct OrderedText<Cx>(Box<dyn Iterator<Item = OrderedTextItem<Cx>>>)
+pub struct OrderedText<'a, Cx>(Box<dyn Iterator<Item = OrderedTextItem<Cx>> + 'a>)
 where
     Cx: ProvideTextTy;
 
-impl<T, Cx> From<T> for OrderedText<Cx>
-where
-    Cx: ProvideTextTy,
-    T: IntoIterator<Item = OrderedTextItem<Cx>>,
-{
-    #[inline]
-    fn from(value: T) -> Self {
-        let vec: Vec<OrderedTextItem<Cx>> = value.into_iter().collect();
-        Self(Box::new(vec.into_iter()))
-    }
-}
-
-impl<Cx> Debug for OrderedText<Cx>
+impl<Cx> Debug for OrderedText<'_, Cx>
 where
     Cx: ProvideTextTy,
 {
@@ -48,57 +36,80 @@ where
     }
 }
 
-impl<Cx> OrderedText<Cx>
+impl<Cx> Iterator for OrderedText<'_, Cx>
+where
+    Cx: ProvideTextTy,
+{
+    type Item = OrderedTextItem<Cx>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl<'a, Cx> OrderedText<'a, Cx>
+where
+    Cx: ProvideTextTy,
+{
+    #[inline]
+    fn of<T>(value: T) -> Self
+    where
+        T: IntoIterator<Item = OrderedTextItem<Cx>> + 'a,
+    {
+        Self(Box::new(value.into_iter()))
+    }
+}
+
+impl<'a, Cx> OrderedText<'a, Cx>
 where
     Cx: ProvideTextTy,
 {
     /// Returns an empty [`OrderedText`].
     pub fn empty() -> Self {
-        std::iter::empty().into()
+        Self::of(std::iter::empty())
     }
 
     /// Returns an [`OrderedText`] with a single styled character.
     pub fn styled_char(c: char, style: Style<Cx::StyleExt>) -> Self {
-        std::iter::once(OrderedTextItem { index: 0, c, style }).into()
+        Self::of(std::iter::once(OrderedTextItem { index: 0, c, style }))
     }
 
     /// Returns an [`OrderedText`] over the characters of the given string,
     /// all with the given [`Style`].
-    pub fn styled_str(s: &str, style: Style<Cx::StyleExt>) -> Self
+    pub fn styled_str(s: &'a str, style: Style<Cx::StyleExt>) -> Self
     where
         <Cx as ProvideTextTy>::StyleExt: Clone,
     {
-        s.chars()
-            .enumerate()
-            .map(move |(i, c)| OrderedTextItem {
-                index: i,
-                c,
-                style: style.clone(),
-            })
-            .into()
+        Self::of(s.chars().enumerate().map(move |(i, c)| OrderedTextItem {
+            index: i,
+            c,
+            style: style.clone(),
+        }))
     }
 
     /// Returns an [`OrderedText`] over the characters of the given string in reverse order,
     /// all with the given [`Style`].
-    pub fn styled_str_rev(s: &str, style: Style<Cx::StyleExt>) -> Self
+    pub fn styled_str_rev(s: &'a str, style: Style<Cx::StyleExt>) -> Self
     where
         <Cx as ProvideTextTy>::StyleExt: Clone,
     {
-        s.chars()
-            .rev()
-            .enumerate()
-            .map(move |(i, c)| OrderedTextItem {
-                index: i,
-                c,
-                style: style.clone(),
-            })
-            .into()
+        Self::of(
+            s.chars()
+                .rev()
+                .enumerate()
+                .map(move |(i, c)| OrderedTextItem {
+                    index: i,
+                    c,
+                    style: style.clone(),
+                }),
+        )
     }
 
     /// Returns an [`OrderedText`] over the characters of the given formatted string,
     /// starting from the given index, applying formatting codes as specified.
     pub fn iter_formatted(
-        str: &str,
+        str: &'a str,
         start_index: usize,
         starting_style: Style<Cx::StyleExt>,
         reset_style: Style<Cx::StyleExt>,
@@ -109,7 +120,7 @@ where
         let mut style = starting_style;
         let mut chars = str.chars().enumerate().skip(start_index).peekable();
 
-        std::iter::from_fn(move || {
+        Self::of(std::iter::from_fn(move || {
             while let Some((_, c)) = chars.next() {
                 // Checks for formatting code prefix (§ = U+00A7)
                 if c == Formatting::CODE_PREFIX {
@@ -140,14 +151,17 @@ where
                 });
             }
             None
-        })
-        .into()
+        }))
     }
 
     /// Returns an [`OrderedText`] over the characters of the given formatted string,
     /// starting from the given index, applying formatting codes as specified,
     /// with a unified [`Style`] for starting and reset.
-    pub fn iter_formatted_unified(str: &str, start_index: usize, style: Style<Cx::StyleExt>) -> Self
+    pub fn iter_formatted_unified(
+        str: &'a str,
+        start_index: usize,
+        style: Style<Cx::StyleExt>,
+    ) -> Self
     where
         <Cx as ProvideTextTy>::StyleExt: Clone,
     {
@@ -157,7 +171,7 @@ where
     /// Returns an [`OrderedText`] over the characters of the given formatted string,
     /// applying formatting codes as specified,
     /// with a unified [`Style`] for starting and reset.
-    pub fn iter_formatted_unified_from_start(str: &str, style: Style<Cx::StyleExt>) -> Self
+    pub fn iter_formatted_unified_from_start(str: &'a str, style: Style<Cx::StyleExt>) -> Self
     where
         <Cx as ProvideTextTy>::StyleExt: Clone,
     {
@@ -167,7 +181,7 @@ where
     /// Removes formatting codes from the given string and returns the plain text.
     ///
     /// See: [`Self::iter_formatted_unified_from_start`]
-    pub fn remove_formatting_codes(str: &str) -> String
+    pub fn remove_formatting_codes(str: &'a str) -> String
     where
         <Cx as ProvideTextTy>::StyleExt: Clone + Default,
     {

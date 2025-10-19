@@ -5,11 +5,9 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
-use text::{ProvideTextTy, style::Formattable};
+use text::ProvideTextTy;
 
 use crate::TestContext;
-
-impl Formattable for sealed::EmptyStyleExt {}
 
 impl ProvideTextTy for TestContext {
     type Content = TextContent;
@@ -22,7 +20,7 @@ impl ProvideTextTy for TestContext {
 /// *Distinguishing optional type tags is unsupported as it only accelerates parsing,
 /// which is not favorable in testing contexts.*
 #[non_exhaustive]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum TextContent {
     /// Displays plain text.
@@ -41,11 +39,15 @@ pub enum TextContent {
     },
 }
 
+impl From<String> for TextContent {
+    fn from(value: String) -> Self {
+        Self::Plain { text: value }
+    }
+}
+
 impl From<&str> for TextContent {
     fn from(value: &str) -> Self {
-        Self::Plain {
-            text: value.to_owned(),
-        }
+        value.to_owned().into()
     }
 }
 
@@ -63,7 +65,10 @@ impl Display for TextContent {
 
 mod sealed {
     use serde::{Deserialize, Serialize};
+    use text::style::Formattable;
 
-    #[derive(Debug, Default, Serialize, Deserialize, Clone)]
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
     pub struct EmptyStyleExt {}
+
+    impl Formattable for EmptyStyleExt {}
 }

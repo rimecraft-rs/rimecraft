@@ -4,7 +4,10 @@ use std::fmt::{Debug, Display};
 
 use rimecraft_client_narration::{Narratable, NarrationPart};
 use rimecraft_global_cx::GlobalContext;
-use rimecraft_text::{ProvideTextTy, Text, ordered_text::OrderedText};
+use rimecraft_text::{
+    ProvideTextTy, Text,
+    ordered_text::{OrderedText, OrderedTextItem},
+};
 
 /// Global context for [`Tooltip`].
 pub trait ProvideTooltipTy: GlobalContext {
@@ -13,16 +16,16 @@ pub trait ProvideTooltipTy: GlobalContext {
 }
 
 /// Displays a tooltip with text content and optional narration.
-pub struct Tooltip<Cx>
+pub struct Tooltip<'t, Cx>
 where
     Cx: ProvideTooltipTy + ProvideTextTy,
 {
     content: Text<Cx>,
     narration: Option<Text<Cx>>,
-    lines: Vec<OrderedText<Cx>>,
+    lines: Vec<OrderedText<'t, Cx>>,
 }
 
-impl<Cx> Debug for Tooltip<Cx>
+impl<Cx> Debug for Tooltip<'_, Cx>
 where
     Cx: ProvideTooltipTy + ProvideTextTy,
     <Cx as ProvideTextTy>::Content: Debug,
@@ -37,7 +40,7 @@ where
     }
 }
 
-impl<Cx> Tooltip<Cx>
+impl<'t, Cx> Tooltip<'t, Cx>
 where
     Cx: ProvideTooltipTy + ProvideTextTy,
 {
@@ -60,12 +63,34 @@ where
     }
 
     /// Returns the tooltip lines.
-    pub fn get_lines(&self) -> &Vec<OrderedText<Cx>> {
+    pub fn get_lines(&self) -> &Vec<OrderedText<'t, Cx>> {
         &self.lines
+    }
+
+    /// Converts the tooltip lines into a vector of vectors of [`OrderedTextItem`]s.
+    pub fn to_items(self) -> Vec<Vec<OrderedTextItem<Cx>>>
+    where
+        Cx: Clone,
+    {
+        self.lines
+            .into_iter()
+            .map(|line| line.into_iter().collect())
+            .collect()
     }
 }
 
-impl<Cx> Narratable for Tooltip<Cx>
+impl<Cx> From<Text<Cx>> for Tooltip<'_, Cx>
+where
+    Cx: ProvideTooltipTy + ProvideTextTy,
+    <Cx as ProvideTextTy>::Content: Clone,
+    <Cx as ProvideTextTy>::StyleExt: Clone,
+{
+    fn from(content: Text<Cx>) -> Self {
+        Self::of(content)
+    }
+}
+
+impl<Cx> Narratable for Tooltip<'_, Cx>
 where
     Cx: ProvideTooltipTy + ProvideTextTy,
     <Cx as ProvideTextTy>::Content: Display,

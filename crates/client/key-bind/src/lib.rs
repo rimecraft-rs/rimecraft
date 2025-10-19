@@ -80,15 +80,18 @@ where
     fn unbind(&mut self);
 }
 
+/// A key bind that can be pressed and released, tracking its state and press count.
 pub struct KeyBind<Cx, Ext>
 where
     Cx: ProvideKeyboardTy + ProvideMouseTy,
 {
     mode_getter: Box<dyn Fn() -> KeyBindMode>,
     default_key: Key<Cx>,
+    /// The currently bound key, if any.
     pub bound_key: Option<Key<Cx>>,
     state: KeyState,
     press_count: u32,
+    /// Extension data associated with the key bind.
     pub ext: Ext,
 }
 
@@ -108,6 +111,31 @@ where
             .field("ext", &self.ext)
             .finish()
     }
+}
+
+impl<Cx, Ext> PartialEq for KeyBind<Cx, Ext>
+where
+    Cx: ProvideKeyboardTy + ProvideMouseTy + PartialEq,
+    <Cx as ProvideKeyboardTy>::Key: PartialEq,
+    <Cx as ProvideMouseTy>::Button: PartialEq,
+    Ext: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.default_key == other.default_key
+            && self.bound_key == other.bound_key
+            && self.state == other.state
+            && self.press_count == other.press_count
+            && self.ext == other.ext
+    }
+}
+
+impl<Cx, Ext> Eq for KeyBind<Cx, Ext>
+where
+    Cx: ProvideKeyboardTy + ProvideMouseTy + Eq,
+    <Cx as ProvideKeyboardTy>::Key: Eq,
+    <Cx as ProvideMouseTy>::Button: Eq,
+    Ext: Eq,
+{
 }
 
 impl<Cx, Ext> KeyBind<Cx, Ext>
