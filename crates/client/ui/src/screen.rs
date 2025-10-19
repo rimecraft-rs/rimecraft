@@ -4,7 +4,7 @@ use std::ops::{Add, Sub};
 
 use num_traits::One;
 
-use crate::nav::{NavAxis, NavDirection};
+use crate::nav::{NavAxis, NavDirection, Sign};
 
 /// A vector on the screen in 2D space.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -120,6 +120,12 @@ where
     }
 }
 
+impl From<glam::Vec2> for ScreenVec<f32> {
+    fn from(vec: glam::Vec2) -> Self {
+        Self::new(vec.x, vec.y)
+    }
+}
+
 /// A position on the screen in 2D space.
 pub type ScreenPos = ScreenVec<f32>;
 
@@ -133,17 +139,12 @@ pub struct ScreenRect {
     pub pos: ScreenPos,
     /// The size of the rectangle.
     pub size: ScreenSize,
-    is_empty: bool,
 }
 
 impl ScreenRect {
     /// Creates a new [`ScreenRect`] from the given position and size.
     pub const fn new(pos: ScreenPos, size: ScreenSize) -> Self {
-        Self {
-            pos,
-            size,
-            is_empty: false,
-        }
+        Self { pos, size }
     }
 
     /// Creates a new [`ScreenRect`] from the given x, y, width and height.
@@ -151,7 +152,6 @@ impl ScreenRect {
         Self {
             pos: ScreenPos::new(x, y),
             size: ScreenSize::new(w, h),
-            is_empty: false,
         }
     }
 
@@ -167,16 +167,181 @@ impl ScreenRect {
         Self {
             pos: ScreenVec::from_axis(axis, this_axis_pos, other_axis_pos),
             size: ScreenVec::from_axis(axis, this_axis_size, other_axis_size),
-            is_empty: false,
+        }
+    }
+}
+
+impl ScreenRect {
+    pub fn is_at_origin(&self) -> bool {
+        self.pos.is_zero()
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.size.is_zero()
+    }
+
+    pub fn length(&self, axis: NavAxis) -> f32 {
+        match axis {
+            NavAxis::Horizontal => self.size.horizontal,
+            NavAxis::Vertical => self.size.vertical,
         }
     }
 
-    /// Creates an empty [`ScreenRect`].
-    pub fn empty() -> Self {
-        Self {
-            is_empty: true,
-            ..Default::default()
+    pub fn coord(&self, direction: NavDirection) -> f32 {
+        match direction.sign() {
+            Sign::Positive => self.pos.get(direction.axis()) + self.length(direction.axis()),
+            Sign::Negative => self.pos.get(direction.axis()).to_owned(),
         }
+    }
+
+    pub fn border(&self, direction: NavDirection) -> ScreenRect {
+        let opposite_axis = direction.axis().flip();
+        let coord_start = self.coord(direction);
+        let coord_end = self.coord(opposite_axis.direction(Sign::Negative));
+        let length = self.length(opposite_axis);
+        ScreenRect::from_axis(direction.axis(), coord_start, coord_end, 1.0, length) + direction
+    }
+
+    pub fn overlaps_axis(&self, other: &Self, axis: NavAxis) -> bool {
+        let self_start = self.coord(axis.direction(Sign::Negative));
+        let self_end = self.coord(axis.direction(Sign::Positive));
+        let other_start = other.coord(axis.direction(Sign::Negative));
+        let other_end = other.coord(axis.direction(Sign::Positive));
+        self_start.max(other_start) <= self_end.min(other_end)
+    }
+
+    pub fn overlaps(&self, other: &Self) -> bool {
+        self.overlaps_axis(other, NavAxis::Horizontal)
+            && self.overlaps_axis(other, NavAxis::Vertical)
+    }
+
+    pub fn center_axis(&self, axis: NavAxis) -> f32 {
+        let start = self.coord(axis.direction(Sign::Negative));
+        let end = self.coord(axis.direction(Sign::Positive));
+        (start + end) / 2.0
+    }
+
+    pub fn center(&self) -> ScreenPos {
+        ScreenPos::new(
+            self.center_axis(NavAxis::Horizontal),
+            self.center_axis(NavAxis::Vertical),
+        )
+    }
+
+    pub fn coord_top(&self) -> f32 {
+        self.coord(NavDirection::Up)
+    }
+
+    pub fn coord_bottom(&self) -> f32 {
+        self.coord(NavDirection::Down)
+    }
+
+    pub fn coord_left(&self) -> f32 {
+        self.coord(NavDirection::Left)
+    }
+
+    pub fn coord_right(&self) -> f32 {
+        self.coord(NavDirection::Right)
+    }
+
+    pub fn intersection(&self, other: &Self) -> Option<Self> {
+        if self.is_zero() || other.is_zero() {
+            return None;
+        }
+
+        let x1 = self.coord_left().max(other.coord_left());
+        let y1 = self.coord_top().max(other.coord_top());
+        let x2 = self.coord_right().min(other.coord_right());
+        let y2 = self.coord_bottom().min(other.coord_bottom());
+
+        if x2 >= x1 && y2 >= y1 {
+            Some(ScreenRect::from_xywh(x1, y1, x2 - x1, y2 - y1))
+        } else {
+            None
+        }
+    }
+
+    pub fn intersects(&self, other: &Self) -> bool {
+        self.intersection(other).is_some()
+    }
+
+    pub fn union(&self, other: &Self) -> Self {
+        if self.is_zero() {
+            return *other;
+        }
+        if other.is_zero() {
+            return *self;
+        }
+
+        let x1 = self.coord_left().min(other.coord_left());
+        let y1 = self.coord_top().min(other.coord_top());
+        let x2 = self.coord_right().max(other.coord_right());
+        let y2 = self.coord_bottom().max(other.coord_bottom());
+
+        ScreenRect::from_xywh(x1, y1, x2 - x1, y2 - y1)
+    }
+
+    pub fn contains(&self, other: &Self) -> bool {
+        self.coord_left() <= other.coord_left()
+            && self.coord_right() >= other.coord_right()
+            && self.coord_top() <= other.coord_top()
+            && self.coord_bottom() >= other.coord_bottom()
+    }
+
+    pub fn contains_pos(&self, pos: ScreenPos) -> bool {
+        let x = pos.horizontal;
+        let y = pos.vertical;
+        x >= self.coord_left()
+            && x <= self.coord_right()
+            && y >= self.coord_top()
+            && y <= self.coord_bottom()
+    }
+
+    pub fn transform(&self, transformation: glam::Affine2) -> Self {
+        let top_left =
+            transformation.transform_point2(glam::Vec2::new(self.coord_left(), self.coord_top()));
+        let bottom_right = transformation
+            .transform_point2(glam::Vec2::new(self.coord_right(), self.coord_bottom()));
+        ScreenRect::from_xywh(
+            top_left.x,
+            top_left.y,
+            bottom_right.x - top_left.x,
+            bottom_right.y - top_left.y,
+        )
+    }
+
+    pub fn transform_vertices(&self, transformation: glam::Affine2) -> ScreenRect {
+        let top_left =
+            transformation.transform_point2(glam::Vec2::new(self.coord_left(), self.coord_top()));
+        let top_right =
+            transformation.transform_point2(glam::Vec2::new(self.coord_right(), self.coord_top()));
+        let bottom_left = transformation
+            .transform_point2(glam::Vec2::new(self.coord_left(), self.coord_bottom()));
+        let bottom_right = transformation
+            .transform_point2(glam::Vec2::new(self.coord_right(), self.coord_bottom()));
+
+        let min_x = top_left
+            .x
+            .min(top_right.x)
+            .min(bottom_left.x)
+            .min(bottom_right.x);
+        let max_x = top_left
+            .x
+            .max(top_right.x)
+            .max(bottom_left.x)
+            .max(bottom_right.x);
+        let min_y = top_left
+            .y
+            .min(top_right.y)
+            .min(bottom_left.y)
+            .min(bottom_right.y);
+        let max_y = top_left
+            .y
+            .max(top_right.y)
+            .max(bottom_left.y)
+            .max(bottom_right.y);
+
+        ScreenRect::from_xywh(min_x, min_y, max_x - min_x, max_y - min_y)
     }
 }
 

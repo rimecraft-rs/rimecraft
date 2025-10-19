@@ -42,7 +42,7 @@ impl NavAxis {
     }
 
     /// Returns the [`NavDirection`] for the given [`Sign`] on this axis.
-    pub fn directions(&self, sign: Sign) -> NavDirection {
+    pub fn direction(&self, sign: Sign) -> NavDirection {
         match (self, sign) {
             (NavAxis::Horizontal, Sign::Positive) => NavDirection::Right,
             (NavAxis::Horizontal, Sign::Negative) => NavDirection::Left,
