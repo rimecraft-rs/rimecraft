@@ -38,7 +38,7 @@ where
     fn i32_validate(&self, value: i32) -> Option<i32>;
 
     /// Returns a new [`IntSliderCallbacks`] with the given modifier functions applied.
-    fn with_modifier<R, IR, RI, F, ToP, ToV>(
+    fn with_modifier<R, IR, RI>(
         &self,
         progress_to_value: IR,
         value_to_progress: RI,
@@ -46,9 +46,6 @@ where
     where
         IR: Fn(i32) -> Option<R> + Clone,
         RI: Fn(R) -> Option<i32>,
-        F: Fn(i32) -> Option<i32>,
-        ToP: Fn(i32) -> f32,
-        ToV: Fn(f32) -> i32,
     {
         struct Impl<IR, RI, F, ToP, ToV> {
             progress_to_value: IR,

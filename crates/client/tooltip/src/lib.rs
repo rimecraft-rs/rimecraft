@@ -10,7 +10,7 @@ use rimecraft_text::{
 };
 
 /// Global context for [`Tooltip`].
-pub trait ProvideTooltipTy: GlobalContext {
+pub trait TooltipCx: GlobalContext {
     /// The number of characters per row in the tooltip.
     const ROW_LENGTH: usize;
 }
@@ -18,7 +18,7 @@ pub trait ProvideTooltipTy: GlobalContext {
 /// Displays a tooltip with text content and optional narration.
 pub struct Tooltip<'t, Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
 {
     content: Text<Cx>,
     narration: Option<Text<Cx>>,
@@ -27,7 +27,7 @@ where
 
 impl<Cx> Debug for Tooltip<'_, Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
     <Cx as ProvideTextTy>::Content: Debug,
     <Cx as ProvideTextTy>::StyleExt: Debug,
 {
@@ -42,7 +42,7 @@ where
 
 impl<'t, Cx> Tooltip<'t, Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
 {
     /// Creates a new [`Tooltip`] with the given content and optional narration.
     pub fn new(content: Text<Cx>, narration: Option<Text<Cx>>) -> Self {
@@ -81,7 +81,7 @@ where
 
 impl<Cx> From<Text<Cx>> for Tooltip<'_, Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
     <Cx as ProvideTextTy>::Content: Clone,
     <Cx as ProvideTextTy>::StyleExt: Clone,
 {
@@ -92,7 +92,7 @@ where
 
 impl<Cx> Narratable for Tooltip<'_, Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
     <Cx as ProvideTextTy>::Content: Display,
 {
     fn append_narrations<B>(&self, builder: &mut B)

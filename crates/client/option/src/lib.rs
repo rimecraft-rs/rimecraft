@@ -5,7 +5,7 @@ mod tests;
 
 pub mod callbacks;
 
-use rimecraft_client_tooltip::{ProvideTooltipTy, Tooltip};
+use rimecraft_client_tooltip::{Tooltip, TooltipCx};
 use rimecraft_text::{ProvideTextTy, Text};
 use std::fmt::{Debug, Display};
 
@@ -14,7 +14,7 @@ use crate::callbacks::Callbacks;
 /// A factory for creating [`Tooltip`]s based on a value.
 pub trait TooltipFactory<V, Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
 {
     /// Creates a [`Tooltip`] for the given value, or [`None`] if no tooltip should be shown.
     fn apply<'t>(&self, value: &'t V) -> Option<Tooltip<'t, Cx>>;
@@ -22,7 +22,7 @@ where
 
 impl<V, Cx, T> TooltipFactory<V, Cx> for T
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
     T: Fn(&V) -> Option<Tooltip<'_, Cx>> + ?Sized,
 {
     fn apply<'t>(&self, value: &'t V) -> Option<Tooltip<'t, Cx>> {
@@ -43,7 +43,7 @@ impl EmptyTooltipFactory {
 
 impl<V, Cx> TooltipFactory<V, Cx> for EmptyTooltipFactory
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
 {
     fn apply<'t>(&self, _value: &'t V) -> Option<Tooltip<'t, Cx>> {
         None
@@ -53,14 +53,14 @@ where
 /// A [`TooltipFactory`] that always returns the same static tooltip.
 pub struct StaticTooltipFactory<Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
 {
     text: Text<Cx>,
 }
 
 impl<Cx> Debug for StaticTooltipFactory<Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
     Cx::Content: Debug,
     Cx::StyleExt: Debug,
 {
@@ -73,7 +73,7 @@ where
 
 impl<Cx> StaticTooltipFactory<Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
 {
     /// Creates a new [`StaticTooltipFactory`] with the given [`Text`].
     pub fn new(text: Text<Cx>) -> Self {
@@ -83,7 +83,7 @@ where
 
 impl<V, Cx> TooltipFactory<V, Cx> for StaticTooltipFactory<Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
     <Cx as ProvideTextTy>::Content: Clone,
     <Cx as ProvideTextTy>::StyleExt: Clone,
 {
@@ -97,14 +97,14 @@ type DynamicTooltipGetter<'f, V, Cx> = Box<dyn for<'t> Fn(&'t V) -> Option<Toolt
 /// A [`TooltipFactory`] that uses a dynamic factory function.
 pub struct DynamicTooltipFactory<'f, V, Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
 {
     factory: DynamicTooltipGetter<'f, V, Cx>,
 }
 
 impl<V, Cx> Debug for DynamicTooltipFactory<'_, V, Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DynamicTooltipFactory").finish()
@@ -113,7 +113,7 @@ where
 
 impl<'f, V, Cx> DynamicTooltipFactory<'f, V, Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
 {
     /// Creates a new [`DynamicTooltipFactory`] with the given factory function.
     pub fn new<F>(factory: F) -> Self
@@ -128,7 +128,7 @@ where
 
 impl<V, Cx> TooltipFactory<V, Cx> for DynamicTooltipFactory<'_, V, Cx>
 where
-    Cx: ProvideTooltipTy + ProvideTextTy,
+    Cx: TooltipCx + ProvideTextTy,
 {
     fn apply<'t>(&self, value: &'t V) -> Option<Tooltip<'t, Cx>> {
         (self.factory)(value)

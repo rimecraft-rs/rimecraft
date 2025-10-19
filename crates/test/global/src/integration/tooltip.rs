@@ -2,10 +2,10 @@
 
 #![cfg(feature = "tooltip")]
 
-use tooltip::ProvideTooltipTy;
+use tooltip::TooltipCx;
 
 use crate::TestContext;
 
-impl ProvideTooltipTy for TestContext {
+impl TooltipCx for TestContext {
     const ROW_LENGTH: usize = 170;
 }

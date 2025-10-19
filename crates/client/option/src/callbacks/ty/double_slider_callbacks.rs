@@ -33,7 +33,7 @@ where
     fn f32_validate(&self, value: f32) -> Option<f32>;
 
     /// Returns a new [`DoubleSliderCallbacks`] with the given modifier functions applied.
-    fn with_modifier<R, IR, RI, F, ToP, ToV>(
+    fn with_modifier<R, IR, RI>(
         &self,
         progress_to_value: IR,
         value_to_progress: RI,
@@ -41,9 +41,6 @@ where
     where
         IR: Fn(f32) -> Option<R> + Clone,
         RI: Fn(R) -> Option<f32>,
-        F: Fn(f32) -> Option<f32>,
-        ToP: Fn(f32) -> f32,
-        ToV: Fn(f32) -> f32,
     {
         struct Impl<IR, RI, F, ToP, ToV> {
             progress_to_value: IR,
