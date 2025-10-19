@@ -14,6 +14,13 @@
 #[macro_export]
 macro_rules! format_localization_key {
     ($($word:expr),* $(,)?) => {{
-        [$($word.to_string()),*].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(".")
+        let mut parts = ::std::vec::Vec::new();
+        $(
+            let s = ::std::string::ToString::to_string(&$word);
+            if !s.is_empty() {
+                parts.push(s);
+            }
+        )*
+        parts.join(".")
     }};
 }
