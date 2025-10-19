@@ -1,5 +1,17 @@
 //! Minecraft text API.
 
+#[cfg(feature = "macros")]
+mod macros;
+
+#[doc(hidden)]
+pub mod __priv_macro_use {
+    pub use std::string::{String, ToString};
+    pub use std::vec::Vec;
+}
+
+#[cfg(feature = "macros")]
+pub use rimecraft_text_derive::Localize;
+
 mod error;
 mod iter;
 pub mod ordered_text;
@@ -209,9 +221,3 @@ pub type EdcodeSeed<Cx> = rimecraft_global_cx::edcode::Nbt<Text<Cx>, Cx>;
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(feature = "macros")]
-mod macros;
-
-#[cfg(feature = "macros")]
-pub use rimecraft_text_derive::Localize;
