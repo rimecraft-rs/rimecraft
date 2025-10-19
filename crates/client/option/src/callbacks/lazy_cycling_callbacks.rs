@@ -61,7 +61,7 @@ where
     Cx: ProvideTextTy,
     V: Clone,
 {
-    fn get_values(&self) {
+    fn values(&self) {
         (self.values)();
         todo!()
     }

@@ -52,9 +52,12 @@ where
 
 impl Narration<String> {
     /// Creates a [`Narration`] from a single string sentence.
-    pub fn string(value: String) -> Self {
+    pub fn string<T>(value: T) -> Self
+    where
+        T: Into<String>,
+    {
         Self {
-            value,
+            value: value.into(),
             transformer: Box::new(|f, v| f(&v)),
         }
     }

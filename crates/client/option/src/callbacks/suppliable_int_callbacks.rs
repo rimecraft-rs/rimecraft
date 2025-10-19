@@ -76,7 +76,7 @@ impl<Cx> CyclingCallbacks<i32, Cx> for SuppliableIntCallbacks
 where
     Cx: ProvideTextTy,
 {
-    fn get_values(&self) {
+    fn values(&self) {
         todo!()
     }
 }

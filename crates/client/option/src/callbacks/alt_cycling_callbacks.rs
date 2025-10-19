@@ -107,10 +107,10 @@ where
     Cx: ProvideTextTy,
     V: PartialEq,
 {
-    fn get_values(&self) {
+    fn values(&self) {
         let key = (self.condition)();
         self.values.get(&key);
-        todo!()
+        unimplemented!()
     }
 
     fn value_setter(&self) -> &ValueSetter<V, Cx> {

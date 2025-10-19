@@ -63,7 +63,7 @@ where
     }
 
     /// Returns the tooltip lines.
-    pub fn get_lines(&self) -> &Vec<OrderedText<'t, Cx>> {
+    pub fn lines(&self) -> &Vec<OrderedText<'t, Cx>> {
         &self.lines
     }
 

@@ -21,7 +21,7 @@ where
     Cx: ProvideTextTy,
     V: PartialEq,
 {
-    fn get_values(&self) {
+    fn values(&self) {
         todo!()
     }
 }

@@ -141,7 +141,7 @@ where
     Cx: ProvideTextTy,
 {
     /// Gets the display text for the given value.
-    fn get_value_text(&self, option_text: &Text<Cx>, value: &V) -> Text<Cx>;
+    fn value_text(&self, option_text: &Text<Cx>, value: &V) -> Text<Cx>;
 }
 
 impl<V, Cx, T> ValueTextGetter<V, Cx> for T
@@ -149,7 +149,7 @@ where
     Cx: ProvideTextTy,
     T: Fn(&Text<Cx>, &V) -> Text<Cx> + ?Sized,
 {
-    fn get_value_text(&self, option_text: &Text<Cx>, value: &V) -> Text<Cx> {
+    fn value_text(&self, option_text: &Text<Cx>, value: &V) -> Text<Cx> {
         (self)(option_text, value)
     }
 }
@@ -238,7 +238,7 @@ where
     }
 
     /// Gets the [`Callbacks`] of the option.
-    pub fn get_callbacks(&self) -> &dyn Callbacks<V, Cx> {
+    pub fn callbacks(&self) -> &dyn Callbacks<V, Cx> {
         &*self.callbacks
     }
 }

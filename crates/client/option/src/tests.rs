@@ -27,7 +27,7 @@ fn test_simple_options() {
     assert_eq!(
         bool_option
             .value_text_getter
-            .get_value_text(&bool_option.text, &true)
+            .value_text(&bool_option.text, &true)
             .to_string(),
         "true"
     );
