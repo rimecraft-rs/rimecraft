@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Rimecraft global context for testing"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
 
@@ -31,11 +31,19 @@ freezer = { path = "../../util/freezer", package = "rimecraft-freezer" }
 registry = { path = "../../core/registry", package = "rimecraft-registry", optional = true }
 text = { path = "../../core/text", package = "rimecraft-text", optional = true }
 component = { path = "../../core/component", package = "rimecraft-component", optional = true }
+# client components
+tooltip = { path = "../../client/tooltip", package = "rimecraft-client-tooltip", optional = true }
+# util components
+keyboard = { path = "../../util/keyboard", package = "rimecraft-keyboard", optional = true }
+mouse = { path = "../../util/mouse", package = "rimecraft-mouse", optional = true }
 
 [features]
 registry = ["dep:registry"]
 text = ["dep:text"]
 component = ["dep:component", "registry"]
+tooltip = ["dep:tooltip"]
+keyboard = ["dep:keyboard"]
+mouse = ["dep:mouse"]
 
 [lints]
 workspace = true

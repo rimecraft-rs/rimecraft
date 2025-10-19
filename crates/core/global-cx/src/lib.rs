@@ -67,6 +67,9 @@ pub trait ProvideNbtTy: GlobalContext {
 #[deprecated = "use `nbt` feature instead"]
 pub use nbt as nbt_edcode;
 
+#[cfg(feature = "unit")]
+unsafe impl GlobalContext for () {}
+
 /// Trait usually for global-context-provided 'extension types' to represent types that is held.
 pub trait Hold<T> {
     /// Returns the held value.

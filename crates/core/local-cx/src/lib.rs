@@ -92,7 +92,7 @@ where
 
 /// Extension trait for local context.
 pub trait LocalContextExt {
-    /// Create a `WithLocalCx` with the given inner data.
+    /// Create a [`WithLocalCx`] with the given inner data.
     #[inline]
     fn with<T>(self, inner: T) -> WithLocalCx<T, Self>
     where

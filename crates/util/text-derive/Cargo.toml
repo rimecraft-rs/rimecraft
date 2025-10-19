@@ -1,0 +1,23 @@
+[package]
+name = "rimecraft-text-derive"
+version = "0.1.0"
+edition = "2024"
+authors = ["KrLite"]
+description = "Proc macros for rimecraft-text"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full", "extra-traits"] }
+
+[dev-dependencies]
+rimecraft-text = { path = "../../core/text", features = ["macros"] }
+
+[lints]
+workspace = true
