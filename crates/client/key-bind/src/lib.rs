@@ -61,6 +61,9 @@ where
     /// Forcefully resets the key bind state to idle.
     fn reset_to_idle(&mut self);
 
+    /// Forcefully resets everything of the key bind, except the bound key.
+    fn reset(&mut self);
+
     /// Returns the current [`KeyState`] of the key bind. The state should be frozen when a key is pressed.
     fn state(&self) -> KeyState;
 
@@ -80,10 +83,51 @@ where
     fn unbind(&mut self);
 }
 
+/// A hook for listening to key bind events.
+pub trait KeyBindHook<Cx>
+where
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+{
+    /// Called when a handle to the key bind is obtained.
+    fn obtain_handle(&mut self) {}
+
+    /// Called when a handle to the key bind is dropped.
+    fn drop_handle(&mut self) {}
+
+    /// Called when the key bind is pressed, that is, the state changes to [`KeyState::Pressed`].
+    fn press(&mut self) {}
+
+    /// Called when the key bind is released, that is, the state changes to [`KeyState::Idle`].
+    fn release(&mut self) {}
+
+    /// Binds the key bind to the specified key.
+    fn bind(&mut self, key: Key<Cx>, default: Key<Cx>, current: Option<Key<Cx>>) {
+        drop((key, default, current));
+    }
+
+    /// Reverting the bound key to [`None`]. This makes the key bind use the default key.
+    fn unbind(&mut self, key: Option<Key<Cx>>, default: Key<Cx>) {
+        drop((key, default));
+    }
+
+    /// Forcefully resets the key bind state to idle.
+    fn reset_to_idle(&mut self) {}
+
+    /// Forcefully resets everything of the key bind, except the bound key.
+    fn reset(&mut self) {}
+}
+
+/// An empty implementation of [`KeyBindHook`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EmptyKeyBindHook;
+
+impl<Cx> KeyBindHook<Cx> for EmptyKeyBindHook where Cx: ProvideKeyboardTy + ProvideMouseTy {}
+
 /// A key bind that can be pressed and released, tracking its state and press count.
 pub struct KeyBind<Cx, Ext>
 where
     Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Ext: KeyBindHook<Cx>,
 {
     mode_getter: Box<dyn Fn() -> KeyBindMode>,
     default_key: Key<Cx>,
@@ -100,7 +144,7 @@ where
     Cx: ProvideKeyboardTy + ProvideMouseTy + Debug,
     <Cx as ProvideKeyboardTy>::Key: Debug,
     <Cx as ProvideMouseTy>::Button: Debug,
-    Ext: Debug,
+    Ext: KeyBindHook<Cx> + Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("KeyBind")
@@ -118,7 +162,7 @@ where
     Cx: ProvideKeyboardTy + ProvideMouseTy + PartialEq,
     <Cx as ProvideKeyboardTy>::Key: PartialEq,
     <Cx as ProvideMouseTy>::Button: PartialEq,
-    Ext: PartialEq,
+    Ext: KeyBindHook<Cx> + PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.default_key == other.default_key
@@ -134,13 +178,14 @@ where
     Cx: ProvideKeyboardTy + ProvideMouseTy + Eq,
     <Cx as ProvideKeyboardTy>::Key: Eq,
     <Cx as ProvideMouseTy>::Button: Eq,
-    Ext: Eq,
+    Ext: KeyBindHook<Cx> + Eq,
 {
 }
 
 impl<Cx, Ext> KeyBind<Cx, Ext>
 where
     Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Ext: KeyBindHook<Cx>,
 {
     /// Creates a new [`KeyBind`] with the specified default key and extension data.
     pub fn new<F>(mode_getter: F, default_key: Key<Cx>, ext: Ext) -> Self
@@ -218,6 +263,7 @@ where
 impl<Cx, Ext> KeyBindOp<Cx> for KeyBind<Cx, Ext>
 where
     Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Ext: KeyBindHook<Cx>,
 {
     type Ext = Ext;
 
@@ -235,6 +281,11 @@ where
 
     fn reset_to_idle(&mut self) {
         self.state = KeyState::Idle;
+    }
+
+    fn reset(&mut self) {
+        self.state = KeyState::Idle;
+        self.press_count = 0;
     }
 
     fn state(&self) -> KeyState {
@@ -265,14 +316,15 @@ where
 /// A handle that releases the [`KeyBind`] when dropped.
 pub struct KeyBindHandle<'a, Cx, Ext>(&'a mut KeyBind<Cx, Ext>, KeyBindMode)
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy;
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Ext: KeyBindHook<Cx>;
 
 impl<Cx, Ext> Debug for KeyBindHandle<'_, Cx, Ext>
 where
     Cx: ProvideKeyboardTy + ProvideMouseTy + Debug,
     <Cx as ProvideKeyboardTy>::Key: Debug,
     <Cx as ProvideMouseTy>::Button: Debug,
-    Ext: Debug,
+    Ext: KeyBindHook<Cx> + Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("KeyBindHandle").field(&self.0).finish()
@@ -282,6 +334,7 @@ where
 impl<Cx, Ext> Drop for KeyBindHandle<'_, Cx, Ext>
 where
     Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Ext: KeyBindHook<Cx>,
 {
     fn drop(&mut self) {
         self.0.release(self.1);
@@ -291,6 +344,7 @@ where
 impl<Cx, Ext> Deref for KeyBindHandle<'_, Cx, Ext>
 where
     Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Ext: KeyBindHook<Cx>,
 {
     type Target = KeyBind<Cx, Ext>;
 
@@ -302,6 +356,7 @@ where
 impl<Cx, Ext> KeyBindOp<Cx> for KeyBindHandle<'_, Cx, Ext>
 where
     Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Ext: KeyBindHook<Cx>,
 {
     type Ext = Ext;
 
@@ -320,6 +375,10 @@ where
 
     fn reset_to_idle(&mut self) {
         self.0.reset_to_idle();
+    }
+
+    fn reset(&mut self) {
+        self.0.reset();
     }
 
     fn state(&self) -> KeyState {
