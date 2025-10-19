@@ -1,4 +1,4 @@
-//! Minecraft input.
+//! Minecraft client inputs.
 
 use glam::Vec2;
 use slow_down::SlowDownTickable;

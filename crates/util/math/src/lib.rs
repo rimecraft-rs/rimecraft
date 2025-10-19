@@ -1,59 +1,63 @@
-//! Math library for Rimecraft
+//! Math library for Rimecraft.
 
 use std::ops::Range;
 
+use num_traits::Num;
+
 pub mod int;
 
-/// Linear interpolates an [`f32`] between two values by a factor.
-pub fn __lerp_f32(factor: f32, start: f32, end: f32) -> f32 {
-    start + (end - start) * factor
+/// Extension trait for common mathematical operations.
+pub trait MathExt
+where
+    Self: Copy + Num,
+{
+    /// The type used as interpolation factors.
+    type Factor: Sized + Copy;
+
+    /// Converts `self` to a factor.
+    fn to_factor(self) -> Self::Factor;
+
+    /// Converts a factor back to the original type.
+    fn from_factor(factor: Self::Factor) -> Self;
+
+    /// Lerps between `self` and `to` by the given `factor`.
+    fn lerp(self, to: Self, factor: Self::Factor) -> Self {
+        self + (to - self) * Self::from_factor(factor)
+    }
+
+    /// Calculates the progress of `self` within the given `range`.
+    fn progress(self, range: Range<Self>) -> Self::Factor {
+        ((self - range.start) / (range.end - range.start)).to_factor()
+    }
+
+    /// Maps `self` from the `from` range to the `to` range, preserving the relative position.
+    fn map(self, from: Range<Self>, to: Range<Self>) -> Self {
+        to.start.lerp(to.end, self.progress(from))
+    }
 }
 
-/// Linear interpolates an [`f32`] between two values by a factor, with argument `clamp` available to clamp the result.
-pub fn lerp_f32(factor: f32, start: f32, end: f32, clamps: bool) -> f32 {
-    let lerp = __lerp_f32(factor, start, end);
-    if clamps { lerp.clamp(start, end) } else { lerp }
-}
+impl MathExt for f32 {
+    type Factor = f32;
 
-/// Gets the factor of a [`f32`] in a linear interpolation progress.
-pub fn __lerp_factor_f32(value: f32, start: f32, end: f32) -> f32 {
-    (value - start) / (end - start)
-}
+    fn to_factor(self) -> Self::Factor {
+        self
+    }
 
-/// Gets the factor of a [`f32`] in a linear interpolation progress, with argument `clamp` available to clamp the result.
-pub fn lerp_factor_f32(value: f32, start: f32, end: f32, clamps: bool) -> f32 {
-    let factor = __lerp_factor_f32(value, start, end);
-    if clamps {
-        factor.clamp(0.0, 1.0)
-    } else {
+    fn from_factor(factor: Self::Factor) -> Self {
         factor
     }
 }
 
-/// Linearly maps a [`f32`] from an old range to a newer one.
-pub fn __map_f32(value: f32, old_start: f32, old_end: f32, new_start: f32, new_end: f32) -> f32 {
-    __lerp_f32(
-        __lerp_factor_f32(value, old_start, old_end),
-        new_start,
-        new_end,
-    )
-}
+impl MathExt for i32 {
+    type Factor = f32;
 
-/// Linearly maps a [`f32`] from an old range to a newer one, with argument `clamps` available to clamp the result.
-pub fn map_f32(
-    value: f32,
-    old_start: f32,
-    old_end: f32,
-    new_start: f32,
-    new_end: f32,
-    clamps: bool,
-) -> f32 {
-    lerp_f32(
-        lerp_factor_f32(value, old_start, old_end, clamps),
-        new_start,
-        new_end,
-        clamps,
-    )
+    fn to_factor(self) -> Self::Factor {
+        self as Self::Factor
+    }
+
+    fn from_factor(factor: Self::Factor) -> Self {
+        factor as Self
+    }
 }
 
 /// Finds the minimum value in the given range that satisfies the *monotonic predicate* `p`.

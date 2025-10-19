@@ -63,3 +63,6 @@ pub trait ProvideNbtTy: GlobalContext {
 
 #[deprecated = "use `nbt` feature instead"]
 pub use nbt as nbt_edcode;
+
+#[cfg(feature = "unit")]
+unsafe impl GlobalContext for () {}

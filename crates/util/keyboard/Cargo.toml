@@ -1,0 +1,18 @@
+[package]
+name = "rimecraft-keyboard"
+version = "0.1.0"
+edition = "2024"
+authors = ["KrLite"]
+description = "Keyboard input handling for Rimecraft"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["game-development"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+rimecraft-global-cx = { path = "../../core/global-cx" }
+
+[lints]
+workspace = true
