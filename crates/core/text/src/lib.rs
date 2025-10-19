@@ -5,6 +5,7 @@ mod macros;
 
 #[doc(hidden)]
 pub mod __priv_macro_use {
+    pub use std::concat;
     pub use std::string::{String, ToString};
     pub use std::vec::Vec;
 }
