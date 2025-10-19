@@ -62,7 +62,12 @@ where
         <Cx as ProvideTextTy>::Content: Clone,
         <Cx as ProvideTextTy>::StyleExt: Clone,
     {
-        Self::new(content.clone(), Some(content))
+        let content = Arc::new(content);
+        Self {
+            content: content.clone(),
+            narration: Some(content),
+            lines: Vec::new(),
+        }
     }
 
     /// Returns the tooltip lines.
