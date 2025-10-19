@@ -1,19 +1,22 @@
 [package]
-name = "rimecraft-math"
+name = "rimecraft-client-ui"
 version = "0.1.0"
 edition = "2024"
-authors = ["KrLite", "JieningYu <jiening.yu@outlook.com>"]
-description = "Math library for Rimecraft"
+authors = ["KrLite"]
+description = "Minecraft client UI framework"
 repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
-categories = ["game-development"]
+categories = []
 
 [badges]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-num-integer = "0.1"
 num-traits = "0.2"
+glam = "0.30"
+
+[dev-dependencies]
+rimecraft-global-cx = { path = "../../core/global-cx" }
 
 [lints]
 workspace = true
