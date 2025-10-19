@@ -8,7 +8,9 @@ use crate::{
 };
 
 /// A callback for cycling options that support alternate value sets based on a condition.
-pub struct AlternateValuesSupportingCyclingCallbacks<K, V, Cx>
+///
+/// Can also be named `AlternateValuesSupportingCyclingCallbacks`.
+pub struct AltCyclingCallbacks<K, V, Cx>
 where
     Cx: ProvideTextTy,
 {
@@ -20,7 +22,7 @@ where
     pub value_setter: Box<ValueSetter<V, Cx>>,
 }
 
-impl<K, V, Cx> Debug for AlternateValuesSupportingCyclingCallbacks<K, V, Cx>
+impl<K, V, Cx> Debug for AltCyclingCallbacks<K, V, Cx>
 where
     K: Debug + Hash + Eq,
     V: Debug,
@@ -33,11 +35,11 @@ where
     }
 }
 
-impl<K, V, Cx> AlternateValuesSupportingCyclingCallbacks<K, V, Cx>
+impl<K, V, Cx> AltCyclingCallbacks<K, V, Cx>
 where
     Cx: ProvideTextTy,
 {
-    /// Creates a new [`AlternateValuesSupportingCyclingCallbacks`].
+    /// Creates a new [`AltCyclingCallbacks`].
     pub fn new<Condition, F>(
         values: HashMap<K, Vec<V>>,
         condition: Condition,
@@ -55,11 +57,11 @@ where
     }
 }
 
-impl<V, Cx> AlternateValuesSupportingCyclingCallbacks<bool, V, Cx>
+impl<V, Cx> AltCyclingCallbacks<bool, V, Cx>
 where
     Cx: ProvideTextTy,
 {
-    /// Creates a new [`AlternateValuesSupportingCyclingCallbacks`] that switches between two sets of values
+    /// Creates a new [`AltCyclingCallbacks`] that switches between two sets of values
     /// based on a boolean condition.
     pub fn new_binary<Condition, F>(
         true_values: Vec<V>,
@@ -84,7 +86,7 @@ where
     }
 }
 
-impl<K, V, Cx> Callbacks<V, Cx> for AlternateValuesSupportingCyclingCallbacks<K, V, Cx>
+impl<K, V, Cx> Callbacks<V, Cx> for AltCyclingCallbacks<K, V, Cx>
 where
     K: Hash + Eq,
     Cx: ProvideTextTy,
@@ -99,7 +101,7 @@ where
     }
 }
 
-impl<K, V, Cx> CyclingCallbacks<V, Cx> for AlternateValuesSupportingCyclingCallbacks<K, V, Cx>
+impl<K, V, Cx> CyclingCallbacks<V, Cx> for AltCyclingCallbacks<K, V, Cx>
 where
     K: Hash + Eq,
     Cx: ProvideTextTy,

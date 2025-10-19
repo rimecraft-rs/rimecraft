@@ -1,6 +1,6 @@
 //! Callback implementations and traits.
 
-mod alternate_values_supporting_cycling_callbacks;
+mod alt_cycling_callbacks;
 mod lazy_cycling_callbacks;
 mod potential_values_based_callbacks;
 mod suppliable_int_callbacks;
@@ -8,7 +8,7 @@ mod validating_int_slider_callbacks;
 
 pub mod ty;
 
-pub use alternate_values_supporting_cycling_callbacks::*;
+pub use alt_cycling_callbacks::*;
 pub use lazy_cycling_callbacks::*;
 pub use potential_values_based_callbacks::*;
 pub use suppliable_int_callbacks::*;
