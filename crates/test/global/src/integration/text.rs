@@ -5,11 +5,9 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
-use text::{ProvideTextTy, style::Formattable};
+use text::ProvideTextTy;
 
 use crate::TestContext;
-
-impl Formattable for sealed::EmptyStyleExt {}
 
 impl ProvideTextTy for TestContext {
     type Content = TextContent;
@@ -67,7 +65,10 @@ impl Display for TextContent {
 
 mod sealed {
     use serde::{Deserialize, Serialize};
+    use text::style::Formattable;
 
     #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
     pub struct EmptyStyleExt {}
+
+    impl Formattable for EmptyStyleExt {}
 }
