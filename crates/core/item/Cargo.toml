@@ -7,7 +7,7 @@ authors = [
     "C191239 <zhushunzhong2025@i.pkuschool.edu.cn>",
 ]
 description = "Minecraft item primitives"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
 

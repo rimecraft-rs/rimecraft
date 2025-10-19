@@ -1,10 +1,10 @@
 [package]
-name = "rimecraft-option"
+name = "rimecraft-client-option"
 version = "0.1.0"
 edition = "2024"
 authors = ["KrLite"]
-description = "Minecraft game options"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+description = "Minecraft client game options"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
 
@@ -14,7 +14,14 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 rimecraft-text = { path = "../../core/text" }
 rimecraft-math = { path = "../../util/math" }
+rimecraft-client-tooltip = { path = "../tooltip" }
 enum-iterator = "2.0.0"
+
+[dev-dependencies]
+rimecraft-test-global = { path = "../../test/global", features = [
+    "text",
+    "tooltip",
+] }
 
 [lints]
 workspace = true

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["KrLite", "JieningYu <jiening.yu@outlook.com>"]
 description = "Math library for Rimecraft"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = ["game-development"]
 
@@ -13,6 +13,7 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 num-integer = "0.1"
+num-traits = "0.2.19"
 
 [lints]
 workspace = true
