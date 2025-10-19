@@ -17,7 +17,7 @@ edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional
 rand = { version = "0.9", default-features = false, optional = true }
 
 [features]
-default = ["std"]
+default = ["std", "unit"]
 std = []
 serde = ["dep:serde"]
 nbt = ["serde"]

@@ -71,7 +71,7 @@ where
     }
 
     /// Converts the tooltip lines into a vector of vectors of [`OrderedTextItem`]s.
-    pub fn to_items(self) -> Vec<Vec<OrderedTextItem<Cx>>>
+    pub fn into_items(self) -> Box<[Box<[OrderedTextItem<Cx>]>]>
     where
         Cx: Clone,
     {

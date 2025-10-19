@@ -36,8 +36,8 @@ fn test_simple_options() {
         bool_option
             .tooltip_factory
             .apply(&true)
-            .map(|t| t.to_items()),
-        Some(Tooltip::from(Text::<TestContext>::from(TextContent::from("true"))).to_items())
+            .map(|t| t.into_items()),
+        Some(Tooltip::from(Text::<TestContext>::from(TextContent::from("true"))).into_items())
     );
 
     // Change the value and check the callback
