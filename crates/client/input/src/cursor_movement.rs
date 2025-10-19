@@ -1,13 +1,13 @@
 //! Handles cursor movements.
 
-/// Represents the movement of a cursor.
+/// The movement of a cursor.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum CursorMovement {
-    /// Represents an absolute cursor movement.
+    /// An absolute cursor movement.
     Absolute,
-    /// Represents a relative cursor movement.
+    /// A relative cursor movement.
     Relative,
-    /// Represents the end of cursor movement.
+    /// The end of a cursor movement.
     End,
 }

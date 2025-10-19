@@ -1,4 +1,4 @@
-//! Defines slow down by a factor.
+//! Being able to slow down by a factor.
 
 /// Represents the tickable component.
 pub trait SlowDownTickable {
@@ -12,6 +12,6 @@ pub trait SlowDownTickable {
 pub enum SlowDown {
     /// Slows down with a factor.
     Yes(f32),
-    /// No slow down available.
+    /// Does not slow down.
     No,
 }

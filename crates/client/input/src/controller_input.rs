@@ -1,12 +1,12 @@
 //! Handles keyboard inputs.
 
-use crate::{slow_down::SlowDown, SlowDownTickable};
+use crate::{SlowDownTickable, slow_down::SlowDown};
 
 use super::Input;
 
-/// Represents keyboard input.
+/// Inputs from a controller.
 #[derive(Debug, Default)]
-pub struct KeyboardInput {
+pub struct ControllerInput {
     /// Whether the forward key is currently pressed.
     pub pressing_forward: bool,
     /// Whether the backward key is currently pressed.
@@ -20,14 +20,14 @@ pub struct KeyboardInput {
     /// The movement modifier for sideways direction.
     pub movement_sideways: f32,
     /// Whether the jump key is currently pressed.
-    pub jumping: bool,
+    pub is_jumping: bool,
     /// Whether the sneak key is currently pressed.
-    pub sneaking: bool,
+    pub is_sneaking: bool,
 }
 
-impl KeyboardInput {
-    /// Returns the movement modifier based on the positive and negative flags.
-    pub fn get_movement_modifier(positive: bool, negative: bool) -> f32 {
+impl ControllerInput {
+    /// The movement modifier based on the positive and negative flags.
+    pub fn movement_modifier(positive: bool, negative: bool) -> f32 {
         if positive == negative {
             0.0
         } else if positive {
@@ -38,7 +38,7 @@ impl KeyboardInput {
     }
 }
 
-impl SlowDownTickable for KeyboardInput {
+impl SlowDownTickable for ControllerInput {
     fn tick(&mut self, slow_down: SlowDown) {
         self.pressing_forward = false;
         self.pressing_backward = false;
@@ -46,12 +46,11 @@ impl SlowDownTickable for KeyboardInput {
         self.pressing_right = false;
 
         self.movement_forward =
-            Self::get_movement_modifier(self.pressing_forward, self.pressing_backward);
-        self.movement_sideways =
-            Self::get_movement_modifier(self.pressing_left, self.pressing_right);
+            Self::movement_modifier(self.pressing_forward, self.pressing_backward);
+        self.movement_sideways = Self::movement_modifier(self.pressing_left, self.pressing_right);
 
-        self.jumping = false;
-        self.sneaking = false;
+        self.is_jumping = false;
+        self.is_sneaking = false;
 
         match slow_down {
             SlowDown::Yes(factor) => {
@@ -63,7 +62,7 @@ impl SlowDownTickable for KeyboardInput {
     }
 }
 
-impl Input for KeyboardInput {
+impl Input for ControllerInput {
     fn movement_forward(&self) -> f32 {
         self.movement_forward
     }
@@ -72,11 +71,11 @@ impl Input for KeyboardInput {
         self.movement_sideways
     }
 
-    fn jumping(&self) -> bool {
-        self.jumping
+    fn is_jumping(&self) -> bool {
+        self.is_jumping
     }
 
-    fn sneaking(&self) -> bool {
-        self.sneaking
+    fn is_sneaking(&self) -> bool {
+        self.is_sneaking
     }
 }
