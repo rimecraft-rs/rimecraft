@@ -1,0 +1,3 @@
+//! Piplining.
+
+pub trait Pipeline {}

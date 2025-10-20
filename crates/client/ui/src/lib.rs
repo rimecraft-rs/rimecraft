@@ -6,6 +6,7 @@ use crate::screen::ScreenRect;
 
 pub mod context;
 pub mod nav;
+pub mod render;
 pub mod screen;
 
 pub trait Drawable {

@@ -1,0 +1,19 @@
+[package]
+name = "rimecraft-render"
+version = "0.1.0"
+edition = "2024"
+authors = ["KrLite"]
+description = "Minecraft rendering API"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+rimecraft-global-cx = { path = "../global-cx" }
+glam = "0.30"
+
+[lints]
+workspace = true

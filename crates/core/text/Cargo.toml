@@ -2,7 +2,7 @@
 name = "rimecraft-text"
 version = "0.1.0"
 edition = "2024"
-authors = ["C191239", "JieningYu <jiening.yu@outlook.com>"]
+authors = ["KrLite", "C191239", "JieningYu <jiening.yu@outlook.com>"]
 description = "Minecraft text API"
 repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
