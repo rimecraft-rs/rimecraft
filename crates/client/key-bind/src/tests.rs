@@ -11,13 +11,13 @@ fn test_key_bind_handle_release() {
     let mode = Rc::new(RefCell::new(KeyBindMode::Hold));
     let mode_for_getter = mode.clone();
 
-    let mut key_bind = KeyBind::<TestContext, EmptyKeyBindHook> {
+    let mut key_bind = KeyBind::<TestContext, EmptyKeyBindExt> {
         mode_getter: Box::new(move || *mode_for_getter.borrow()),
         default_key: Key::KeyboardKey(TestKey::Num0),
         bound_key: None,
         state: KeyState::Idle,
         press_count: 0,
-        ext: EmptyKeyBindHook,
+        ext: EmptyKeyBindExt,
     };
 
     {
@@ -55,13 +55,13 @@ fn test_key_bind_handle_release() {
 
 #[test]
 fn test_key_bind_default_key() {
-    let key_bind = KeyBind::<TestContext, EmptyKeyBindHook> {
+    let key_bind = KeyBind::<TestContext, EmptyKeyBindExt> {
         mode_getter: Box::new(|| KeyBindMode::Hold),
         default_key: Key::KeyboardKey(TestKey::A),
         bound_key: None,
         state: KeyState::Idle,
         press_count: 0,
-        ext: EmptyKeyBindHook,
+        ext: EmptyKeyBindExt,
     };
 
     assert_eq!(key_bind.default_key(), &Key::KeyboardKey(TestKey::A));
@@ -70,13 +70,13 @@ fn test_key_bind_default_key() {
 
 #[test]
 fn test_key_bind_binding() {
-    let mut key_bind = KeyBind::<TestContext, EmptyKeyBindHook> {
+    let mut key_bind = KeyBind::<TestContext, EmptyKeyBindExt> {
         mode_getter: Box::new(|| KeyBindMode::Hold),
         default_key: Key::KeyboardKey(TestKey::A),
         bound_key: None,
         state: KeyState::Idle,
         press_count: 0,
-        ext: EmptyKeyBindHook,
+        ext: EmptyKeyBindExt,
     };
 
     assert_eq!(key_bind.bound_key(), None);
