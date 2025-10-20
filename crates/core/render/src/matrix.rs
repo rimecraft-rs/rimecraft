@@ -316,4 +316,51 @@ mod tests {
         let stack = MatrixStack::<i32>::with_capacity(0, 10);
         assert!(stack.stack.capacity() >= 10);
     }
+
+    #[test]
+    fn test_nested_blocks() {
+        let mut stack = MatrixStack::new(1);
+
+        {
+            let mut h1 = stack.push();
+            *h1.peek_mut() += 1; // 2
+
+            {
+                let mut h2 = h1.push();
+                *h2.peek_mut() *= 3; // 6
+            } // h2 pops here
+
+            assert_eq!(*h1.peek(), 2);
+        } // h1 pops here
+
+        assert_eq!(*stack.peek(), 1);
+    }
+
+    #[test]
+    fn test_chain_invocations() {
+        let mut stack = MatrixStack::new(1);
+
+        fn render_inner(stack: &mut dyn MatrixStackOp<Entry = i32>) -> i32 {
+            let mut h = stack.push();
+            *h.peek_mut() += 5;
+            *h.peek()
+        }
+
+        fn render(stack: &mut dyn MatrixStackOp<Entry = i32>) -> i32 {
+            let mut h1 = stack.push();
+            *h1.peek_mut() += 1;
+
+            let mut h2 = h1.push();
+            *h2.peek_mut() *= 3;
+
+            render_inner(&mut h2)
+        }
+
+        {
+            let mut h = stack.push();
+            let res = render(&mut h);
+            assert_eq!(res, 11); // ((1 + 1) * 3) + 5
+            assert_eq!(*h.peek(), 1); // h is back to original
+        }
+    }
 }
