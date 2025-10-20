@@ -16,5 +16,3 @@ pub trait ProvideRenderTy: GlobalContext {
 }
 
 pub trait TextureSetup {}
-
-
