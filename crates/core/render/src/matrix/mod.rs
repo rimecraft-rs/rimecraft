@@ -9,7 +9,7 @@ use std::ops::{Deref, DerefMut};
 /// # Example
 ///
 /// ```
-/// # use rimecraft_render::matrix::{MatrixStack, MatrixStackOp};
+/// # use rimecraft_render::matrix::MatrixStack;
 /// let mut stack = MatrixStack::new(0);
 /// {
 ///     let mut handle = stack.push();

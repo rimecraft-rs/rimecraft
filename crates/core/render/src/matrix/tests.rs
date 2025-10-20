@@ -46,19 +46,6 @@ fn test_nested_transformations() {
 }
 
 #[test]
-fn test_trait_object_usage() {
-    fn transform(stack: &mut MatrixStack<i32>) {
-        *stack.peek_mut() *= 2;
-    }
-
-    let mut stack = MatrixStack::new(5);
-    let mut handle = stack.push();
-    transform(&mut handle);
-
-    assert_eq!(*handle.peek(), 10);
-}
-
-#[test]
 fn test_complex_types() {
     let mut stack = MatrixStack::new(vec![1, 2, 3]);
 
