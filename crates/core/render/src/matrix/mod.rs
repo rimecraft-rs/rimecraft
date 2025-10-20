@@ -1,29 +1,6 @@
 //! Matrix operations and stacks.
 
-/// Common operations for matrix stacks.
-pub trait MatrixStackOp {
-    /// The type of entry stored in the stack.
-    type Entry;
-
-    /// Pushes a new entry by copying the current top.
-    ///
-    /// Returns a [`MatrixStackHandle`] that automatically pops when dropped.
-    fn push(&mut self) -> MatrixStackHandle<'_, Self::Entry>;
-
-    /// Returns a reference to the top entry.
-    fn peek(&self) -> &Self::Entry;
-
-    /// Returns a mutable reference to the top entry.
-    fn peek_mut(&mut self) -> &mut Self::Entry;
-
-    /// Returns the current depth (0-indexed).
-    fn depth(&self) -> usize;
-
-    /// Returns `true` if only the initial entry exists.
-    fn is_empty(&self) -> bool {
-        self.depth() == 0
-    }
-}
+use std::ops::{Deref, DerefMut};
 
 /// A stack of transformation matrices with optimized push/pop operations.
 ///
@@ -58,30 +35,19 @@ impl<Entry> Drop for MatrixStackHandle<'_, Entry> {
     }
 }
 
-impl<Entry> MatrixStackOp for MatrixStackHandle<'_, Entry>
-where
-    Entry: Clone,
-{
-    type Entry = Entry;
+impl<Entry> Deref for MatrixStackHandle<'_, Entry> {
+    type Target = MatrixStack<Entry>;
 
     #[inline]
-    fn push(&mut self) -> MatrixStackHandle<'_, Self::Entry> {
-        self.stack.push()
+    fn deref(&self) -> &Self::Target {
+        self.stack
     }
+}
 
+impl<Entry> DerefMut for MatrixStackHandle<'_, Entry> {
     #[inline]
-    fn peek(&self) -> &Self::Entry {
-        self.stack.peek()
-    }
-
-    #[inline]
-    fn peek_mut(&mut self) -> &mut Self::Entry {
-        self.stack.peek_mut()
-    }
-
-    #[inline]
-    fn depth(&self) -> usize {
-        self.stack.depth()
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.stack
     }
 }
 
@@ -122,19 +88,13 @@ where
     pub fn clear(&mut self) {
         self.stack.truncate(1);
     }
-}
-
-impl<Entry> MatrixStackOp for MatrixStack<Entry>
-where
-    Entry: Clone,
-{
-    type Entry = Entry;
 
     /// Pushes a new entry by copying the current top.
     ///
     /// Returns a handle that automatically pops when dropped.
+    #[allow(clippy::missing_panics_doc)]
     #[inline]
-    fn push(&mut self) -> MatrixStackHandle<'_, Self::Entry> {
+    pub fn push(&mut self) -> MatrixStackHandle<'_, Entry> {
         let top = self
             .stack
             .last()
@@ -144,19 +104,30 @@ where
         MatrixStackHandle { stack: self }
     }
 
+    /// Returns a reference to the top entry.
+    #[allow(clippy::missing_panics_doc)]
     #[inline]
-    fn peek(&self) -> &Self::Entry {
+    pub fn peek(&self) -> &Entry {
         self.stack.last().expect("stack should not be empty")
     }
 
+    /// Returns a mutable reference to the top entry.
+    #[allow(clippy::missing_panics_doc)]
     #[inline]
-    fn peek_mut(&mut self) -> &mut Self::Entry {
+    pub fn peek_mut(&mut self) -> &mut Entry {
         self.stack.last_mut().expect("stack should not be empty")
     }
 
+    /// Returns the current depth (0-indexed).
     #[inline]
-    fn depth(&self) -> usize {
+    pub fn depth(&self) -> usize {
         self.stack.len() - 1
+    }
+
+    /// Returns `true` if only the initial entry exists.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.depth() == 0
     }
 }
 
@@ -164,6 +135,7 @@ impl<Entry> Default for MatrixStack<Entry>
 where
     Entry: Default + Clone,
 {
+    #[inline]
     fn default() -> Self {
         Self::new(Entry::default())
     }

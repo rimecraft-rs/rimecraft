@@ -47,7 +47,7 @@ fn test_nested_transformations() {
 
 #[test]
 fn test_trait_object_usage() {
-    fn transform(stack: &mut dyn MatrixStackOp<Entry = i32>) {
+    fn transform(stack: &mut MatrixStack<i32>) {
         *stack.peek_mut() *= 2;
     }
 
@@ -111,19 +111,13 @@ fn test_nested_blocks() {
 fn test_chain_invocations() {
     let mut stack = MatrixStack::new(1);
 
-    fn render_inner<M>(stack: &mut M) -> i32
-    where
-        M: MatrixStackOp<Entry = i32>,
-    {
+    fn render_inner(stack: &mut MatrixStack<i32>) -> i32 {
         let mut h = stack.push();
         *h.peek_mut() += 5;
         *h.peek()
     }
 
-    fn render<M>(stack: &mut M) -> i32
-    where
-        M: MatrixStackOp<Entry = i32>,
-    {
+    fn render(stack: &mut MatrixStack<i32>) -> i32 {
         let mut h1 = stack.push();
         *h1.peek_mut() += 1;
 
