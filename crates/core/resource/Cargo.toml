@@ -1,0 +1,17 @@
+[package]
+name = "rimecraft-resource"
+version = "0.1.0"
+edition = "2024"
+authors = ["KrLite"]
+description = "Minecraft resource management"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+
+[lints]
+workspace = true
