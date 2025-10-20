@@ -5,14 +5,14 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
-use text::ProvideTextTy;
+use text::{ProvideTextTy, style::EmptyStyleExt};
 
 use crate::TestContext;
 
 impl ProvideTextTy for TestContext {
     type Content = TextContent;
 
-    type StyleExt = sealed::EmptyStyleExt;
+    type StyleExt = EmptyStyleExt;
 }
 
 /// Vanilla-style text content types for testing. Incomplete.
@@ -61,14 +61,4 @@ impl Display for TextContent {
             } => write!(f, "{}", fallback.as_ref().unwrap_or(translate)),
         }
     }
-}
-
-mod sealed {
-    use serde::{Deserialize, Serialize};
-    use text::style::Formattable;
-
-    #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-    pub struct EmptyStyleExt {}
-
-    impl Formattable for EmptyStyleExt {}
 }

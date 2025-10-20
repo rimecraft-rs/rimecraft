@@ -117,12 +117,6 @@ where
     fn reset(&mut self) {}
 }
 
-/// An empty implementation of [`KeyBindHook`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct EmptyKeyBindHook;
-
-impl<Cx> KeyBindHook<Cx> for EmptyKeyBindHook where Cx: ProvideKeyboardTy + ProvideMouseTy {}
-
 /// A key bind that can be pressed and released, tracking its state and press count.
 pub struct KeyBind<Cx, Ext>
 where
@@ -405,3 +399,18 @@ where
         self.0.unbind();
     }
 }
+
+#[cfg(feature = "empty-ext")]
+mod empty_ext {
+    use crate::*;
+    use serde::{Deserialize, Serialize};
+
+    /// An empty [`KeyBind`] extension.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+    pub struct EmptyKeyBindExt;
+
+    impl<Cx> KeyBindHook<Cx> for EmptyKeyBindExt where Cx: ProvideKeyboardTy + ProvideMouseTy {}
+}
+
+#[cfg(feature = "empty-ext")]
+pub use empty_ext::EmptyKeyBindExt;

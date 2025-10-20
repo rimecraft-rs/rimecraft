@@ -20,10 +20,11 @@ edcode2 = { path = "../../util/edcode2", optional = true, package = "rimecraft-e
 rimecraft-text-derive = { path = "../../util/text-derive", optional = true }
 
 [features]
-default = ["macros", "rgb/argb"]
+default = ["macros", "rgb/argb", "empty-ext"]
 serde = ["dep:serde"]
 macros = ["dep:rimecraft-text-derive"]
 edcode = ["dep:edcode2", "rimecraft-global-cx/edcode", "serde"]
+empty-ext = ["dep:serde"]
 
 [lints]
 workspace = true
