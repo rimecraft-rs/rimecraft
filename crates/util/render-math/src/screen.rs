@@ -106,10 +106,12 @@ impl ScreenRect {
 }
 
 impl ScreenRect {
+    /// Whether the position is at the origin (0, 0).
     pub fn is_at_origin(&self) -> bool {
         self.pos.is_zero()
     }
 
+    /// Whether the size is zero (width and height are both 0).
     pub fn is_zero(&self) -> bool {
         self.size.is_zero()
     }
