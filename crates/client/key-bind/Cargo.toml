@@ -12,20 +12,20 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+rimecraft-global-cx = { path = "../../core/global-cx" }
 rimecraft-keyboard = { path = "../../util/keyboard" }
 rimecraft-mouse = { path = "../../util/mouse" }
-serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
 rimecraft-test-global = { path = "../../test/global", package = "rimecraft-test-global", features = [
     "keyboard",
     "mouse",
+    "key-bind",
 ] }
-rimecraft-global-cx = { path = "../../core/global-cx" }
 
 [features]
-default = ["empty-ext"]
-empty-ext = ["dep:serde"]
+default = ["unit-ext"]
+unit-ext = []
 
 [lints]
 workspace = true

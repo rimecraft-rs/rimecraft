@@ -5,8 +5,15 @@ mod tests;
 
 use std::{fmt::Debug, ops::Deref};
 
+use rimecraft_global_cx::GlobalContext;
 use rimecraft_keyboard::{KeyState, ProvideKeyboardTy};
 use rimecraft_mouse::ProvideMouseTy;
+
+/// A context that provides key bind types.
+pub trait ProvideKeyBindTy: GlobalContext + ProvideKeyboardTy + ProvideMouseTy {
+    /// The extension data associated with the key bind.
+    type KeyBindExt: KeyBindHook<Self>;
+}
 
 /// Represents a key of a [`KeyBind`]. Currently supporting:
 ///
@@ -16,7 +23,7 @@ use rimecraft_mouse::ProvideMouseTy;
 #[non_exhaustive]
 pub enum Key<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Cx: ProvideKeyBindTy,
 {
     /// The keyboard key associated with this key.
     KeyboardKey(Cx::Key),
@@ -39,7 +46,7 @@ pub enum KeyBindMode {
 /// This trait is useful for abstracting over both [`KeyBind`] and [`KeyBindHandle`].
 pub trait KeyBindOp<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Cx: ProvideKeyBindTy,
 {
     /// The extension data associated with the key bind.
     type Ext;
@@ -86,7 +93,7 @@ where
 /// A hook for listening to key bind events.
 pub trait KeyBindHook<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Cx: ProvideKeyBindTy,
 {
     /// Called when a handle to the key bind is obtained.
     fn obtain_handle(&mut self) {}
@@ -118,10 +125,9 @@ where
 }
 
 /// A key bind that can be pressed and released, tracking its state and press count.
-pub struct KeyBind<Cx, Ext>
+pub struct KeyBind<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
-    Ext: KeyBindHook<Cx>,
+    Cx: ProvideKeyBindTy,
 {
     mode_getter: Box<dyn Fn() -> KeyBindMode>,
     default_key: Key<Cx>,
@@ -130,15 +136,15 @@ where
     state: KeyState,
     press_count: u32,
     /// Extension data associated with the key bind.
-    pub ext: Ext,
+    pub ext: Cx::KeyBindExt,
 }
 
-impl<Cx, Ext> Debug for KeyBind<Cx, Ext>
+impl<Cx> Debug for KeyBind<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy + Debug,
+    Cx: ProvideKeyBindTy + Debug,
     <Cx as ProvideKeyboardTy>::Key: Debug,
     <Cx as ProvideMouseTy>::Button: Debug,
-    Ext: KeyBindHook<Cx> + Debug,
+    Cx::KeyBindExt: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("KeyBind")
@@ -151,12 +157,12 @@ where
     }
 }
 
-impl<Cx, Ext> PartialEq for KeyBind<Cx, Ext>
+impl<Cx> PartialEq for KeyBind<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy + PartialEq,
+    Cx: ProvideKeyBindTy + PartialEq,
     <Cx as ProvideKeyboardTy>::Key: PartialEq,
     <Cx as ProvideMouseTy>::Button: PartialEq,
-    Ext: KeyBindHook<Cx> + PartialEq,
+    Cx::KeyBindExt: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.default_key == other.default_key
@@ -167,22 +173,21 @@ where
     }
 }
 
-impl<Cx, Ext> Eq for KeyBind<Cx, Ext>
+impl<Cx> Eq for KeyBind<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy + Eq,
+    Cx: ProvideKeyBindTy + Eq,
     <Cx as ProvideKeyboardTy>::Key: Eq,
     <Cx as ProvideMouseTy>::Button: Eq,
-    Ext: KeyBindHook<Cx> + Eq,
+    Cx::KeyBindExt: Eq,
 {
 }
 
-impl<Cx, Ext> KeyBind<Cx, Ext>
+impl<Cx> KeyBind<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
-    Ext: KeyBindHook<Cx>,
+    Cx: ProvideKeyBindTy,
 {
     /// Creates a new [`KeyBind`] with the specified default key and extension data.
-    pub fn new<F>(mode_getter: F, default_key: Key<Cx>, ext: Ext) -> Self
+    pub fn new<F>(mode_getter: F, default_key: Key<Cx>, ext: Cx::KeyBindExt) -> Self
     where
         F: Fn() -> KeyBindMode + 'static,
     {
@@ -197,12 +202,12 @@ where
     }
 
     /// Creates a new [`KeyBind`] that will be triggered on key hold.
-    pub fn new_hold(default_key: Key<Cx>, ext: Ext) -> Self {
+    pub fn new_hold(default_key: Key<Cx>, ext: Cx::KeyBindExt) -> Self {
         Self::new(|| KeyBindMode::Hold, default_key, ext)
     }
 
     /// Creates a new [`KeyBind`] that will be triggered on key toggle (or sticky key).
-    pub fn new_toggle(default_key: Key<Cx>, ext: Ext) -> Self {
+    pub fn new_toggle(default_key: Key<Cx>, ext: Cx::KeyBindExt) -> Self {
         Self::new(|| KeyBindMode::Toggle, default_key, ext)
     }
 
@@ -215,7 +220,7 @@ where
     /// # `Toggle` Mode
     ///
     /// Toggles the key state between pressed and idle, returning a [`KeyBindHandle`] that will do nothing when dropped.
-    pub fn press<'a>(&'a mut self) -> KeyBindHandle<'a, Cx, Ext> {
+    pub fn press<'a>(&'a mut self) -> KeyBindHandle<'a, Cx> {
         let mode = (self.mode_getter)();
         self.press_count += 1;
 
@@ -254,12 +259,11 @@ where
     }
 }
 
-impl<Cx, Ext> KeyBindOp<Cx> for KeyBind<Cx, Ext>
+impl<Cx> KeyBindOp<Cx> for KeyBind<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
-    Ext: KeyBindHook<Cx>,
+    Cx: ProvideKeyBindTy,
 {
-    type Ext = Ext;
+    type Ext = Cx::KeyBindExt;
 
     fn default_key(&self) -> &Key<Cx> {
         &self.default_key
@@ -308,51 +312,47 @@ where
 }
 
 /// A handle that releases the [`KeyBind`] when dropped.
-pub struct KeyBindHandle<'a, Cx, Ext>(&'a mut KeyBind<Cx, Ext>, KeyBindMode)
+pub struct KeyBindHandle<'a, Cx>(&'a mut KeyBind<Cx>, KeyBindMode)
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
-    Ext: KeyBindHook<Cx>;
+    Cx: ProvideKeyBindTy;
 
-impl<Cx, Ext> Debug for KeyBindHandle<'_, Cx, Ext>
+impl<Cx> Debug for KeyBindHandle<'_, Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy + Debug,
+    Cx: ProvideKeyBindTy + Debug,
     <Cx as ProvideKeyboardTy>::Key: Debug,
     <Cx as ProvideMouseTy>::Button: Debug,
-    Ext: KeyBindHook<Cx> + Debug,
+    Cx::KeyBindExt: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("KeyBindHandle").field(&self.0).finish()
     }
 }
 
-impl<Cx, Ext> Drop for KeyBindHandle<'_, Cx, Ext>
+impl<Cx> Drop for KeyBindHandle<'_, Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
-    Ext: KeyBindHook<Cx>,
+    Cx: ProvideKeyBindTy,
 {
     fn drop(&mut self) {
         self.0.release(self.1);
     }
 }
 
-impl<Cx, Ext> Deref for KeyBindHandle<'_, Cx, Ext>
+impl<Cx> Deref for KeyBindHandle<'_, Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
-    Ext: KeyBindHook<Cx>,
+    Cx: ProvideKeyBindTy,
 {
-    type Target = KeyBind<Cx, Ext>;
+    type Target = KeyBind<Cx>;
 
     fn deref(&self) -> &Self::Target {
         self.0
     }
 }
 
-impl<Cx, Ext> KeyBindOp<Cx> for KeyBindHandle<'_, Cx, Ext>
+impl<Cx> KeyBindOp<Cx> for KeyBindHandle<'_, Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
-    Ext: KeyBindHook<Cx>,
+    Cx: ProvideKeyBindTy,
 {
-    type Ext = Ext;
+    type Ext = Cx::KeyBindExt;
 
     fn default_key(&self) -> &Key<Cx> {
         self.0.default_key()
@@ -400,17 +400,5 @@ where
     }
 }
 
-#[cfg(feature = "empty-ext")]
-mod empty_ext {
-    use crate::*;
-    use serde::{Deserialize, Serialize};
-
-    /// An empty [`KeyBind`] extension.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-    pub struct EmptyKeyBindExt;
-
-    impl<Cx> KeyBindHook<Cx> for EmptyKeyBindExt where Cx: ProvideKeyboardTy + ProvideMouseTy {}
-}
-
-#[cfg(feature = "empty-ext")]
-pub use empty_ext::EmptyKeyBindExt;
+#[cfg(feature = "unit-ext")]
+impl<Cx> KeyBindHook<Cx> for () where Cx: ProvideKeyBindTy {}

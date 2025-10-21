@@ -417,17 +417,5 @@ mod _serde {
     }
 }
 
-#[cfg(feature = "empty-ext")]
-mod empty_ext {
-    use super::*;
-    use serde::{Deserialize, Serialize};
-
-    /// An empty [`Style`] extension.
-    #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default, Hash)]
-    pub struct EmptyStyleExt;
-
-    impl Formattable for EmptyStyleExt {}
-}
-
-#[cfg(feature = "empty-ext")]
-pub use empty_ext::EmptyStyleExt;
+#[cfg(feature = "unit-ext")]
+impl Formattable for () {}

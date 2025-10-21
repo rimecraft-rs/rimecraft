@@ -5,14 +5,14 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
-use text::{ProvideTextTy, style::EmptyStyleExt};
+use text::ProvideTextTy;
 
 use crate::TestContext;
 
 impl ProvideTextTy for TestContext {
     type Content = TextContent;
 
-    type StyleExt = EmptyStyleExt;
+    type StyleExt = ();
 }
 
 /// Vanilla-style text content types for testing. Incomplete.

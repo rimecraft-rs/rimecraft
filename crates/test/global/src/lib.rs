@@ -26,6 +26,7 @@ pub use local_cx;
 /// Integration with several Rimecraft crates.
 pub mod integration {
     pub mod component;
+    pub mod key_bind;
     pub mod keyboard;
     pub mod mouse;
     pub mod registry;
@@ -39,9 +40,9 @@ pub use identifier::Id;
 use registry::Registry;
 
 /// The global context.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[allow(clippy::exhaustive_enums)]
-pub enum TestContext {}
+pub struct TestContext;
 
 /// The owned local context.
 #[derive(Debug)]
