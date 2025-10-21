@@ -1,61 +1,30 @@
-//! Screen space operations and abstractions.
+//! Navigation operations in screen space.
 
 use std::ops::{Add, Sub};
 
+use super::*;
+
 use num_traits::One;
+use rimecraft_render_math::screen::{ScreenPos, ScreenRect, ScreenVec};
 
-use crate::nav::{NavAxis, NavDirection, Sign};
-
-/// A vector on the screen in 2D space.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ScreenVec<V> {
-    /// The value on the horizontal axis.
-    pub horizontal: V,
-    /// The value on the vertical axis.
-    pub vertical: V,
-}
-
-impl<V> Default for ScreenVec<V>
-where
-    V: Default,
-{
-    fn default() -> Self {
-        Self {
-            horizontal: V::default(),
-            vertical: V::default(),
-        }
-    }
-}
-
-impl<V> ScreenVec<V> {
-    /// Creates a new [`ScreenVec`] from the given horizontal and vertical values.
-    pub const fn new(horizontal: V, vertical: V) -> Self {
-        Self {
-            horizontal,
-            vertical,
-        }
-    }
-
+/// Extension methods for [`ScreenVec`] to support navigation operations.
+pub trait ScreenVecExt<V> {
     /// Creates a new [`ScreenVec`] from the given axis, this axis value, and other axis value.
-    pub const fn from_axis(axis: NavAxis, this_axis: V, other_axis: V) -> Self {
+    fn from_axis(axis: NavAxis, this_axis: V, other_axis: V) -> Self;
+
+    /// Returns the value on the given axis.
+    fn get(&self, axis: NavAxis) -> &V;
+}
+
+impl<V> ScreenVecExt<V> for ScreenVec<V> {
+    fn from_axis(axis: NavAxis, this_axis: V, other_axis: V) -> Self {
         match axis {
             NavAxis::Horizontal => Self::new(this_axis, other_axis),
             NavAxis::Vertical => Self::new(other_axis, this_axis),
         }
     }
 
-    /// Returns `true` if both horizontal and vertical values are zero, i.e., equal to their default value.
-    pub fn is_zero(&self) -> bool
-    where
-        V: PartialEq + Default,
-    {
-        self.horizontal == V::default() && self.vertical == V::default()
-    }
-}
-
-impl<V> ScreenVec<V> {
-    /// Returns the value on the given axis.
-    pub fn get(&self, axis: NavAxis) -> &V {
+    fn get(&self, axis: NavAxis) -> &V {
         match axis {
             NavAxis::Horizontal => &self.horizontal,
             NavAxis::Vertical => &self.vertical,
@@ -92,72 +61,77 @@ where
     }
 }
 
-impl<V> Add for ScreenVec<V>
-where
-    V: Add<Output = V>,
-{
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.horizontal + rhs.horizontal,
-            self.vertical + rhs.vertical,
-        )
-    }
-}
-
-impl<V> Sub for ScreenVec<V>
-where
-    V: Sub<Output = V>,
-{
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.horizontal - rhs.horizontal,
-            self.vertical - rhs.vertical,
-        )
-    }
-}
-
-impl From<glam::Vec2> for ScreenVec<f32> {
-    fn from(vec: glam::Vec2) -> Self {
-        Self::new(vec.x, vec.y)
-    }
-}
-
-/// A position on the screen in 2D space.
-pub type ScreenPos = ScreenVec<f32>;
-
-/// A size on the screen in 2D space.
-pub type ScreenSize = ScreenVec<f32>;
-
-/// A rectangle on the screen in 2D space.
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct ScreenRect {
-    /// The position of the rectangle.
-    pub pos: ScreenPos,
-    /// The size of the rectangle.
-    pub size: ScreenSize,
-}
-
-impl ScreenRect {
-    /// Creates a new [`ScreenRect`] from the given position and size.
-    pub const fn new(pos: ScreenPos, size: ScreenSize) -> Self {
-        Self { pos, size }
-    }
-
-    /// Creates a new [`ScreenRect`] from the given x, y, width and height.
-    pub const fn from_xywh(x: f32, y: f32, w: f32, h: f32) -> Self {
-        Self {
-            pos: ScreenPos::new(x, y),
-            size: ScreenSize::new(w, h),
-        }
-    }
-
+/// Extension methods for [`ScreenRect`] to support navigation operations.
+pub trait ScreenRectExt {
     /// Creates a new [`ScreenRect`] from the given axis, this axis position, other axis position,
     /// this axis size, and other axis size.
-    pub const fn from_axis(
+    fn from_axis(
+        axis: NavAxis,
+        this_axis_pos: f32,
+        other_axis_pos: f32,
+        this_axis_size: f32,
+        other_axis_size: f32,
+    ) -> Self;
+
+    /// Returns the length along the given axis.
+    fn length(&self, axis: NavAxis) -> f32;
+
+    /// Returns the coordinate in the given direction.
+    fn coord(&self, direction: NavDirection) -> f32;
+
+    /// Returns the border rectangle in the given direction.
+    fn border(&self, direction: NavDirection) -> Self;
+
+    /// Checks if overlaps on the given axis.
+    fn overlaps_axis(&self, other: &Self, axis: NavAxis) -> bool;
+
+    /// Checks if overlaps on both axes.
+    fn overlaps(&self, other: &Self) -> bool;
+
+    /// Returns the center coordinate along the given axis.
+    fn center_axis(&self, axis: NavAxis) -> f32;
+
+    /// Returns the center position.
+    fn center(&self) -> ScreenPos;
+
+    /// Returns the top coordinate.
+    fn coord_top(&self) -> f32;
+
+    /// Returns the bottom coordinate.
+    fn coord_bottom(&self) -> f32;
+
+    /// Returns the left coordinate.
+    fn coord_left(&self) -> f32;
+
+    /// Returns the right coordinate.
+    fn coord_right(&self) -> f32;
+
+    /// Returns the intersection with another rectangle.
+    fn intersection(&self, other: &Self) -> Option<Self>
+    where
+        Self: Sized;
+
+    /// Checks if there is an intersection.
+    fn intersects(&self, other: &Self) -> bool;
+
+    /// Returns the union with another rectangle.
+    fn union(&self, other: &Self) -> Self;
+
+    /// Checks if contains another rectangle.
+    fn contains(&self, other: &Self) -> bool;
+
+    /// Checks if contains the given point.
+    fn contains_pos(&self, pos: ScreenPos) -> bool;
+
+    /// Applies an affine transformation to the rectangle.
+    fn transform(&self, transformation: glam::Affine2) -> Self;
+
+    /// Applies an affine transformation to vertices and returns the bounding box.
+    fn transform_vertices(&self, transformation: glam::Affine2) -> Self;
+}
+
+impl ScreenRectExt for ScreenRect {
+    fn from_axis(
         axis: NavAxis,
         this_axis_pos: f32,
         other_axis_pos: f32,
@@ -169,32 +143,22 @@ impl ScreenRect {
             size: ScreenVec::from_axis(axis, this_axis_size, other_axis_size),
         }
     }
-}
 
-impl ScreenRect {
-    pub fn is_at_origin(&self) -> bool {
-        self.pos.is_zero()
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.size.is_zero()
-    }
-
-    pub fn length(&self, axis: NavAxis) -> f32 {
+    fn length(&self, axis: NavAxis) -> f32 {
         match axis {
             NavAxis::Horizontal => self.size.horizontal,
             NavAxis::Vertical => self.size.vertical,
         }
     }
 
-    pub fn coord(&self, direction: NavDirection) -> f32 {
+    fn coord(&self, direction: NavDirection) -> f32 {
         match direction.sign() {
             Sign::Positive => self.pos.get(direction.axis()) + self.length(direction.axis()),
             Sign::Negative => self.pos.get(direction.axis()).to_owned(),
         }
     }
 
-    pub fn border(&self, direction: NavDirection) -> ScreenRect {
+    fn border(&self, direction: NavDirection) -> ScreenRect {
         let opposite_axis = direction.axis().flip();
         let coord_start = self.coord(direction);
         let coord_end = self.coord(opposite_axis.direction(Sign::Negative));
@@ -202,7 +166,7 @@ impl ScreenRect {
         ScreenRect::from_axis(direction.axis(), coord_start, coord_end, 1.0, length) + direction
     }
 
-    pub fn overlaps_axis(&self, other: &Self, axis: NavAxis) -> bool {
+    fn overlaps_axis(&self, other: &Self, axis: NavAxis) -> bool {
         let self_start = self.coord(axis.direction(Sign::Negative));
         let self_end = self.coord(axis.direction(Sign::Positive));
         let other_start = other.coord(axis.direction(Sign::Negative));
@@ -210,41 +174,41 @@ impl ScreenRect {
         self_start.max(other_start) <= self_end.min(other_end)
     }
 
-    pub fn overlaps(&self, other: &Self) -> bool {
+    fn overlaps(&self, other: &Self) -> bool {
         self.overlaps_axis(other, NavAxis::Horizontal)
             && self.overlaps_axis(other, NavAxis::Vertical)
     }
 
-    pub fn center_axis(&self, axis: NavAxis) -> f32 {
+    fn center_axis(&self, axis: NavAxis) -> f32 {
         let start = self.coord(axis.direction(Sign::Negative));
         let end = self.coord(axis.direction(Sign::Positive));
         (start + end) / 2.0
     }
 
-    pub fn center(&self) -> ScreenPos {
+    fn center(&self) -> ScreenPos {
         ScreenPos::new(
             self.center_axis(NavAxis::Horizontal),
             self.center_axis(NavAxis::Vertical),
         )
     }
 
-    pub fn coord_top(&self) -> f32 {
+    fn coord_top(&self) -> f32 {
         self.coord(NavDirection::Up)
     }
 
-    pub fn coord_bottom(&self) -> f32 {
+    fn coord_bottom(&self) -> f32 {
         self.coord(NavDirection::Down)
     }
 
-    pub fn coord_left(&self) -> f32 {
+    fn coord_left(&self) -> f32 {
         self.coord(NavDirection::Left)
     }
 
-    pub fn coord_right(&self) -> f32 {
+    fn coord_right(&self) -> f32 {
         self.coord(NavDirection::Right)
     }
 
-    pub fn intersection(&self, other: &Self) -> Option<Self> {
+    fn intersection(&self, other: &Self) -> Option<Self> {
         if self.is_zero() || other.is_zero() {
             return None;
         }
@@ -254,18 +218,14 @@ impl ScreenRect {
         let x2 = self.coord_right().min(other.coord_right());
         let y2 = self.coord_bottom().min(other.coord_bottom());
 
-        if x2 >= x1 && y2 >= y1 {
-            Some(ScreenRect::from_xywh(x1, y1, x2 - x1, y2 - y1))
-        } else {
-            None
-        }
+        (x2 >= x1 && y2 >= y1).then(|| ScreenRect::from_xywh(x1, y1, x2 - x1, y2 - y1))
     }
 
-    pub fn intersects(&self, other: &Self) -> bool {
+    fn intersects(&self, other: &Self) -> bool {
         self.intersection(other).is_some()
     }
 
-    pub fn union(&self, other: &Self) -> Self {
+    fn union(&self, other: &Self) -> Self {
         if self.is_zero() {
             return *other;
         }
@@ -281,14 +241,14 @@ impl ScreenRect {
         ScreenRect::from_xywh(x1, y1, x2 - x1, y2 - y1)
     }
 
-    pub fn contains(&self, other: &Self) -> bool {
+    fn contains(&self, other: &Self) -> bool {
         self.coord_left() <= other.coord_left()
             && self.coord_right() >= other.coord_right()
             && self.coord_top() <= other.coord_top()
             && self.coord_bottom() >= other.coord_bottom()
     }
 
-    pub fn contains_pos(&self, pos: ScreenPos) -> bool {
+    fn contains_pos(&self, pos: ScreenPos) -> bool {
         let x = pos.horizontal;
         let y = pos.vertical;
         x >= self.coord_left()
@@ -297,7 +257,7 @@ impl ScreenRect {
             && y <= self.coord_bottom()
     }
 
-    pub fn transform(&self, transformation: glam::Affine2) -> Self {
+    fn transform(&self, transformation: glam::Affine2) -> Self {
         let top_left =
             transformation.transform_point2(glam::Vec2::new(self.coord_left(), self.coord_top()));
         let bottom_right = transformation
@@ -310,7 +270,7 @@ impl ScreenRect {
         )
     }
 
-    pub fn transform_vertices(&self, transformation: glam::Affine2) -> ScreenRect {
+    fn transform_vertices(&self, transformation: glam::Affine2) -> ScreenRect {
         let top_left =
             transformation.transform_point2(glam::Vec2::new(self.coord_left(), self.coord_top()));
         let top_right =

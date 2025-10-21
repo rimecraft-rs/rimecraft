@@ -1,20 +1,20 @@
 [package]
-name = "rimecraft-render"
+name = "rimecraft-render-math"
 version = "0.1.0"
 edition = "2024"
 authors = ["KrLite"]
-description = "Minecraft rendering API"
+description = "Render math library for Rimecraft"
 repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
-categories = []
+categories = ["game-development"]
 
 [badges]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-global-cx = { path = "../global-cx" }
-rimecraft-render-math = { path = "../../util/render-math" }
 glam = "0.30"
+
+[features]
 
 [lints]
 workspace = true

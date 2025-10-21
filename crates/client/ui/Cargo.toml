@@ -12,6 +12,7 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+rimecraft-render-math = { path = "../../util/render-math" }
 num-traits = "0.2"
 glam = "0.30"
 serde = { version = "1.0", features = ["derive"], optional = true }

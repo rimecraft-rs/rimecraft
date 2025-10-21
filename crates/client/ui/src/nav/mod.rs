@@ -1,5 +1,7 @@
 //! UI navigation components.
 
+pub mod screen;
+
 use std::ops::Not;
 
 /// The sign of a navigation action, either positive or negative.

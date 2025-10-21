@@ -4,7 +4,7 @@ use rimecraft_global_cx::GlobalContext;
 
 use crate::{pipeline::Pipeline, vertex::VertexConsumer};
 
-pub mod matrix;
+pub mod draw;
 pub mod pipeline;
 pub mod vertex;
 
