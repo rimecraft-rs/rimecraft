@@ -11,7 +11,4 @@ pub mod vertex;
 pub trait ProvideRenderTy: GlobalContext {
     type VertexConsumer: VertexConsumer;
     type Pipeline: Pipeline;
-    type TextureSetup: TextureSetup;
 }
-
-pub trait TextureSetup {}
