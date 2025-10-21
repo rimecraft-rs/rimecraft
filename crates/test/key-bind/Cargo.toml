@@ -1,0 +1,23 @@
+[package]
+name = "rimecraft-client-key-bind-text"
+version = "0.1.0"
+edition = "2024"
+authors = ["KrLite"]
+description = "Essential tests for rimecraft-client-key-bind that require a context"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+test-global = { path = "../global", package = "rimecraft-test-global", features = [
+    "key-bind",
+] }
+keyboard = { path = "../../util/keyboard", package = "rimecraft-keyboard" }
+mouse = { path = "../../util/mouse", package = "rimecraft-mouse" }
+key_bind = { path = "../../client/key-bind", package = "rimecraft-client-key-bind" }
+
+[lints]
+workspace = true

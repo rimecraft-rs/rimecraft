@@ -13,7 +13,6 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 
-[features]
 
 [lints]
 workspace = true

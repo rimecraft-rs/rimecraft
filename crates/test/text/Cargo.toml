@@ -21,7 +21,5 @@ text = { path = "../../core/text", package = "rimecraft-text", features = [
     "serde",
 ] }
 
-[features]
-
 [lints]
 workspace = true

@@ -1,8 +1,5 @@
 //! Minecraft client key binds.
 
-#[cfg(test)]
-mod tests;
-
 use std::{fmt::Debug, ops::Deref};
 
 use rimecraft_global_cx::GlobalContext;
