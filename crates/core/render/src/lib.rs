@@ -5,7 +5,6 @@ use rimecraft_global_cx::GlobalContext;
 use crate::{pipeline::Pipeline, vertex::VertexConsumer};
 
 pub mod matrix;
-pub mod phase;
 pub mod pipeline;
 pub mod vertex;
 

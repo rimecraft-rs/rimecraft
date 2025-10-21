@@ -29,6 +29,7 @@ pub mod integration {
     pub mod keyboard;
     pub mod mouse;
     pub mod registry;
+    pub mod render;
     pub mod text;
     pub mod tooltip;
 }

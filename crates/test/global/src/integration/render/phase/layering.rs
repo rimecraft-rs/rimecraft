@@ -1,23 +1,23 @@
 use std::fmt::Debug;
 
-use crate::phase::{sealed::*, *};
+use super::{sealed::*, *};
 
-pub struct Texturing<'p> {
+pub struct Layering<'p> {
     name: &'static str,
     begin_action: Box<dyn FnMut() + 'p>,
     end_action: Box<dyn FnMut() + 'p>,
 }
 
-impl Debug for Texturing<'_> {
+impl Debug for Layering<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Texturing")
+        f.debug_struct("Layering")
             .field("name", &self.name)
             .finish()
     }
 }
 
-impl<'p> Phase<'p> for Texturing<'p> {
-    type Handle = TexturingHandle<'p>;
+impl<'p> Phase<'p> for Layering<'p> {
+    type Handle = LayeringHandle<'p>;
 
     fn name(&self) -> &'static str {
         self.name
@@ -25,22 +25,23 @@ impl<'p> Phase<'p> for Texturing<'p> {
 
     fn begin(&'p mut self) -> Self::Handle {
         (self.begin_action)();
-        TexturingHandle(self)
+        LayeringHandle(self)
     }
 }
 
-impl<'p> SealedPhase<'p> for Texturing<'p> {
+impl<'p> SealedPhase<'p> for Layering<'p> {
     fn end(&mut self) {
         (self.end_action)();
     }
 }
 
-impl<'p> Texturing<'p> {
-    pub fn new<F>(name: &'static str, begin_action: F, end_action: F) -> Self
+impl<'p> Layering<'p> {
+    pub fn new<F1, F2>(name: &'static str, begin_action: F1, end_action: F2) -> Self
     where
-        F: FnMut() + 'p,
+        F1: FnMut() + 'p,
+        F2: FnMut() + 'p,
     {
-        Texturing {
+        Layering {
             name,
             begin_action: Box::new(begin_action),
             end_action: Box::new(end_action),
@@ -48,18 +49,18 @@ impl<'p> Texturing<'p> {
     }
 }
 
-pub struct TexturingHandle<'p>(&'p mut Texturing<'p>);
+pub struct LayeringHandle<'p>(&'p mut Layering<'p>);
 
-impl Debug for TexturingHandle<'_> {
+impl Debug for LayeringHandle<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TexturingHandle")
+        f.debug_struct("LayeringHandle")
             .field("name", &self.0.name)
             .finish()
     }
 }
 
-impl<'p> SealedPhaseHandle<'p> for TexturingHandle<'p> {
-    type P = Texturing<'p>;
+impl<'p> SealedPhaseHandle<'p> for LayeringHandle<'p> {
+    type P = Layering<'p>;
 
     fn phase(&'p self) -> &'p Self::P {
         self.0

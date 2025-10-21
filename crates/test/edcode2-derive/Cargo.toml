@@ -3,7 +3,7 @@ name = "rimecraft-edcode2-derive-tests"
 version = "0.1.0"
 edition = "2024"
 authors = ["C191239 <zhushunzhong2025@i.pkuschool.edu.cn>"]
-description = "Tests for rimecraft-edcode2-derive"
+description = "Essential tests for rimecraft-edcode2-derive"
 repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = ["encoding"]
@@ -12,7 +12,7 @@ categories = ["encoding"]
 maintenance = { status = "passively-maintained" }
 
 [dev-dependencies]
-rimecraft-edcode2 = { path = "../edcode2", features = ["derive"] }
+rimecraft-edcode2 = { path = "../../util/edcode2", features = ["derive"] }
 
 [lints]
 workspace = true

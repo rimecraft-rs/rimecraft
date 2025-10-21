@@ -1,9 +1,9 @@
 [package]
-name = "rimecraft-client-ui"
+name = "rimecraft-test-render"
 version = "0.1.0"
 edition = "2024"
 authors = ["KrLite"]
-description = "Minecraft client UI framework"
+description = "Essential tests for rimecraft-render that require a context"
 repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
@@ -12,13 +12,8 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-num-traits = "0.2"
-glam = "0.30"
-serde = { version = "1.0", features = ["derive"], optional = true }
 
 [features]
-default = []
-serde = ["dep:serde"]
 
 [lints]
 workspace = true

@@ -31,6 +31,7 @@ freezer = { path = "../../util/freezer", package = "rimecraft-freezer" }
 registry = { path = "../../core/registry", package = "rimecraft-registry", optional = true }
 text = { path = "../../core/text", package = "rimecraft-text", optional = true }
 component = { path = "../../core/component", package = "rimecraft-component", optional = true }
+render = { path = "../../core/render", package = "rimecraft-render", optional = true }
 # client components
 tooltip = { path = "../../client/tooltip", package = "rimecraft-client-tooltip", optional = true }
 # util components
@@ -44,6 +45,7 @@ component = ["dep:component", "registry"]
 tooltip = ["dep:tooltip"]
 keyboard = ["dep:keyboard"]
 mouse = ["dep:mouse"]
+render = ["dep:render"]
 
 [lints]
 workspace = true

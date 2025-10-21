@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::phase::{sealed::*, *};
+use super::{sealed::*, *};
 
 pub struct Toggleable<'p, C> {
     name: &'static str,
