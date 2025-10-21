@@ -2,9 +2,9 @@
 
 use std::ops::{Deref, DerefMut};
 
-/// A stack of transformation matrices with optimized push/pop operations.
+/// A stack of transformation matrices.
 ///
-/// Uses RAII pattern: [`MatrixStack::push()`] returns a handle that automatically pops when dropped.
+/// Uses RAII pattern: [`MatrixStack::push()`] returns a guard that automatically pops when dropped.
 ///
 /// # Example
 ///
@@ -22,20 +22,20 @@ pub struct MatrixStack<Entry> {
     stack: Vec<Entry>,
 }
 
-/// A RAII handle that automatically pops the stack when dropped.
+/// A RAII guard that automatically pops the stack when dropped.
 #[derive(Debug)]
-pub struct MatrixStackHandle<'a, Entry> {
+pub struct MatrixStackGuard<'a, Entry> {
     stack: &'a mut MatrixStack<Entry>,
 }
 
-impl<Entry> Drop for MatrixStackHandle<'_, Entry> {
+impl<Entry> Drop for MatrixStackGuard<'_, Entry> {
     #[inline]
     fn drop(&mut self) {
         self.stack.pop();
     }
 }
 
-impl<Entry> Deref for MatrixStackHandle<'_, Entry> {
+impl<Entry> Deref for MatrixStackGuard<'_, Entry> {
     type Target = MatrixStack<Entry>;
 
     #[inline]
@@ -44,7 +44,7 @@ impl<Entry> Deref for MatrixStackHandle<'_, Entry> {
     }
 }
 
-impl<Entry> DerefMut for MatrixStackHandle<'_, Entry> {
+impl<Entry> DerefMut for MatrixStackGuard<'_, Entry> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.stack
@@ -91,17 +91,17 @@ where
 
     /// Pushes a new entry by copying the current top.
     ///
-    /// Returns a handle that automatically pops when dropped.
+    /// Returns a guard that automatically pops when dropped.
     #[allow(clippy::missing_panics_doc)]
     #[inline]
-    pub fn push(&mut self) -> MatrixStackHandle<'_, Entry> {
+    pub fn push(&mut self) -> MatrixStackGuard<'_, Entry> {
         let top = self
             .stack
             .last()
             .expect("stack should not be empty")
             .clone();
         self.stack.push(top);
-        MatrixStackHandle { stack: self }
+        MatrixStackGuard { stack: self }
     }
 
     /// Returns a reference to the top entry.
