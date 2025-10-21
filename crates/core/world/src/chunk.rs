@@ -24,7 +24,7 @@ use rimecraft_registry::Registry;
 use rimecraft_voxel_math::{BlockPos, ChunkSectionPos};
 
 use crate::{
-    chunk::{light::ChunkSkyLight, section::ComputeIndex},
+    chunk::light::ChunkSkyLight,
     event::game_event,
     heightmap::{self, Heightmap},
     view::{
@@ -40,16 +40,18 @@ mod be_tick;
 pub mod iter;
 pub mod light;
 mod section;
+pub mod status;
 mod upgrade;
 
 mod world_chunk;
 
 pub use rimecraft_voxel_math::ChunkPos;
 
-pub use section::ChunkSection;
-pub use upgrade::UpgradeData;
-
 pub use internal_types::*;
+
+pub use section::*;
+pub use status::{ChunkStatus, ChunkType};
+pub use upgrade::UpgradeData;
 pub use world_chunk::*;
 
 /// The length of the border of a chunk.

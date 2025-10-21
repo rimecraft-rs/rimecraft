@@ -1,4 +1,7 @@
 //! Light view traits.
+//!
+//! These views all take mutable reference to the _type_ for unifying the interface of locked access
+//! and lock-free access, where the latter one requires mutability.
 
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_fluid::ProvideFluidStateExtTy;

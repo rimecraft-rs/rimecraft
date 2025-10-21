@@ -19,6 +19,15 @@ pub use ::dsyn as __dsyn;
 /// A base local context.
 pub trait BaseLocalContext: Sized + Copy {}
 
+/// A trait for types that can hold a local context inside.
+pub trait HoldLocalContext {
+    /// The local context type.
+    type LocalCx: BaseLocalContext;
+
+    /// Returns the local context.
+    fn local_context(&self) -> Self::LocalCx;
+}
+
 /// A local context provides data to the global context.
 pub trait LocalContext<T>: BaseLocalContext {
     /// Acquire the data from the local context.
@@ -103,9 +112,37 @@ pub trait LocalContextExt {
             local_cx: self,
         }
     }
+
+    /// Acquire the inner data within the local context.
+    ///
+    /// This is a shorthand for [`LocalContext::acquire`] but with better generic bounding experience.
+    #[inline(always)]
+    fn acquire_within<T>(self) -> T
+    where
+        Self: LocalContext<T>,
+    {
+        self.acquire()
+    }
 }
 
 impl<Cx> LocalContextExt for Cx where Cx: BaseLocalContext {}
+
+/// Extension trait for peekable local context.
+pub trait PeekLocalContextExt {
+    /// Peek the inner data within the local context.
+    ///
+    /// This is a shorthand for [`PeekLocalContext::peek_acquire`] but with better generic bounding experience.
+    #[inline(always)]
+    fn peek_within<T, F, U>(self, f: F) -> U
+    where
+        F: FnOnce(&T) -> U,
+        Self: PeekLocalContext<T>,
+    {
+        self.peek_acquire(f)
+    }
+}
+
+impl<Cx> PeekLocalContextExt for Cx where Cx: BaseLocalContext {}
 
 /// A type that can be transformed into a [`WithLocalCx`] by taking ownership of it.
 pub trait ForwardToWithLocalCx {

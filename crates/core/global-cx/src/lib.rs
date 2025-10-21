@@ -74,7 +74,10 @@ unsafe impl GlobalContext for () {}
 pub trait Hold<T> {
     /// Returns the held value.
     fn get_held(&self) -> &T;
+}
 
+/// Trait usually for global-context-provided 'extension types' to represent types that is held mutably.
+pub trait HoldMut<T>: Hold<T> {
     /// Returns the held value mutably.
     fn get_held_mut(&mut self) -> &mut T;
 }

@@ -1,4 +1,7 @@
 //! Block views.
+//!
+//! These views all take mutable reference to the _type_ for unifying the interface of locked access
+//! and lock-free access, where the latter one requires mutability.
 
 use bitflags::bitflags;
 use local_cx::ProvideLocalCxTy;
