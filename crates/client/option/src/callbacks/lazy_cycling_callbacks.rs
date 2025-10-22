@@ -16,7 +16,7 @@ where
     pub values: ValuesFn<V>,
     /// A function that validates a given value.
     pub validate: ValidateFn<V>,
-    _phantom: std::marker::PhantomData<Cx>,
+    _marker: std::marker::PhantomData<Cx>,
 }
 
 impl<V, Cx> Debug for LazyCyclingCallbacks<V, Cx>
@@ -41,7 +41,7 @@ where
         Self {
             values: Box::new(values),
             validate: Box::new(validate),
-            _phantom: std::marker::PhantomData,
+            _marker: std::marker::PhantomData,
         }
     }
 }

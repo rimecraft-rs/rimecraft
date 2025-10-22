@@ -51,7 +51,7 @@ pub struct OwnedLocalTestContext<'a> {
     /// The component registry.
     #[cfg(feature = "component")]
     pub reg_components: Registry<Id, component::RawErasedComponentType<'a, TestContext>>,
-    _phantom: std::marker::PhantomData<&'a ()>,
+    _marker: std::marker::PhantomData<&'a ()>,
 }
 
 impl Default for OwnedLocalTestContext<'_> {
@@ -59,7 +59,7 @@ impl Default for OwnedLocalTestContext<'_> {
         Self {
             #[cfg(feature = "component")]
             reg_components: integration::component::default_components_registry_builder().into(),
-            _phantom: std::marker::PhantomData,
+            _marker: std::marker::PhantomData,
         }
     }
 }
