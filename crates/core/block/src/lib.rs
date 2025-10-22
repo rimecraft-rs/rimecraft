@@ -16,7 +16,7 @@ pub use rimecraft_state as state;
 #[derive(Debug)]
 pub struct RawBlock<'a, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateTy,
 {
     settings: Settings,
     states: States<'a, Cx::BlockStateExt>,
@@ -26,7 +26,7 @@ where
 
 impl<'a, Cx> RawBlock<'a, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateTy,
 {
     /// Creates a new block with the given settings.
     #[inline]
@@ -58,7 +58,7 @@ where
 
 impl<'a, Cx> HoldDescriptors<'static, 'a> for RawBlock<'a, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateTy,
 {
     #[inline]
     fn descriptors(&self) -> &DescriptorSet<'static, 'a> {
@@ -103,8 +103,8 @@ pub trait ProvideStateIds: GlobalContext {
     /// Returns the state IDs.
     fn state_ids() -> Self::List;
 }
-/// Global contexts providing block state extensions.
-pub trait ProvideBlockStateExtTy: ProvideIdTy {
+/// Global contexts providing block state types.
+pub trait ProvideBlockStateTy: ProvideIdTy {
     /// The type of the block state extension.
     type BlockStateExt;
 }
@@ -114,7 +114,7 @@ pub trait ProvideBlockStateExtTy: ProvideIdTy {
 /// This contains the block registration and the [`State`].
 pub struct BlockState<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateTy,
 {
     /// The block.
     pub block: Block<'w, Cx>,
@@ -125,7 +125,7 @@ where
 
 impl<Cx> BlockState<'_, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateTy,
     Cx::BlockStateExt: ProvideLuminance,
 {
     /// Returns the luminance level of this block state.
@@ -137,7 +137,7 @@ where
 
 impl<Cx> Debug for BlockState<'_, Cx>
 where
-    Cx: ProvideBlockStateExtTy + Debug,
+    Cx: ProvideBlockStateTy + Debug,
     Cx::Id: Debug,
     Cx::BlockStateExt: Debug,
 {
@@ -149,11 +149,11 @@ where
     }
 }
 
-impl<Cx> Copy for BlockState<'_, Cx> where Cx: ProvideBlockStateExtTy {}
+impl<Cx> Copy for BlockState<'_, Cx> where Cx: ProvideBlockStateTy {}
 
 impl<Cx> Clone for BlockState<'_, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateTy,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -163,7 +163,7 @@ where
 
 impl<Cx> PartialEq for BlockState<'_, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateTy,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -171,11 +171,11 @@ where
     }
 }
 
-impl<Cx> Eq for BlockState<'_, Cx> where Cx: ProvideBlockStateExtTy {}
+impl<Cx> Eq for BlockState<'_, Cx> where Cx: ProvideBlockStateTy {}
 
 impl<Cx> Hash for BlockState<'_, Cx>
 where
-    Cx: ProvideBlockStateExtTy,
+    Cx: ProvideBlockStateTy,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.block.hash(state);

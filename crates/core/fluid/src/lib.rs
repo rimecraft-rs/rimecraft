@@ -1,6 +1,6 @@
 //! Minecraft Fluid primitives.
 
-use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
+use rimecraft_block::{BlockState, ProvideBlockStateTy};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
 use rimecraft_state::{State, States};
@@ -131,7 +131,7 @@ where
 /// Global Contexts that is able to convert [`BlockState`] to [`FluidState`] instances.
 pub trait BsToFs<'w>
 where
-    Self: ProvideFluidStateExtTy + ProvideBlockStateExtTy,
+    Self: ProvideFluidStateExtTy + ProvideBlockStateTy,
 {
     /// Converts a block state to a fluid state.
     fn block_to_fluid_state(bs: BlockState<'w, Self>) -> FluidState<'w, Self>;

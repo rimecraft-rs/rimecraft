@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, atomic::AtomicU32},
 };
 
-use block::{BlockState, ProvideBlockStateExtTy};
+use block::{BlockState, ProvideBlockStateTy};
 use dsyn::HoldDescriptors;
 use erased_serde::Serialize as ErasedSerialize;
 use glam::DVec3;
@@ -36,7 +36,7 @@ pub trait EntityCx<'a>:
     ProvideIdTy
     + ProvideNbtTy
     + ProvideEntityExtTy
-    + ProvideBlockStateExtTy
+    + ProvideBlockStateTy
     + ProvideLocalCxTy
     + EntityDataCx<'a>
 {
@@ -46,7 +46,7 @@ impl<'a, T> EntityCx<'a> for T where
     T: ProvideIdTy
         + ProvideNbtTy
         + ProvideEntityExtTy
-        + ProvideBlockStateExtTy
+        + ProvideBlockStateTy
         + ProvideLocalCxTy
         + EntityDataCx<'a>
 {

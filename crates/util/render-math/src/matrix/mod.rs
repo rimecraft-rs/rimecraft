@@ -24,14 +24,12 @@ pub struct MatrixStack<Entry> {
 
 /// A RAII guard that automatically pops the stack when dropped.
 #[derive(Debug)]
-pub struct MatrixStackGuard<'a, Entry> {
-    stack: &'a mut MatrixStack<Entry>,
-}
+pub struct MatrixStackGuard<'a, Entry>(&'a mut MatrixStack<Entry>);
 
-impl<Entry> Drop for MatrixStackGuard<'_, Entry> {
+impl<'a, Entry> Drop for MatrixStackGuard<'a, Entry> {
     #[inline]
     fn drop(&mut self) {
-        self.stack.pop();
+        self.0.pop();
     }
 }
 
@@ -40,14 +38,14 @@ impl<Entry> Deref for MatrixStackGuard<'_, Entry> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.stack
+        self.0
     }
 }
 
 impl<Entry> DerefMut for MatrixStackGuard<'_, Entry> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.stack
+        self.0
     }
 }
 
@@ -101,7 +99,7 @@ where
             .expect("stack should not be empty")
             .clone();
         self.stack.push(top);
-        MatrixStackGuard { stack: self }
+        MatrixStackGuard(self)
     }
 
     /// Returns a reference to the top entry.

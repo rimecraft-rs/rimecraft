@@ -2,7 +2,7 @@
 
 use bitflags::bitflags;
 use local_cx::ProvideLocalCxTy;
-use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
+use rimecraft_block::{BlockState, ProvideBlockStateTy};
 use rimecraft_block_entity::{BlockEntity, BlockEntityCell};
 use rimecraft_fluid::{FluidState, ProvideFluidStateExtTy};
 use rimecraft_voxel_math::BlockPos;
@@ -14,7 +14,7 @@ use super::StateOption;
 /// A scoped, immutable view of [`BlockState`]s and [`FluidState`]s.
 pub trait BlockView<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy,
 {
     /// Returns the [`BlockState`] at the given position.
     fn block_state(&self, pos: BlockPos) -> Option<BlockState<'w, Cx>>;
@@ -28,7 +28,7 @@ where
 /// This is an affiliation of [`BlockView`].
 pub trait BlockEntityView<'w, Cx>: BlockView<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy,
 {
     /// Peeks the [`BlockEntity`] at the given position.
     fn peek_block_entity<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
@@ -39,7 +39,7 @@ where
 /// View of block luminance source levels.
 pub trait BlockLuminanceView<'w, Cx>: BlockView<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy,
 {
     /// Returns the luminance source level of the given position.
     fn luminance(&self, pos: BlockPos) -> StateOption<u32>;
@@ -56,7 +56,7 @@ where
 /// Lock-free variant of [`BlockView`].
 pub trait LockFreeBlockView<'w, Cx>: BlockView<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy,
 {
     /// Returns the [`BlockState`] at the given position.
     fn block_state_lf(&mut self, pos: BlockPos) -> Option<BlockState<'w, Cx>>;
@@ -69,7 +69,7 @@ where
 pub trait LockFreeBlockEntityView<'w, Cx>:
     BlockEntityView<'w, Cx> + LockFreeBlockView<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy,
 {
     /// Peeks the [`BlockEntity`] at the given position.
     fn peek_block_entity_lf<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
@@ -112,7 +112,7 @@ bitflags! {
 /// Mutable variant of [`BlockView`], without internal mutability.
 pub trait BlockViewMut<'w, Cx>: BlockView<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy,
 {
     /// Sets the block state at the given position.
     ///
@@ -128,7 +128,7 @@ where
 /// Mutable variant of [`BlockEntityView`], without internal mutability.
 pub trait BlockEntityViewMut<'w, Cx>: BlockEntityView<'w, Cx> + BlockViewMut<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
+    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
 {
     /// Adds a [`BlockEntity`] to this view.
     fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>);
@@ -140,7 +140,7 @@ where
 /// [`BlockViewMut`] with internal mutability.
 pub trait LockedBlockViewMut<'w, Cx>: BlockViewMut<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
+    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
 {
     /// Sets the block state at the given position.
     ///
@@ -160,7 +160,7 @@ where
 pub trait LockedBlockEntityViewMut<'w, Cx>:
     BlockEntityViewMut<'w, Cx> + LockedBlockViewMut<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
+    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
 {
     /// Removes a [`BlockEntity`] from this view, and returns it if presents.
     fn remove_block_entity_locked(&self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>>;

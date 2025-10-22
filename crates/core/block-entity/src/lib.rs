@@ -11,7 +11,7 @@ use erased_serde::{Serialize as ErasedSerialize, serialize_trait_object};
 
 use local_cx::{LocalContext, ProvideLocalCxTy};
 use parking_lot::Mutex;
-use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
+use rimecraft_block::{BlockState, ProvideBlockStateTy};
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
 use rimecraft_serde_update::erased::ErasedUpdate;
@@ -25,9 +25,9 @@ pub use components_util::ComponentsAccess;
 pub use component;
 
 /// Global context types satisfying use of block entities.
-pub trait BlockEntityCx<'a>: ProvideLocalCxTy + ProvideBlockStateExtTy {}
+pub trait BlockEntityCx<'a>: ProvideLocalCxTy + ProvideBlockStateTy {}
 
-impl<T> BlockEntityCx<'_> for T where T: ProvideLocalCxTy + ProvideBlockStateExtTy {}
+impl<T> BlockEntityCx<'_> for T where T: ProvideLocalCxTy + ProvideBlockStateTy {}
 
 /// Boxed block entity cell with internal mutability and reference-counting.
 pub type BlockEntityCell<'w, Cx> = Arc<Mutex<Box<BlockEntity<'w, Cx>>>>;
