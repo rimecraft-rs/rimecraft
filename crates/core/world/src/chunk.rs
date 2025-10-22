@@ -10,6 +10,7 @@ use std::{
 };
 
 use ahash::AHashMap;
+use entity::ProvideEntityExtTy;
 use local_cx::{GlobalProvideLocalCxTy, LocalContext};
 use parking_lot::{Mutex, RwLock};
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy, RawBlock};
@@ -72,15 +73,14 @@ where
         + ProvideIdTy
         + ProvideNbtTy
         + ProvideBlockStateExtTy<BlockStateExt<'w>: Hold<crate::NestedBlockStateExt<'w>>>
-        + GlobalProvideLocalCxTy,
+        + GlobalProvideLocalCxTy
+        + ProvideEntityExtTy,
 {
     /// The type of block state id list.
     type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>
         + for<'a> PalIndexToRaw<&'a BlockState<'w, Self>>
         + for<'a> IntoIteratorRef<'a, Item = &'a BlockState<'w, Self>, IntoIter: ExactSizeIterator>
         + Clone;
-    // where
-    //     for<'a> &'a Self::BlockStateList: IntoIterator<Item = &'a BlockState<'w, Self>>;
 
     /// The type of biomes.
     type Biome: 'w;

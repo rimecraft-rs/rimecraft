@@ -31,12 +31,14 @@ pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
 //TODO: PLACEHOLDERS
 
 /// Placeholder of type `ServerWorld`.
+#[deprecated = "isolate server from core"]
 pub(crate) type ServerWorld<'w, Cx> = placeholder::ServerWorld<'w, Cx>;
 
 /// Placeholder of type `World`.
-pub(crate) type World<'w, Cx> = placeholder::World<'w, Cx>;
+pub type World<'w, Cx> = placeholder::World<'w, Cx>;
 
 /// Placeholder of type `Entity`.
+#[deprecated = "entity is already implemented"]
 pub(crate) type Entity<'w, Cx> = placeholder::Entity<'w, Cx>; // Should be atomic reference counted with internal mutability.
 
 #[allow(missing_docs, missing_debug_implementations)]
@@ -160,7 +162,6 @@ mod __dsyn_cache {
         be_on_block_replaced => BlockEntityOnBlockReplaced<Cx>,
         be_get_game_event_listener => BlockEntityGetGameEventListener<Cx>,
         b_always_replace_state => BlockAlwaysReplaceState,
-        b_on_state_replaced => BlockOnStateReplaced<Cx>,
         b_on_block_added => BlockOnBlockAdded<Cx>,
     }
 }

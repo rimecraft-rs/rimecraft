@@ -19,7 +19,7 @@ use crate::{
     DsynCache, ServerWorld, World,
     behave::*,
     chunk::{AsBaseChunkAccess, BaseChunkAccess, light::ChunkSkyLight},
-    event::game_event,
+    event::{ServerEventCallback, game_event},
     heightmap,
     view::{block::*, light::*},
 };
@@ -40,7 +40,6 @@ pub trait WorldChunkLocalCx<'w, Cx>:
     + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
     + LocalContext<dsyn::Type<BlockEntityOnBlockReplaced<Cx>>>
     + LocalContext<dsyn::Type<BlockAlwaysReplaceState>>
-    + LocalContext<dsyn::Type<BlockOnStateReplaced<Cx>>>
     + LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>
     + LocalContext<dsyn::Type<BlockEntityGetGameEventListener<Cx>>>
 where
@@ -56,7 +55,6 @@ where
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
         + LocalContext<dsyn::Type<BlockEntityOnBlockReplaced<Cx>>>
         + LocalContext<dsyn::Type<BlockAlwaysReplaceState>>
-        + LocalContext<dsyn::Type<BlockOnStateReplaced<Cx>>>
         + LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>
         + LocalContext<dsyn::Type<BlockEntityGetGameEventListener<Cx>>>,
 {
@@ -241,7 +239,10 @@ where
 
 impl<'w, Cx> WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -522,33 +523,15 @@ where
             Self::__remove_block_entity(this.reclaim(), pos);
         }
 
-        // Generic callback
-        if !is_client
-            && (old_state.block != state.block
-                || {
-                    bool::from(
-                dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*state.block => export BlockAlwaysReplaceState)
-                    .unwrap_or(default_block_always_replace_state())
-                )
-                })
-            && (flags.contains(SetBlockStateFlags::NOTIFY_NEIGHBORS)
-                || flags.contains(SetBlockStateFlags::MOVED))
-            && let Some(server_w) = ServerWorld::downcast_arc_from_world(
-                this.wca_as_wc()
-                    .world_ptr
-                    .upgrade()
-                    .expect("world vanished"),
-            )
-        {
-            let f = dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*old_state.block => export BlockOnStateReplaced<Cx>)
-                .unwrap_or(default_block_on_state_replaced());
-            f(
-                old_state,
-                &server_w,
+        // Generic callbacks
+        if !is_client && old_state != state {
+            Cx::replace_block_state(
                 pos,
-                flags.contains(SetBlockStateFlags::MOVED),
+                state,
+                old_state,
+                &this.wca_as_wc().world_ptr,
+                SetBlockStateFlags::MOVED,
                 local_cx,
-                BlockOnStateReplacedMarker,
             );
         }
 
@@ -760,7 +743,10 @@ where
 
 impl<'w, Cx> BlockEntityView<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -775,7 +761,10 @@ where
 
 impl<'w, Cx> BlockEntityView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -790,7 +779,10 @@ where
 
 impl<'w, Cx> BlockViewMut<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -807,7 +799,10 @@ where
 
 impl<'w, Cx> BlockViewMut<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -824,7 +819,10 @@ where
 
 impl<'w, Cx> BlockEntityViewMut<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -841,7 +839,10 @@ where
 
 impl<'w, Cx> BlockEntityViewMut<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -858,7 +859,10 @@ where
 
 impl<'w, Cx> BlockLuminanceView<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -882,7 +886,10 @@ where
 
 impl<'w, Cx> LightSourceView<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -902,7 +909,10 @@ where
 
 impl<'w, Cx> LightSourceView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -922,7 +932,10 @@ where
 
 impl<'w, Cx> Chunk<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -937,7 +950,10 @@ where
 
 impl<'w, Cx> Chunk<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerEventCallback<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {

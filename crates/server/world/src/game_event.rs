@@ -2,22 +2,21 @@
 //!
 //! This is completely different from `rimecraft-event` as the former one is way more generalized.
 
-#![deprecated = "moved into server-world crate"]
-
 //TODO: funtion of dispatch manager, which requires interacting with a world instance.
 
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
+use block::BlockState;
+use entity::{Entity, EntityCell};
 use glam::DVec3;
+use global_cx::ProvideIdTy;
 use ident_hash::{HashTableExt as _, IHashSet};
 use local_cx::dyn_codecs::{Any, EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
 use maybe::Maybe;
 use parking_lot::Mutex;
-use rimecraft_block::BlockState;
-use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::Reg;
-
-use crate::{Entity, ServerWorld, World, chunk::ChunkCx};
+use registry::Reg;
+use voxel_math::glam;
+use world::{World, chunk::ChunkCx};
 
 /// Raw type of a [`GameEvent`], consisting of its notification radius.
 #[derive(Debug)]
@@ -70,7 +69,7 @@ where
     /// Listens to an incoming game event.
     fn listen(
         &self,
-        world: &ServerWorld<'w, Cx>,
+        world: &World<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -97,7 +96,7 @@ where
 {
     fn _erased_listen(
         &mut self,
-        world: &ServerWorld<'w, Cx>,
+        world: &World<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -125,7 +124,7 @@ where
 {
     fn _erased_listen(
         &mut self,
-        world: &ServerWorld<'w, Cx>,
+        world: &World<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -183,7 +182,7 @@ pub struct Emitter<'event, 'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    src: Option<Maybe<'event, Entity<'w, Cx>>>,
+    src: Option<Maybe<'event, EntityCell<'w, Cx>>>,
     dst: Option<BlockState<'w, Cx>>,
 }
 
@@ -193,7 +192,7 @@ where
 {
     /// Creates a new emitter from source entity and affected state.
     #[inline]
-    pub fn new(src: Option<&'event Entity<'w, Cx>>, dst: Option<BlockState<'w, Cx>>) -> Self {
+    pub fn new(src: Option<&'event EntityCell<'w, Cx>>, dst: Option<BlockState<'w, Cx>>) -> Self {
         Self {
             src: src.map(Maybe::Borrowed),
             dst,
@@ -202,7 +201,7 @@ where
 
     /// Creates a new emitter from owned source entity and affected state.
     #[inline]
-    pub fn from_owned(src: Option<Entity<'w, Cx>>, dst: Option<BlockState<'w, Cx>>) -> Self {
+    pub fn from_owned(src: Option<EntityCell<'w, Cx>>, dst: Option<BlockState<'w, Cx>>) -> Self {
         Self {
             src: src.map(|e| Maybe::Owned(maybe::SimpleOwned(e))),
             dst,
@@ -211,7 +210,7 @@ where
 
     /// Gets the source entity of this game event emitter.
     #[inline]
-    pub fn source_entity(&self) -> Option<&Entity<'w, Cx>> {
+    pub fn source_entity(&self) -> Option<&EntityCell<'w, Cx>> {
         self.src.as_deref()
     }
 
@@ -358,14 +357,14 @@ where
     /// Firing event to any listener should be done by given `callback`, who receives listener and its position.
     ///
     /// Returns whether the callback was triggered.
-    pub fn dispatch<F>(&self, world: &ServerWorld<'w, Cx>, pos: DVec3, mut callback: F) -> bool
+    pub fn dispatch<F>(&self, world: &World<'w, Cx>, pos: DVec3, mut callback: F) -> bool
     where
         F: for<'env> FnMut(&'env dyn ErasedListener<'w, Cx>, DVec3),
     {
         let mut vg = self.listeners.lock();
         let mut visited = false;
         for listener in &*vg {
-            if let Some(sp) = listener._erased_ps_pos(world.as_ref()) {
+            if let Some(sp) = listener._erased_ps_pos(world) {
                 let d = sp.floor().distance_squared(pos.floor());
                 let i = listener._erased_range().pow(2) as f64;
                 if d <= i {
@@ -485,9 +484,9 @@ mod sealed {
 mod _edcode {
     use edcode2::{Buf, BufMut, Decode, Encode};
     use local_cx::{ForwardToWithLocalCx, LocalContext, LocalContextExt, WithLocalCx};
-    use rimecraft_registry::Registry;
+    use registry::Registry;
 
-    use crate::chunk::ChunkCx;
+    use world::chunk::ChunkCx;
 
     use super::{PositionSource, PositionSourceType, RawPositionSourceType};
 
@@ -531,11 +530,13 @@ mod _serde {
         LocalContext, LocalContextExt, WithLocalCx,
         serde::{DeserializeWithCx, SerializeWithCx, TYPE_KEY},
     };
-    use rimecraft_registry::Registry;
+    use registry::Registry;
     use serde::{Deserialize, Serialize, ser::SerializeMap};
     use serde_private::de::ContentVisitor;
 
-    use crate::{chunk::ChunkCx, event::game_event::PositionSourceType};
+    use world::chunk::ChunkCx;
+
+    use crate::game_event::PositionSourceType;
 
     use super::{PositionSource, RawPositionSourceType};
 

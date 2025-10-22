@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["crates/util/*", "crates/client/*", "crates/core/*", "crates/test/*"]
+members = [
+    "crates/util/*",
+    "crates/client/*",
+    "crates/core/*",
+    "crates/test/*",
+    "crates/server/*",
+]
 
 [workspace.lints.rust]
 missing-docs = "warn"

@@ -316,7 +316,6 @@ pub trait ComputeIndex<L, T>: ProvidePalette<L, T> {
     }
 }
 
-#[cfg(feature = "edcode")]
 mod _edcode {
 
     use edcode2::{Buf, BufMut, Decode, Encode};

@@ -10,7 +10,7 @@ use rimecraft_block::BlockState;
 use rimecraft_block_entity::{BlockEntity, BlockEntityCell};
 use rimecraft_voxel_math::BlockPos;
 
-use crate::{ArcAccess, ServerWorld, World, chunk::ChunkCx, event::game_event::DynListener};
+use crate::{ArcAccess, World, chunk::ChunkCx, event::game_event::DynListener};
 
 pub use rimecraft_block_entity::BlockEntityConstructorMarker;
 
@@ -63,38 +63,6 @@ pub struct BlockAlwaysReplaceState(pub usize);
 #[inline]
 pub const fn default_block_always_replace_state() -> BlockAlwaysReplaceState {
     BlockAlwaysReplaceState(false as usize)
-}
-
-/// Marker type for [`BlockOnStateReplaced`] to make it differs from other functions.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct BlockOnStateReplacedMarker;
-
-/// Behavior of a block when its block was been replaced by another one on server side.
-///
-/// See [`BlockAlwaysReplaceState`] for always triggering this behavior.
-///
-/// # Parameters
-///
-/// 1. The old block state (this block).
-/// 2. The server world.
-/// 3. The block position.
-/// 4. Whether the block was **moved** by thing like piston.
-pub type BlockOnStateReplaced<Cx> = for<'env> fn(
-    BlockState<'env, Cx>,
-    &(dyn ArcAccess<ServerWorld<'env, Cx>> + '_),
-    BlockPos,
-    bool,
-    <Cx as ProvideLocalCxTy>::LocalContext<'env>,
-    BlockOnStateReplacedMarker,
-);
-
-/// The default implementation of [`BlockOnStateReplaced`], which does nothing.
-#[inline]
-pub const fn default_block_on_state_replaced<'w, Cx>() -> BlockOnStateReplaced<Cx>
-where
-    Cx: ChunkCx<'w>,
-{
-    |_, _, _, _, _, _| {}
 }
 
 /// Marker type for [`BlockOnBlockAdded`] to make it differs from other functions.
