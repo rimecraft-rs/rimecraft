@@ -133,8 +133,23 @@ pub enum TestKey {
     PrintScreen,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum TestModifier {
+    LeftShift,
+    LeftCtrl,
+    LeftAlt,
+    LeftMeta,
+    RightShift,
+    RightCtrl,
+    RightAlt,
+    RightMeta,
+}
+
 impl ProvideKeyboardTy for TestContext {
     type Key = TestKey;
+
+    type Modifier = TestModifier;
 }
 
 impl KeyNum for TestKey {
@@ -277,4 +292,15 @@ impl KeySpecial for TestKey {
     const SCROLL_LOCK: Self = Self::ScrollLock;
     const NUM_LOCK: Self = Self::NumLock;
     const PRINT_SCREEN: Self = Self::PrintScreen;
+}
+
+impl KeyModifier for TestModifier {
+    const LEFT_SHIFT: Self = Self::LeftShift;
+    const LEFT_CTRL: Self = Self::LeftCtrl;
+    const LEFT_ALT: Self = Self::LeftAlt;
+    const LEFT_META: Self = Self::LeftMeta;
+    const RIGHT_SHIFT: Self = Self::RightShift;
+    const RIGHT_CTRL: Self = Self::RightCtrl;
+    const RIGHT_ALT: Self = Self::RightAlt;
+    const RIGHT_META: Self = Self::RightMeta;
 }

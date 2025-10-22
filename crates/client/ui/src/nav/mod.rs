@@ -131,3 +131,9 @@ impl Not for NavDirection {
         self.flip()
     }
 }
+
+/// A component that has a navigation index.
+pub trait WithNavIndex {
+    /// Returns the navigation index of this component.
+    fn nav_index(&self) -> Option<usize>;
+}

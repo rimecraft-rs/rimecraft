@@ -4,6 +4,8 @@ use std::fmt::Debug;
 
 use rimecraft_global_cx::GlobalContext;
 
+use crate::key::KeyModifier;
+
 pub mod key;
 
 /// Provides associated types for keyboard input.
@@ -12,6 +14,9 @@ pub trait ProvideKeyboardTy: GlobalContext {
     ///
     /// See: [`key` module](crate::key) for predefined key traits.
     type Key;
+
+    /// The modifier type used for keyboard input.
+    type Modifier: KeyModifier;
 }
 
 /// Represents the state of a key, useful for querying key states.
