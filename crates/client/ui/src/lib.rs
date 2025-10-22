@@ -200,7 +200,7 @@ pub trait ParentElement: Element {
 
 impl<T> Focusable for T
 where
-    T: ParentElement,
+    T: ParentElement + ?Sized,
 {
     fn is_focused(&self) -> bool {
         self.focused_child().is_some()
@@ -221,7 +221,7 @@ where
 
 impl<T> Element for T
 where
-    T: ParentElement,
+    T: ParentElement + ?Sized,
     <T::Cx as ProvideMouseTy>::Button: PartialEq + Clone,
 {
     type Cx = Self::Cx;
