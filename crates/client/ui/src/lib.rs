@@ -10,6 +10,16 @@ use crate::nav::{NavDirection, WithNavIndex, screen::ScreenRectExt};
 pub mod item;
 pub mod nav;
 
+pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
+    type FocusWriteGuard<'a>: std::ops::DerefMut<Target = bool> + 'a
+    where
+        Self: 'a;
+
+    type FocusReadGuard<'a>: std::ops::Deref<Target = bool> + 'a
+    where
+        Self: 'a;
+}
+
 /// The selection state of a UI component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -60,23 +70,26 @@ pub trait Selectable: Narratable + WithNavIndex {
 /// A UI component that can be focused.
 ///
 /// The reason to have a `Cx` generic parameter is to allow implementations like `impl<T, Cx> Focusable<Cx> for T where T: Element<Cx>`.
-pub trait Focusable<Cx> {
+pub trait Focusable<Cx>
+where
+    Cx: ProvideUiTy,
+{
     /// Whether this component is focused.
-    fn is_focused(&self) -> bool;
+    fn is_focused(&self) -> Cx::FocusReadGuard<'_>;
 
     /// Sets whether this component is focused.
-    fn set_focused(&mut self, focused: bool);
+    fn is_focused_mut(&self) -> Cx::FocusWriteGuard<'_>;
 
     /// Focuses this component.
     fn focus(&mut self) {
-        self.set_focused(true);
+        *self.is_focused_mut() = true;
     }
 }
 
 /// A UI element that can handle input events.
 pub trait Element<Cx>: WithNavIndex + Focusable<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Cx: ProvideUiTy,
 {
     /// Handles mouse movement events.
     fn on_mouse_move(&mut self, pos: MousePos) {
@@ -152,7 +165,7 @@ where
 /// A UI element that can have child elements.
 pub trait ParentElement<Cx>: Element<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Cx: ProvideUiTy,
 {
     /// The child elements of this parent element.
     fn children(&self) -> &[Box<dyn Element<Cx>>];
@@ -179,7 +192,7 @@ where
     fn focused_child(&self) -> Option<&dyn Element<Cx>> {
         self.children()
             .iter()
-            .find(|child| child.is_focused())
+            .find(|child| *child.is_focused())
             .map(|v| &**v)
     }
 
@@ -187,7 +200,7 @@ where
     fn focused_child_mut(&mut self) -> Option<&mut Box<dyn Element<Cx>>> {
         self.children_mut()
             .iter_mut()
-            .find(|child| child.is_focused())
+            .find(|child| *child.is_focused())
     }
 
     /// Finds the index of the first child element that is equal to the given element.
@@ -204,15 +217,15 @@ where
     fn dragging_buttons_mut(&mut self) -> &mut Vec<Cx::Button>;
 }
 
-pub trait ParentElementFocusableImpl<Cx>: ParentElement<Cx>
+pub trait ParentElementFocusableImpl<'a, Cx>: ParentElement<Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Cx: ProvideUiTy,
 {
-    fn is_focused(&self) -> bool {
-        self.focused_child().is_some()
+    fn is_focused(&'a self) -> Cx::FocusReadGuard<'_> {
+        self.focused_child().is_some().into()
     }
 
-    fn set_focused(&mut self, focused: bool) {
+    fn is_focused_mut(&self) -> Cx::FocusWriteGuard<'_> {
         if focused {
             if self.focused_child().is_none()
                 && let Some(first_child) = self.children_mut().first_mut()
@@ -220,35 +233,38 @@ where
                 first_child.focus();
             }
         } else if let Some(focused_child) = self.focused_child_mut() {
-            focused_child.set_focused(false);
+            *focused_child.is_focused_mut() = false;
         }
     }
 }
 
-pub trait ParentElementFocusableExt<Cx>: ParentElementFocusableImpl<Cx>
+pub trait ParentElementFocusableExt<'a, Cx>: ParentElementFocusableImpl<'a, Cx>
 where
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    Cx: ProvideUiTy,
+    Cx::FocusReadGuard<'a>: From<bool>,
 {
 }
 
-impl<T, Cx> ParentElementFocusableImpl<Cx> for T
+impl<'a, T, Cx> ParentElementFocusableImpl<'a, Cx> for T
 where
-    T: ParentElementFocusableExt<Cx> + ?Sized,
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    T: ParentElementFocusableExt<'a, Cx> + ?Sized,
+    Cx: ProvideUiTy,
+    Cx::FocusReadGuard<'a>: From<bool>,
 {
 }
 
-impl<T, Cx> Focusable<Cx> for T
+impl<'a, T, Cx> Focusable<Cx> for T
 where
-    T: ParentElementFocusableExt<Cx> + ?Sized,
-    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    T: ParentElementFocusableExt<'a, Cx> + ?Sized,
+    Cx: ProvideUiTy,
+    Cx::FocusReadGuard<'a>: From<bool>,
 {
     fn is_focused(&self) -> bool {
         <Self as ParentElementFocusableImpl<_>>::is_focused(self)
     }
 
-    fn set_focused(&mut self, focused: bool) {
-        <Self as ParentElementFocusableImpl<_>>::set_focused(self, focused);
+    fn is_focused_mut(&self) -> <Cx as ProvideUiTy>::FocusWriteGuard<'_> {
+        <Self as ParentElementFocusableImpl<_>>::is(self)
     }
 }
 
