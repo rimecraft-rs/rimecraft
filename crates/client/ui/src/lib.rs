@@ -148,6 +148,10 @@ pub trait Element: WithNavIndex + Focusable {
 }
 
 /// A UI element that can have child elements.
+///
+/// If you want to have event propagation for free, also implement [`ParentElementImpl`].
+///
+/// See: [`ParentElementImpl`]
 pub trait ParentElement: Element {
     /// The child elements of this parent element.
     fn children(&self) -> &[Box<dyn Element<Cx = Self::Cx>>];
@@ -220,13 +224,15 @@ where
     }
 }
 
-impl<T> Element for T
+/// Implementation of event handling for parent elements.
+///
+/// This trait is extracted to avoid overflowing the evaluation stack.
+pub trait ParentElementImpl<Cx>: ParentElement<Cx = Cx>
 where
-    T: ParentElement + ?Sized,
-    <T::Cx as ProvideMouseTy>::Button: PartialEq + Clone,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    <Cx as ProvideMouseTy>::Button: PartialEq + Clone,
 {
-    type Cx = Self::Cx;
-
+    /// See: [`Element::on_mouse_button`]
     fn on_mouse_button(
         &mut self,
         pos: MousePos,
@@ -265,6 +271,7 @@ where
         }
     }
 
+    /// See: [`Element::on_mouse_drag`]
     fn on_mouse_drag(
         &mut self,
         pos: MousePos,
@@ -281,6 +288,7 @@ where
         }
     }
 
+    /// See: [`Element::on_mouse_scroll`]
     fn on_mouse_scroll(&mut self, pos: MousePos, scroll: MouseScroll) -> EventPropagation {
         match self.hovered_child_mut(pos) {
             Some(child) => child.on_mouse_scroll(pos, scroll),
@@ -288,6 +296,7 @@ where
         }
     }
 
+    /// See: [`Element::on_keyboard_key`]
     fn on_keyboard_key(
         &mut self,
         key: <Self::Cx as ProvideKeyboardTy>::Key,
@@ -300,6 +309,7 @@ where
         }
     }
 
+    /// See: [`Element::on_char_type`]
     fn on_char_type(
         &mut self,
         c: char,

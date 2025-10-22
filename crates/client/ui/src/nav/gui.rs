@@ -223,10 +223,11 @@ where
 mod tests {
     use rimecraft_test_global::{TestContext, integration::mouse::TestButton};
 
-    use crate::{Focusable, nav::WithNavIndex};
+    use crate::{Focusable, ParentElementImpl, nav::WithNavIndex};
 
     use super::*;
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     struct TestElement {
         name: &'static str,
         focused: bool,
@@ -307,14 +308,17 @@ mod tests {
         }
     }
 
+    impl ParentElementImpl<TestContext> for TestParentElement {}
+
     #[test]
     fn test_navigation() {
-        let leaf = leaf(TestElement::new("leaf"));
-        let parents = vec![
+        let element = TestElement::new("leaf");
+        let leaf = leaf(element);
+        let parents: Vec<Box<dyn ParentElement<Cx = TestContext>>> = vec![
             Box::new(TestParentElement::new("parent1")),
             Box::new(TestParentElement::new("parent2")),
         ];
 
-        let path = path(leaf, parents);
+        let path = path(element, parents);
     }
 }
