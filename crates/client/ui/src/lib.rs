@@ -80,6 +80,17 @@ pub trait Element: WithNavIndex + Focusable {
         let _ = pos;
     }
 
+    /// Handles mouse button events.
+    fn on_mouse_button(
+        &mut self,
+        pos: MousePos,
+        button: <Self::Cx as ProvideMouseTy>::Button,
+        state: ButtonState,
+    ) -> EventPropagation {
+        drop((pos, button, state));
+        EventPropagation::NotHandled
+    }
+
     /// Handles mouse dragged events.
     fn on_mouse_drag(
         &mut self,
@@ -94,17 +105,6 @@ pub trait Element: WithNavIndex + Focusable {
     /// Handles mouse scroll events.
     fn on_mouse_scroll(&mut self, pos: MousePos, scroll: MouseScroll) -> EventPropagation {
         let _ = (pos, scroll);
-        EventPropagation::NotHandled
-    }
-
-    /// Handles mouse button events.
-    fn on_mouse_button(
-        &mut self,
-        pos: MousePos,
-        button: <Self::Cx as ProvideMouseTy>::Button,
-        state: ButtonState,
-    ) -> EventPropagation {
-        drop((pos, button, state));
         EventPropagation::NotHandled
     }
 
@@ -277,6 +277,36 @@ where
                 })
         } else {
             EventPropagation::NotHandled
+        }
+    }
+
+    fn on_mouse_scroll(&mut self, pos: MousePos, scroll: MouseScroll) -> EventPropagation {
+        match self.hovered_child_mut(pos) {
+            Some(child) => child.on_mouse_scroll(pos, scroll),
+            None => EventPropagation::NotHandled,
+        }
+    }
+
+    fn on_keyboard_key(
+        &mut self,
+        key: <Self::Cx as ProvideKeyboardTy>::Key,
+        modifiers: &[<Self::Cx as ProvideKeyboardTy>::Modifier],
+        state: KeyState,
+    ) -> EventPropagation {
+        match self.focused_child_mut() {
+            Some(child) => child.on_keyboard_key(key, modifiers, state),
+            None => EventPropagation::NotHandled,
+        }
+    }
+
+    fn on_char_type(
+        &mut self,
+        c: char,
+        modifiers: &[<Self::Cx as ProvideKeyboardTy>::Modifier],
+    ) -> EventPropagation {
+        match self.focused_child_mut() {
+            Some(child) => child.on_char_type(c, modifiers),
+            None => EventPropagation::NotHandled,
         }
     }
 }
