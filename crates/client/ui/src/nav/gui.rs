@@ -219,21 +219,102 @@ where
     current
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use rimecraft_test_global::{TestContext, integration::mouse::TestButton};
 
-//     struct TestElement {
-//         focused: bool,
-//     }
+    use crate::{Focusable, nav::WithNavIndex};
 
-//     impl<
+    use super::*;
 
-//     #[test]
-//     fn test_navigation() {
-//         let leaf = leaf("leaf");
-//         let parents = vec![Box::new("parent1"), Box::new("parent2")];
+    struct TestElement {
+        name: &'static str,
+        focused: bool,
+    }
 
-//         let path = path(leaf, parents);
-//     }
-// }
+    impl TestElement {
+        const fn new(name: &'static str) -> Self {
+            Self {
+                name,
+                focused: false,
+            }
+        }
+    }
+
+    impl WithNavIndex for TestElement {
+        fn nav_index(&self) -> Option<usize> {
+            Some(0)
+        }
+    }
+
+    impl Focusable for TestElement {
+        fn is_focused(&self) -> bool {
+            self.focused
+        }
+
+        fn set_focused(&mut self, focused: bool) {
+            self.focused = focused;
+        }
+    }
+
+    impl Element for TestElement {
+        type Cx = TestContext;
+    }
+
+    struct TestParentElement {
+        name: &'static str,
+        children: Vec<Box<dyn Element<Cx = TestContext>>>,
+        dragging_buttons: Vec<TestButton>,
+    }
+
+    impl TestParentElement {
+        const fn new(name: &'static str) -> Self {
+            Self {
+                name,
+                children: Vec::new(),
+                dragging_buttons: Vec::new(),
+            }
+        }
+    }
+
+    impl WithNavIndex for TestParentElement {
+        fn nav_index(&self) -> Option<usize> {
+            Some(0)
+        }
+    }
+
+    impl Element for TestParentElement {
+        type Cx = TestContext;
+    }
+
+    impl ParentElement for TestParentElement {
+        fn children(&self) -> &[Box<dyn Element<Cx = TestContext>>] {
+            &self.children
+        }
+
+        fn children_mut(&mut self) -> &mut [Box<dyn Element<Cx = TestContext>>] {
+            &mut self.children
+        }
+
+        fn dragging_buttons(&self) -> &[TestButton] {
+            &self.dragging_buttons
+        }
+
+        fn dragging_buttons_mut(
+            &mut self,
+        ) -> &mut Vec<<Self::Cx as rimecraft_mouse::ProvideMouseTy>::Button> {
+            &mut self.dragging_buttons
+        }
+    }
+
+    #[test]
+    fn test_navigation() {
+        let leaf = leaf(TestElement::new("leaf"));
+        let parents = vec![
+            Box::new(TestParentElement::new("parent1")),
+            Box::new(TestParentElement::new("parent2")),
+        ];
+
+        let path = path(leaf, parents);
+    }
+}
