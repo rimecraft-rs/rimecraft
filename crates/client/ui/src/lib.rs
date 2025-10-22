@@ -58,7 +58,7 @@ pub trait Selectable: Narratable + WithNavIndex {
 }
 
 /// A UI component that can be focused.
-pub trait Focusable {
+pub trait Focusable<Cx> {
     /// Whether this component is focused.
     fn is_focused(&self) -> bool;
 
@@ -72,10 +72,10 @@ pub trait Focusable {
 }
 
 /// A UI element that can handle input events.
-pub trait Element: WithNavIndex + Focusable {
-    /// The context type for this element.
-    type Cx: ProvideKeyboardTy + ProvideMouseTy;
-
+pub trait Element<Cx>: WithNavIndex + Focusable<Cx>
+where
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+{
     /// Handles mouse movement events.
     fn on_mouse_move(&mut self, pos: MousePos) {
         let _ = pos;
@@ -85,7 +85,7 @@ pub trait Element: WithNavIndex + Focusable {
     fn on_mouse_button(
         &mut self,
         pos: MousePos,
-        button: <Self::Cx as ProvideMouseTy>::Button,
+        button: <Cx as ProvideMouseTy>::Button,
         state: ButtonState,
     ) -> EventPropagation {
         drop((pos, button, state));
@@ -97,7 +97,7 @@ pub trait Element: WithNavIndex + Focusable {
         &mut self,
         pos: MousePos,
         delta_pos: MousePos,
-        button: <Self::Cx as ProvideMouseTy>::Button,
+        button: <Cx as ProvideMouseTy>::Button,
     ) -> EventPropagation {
         drop((pos, delta_pos, button));
         EventPropagation::NotHandled
@@ -112,8 +112,8 @@ pub trait Element: WithNavIndex + Focusable {
     /// Handles keyboard key events.
     fn on_keyboard_key(
         &mut self,
-        key: <Self::Cx as ProvideKeyboardTy>::Key,
-        modifiers: &[<Self::Cx as ProvideKeyboardTy>::Modifier],
+        key: <Cx as ProvideKeyboardTy>::Key,
+        modifiers: &[<Cx as ProvideKeyboardTy>::Modifier],
         state: KeyState,
     ) -> EventPropagation {
         drop((key, modifiers, state));
@@ -124,7 +124,7 @@ pub trait Element: WithNavIndex + Focusable {
     fn on_char_type(
         &mut self,
         c: char,
-        modifiers: &[<Self::Cx as ProvideKeyboardTy>::Modifier],
+        modifiers: &[<Cx as ProvideKeyboardTy>::Modifier],
     ) -> EventPropagation {
         let _ = (c, modifiers);
         EventPropagation::NotHandled
@@ -152,15 +152,18 @@ pub trait Element: WithNavIndex + Focusable {
 /// If you want to have event propagation for free, also implement [`ParentElementImpl`].
 ///
 /// See: [`ParentElementImpl`]
-pub trait ParentElement: Element {
+pub trait ParentElement<Cx>: Element<Cx>
+where
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+{
     /// The child elements of this parent element.
-    fn children(&self) -> &[Box<dyn Element<Cx = Self::Cx>>];
+    fn children(&self) -> &[Box<dyn Element<Cx>>];
 
     /// The mutable child elements of this parent element.
-    fn children_mut(&mut self) -> &mut [Box<dyn Element<Cx = Self::Cx>>];
+    fn children_mut(&mut self) -> &mut [Box<dyn Element<Cx>>];
 
     /// Finds the first child element that is hovered by the given mouse position.
-    fn hovered_child(&self, pos: MousePos) -> Option<&dyn Element<Cx = Self::Cx>> {
+    fn hovered_child(&self, pos: MousePos) -> Option<&dyn Element<Cx>> {
         self.children()
             .iter()
             .find(|child| child.contains_cursor(pos))
@@ -168,14 +171,14 @@ pub trait ParentElement: Element {
     }
 
     /// Finds the first child element that is hovered by the given mouse position, in mutable form.
-    fn hovered_child_mut(&mut self, pos: MousePos) -> Option<&mut Box<dyn Element<Cx = Self::Cx>>> {
+    fn hovered_child_mut(&mut self, pos: MousePos) -> Option<&mut Box<dyn Element<Cx>>> {
         self.children_mut()
             .iter_mut()
             .find(|child| child.contains_cursor(pos))
     }
 
     /// Finds the first focused child element.
-    fn focused_child(&self) -> Option<&dyn Element<Cx = Self::Cx>> {
+    fn focused_child(&self) -> Option<&dyn Element<Cx>> {
         self.children()
             .iter()
             .find(|child| child.is_focused())
@@ -183,29 +186,30 @@ pub trait ParentElement: Element {
     }
 
     /// Finds the first focused child element, in mutable form.
-    fn focused_child_mut(&mut self) -> Option<&mut Box<dyn Element<Cx = Self::Cx>>> {
+    fn focused_child_mut(&mut self) -> Option<&mut Box<dyn Element<Cx>>> {
         self.children_mut()
             .iter_mut()
             .find(|child| child.is_focused())
     }
 
     /// Finds the index of the first child element that is equal to the given element.
-    fn child_index(&self, child: &dyn Element<Cx = Self::Cx>) -> Option<usize> {
+    fn child_index(&self, child: &dyn Element<Cx>) -> Option<usize> {
         self.children()
             .iter()
             .position(|c| std::ptr::eq(c.as_ref(), child))
     }
 
     /// The buttons currently being dragged.
-    fn dragging_buttons(&self) -> &[<Self::Cx as ProvideMouseTy>::Button];
+    fn dragging_buttons(&self) -> &[Cx::Button];
 
     /// The buttons currently being dragged, in mutable form.
-    fn dragging_buttons_mut(&mut self) -> &mut Vec<<Self::Cx as ProvideMouseTy>::Button>;
+    fn dragging_buttons_mut(&mut self) -> &mut Vec<Cx::Button>;
 }
 
-impl<T> Focusable for T
+impl<T, Cx> Focusable<Cx> for T
 where
-    T: ParentElement + ?Sized,
+    T: ParentElement<Cx> + ?Sized,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
 {
     fn is_focused(&self) -> bool {
         self.focused_child().is_some()
@@ -224,11 +228,9 @@ where
     }
 }
 
-/// Implementation of event handling for parent elements.
-///
-/// This trait is extracted to avoid overflowing the evaluation stack.
-pub trait ParentElementImpl<Cx>: ParentElement<Cx = Cx>
+impl<T, Cx> Element<Cx> for T
 where
+    T: ParentElement<Cx> + ?Sized,
     Cx: ProvideKeyboardTy + ProvideMouseTy,
     <Cx as ProvideMouseTy>::Button: PartialEq + Clone,
 {
@@ -236,7 +238,7 @@ where
     fn on_mouse_button(
         &mut self,
         pos: MousePos,
-        button: <Self::Cx as ProvideMouseTy>::Button,
+        button: Cx::Button,
         state: ButtonState,
     ) -> EventPropagation {
         match self.hovered_child(pos).and_then(|c| self.child_index(c)) {
@@ -276,7 +278,7 @@ where
         &mut self,
         pos: MousePos,
         delta_pos: MousePos,
-        button: <Self::Cx as ProvideMouseTy>::Button,
+        button: Cx::Button,
     ) -> EventPropagation {
         if self.dragging_buttons().contains(&button) {
             self.focused_child_mut()
@@ -299,8 +301,8 @@ where
     /// See: [`Element::on_keyboard_key`]
     fn on_keyboard_key(
         &mut self,
-        key: <Self::Cx as ProvideKeyboardTy>::Key,
-        modifiers: &[<Self::Cx as ProvideKeyboardTy>::Modifier],
+        key: Cx::Key,
+        modifiers: &[Cx::Modifier],
         state: KeyState,
     ) -> EventPropagation {
         match self.focused_child_mut() {
@@ -310,11 +312,7 @@ where
     }
 
     /// See: [`Element::on_char_type`]
-    fn on_char_type(
-        &mut self,
-        c: char,
-        modifiers: &[<Self::Cx as ProvideKeyboardTy>::Modifier],
-    ) -> EventPropagation {
+    fn on_char_type(&mut self, c: char, modifiers: &[Cx::Modifier]) -> EventPropagation {
         match self.focused_child_mut() {
             Some(child) => child.on_char_type(c, modifiers),
             None => EventPropagation::NotHandled,

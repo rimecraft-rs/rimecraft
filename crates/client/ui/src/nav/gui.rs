@@ -2,6 +2,9 @@
 
 use std::fmt::Debug;
 
+use rimecraft_keyboard::ProvideKeyboardTy;
+use rimecraft_mouse::ProvideMouseTy;
+
 use crate::{
     Element, ParentElement,
     nav::{NavAxis, NavDirection},
@@ -56,7 +59,7 @@ impl GuiNavigation for GuiTabNavigation {
 /// A path through the GUI elements for navigation.
 pub trait GuiNavigationPath<Cx> {
     /// The current element in the navigation path.
-    fn element(&self) -> &dyn Element<Cx = Cx>;
+    fn element(&self) -> &dyn Element<Cx>;
 
     /// Sets whether this element is focused.
     fn set_focused(&mut self, focused: bool);
@@ -72,7 +75,7 @@ where
     T: GuiNavigationPath<Cx> + ?Sized,
 {
     #[inline(always)]
-    fn element(&self) -> &dyn Element<Cx = Cx> {
+    fn element(&self) -> &dyn Element<Cx> {
         (**self).element()
     }
 
@@ -90,7 +93,8 @@ where
 /// A navigation node with a parent element and a child path.
 pub struct GuiNavigationNode<'a, Cx, E>
 where
-    E: ParentElement<Cx = Cx> + ?Sized,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    E: ParentElement<Cx> + ?Sized,
 {
     element: Box<E>,
     child: Box<dyn GuiNavigationPath<Cx> + 'a>,
@@ -98,7 +102,8 @@ where
 
 impl<Cx, E> Debug for GuiNavigationNode<'_, Cx, E>
 where
-    E: ParentElement<Cx = Cx> + ?Sized,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    E: ParentElement<Cx> + ?Sized,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GuiNavigationNode").finish()
@@ -107,9 +112,10 @@ where
 
 impl<Cx, E> GuiNavigationPath<Cx> for GuiNavigationNode<'_, Cx, E>
 where
-    E: ParentElement<Cx = Cx>,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    E: ParentElement<Cx>,
 {
-    fn element(&self) -> &dyn Element<Cx = Cx> {
+    fn element(&self) -> &dyn Element<Cx> {
         self.element.as_ref()
     }
 
@@ -124,11 +130,12 @@ where
     }
 }
 
-impl<'a, Cx> GuiNavigationPath<Cx> for GuiNavigationNode<'_, Cx, dyn ParentElement<Cx = Cx> + 'a>
+impl<'a, Cx> GuiNavigationPath<Cx> for GuiNavigationNode<'_, Cx, dyn ParentElement<Cx> + 'a>
 where
-    dyn ParentElement<Cx = Cx> + 'a: Element<Cx = Cx>,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    dyn ParentElement<Cx> + 'a: Element<Cx>,
 {
-    fn element(&self) -> &dyn Element<Cx = Cx> {
+    fn element(&self) -> &dyn Element<Cx> {
         self.element.as_ref()
     }
 
@@ -147,16 +154,19 @@ where
 #[derive(Debug)]
 pub struct GuiNavigationLeaf<Cx, E>
 where
-    E: Element<Cx = Cx> + ?Sized,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    E: Element<Cx> + ?Sized,
 {
     element: Box<E>,
+    _marker: std::marker::PhantomData<Cx>,
 }
 
 impl<Cx, E> GuiNavigationPath<Cx> for GuiNavigationLeaf<Cx, E>
 where
-    E: Element<Cx = Cx>,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    E: Element<Cx>,
 {
-    fn element(&self) -> &dyn Element<Cx = Cx> {
+    fn element(&self) -> &dyn Element<Cx> {
         self.element.as_ref()
     }
 
@@ -165,11 +175,12 @@ where
     }
 }
 
-impl<Cx> GuiNavigationPath<Cx> for GuiNavigationLeaf<Cx, dyn Element<Cx = Cx>>
+impl<Cx> GuiNavigationPath<Cx> for GuiNavigationLeaf<Cx, dyn Element<Cx>>
 where
-    dyn Element<Cx = Cx>: Element<Cx = Cx>,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    dyn Element<Cx>: Element<Cx>,
 {
-    fn element(&self) -> &dyn Element<Cx = Cx> {
+    fn element(&self) -> &dyn Element<Cx> {
         self.element.as_ref()
     }
 
@@ -181,17 +192,20 @@ where
 /// Creates a [`GuiNavigationLeaf`] with the given element.
 pub fn leaf<Cx, E>(element: E) -> impl GuiNavigationPath<Cx>
 where
-    E: Element<Cx = Cx>,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    E: Element<Cx>,
 {
     GuiNavigationLeaf {
         element: Box::new(element),
+        _marker: std::marker::PhantomData,
     }
 }
 
 /// Creates a [`GuiNavigationNode`] with the given parent element and child path.
 pub fn node<'a, Cx, E, Child>(element: E, child: Child) -> impl GuiNavigationPath<Cx>
 where
-    E: ParentElement<Cx = Cx>,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    E: ParentElement<Cx>,
     Child: GuiNavigationPath<Cx> + 'a,
 {
     GuiNavigationNode {
@@ -201,11 +215,12 @@ where
 }
 
 /// Creates a full navigation path from a leaf element and an iterator of parent elements.
-pub fn path<'a, Cx: 'a, E, P>(leaf: E, parents: P) -> impl GuiNavigationPath<Cx>
+pub fn path<'a, Cx, E, P>(leaf: E, parents: P) -> impl GuiNavigationPath<Cx>
 where
-    E: Element<Cx = Cx> + 'a,
-    P: IntoIterator<Item = Box<dyn ParentElement<Cx = Cx>>>,
-    dyn ParentElement<Cx = Cx>: Element<Cx = Cx>,
+    Cx: ProvideKeyboardTy + ProvideMouseTy + 'a,
+    E: Element<Cx> + 'a,
+    P: IntoIterator<Item = Box<dyn ParentElement<Cx>>>,
+    dyn ParentElement<Cx>: Element<Cx>,
 {
     let mut current: Box<dyn GuiNavigationPath<Cx> + 'a> = Box::new(crate::nav::gui::leaf(leaf));
 
@@ -223,7 +238,7 @@ where
 mod tests {
     use rimecraft_test_global::{TestContext, integration::mouse::TestButton};
 
-    use crate::{Focusable, ParentElementImpl, nav::WithNavIndex};
+    use crate::{Focusable, nav::WithNavIndex};
 
     use super::*;
 
@@ -248,7 +263,7 @@ mod tests {
         }
     }
 
-    impl Focusable for TestElement {
+    impl Focusable<TestContext> for TestElement {
         fn is_focused(&self) -> bool {
             self.focused
         }
@@ -258,13 +273,11 @@ mod tests {
         }
     }
 
-    impl Element for TestElement {
-        type Cx = TestContext;
-    }
+    impl Element<TestContext> for TestElement {}
 
     struct TestParentElement {
         name: &'static str,
-        children: Vec<Box<dyn Element<Cx = TestContext>>>,
+        children: Vec<Box<dyn Element<TestContext>>>,
         dragging_buttons: Vec<TestButton>,
     }
 
@@ -284,16 +297,12 @@ mod tests {
         }
     }
 
-    impl Element for TestParentElement {
-        type Cx = TestContext;
-    }
-
-    impl ParentElement for TestParentElement {
-        fn children(&self) -> &[Box<dyn Element<Cx = TestContext>>] {
+    impl ParentElement<TestContext> for TestParentElement {
+        fn children(&self) -> &[Box<dyn Element<TestContext>>] {
             &self.children
         }
 
-        fn children_mut(&mut self) -> &mut [Box<dyn Element<Cx = TestContext>>] {
+        fn children_mut(&mut self) -> &mut [Box<dyn Element<TestContext>>] {
             &mut self.children
         }
 
@@ -301,20 +310,18 @@ mod tests {
             &self.dragging_buttons
         }
 
-        fn dragging_buttons_mut(
-            &mut self,
-        ) -> &mut Vec<<Self::Cx as rimecraft_mouse::ProvideMouseTy>::Button> {
+        fn dragging_buttons_mut(&mut self) -> &mut Vec<TestButton> {
             &mut self.dragging_buttons
         }
     }
 
-    impl ParentElementImpl<TestContext> for TestParentElement {}
-
     #[test]
     fn test_navigation() {
         let element = TestElement::new("leaf");
+        let parent_element = TestParentElement::new("parent");
+
         let leaf = leaf(element);
-        let parents: Vec<Box<dyn ParentElement<Cx = TestContext>>> = vec![
+        let parents: Vec<Box<dyn ParentElement<TestContext>>> = vec![
             Box::new(TestParentElement::new("parent1")),
             Box::new(TestParentElement::new("parent2")),
         ];
