@@ -169,13 +169,6 @@ pub trait ParentElement: Element {
             .find(|child| child.contains_cursor(pos))
     }
 
-    /// Finds the index of the first child element that is hovered by the given mouse position.
-    fn hovered_child_index(&self, pos: MousePos) -> Option<usize> {
-        self.children()
-            .iter()
-            .position(|child| child.contains_cursor(pos))
-    }
-
     /// Finds the first focused child element.
     fn focused_child(&self) -> Option<&dyn Element<Cx = Self::Cx>> {
         self.children()
@@ -189,6 +182,13 @@ pub trait ParentElement: Element {
         self.children_mut()
             .iter_mut()
             .find(|child| child.is_focused())
+    }
+
+    /// Finds the index of the first child element that is equal to the given element.
+    fn child_index(&self, child: &dyn Element<Cx = Self::Cx>) -> Option<usize> {
+        self.children()
+            .iter()
+            .position(|c| c.as_ref() as *const _ == child as *const _)
     }
 
     /// The buttons currently being dragged.
@@ -232,7 +232,7 @@ where
         button: <Self::Cx as ProvideMouseTy>::Button,
         state: ButtonState,
     ) -> EventPropagation {
-        match self.hovered_child_index(pos) {
+        match self.hovered_child(pos).and_then(|c| self.child_index(c)) {
             Some(index) => match state {
                 ButtonState::Pressed => {
                     let propagation =

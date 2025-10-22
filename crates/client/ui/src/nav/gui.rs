@@ -1,7 +1,7 @@
 //! Navigate through the GUI hierarchy.
 
 use crate::{
-    Element,
+    Element, ParentElement,
     nav::{NavAxis, NavDirection},
 };
 
@@ -63,7 +63,85 @@ pub trait GuiNavigationPath<Cx> {
     }
 }
 
-// pub struct GuiNavigationIntermediate<Cx> {
-//     pub element: Box<dyn Element<Cx = Cx>>,
-//     pub focused: bool,
-// }
+pub struct GuiNavigationNode<Cx, E>
+where
+    E: ParentElement<Cx = Cx>,
+{
+    element: Box<E>,
+    child: Box<dyn GuiNavigationPath<Cx>>,
+}
+
+impl<Cx, E> GuiNavigationPath<Cx> for GuiNavigationNode<Cx, E>
+where
+    E: ParentElement<Cx = Cx>,
+{
+    fn element(&self) -> &dyn Element<Cx = Cx> {
+        self.element.as_ref()
+    }
+
+    fn set_focused(&mut self, focused: bool) {
+        self.element.set_focused(false);
+
+        if let Some(index) = self.element.child_index(self.child.element()) {
+            self.element.children_mut()[index].set_focused(focused);
+        }
+
+        self.child.set_focused(focused);
+    }
+}
+
+pub struct GuiNavigationLeaf<Cx, E>
+where
+    E: Element<Cx = Cx>,
+{
+    element: Box<E>,
+}
+
+impl<Cx, E> GuiNavigationPath<Cx> for GuiNavigationLeaf<Cx, E>
+where
+    E: Element<Cx = Cx>,
+{
+    fn element(&self) -> &dyn Element<Cx = Cx> {
+        self.element.as_ref()
+    }
+
+    fn set_focused(&mut self, focused: bool) {
+        self.element.set_focused(focused);
+    }
+}
+
+pub fn leaf<Cx, E>(element: E) -> impl GuiNavigationPath<Cx>
+where
+    E: Element<Cx = Cx>,
+{
+    GuiNavigationLeaf {
+        element: Box::new(element),
+    }
+}
+
+pub fn node<Cx, E, Child>(element: E, child: Child) -> impl GuiNavigationPath<Cx>
+where
+    E: ParentElement<Cx = Cx>,
+    Child: GuiNavigationPath<Cx> + 'static,
+{
+    GuiNavigationNode {
+        element: Box::new(element),
+        child: Box::new(child),
+    }
+}
+
+pub fn path<Cx, E>(
+    leaf: E,
+    parents: impl IntoIterator<Item = Box<dyn ParentElement<Cx = Cx>>>,
+) -> impl GuiNavigationPath<Cx>
+where
+    E: Element<Cx = Cx>,
+{
+    let mut current: Box<dyn GuiNavigationPath<Cx>> = Box::new(crate::nav::gui::leaf(leaf));
+
+    for parent in parents.into_iter() {
+        current = Box::new(node(parent, current));
+    }
+
+    current
+}
