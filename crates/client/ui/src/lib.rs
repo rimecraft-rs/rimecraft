@@ -58,6 +58,8 @@ pub trait Selectable: Narratable + WithNavIndex {
 }
 
 /// A UI component that can be focused.
+///
+/// The reason to have a `Cx` generic parameter is to allow implementations like `impl<T, Cx> Focusable<Cx> for T where T: Element<Cx>`.
 pub trait Focusable<Cx> {
     /// Whether this component is focused.
     fn is_focused(&self) -> bool;
@@ -148,10 +150,6 @@ where
 }
 
 /// A UI element that can have child elements.
-///
-/// If you want to have event propagation for free, also implement [`ParentElementImpl`].
-///
-/// See: [`ParentElementImpl`]
 pub trait ParentElement<Cx>: Element<Cx>
 where
     Cx: ProvideKeyboardTy + ProvideMouseTy,
@@ -206,9 +204,8 @@ where
     fn dragging_buttons_mut(&mut self) -> &mut Vec<Cx::Button>;
 }
 
-impl<T, Cx> Focusable<Cx> for T
+pub trait ParentElementFocusableImpl<Cx>: ParentElement<Cx>
 where
-    T: ParentElement<Cx> + ?Sized,
     Cx: ProvideKeyboardTy + ProvideMouseTy,
 {
     fn is_focused(&self) -> bool {
@@ -228,13 +225,38 @@ where
     }
 }
 
-impl<T, Cx> Element<Cx> for T
+pub trait ParentElementFocusableExt<Cx>: ParentElementFocusableImpl<Cx>
 where
-    T: ParentElement<Cx> + ?Sized,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+{
+}
+
+impl<T, Cx> ParentElementFocusableImpl<Cx> for T
+where
+    T: ParentElementFocusableExt<Cx> + ?Sized,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+{
+}
+
+impl<T, Cx> Focusable<Cx> for T
+where
+    T: ParentElementFocusableExt<Cx> + ?Sized,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+{
+    fn is_focused(&self) -> bool {
+        <Self as ParentElementFocusableImpl<_>>::is_focused(self)
+    }
+
+    fn set_focused(&mut self, focused: bool) {
+        <Self as ParentElementFocusableImpl<_>>::set_focused(self, focused);
+    }
+}
+
+pub trait ParentElementImpl<Cx>: ParentElement<Cx>
+where
     Cx: ProvideKeyboardTy + ProvideMouseTy,
     <Cx as ProvideMouseTy>::Button: PartialEq + Clone,
 {
-    /// See: [`Element::on_mouse_button`]
     fn on_mouse_button(
         &mut self,
         pos: MousePos,
@@ -273,7 +295,6 @@ where
         }
     }
 
-    /// See: [`Element::on_mouse_drag`]
     fn on_mouse_drag(
         &mut self,
         pos: MousePos,
@@ -290,7 +311,6 @@ where
         }
     }
 
-    /// See: [`Element::on_mouse_scroll`]
     fn on_mouse_scroll(&mut self, pos: MousePos, scroll: MouseScroll) -> EventPropagation {
         match self.hovered_child_mut(pos) {
             Some(child) => child.on_mouse_scroll(pos, scroll),
@@ -298,7 +318,6 @@ where
         }
     }
 
-    /// See: [`Element::on_keyboard_key`]
     fn on_keyboard_key(
         &mut self,
         key: Cx::Key,
@@ -311,11 +330,67 @@ where
         }
     }
 
-    /// See: [`Element::on_char_type`]
     fn on_char_type(&mut self, c: char, modifiers: &[Cx::Modifier]) -> EventPropagation {
         match self.focused_child_mut() {
             Some(child) => child.on_char_type(c, modifiers),
             None => EventPropagation::NotHandled,
         }
+    }
+}
+
+pub trait ParentElementExt<Cx>: ParentElementImpl<Cx>
+where
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    <Cx as ProvideMouseTy>::Button: PartialEq + Clone,
+{
+}
+
+impl<T, Cx> ParentElementImpl<Cx> for T
+where
+    T: ParentElementExt<Cx> + ?Sized,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    <Cx as ProvideMouseTy>::Button: PartialEq + Clone,
+{
+}
+
+impl<T, Cx> Element<Cx> for T
+where
+    T: ParentElementExt<Cx> + ?Sized,
+    Cx: ProvideKeyboardTy + ProvideMouseTy,
+    <Cx as ProvideMouseTy>::Button: PartialEq + Clone,
+{
+    fn on_mouse_button(
+        &mut self,
+        pos: MousePos,
+        button: Cx::Button,
+        state: ButtonState,
+    ) -> EventPropagation {
+        <Self as ParentElementImpl<_>>::on_mouse_button(self, pos, button, state)
+    }
+
+    fn on_mouse_drag(
+        &mut self,
+        pos: MousePos,
+        delta_pos: MousePos,
+        button: Cx::Button,
+    ) -> EventPropagation {
+        <Self as ParentElementImpl<_>>::on_mouse_drag(self, pos, delta_pos, button)
+    }
+
+    fn on_mouse_scroll(&mut self, pos: MousePos, scroll: MouseScroll) -> EventPropagation {
+        <Self as ParentElementImpl<_>>::on_mouse_scroll(self, pos, scroll)
+    }
+
+    fn on_keyboard_key(
+        &mut self,
+        key: Cx::Key,
+        modifiers: &[Cx::Modifier],
+        state: KeyState,
+    ) -> EventPropagation {
+        <Self as ParentElementImpl<_>>::on_keyboard_key(self, key, modifiers, state)
+    }
+
+    fn on_char_type(&mut self, c: char, modifiers: &[Cx::Modifier]) -> EventPropagation {
+        <Self as ParentElementImpl<_>>::on_char_type(self, c, modifiers)
     }
 }

@@ -238,7 +238,7 @@ where
 mod tests {
     use rimecraft_test_global::{TestContext, integration::mouse::TestButton};
 
-    use crate::{Focusable, nav::WithNavIndex};
+    use crate::{Focusable, ParentElementExt, ParentElementFocusableImpl, nav::WithNavIndex};
 
     use super::*;
 
@@ -265,10 +265,12 @@ mod tests {
 
     impl Focusable<TestContext> for TestElement {
         fn is_focused(&self) -> bool {
+            println!("Is '{}' focused? {}", self.name, self.focused);
             self.focused
         }
 
         fn set_focused(&mut self, focused: bool) {
+            println!("Setting focus of '{}' to {}", self.name, focused);
             self.focused = focused;
         }
     }
@@ -297,6 +299,26 @@ mod tests {
         }
     }
 
+    impl ParentElementFocusableImpl<TestContext> for TestParentElement {}
+
+    impl Focusable<TestContext> for TestParentElement {
+        fn is_focused(&self) -> bool {
+            println!(
+                "Is parent '{}' focused? {}",
+                self.name,
+                <Self as ParentElementFocusableImpl<_>>::is_focused(self)
+            );
+            <Self as ParentElementFocusableImpl<_>>::is_focused(self)
+        }
+
+        fn set_focused(&mut self, focused: bool) {
+            println!("Setting focus of parent '{}' to {}", self.name, focused);
+            <Self as ParentElementFocusableImpl<_>>::set_focused(self, focused);
+        }
+    }
+
+    impl ParentElementExt<TestContext> for TestParentElement {}
+
     impl ParentElement<TestContext> for TestParentElement {
         fn children(&self) -> &[Box<dyn Element<TestContext>>] {
             &self.children
@@ -313,6 +335,24 @@ mod tests {
         fn dragging_buttons_mut(&mut self) -> &mut Vec<TestButton> {
             &mut self.dragging_buttons
         }
+    }
+
+    #[test]
+    fn test_instances() {
+        let element = TestElement::new("leaf");
+        let parent_element = TestParentElement::new("parent");
+
+        let leaf = leaf(element);
+        let mut node = node(parent_element, leaf);
+
+        node.element().is_focused();
+        node.focus();
+        node.element().is_focused();
+        (node.element() as &dyn ParentElement<TestContext>)
+            .children()
+            .first()
+            .unwrap()
+            .is_focused();
     }
 
     #[test]
