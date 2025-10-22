@@ -27,6 +27,8 @@ pub enum KeyState {
     Idle,
     /// The key is pressed down.
     Pressed,
+    /// The key is being held down in a repeating manner.
+    Repeating,
 }
 
 impl KeyState {
@@ -38,6 +40,11 @@ impl KeyState {
     /// Returns `true` if the key is currently pressed.
     pub fn is_pressed(&self) -> bool {
         matches!(self, KeyState::Pressed)
+    }
+
+    /// Returns `true` if the key is currently repeating.
+    pub fn is_repeating(&self) -> bool {
+        matches!(self, KeyState::Repeating)
     }
 }
 

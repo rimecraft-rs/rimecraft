@@ -21,6 +21,10 @@ pub enum ButtonState {
     Idle,
     /// The button is pressed down.
     Pressed,
+    /// The button was double pressed. You should always receive a `Pressed` event before a `DoublePressed` event.
+    DoublePressed,
+    /// The button is being held down and is dragging.
+    Dragging,
 }
 
 impl ButtonState {

@@ -1,5 +1,6 @@
 //! UI navigation components.
 
+pub mod gui;
 pub mod screen;
 
 use std::ops::Not;

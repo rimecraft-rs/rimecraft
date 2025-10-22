@@ -6,10 +6,13 @@ use rimecraft_render_math::{
     screen::{ScreenPos, ScreenRect},
 };
 
+/// Provides type information for drawing.
 pub trait ProvideDrawTy: GlobalContext {
+    /// The drawing context.
     type Context: DrawContext;
 }
 
+/// The drawing context passed to drawable objects.
 pub trait DrawContext: Send + Sync {
     /// Associated type for a read guard over the matrices stack.
     type MatricesReadGuard<'a>: std::ops::Deref<Target = MatrixStack<glam::Affine3A>> + 'a
