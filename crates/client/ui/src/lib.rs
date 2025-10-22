@@ -4,7 +4,6 @@ use rimecraft_client_narration::Narratable;
 use rimecraft_keyboard::{KeyState, ProvideKeyboardTy};
 use rimecraft_mouse::{ButtonState, MousePos, MouseScroll, ProvideMouseTy};
 use rimecraft_render_math::screen::ScreenRect;
-use serde::{Deserialize, Serialize};
 
 use crate::nav::{NavDirection, WithNavIndex, screen::ScreenRectExt};
 
@@ -12,7 +11,8 @@ pub mod item;
 pub mod nav;
 
 /// The selection state of a UI component.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum SelectionState {
     /// The component is hovered but not selected.
@@ -29,7 +29,8 @@ impl SelectionState {
 }
 
 /// The result of an event handling operation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::exhaustive_enums)]
 pub enum EventPropagation {
     /// The event was handled and should not propagate further.
@@ -188,7 +189,7 @@ pub trait ParentElement: Element {
     fn child_index(&self, child: &dyn Element<Cx = Self::Cx>) -> Option<usize> {
         self.children()
             .iter()
-            .position(|c| c.as_ref() as *const _ == child as *const _)
+            .position(|c| std::ptr::eq(c.as_ref(), child))
     }
 
     /// The buttons currently being dragged.

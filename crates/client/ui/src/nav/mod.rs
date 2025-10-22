@@ -7,6 +7,7 @@ use std::ops::Not;
 
 /// The sign of a navigation action, either positive or negative.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::exhaustive_enums)] // We won't ever have more signs
 pub enum Sign {
     /// Towards positive direction.
@@ -17,6 +18,7 @@ pub enum Sign {
 
 /// Navigation axes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::exhaustive_enums)] // We won't ever have more axes
 pub enum NavAxis {
     /// The horizontal axis.
@@ -65,6 +67,7 @@ impl Not for NavAxis {
 
 /// Navigation directions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::exhaustive_enums)] // We won't ever have more directions
 pub enum NavDirection {
     /// Navigates up.

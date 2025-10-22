@@ -1,7 +1,6 @@
 //! Window management.
 
 use rimecraft_global_cx::GlobalContext;
-use serde::{Deserialize, Serialize};
 
 pub trait ProvideWindowCx: GlobalContext {
     type Window: Window;
@@ -16,7 +15,8 @@ pub trait WindowCx: GlobalContext + ProvideWindowCx {
 /// The position of the window on the screen, in pixels.
 ///
 /// Supports mutual conversions with `(i32, i32)` and [`glam::IVec2`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WindowPos {
     /// The x position of the window.
     pub x: i32,
@@ -68,7 +68,8 @@ impl From<WindowPos> for glam::IVec2 {
 /// The size of the window, in pixels.
 ///
 /// Supports mutual conversions with `(u32, u32)` and [`glam::UVec2`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WindowSize {
     /// The width of the window.
     pub width: u32,

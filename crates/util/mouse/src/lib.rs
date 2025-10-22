@@ -3,7 +3,6 @@
 pub mod button;
 
 use rimecraft_global_cx::GlobalContext;
-use serde::{Deserialize, Serialize};
 
 /// Provides associated types for mouse input.
 pub trait ProvideMouseTy: GlobalContext {
@@ -14,7 +13,8 @@ pub trait ProvideMouseTy: GlobalContext {
 }
 
 /// Represents the state of a button, useful for querying button states.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ButtonState {
     /// The button is not pressed.
@@ -40,7 +40,8 @@ impl ButtonState {
 }
 
 /// Position of the mouse cursor relative to the window coordinate system.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MousePos {
     /// The x coordinate of the mouse position.
     pub x: f32,
@@ -80,7 +81,8 @@ impl From<MousePos> for glam::Vec2 {
 }
 
 /// Represents a mouse scroll event.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MouseScroll {
     /// The horizontal scroll amount.
     pub delta_x: f32,

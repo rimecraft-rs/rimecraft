@@ -1,5 +1,7 @@
 //! Navigate through the GUI hierarchy.
 
+use std::fmt::Debug;
+
 use crate::{
     Element, ParentElement,
     nav::{NavAxis, NavDirection},
@@ -23,14 +25,12 @@ impl GuiNavigation for GuiDownNavigation {
 
 /// Navigation triggered by arrow keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct GuiArrowNavigation {
-    pub direction: NavDirection,
-}
+pub struct GuiArrowNavigation(pub NavDirection);
 
 impl GuiNavigation for GuiArrowNavigation {
     fn direction(&self) -> NavDirection {
-        match self.direction.axis() {
-            NavAxis::Vertical => self.direction,
+        match self.0.axis() {
+            NavAxis::Vertical => self.0,
             NavAxis::Horizontal => NavDirection::Down, // Horizontal arrow directions will lead to a deeper navigation level
         }
     }
@@ -53,11 +53,15 @@ impl GuiNavigation for GuiTabNavigation {
     }
 }
 
+/// A path through the GUI elements for navigation.
 pub trait GuiNavigationPath<Cx> {
+    /// The current element in the navigation path.
     fn element(&self) -> &dyn Element<Cx = Cx>;
 
+    /// Sets whether this element is focused.
     fn set_focused(&mut self, focused: bool);
 
+    /// Focuses this element.
     fn focus(&mut self) {
         self.set_focused(true);
     }
@@ -83,12 +87,22 @@ where
     }
 }
 
+/// A navigation node with a parent element and a child path.
 pub struct GuiNavigationNode<'a, Cx, E>
 where
     E: ParentElement<Cx = Cx> + ?Sized,
 {
     element: Box<E>,
     child: Box<dyn GuiNavigationPath<Cx> + 'a>,
+}
+
+impl<Cx, E> Debug for GuiNavigationNode<'_, Cx, E>
+where
+    E: ParentElement<Cx = Cx> + ?Sized,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GuiNavigationNode").finish()
+    }
 }
 
 impl<Cx, E> GuiNavigationPath<Cx> for GuiNavigationNode<'_, Cx, E>
@@ -129,9 +143,11 @@ where
     }
 }
 
+/// A navigation leaf with a single element.
+#[derive(Debug)]
 pub struct GuiNavigationLeaf<Cx, E>
 where
-    E: Element<Cx = Cx>,
+    E: Element<Cx = Cx> + ?Sized,
 {
     element: Box<E>,
 }
@@ -149,6 +165,20 @@ where
     }
 }
 
+impl<Cx> GuiNavigationPath<Cx> for GuiNavigationLeaf<Cx, dyn Element<Cx = Cx>>
+where
+    dyn Element<Cx = Cx>: Element<Cx = Cx>,
+{
+    fn element(&self) -> &dyn Element<Cx = Cx> {
+        self.element.as_ref()
+    }
+
+    fn set_focused(&mut self, focused: bool) {
+        self.element.set_focused(focused);
+    }
+}
+
+/// Creates a [`GuiNavigationLeaf`] with the given element.
 pub fn leaf<Cx, E>(element: E) -> impl GuiNavigationPath<Cx>
 where
     E: Element<Cx = Cx>,
@@ -158,10 +188,11 @@ where
     }
 }
 
-pub fn node<Cx, E, Child>(element: E, child: Child) -> impl GuiNavigationPath<Cx>
+/// Creates a [`GuiNavigationNode`] with the given parent element and child path.
+pub fn node<'a, Cx, E, Child>(element: E, child: Child) -> impl GuiNavigationPath<Cx>
 where
     E: ParentElement<Cx = Cx>,
-    Child: GuiNavigationPath<Cx> + 'static,
+    Child: GuiNavigationPath<Cx> + 'a,
 {
     GuiNavigationNode {
         element: Box::new(element),
@@ -169,12 +200,11 @@ where
     }
 }
 
-pub fn path<'a, Cx: 'a, E>(
-    leaf: E,
-    parents: impl IntoIterator<Item = Box<dyn ParentElement<Cx = Cx>>>,
-) -> impl GuiNavigationPath<Cx>
+/// Creates a full navigation path from a leaf element and an iterator of parent elements.
+pub fn path<'a, Cx: 'a, E, P>(leaf: E, parents: P) -> impl GuiNavigationPath<Cx>
 where
     E: Element<Cx = Cx> + 'a,
+    P: IntoIterator<Item = Box<dyn ParentElement<Cx = Cx>>>,
     dyn ParentElement<Cx = Cx>: Element<Cx = Cx>,
 {
     let mut current: Box<dyn GuiNavigationPath<Cx> + 'a> = Box::new(crate::nav::gui::leaf(leaf));
@@ -188,3 +218,22 @@ where
 
     current
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+
+//     struct TestElement {
+//         focused: bool,
+//     }
+
+//     impl<
+
+//     #[test]
+//     fn test_navigation() {
+//         let leaf = leaf("leaf");
+//         let parents = vec![Box::new("parent1"), Box::new("parent2")];
+
+//         let path = path(leaf, parents);
+//     }
+// }

@@ -20,7 +20,8 @@ pub trait ProvideKeyboardTy: GlobalContext {
 }
 
 /// Represents the state of a key, useful for querying key states.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum KeyState {
     /// The key is not pressed.
@@ -49,7 +50,8 @@ impl KeyState {
 }
 
 /// Different keyboard input types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum InputType {
     /// The symbolic representation of a key, which may vary based on keyboard layout.
