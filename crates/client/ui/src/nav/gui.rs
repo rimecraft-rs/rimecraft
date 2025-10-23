@@ -2,9 +2,6 @@
 
 use std::fmt::Debug;
 
-use rimecraft_keyboard::ProvideKeyboardTy;
-use rimecraft_mouse::ProvideMouseTy;
-
 use crate::{
     Element, Focusable, ParentElement, ProvideUiTy,
     nav::{NavAxis, NavDirection},

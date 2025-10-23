@@ -1,0 +1,22 @@
+[package]
+name = "rimecraft-cell"
+version = "0.1.0"
+edition = "2024"
+authors = ["KrLite"]
+description = "Cell abstraction for Rimecraft"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["game-development"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+
+[features]
+default = []
+rwlock = []
+refcell = []
+
+[lints]
+workspace = true

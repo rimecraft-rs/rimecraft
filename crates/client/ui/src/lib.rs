@@ -1,6 +1,7 @@
 //! Minecraft client UI framework.
 
 use rimecraft_arena::Arena;
+use rimecraft_cell::Cell;
 use rimecraft_client_narration::Narratable;
 use rimecraft_keyboard::{KeyState, ProvideKeyboardTy};
 use rimecraft_local_cx::LocalContext;
@@ -13,8 +14,9 @@ pub mod item;
 pub mod nav;
 
 pub trait ProvideUiTy<'a>: ProvideKeyboardTy + ProvideMouseTy {
-    type Arena: Arena<Item = dyn Element<Self>, Handle: Copy + Eq>;
-    type ArenaLocalContext: LocalContext<Self::Arena>;
+    type ElementCell: Cell<dyn Element<'a, Self>>;
+    type Arena: Arena<Item = Self::ElementCell, Handle: Copy + Eq>;
+    type ArenaLocalContext: LocalContext<&'a Self::Arena>;
 }
 
 /// The selection state of a UI component.
@@ -78,9 +80,9 @@ pub trait Focusable<Cx> {
 }
 
 /// A UI element that can handle input events.
-pub trait Element<Cx>: WithNavIndex + Focusable<Cx>
+pub trait Element<'a, Cx>: WithNavIndex + Focusable<Cx>
 where
-    Cx: ProvideUiTy,
+    Cx: ProvideUiTy<'a>,
 {
     /// Handles mouse movement events.
     fn on_mouse_move(&mut self, pos: MousePos) {
@@ -154,40 +156,81 @@ where
 }
 
 /// A UI element that can have child elements.
-pub trait ParentElement<Cx>: Element<Cx>
+pub trait ParentElement<'a, Cx>: Element<'a, Cx>
 where
-    Cx: ProvideUiTy,
+    Cx: ProvideUiTy<'a>,
 {
     fn local_cx(&self) -> Cx::ArenaLocalContext;
 
     fn handles(&self) -> &[<Cx::Arena as Arena>::Handle];
 
-    fn handles_mut(&mut self) -> &mut [<Cx::Arena as Arena>::Handle];
+    fn handles_mut(&mut self) -> &mut Vec<<Cx::Arena as Arena>::Handle>;
 
-    fn children(&self) -> Vec<&dyn Element<Cx>> {
-        self.handles()
-            .iter()
-            .flat_map(|handle| self.local_cx().acquire().get(*handle))
-            .collect::<Vec<_>>()
+    fn child_read(&self, handle: <Cx::Arena as Arena>::Handle) -> Option<dyn Element<'a, Cx>> {
+        self.local_cx()
+            .acquire()
+            .get(handle)
+            .map(|cell| cell.read())
     }
 
-    // fn hovered_child(&self, pos: MousePos) -> Option<Arc<dyn Element<Cx>>> {
-    //     self.children()
-    //         .iter()
-    //         .flat_map(|child| self.local_cx().acquire().get(*child).cloned())
-    //         .find(|child| child.contains_cursor(pos))
-    // }
+    fn child_write(
+        &self,
+        handle: <Cx::Arena as Arena>::Handle,
+    ) -> Option<&mut dyn Element<'a, Cx>> {
+        self.local_cx()
+            .acquire()
+            .get(handle)
+            .map(|cell| cell.write())
+    }
 
-    // fn focused_child(&self) -> Option<&<Cx::Arena as Arena>::Handle> {
-    //     self.children()
-    //         .iter()
-    //         .find(|child| child.is_focused())
-    //         .map(|v| &**v)
-    // }
+    fn children_read(&self) -> Vec<&dyn Element<'a, Cx>> {
+        self.handles()
+            .iter()
+            .filter_map(|handle| self.child_read(*handle))
+            .collect()
+    }
 
-    // fn child_index(&self, child: &<Cx::Arena as Arena>::Handle) -> Option<usize> {
-    //     self.children().iter().position(|c| std::ptr::eq(*c, child))
-    // }
+    fn children_write(&self) -> Vec<&mut dyn Element<'a, Cx>> {
+        self.handles()
+            .iter()
+            .filter_map(|handle| self.child_write(*handle))
+            .collect()
+    }
+
+    fn hovered_child_read(&self, pos: MousePos) -> Option<&dyn Element<'a, Cx>> {
+        self.children_read()
+            .into_iter()
+            .find(|child| child.contains_cursor(pos))
+    }
+
+    fn hovered_child_write(&self, pos: MousePos) -> Option<&mut dyn Element<'a, Cx>> {
+        self.children_write()
+            .into_iter()
+            .find(|child| child.contains_cursor(pos))
+    }
+
+    fn focused_child_read(&self) -> Option<&dyn Element<'a, Cx>> {
+        self.children_read()
+            .into_iter()
+            .find(|child| child.is_focused())
+    }
+
+    fn focused_child_write(&self) -> Option<&mut dyn Element<'a, Cx>> {
+        self.children_write()
+            .into_iter()
+            .find(|child| child.is_focused())
+    }
+
+    fn handle(&self, child: &dyn Element<'a, Cx>) -> Option<<Cx::Arena as Arena>::Handle> {
+        for handle in self.handles() {
+            if let Some(e) = self.child_read(*handle) {
+                if std::ptr::eq(e, child) {
+                    return Some(*handle);
+                }
+            }
+        }
+        None
+    }
 
     /// The buttons currently being dragged.
     fn dragging_buttons(&self) -> &[Cx::Button];
@@ -196,57 +239,57 @@ where
     fn dragging_buttons_mut(&mut self) -> &mut Vec<Cx::Button>;
 }
 
-pub trait ParentElementFocusableImpl<Cx>: ParentElement<Cx>
+pub trait ParentElementFocusableImpl<'a, Cx>: ParentElement<'a, Cx>
 where
-    Cx: ProvideUiTy,
+    Cx: ProvideUiTy<'a>,
 {
     fn is_focused(&self) -> bool {
-        self.focused_child().is_some()
+        self.focused_child_read().is_some()
     }
 
     fn set_focused(&mut self, focused: bool) {
         if focused {
-            if self.focused_child().is_none()
-                && let Some(first_child) = self.children_mut().first()
+            if self.focused_child_read().is_none()
+                && let Some(first_child) = self.children_write().first_mut()
             {
                 first_child.focus();
             }
-        } else if let Some(focused_child) = self.focused_child_mut() {
+        } else if let Some(focused_child) = self.focused_child_write() {
             focused_child.set_focused(false);
         }
     }
 }
 
-pub trait ParentElementFocusableExt<Cx>: ParentElementFocusableImpl<Cx>
+pub trait ParentElementFocusableExt<'a, Cx>: ParentElementFocusableImpl<'a, Cx>
 where
-    Cx: ProvideUiTy,
+    Cx: ProvideUiTy<'a>,
 {
 }
 
-impl<T, Cx> ParentElementFocusableImpl<Cx> for T
+impl<'a, T, Cx> ParentElementFocusableImpl<'a, Cx> for T
 where
-    T: ParentElementFocusableExt<Cx> + ?Sized,
-    Cx: ProvideUiTy,
+    T: ParentElementFocusableExt<'a, Cx> + ?Sized,
+    Cx: ProvideUiTy<'a>,
 {
 }
 
-impl<T, Cx> Focusable<Cx> for T
+impl<'a, T, Cx> Focusable<Cx> for T
 where
-    T: ParentElementFocusableExt<Cx> + ?Sized,
-    Cx: ProvideUiTy,
+    T: ParentElementFocusableExt<'a, Cx> + ?Sized,
+    Cx: ProvideUiTy<'a>,
 {
     fn is_focused(&self) -> bool {
         <Self as ParentElementFocusableImpl<_>>::is_focused(self)
     }
 
-    fn set_focused(&self, focused: bool) {
+    fn set_focused(&mut self, focused: bool) {
         <Self as ParentElementFocusableImpl<_>>::set_focused(self, focused)
     }
 }
 
-pub trait ParentElementImpl<Cx>: ParentElement<Cx>
+pub trait ParentElementImpl<'a, Cx>: ParentElement<'a, Cx>
 where
-    Cx: ProvideUiTy,
+    Cx: ProvideUiTy<'a>,
     <Cx as ProvideMouseTy>::Button: PartialEq + Clone,
 {
     fn on_mouse_button(
@@ -255,11 +298,11 @@ where
         button: Cx::Button,
         state: ButtonState,
     ) -> EventPropagation {
-        match self.hovered_child(pos).and_then(|c| self.child_index(c)) {
-            Some(index) => match state {
+        match self.hovered_child_read(pos).and_then(|c| self.handle(c)) {
+            Some(handle) => match state {
                 ButtonState::Pressed => {
                     let propagation = Element::on_mouse_button(
-                        self.children_mut()[index],
+                        self.child_write(handle).unwrap(),
                         pos,
                         button.clone(),
                         state,
@@ -268,7 +311,7 @@ where
                         EventPropagation::Handled => {}
                         EventPropagation::NotHandled => {
                             Focusable::set_focused(self, false);
-                            self.children_mut()[index].focus();
+                            self.child_write(handle).unwrap().focus();
                             self.dragging_buttons_mut().push(button);
                         }
                     };
@@ -277,7 +320,7 @@ where
                 ButtonState::Idle => {
                     if self.dragging_buttons().contains(&button) {
                         self.dragging_buttons_mut().retain(|b| b != &button);
-                        self.focused_child_mut()
+                        self.focused_child_write()
                             .map_or(EventPropagation::NotHandled, |child| {
                                 Element::on_mouse_button(child, pos, button, state)
                             })
@@ -285,7 +328,9 @@ where
                         EventPropagation::NotHandled
                     }
                 }
-                _ => Element::on_mouse_button(self.children_mut()[index], pos, button, state),
+                _ => {
+                    Element::on_mouse_button(self.child_write(handle).unwrap(), pos, button, state)
+                }
             },
             None => EventPropagation::NotHandled,
         }
@@ -298,7 +343,7 @@ where
         button: Cx::Button,
     ) -> EventPropagation {
         if self.dragging_buttons().contains(&button) {
-            self.focused_child_mut()
+            self.focused_child_write()
                 .map_or(EventPropagation::NotHandled, |child| {
                     Element::on_mouse_drag(child, pos, delta_pos, button)
                 })
@@ -308,7 +353,7 @@ where
     }
 
     fn on_mouse_scroll(&mut self, pos: MousePos, scroll: MouseScroll) -> EventPropagation {
-        match self.hovered_child_mut(pos) {
+        match self.hovered_child_write(pos) {
             Some(child) => Element::on_mouse_scroll(child, pos, scroll),
             None => EventPropagation::NotHandled,
         }
@@ -320,39 +365,39 @@ where
         modifiers: &[Cx::Modifier],
         state: KeyState,
     ) -> EventPropagation {
-        match self.focused_child_mut() {
+        match self.focused_child_write() {
             Some(child) => Element::on_keyboard_key(child, key, modifiers, state),
             None => EventPropagation::NotHandled,
         }
     }
 
     fn on_char_type(&mut self, c: char, modifiers: &[Cx::Modifier]) -> EventPropagation {
-        match self.focused_child_mut() {
+        match self.focused_child_write() {
             Some(child) => Element::on_char_type(child, c, modifiers),
             None => EventPropagation::NotHandled,
         }
     }
 }
 
-pub trait ParentElementExt<Cx>: ParentElementImpl<Cx>
+pub trait ParentElementExt<'a, Cx>: ParentElementImpl<'a, Cx>
 where
-    Cx: ProvideUiTy,
+    Cx: ProvideUiTy<'a>,
     <Cx as ProvideMouseTy>::Button: PartialEq + Clone,
 {
 }
 
-impl<T, Cx> ParentElementImpl<Cx> for T
+impl<'a, T, Cx> ParentElementImpl<'a, Cx> for T
 where
-    T: ParentElementExt<Cx> + ?Sized,
-    Cx: ProvideUiTy,
+    T: ParentElementExt<'a, Cx> + ?Sized,
+    Cx: ProvideUiTy<'a>,
     <Cx as ProvideMouseTy>::Button: PartialEq + Clone,
 {
 }
 
-impl<T, Cx> Element<Cx> for T
+impl<'a, T, Cx> Element<'a, Cx> for T
 where
-    T: ParentElementExt<Cx> + ?Sized,
-    Cx: ProvideUiTy,
+    T: ParentElementExt<'a, Cx> + ?Sized,
+    Cx: ProvideUiTy<'a>,
     <Cx as ProvideMouseTy>::Button: PartialEq + Clone,
 {
     fn on_mouse_button(
