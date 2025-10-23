@@ -166,70 +166,27 @@ where
 
     fn handles_mut(&mut self) -> &mut Vec<<Cx::Arena as Arena>::Handle>;
 
-    fn child_read(&self, handle: <Cx::Arena as Arena>::Handle) -> Option<dyn Element<'a, Cx>> {
-        self.local_cx()
-            .acquire()
-            .get(handle)
-            .map(|cell| cell.read())
+    fn child(&self, handle: <Cx::Arena as Arena>::Handle) -> Option<&'a Cx::ElementCell> {
+        self.local_cx().acquire().get(handle)
     }
 
-    fn child_write(
-        &self,
-        handle: <Cx::Arena as Arena>::Handle,
-    ) -> Option<&mut dyn Element<'a, Cx>> {
-        self.local_cx()
-            .acquire()
-            .get(handle)
-            .map(|cell| cell.write())
-    }
-
-    fn children_read(&self) -> Vec<&dyn Element<'a, Cx>> {
+    fn children(&self) -> Vec<&'a Cx::ElementCell> {
         self.handles()
             .iter()
-            .filter_map(|handle| self.child_read(*handle))
+            .filter_map(|handle| self.child(*handle))
             .collect()
     }
 
-    fn children_write(&self) -> Vec<&mut dyn Element<'a, Cx>> {
-        self.handles()
-            .iter()
-            .filter_map(|handle| self.child_write(*handle))
-            .collect()
-    }
-
-    fn hovered_child_read(&self, pos: MousePos) -> Option<&dyn Element<'a, Cx>> {
-        self.children_read()
+    fn hovered_child(&self, pos: MousePos) -> Option<&'a Cx::ElementCell> {
+        self.children()
             .into_iter()
-            .find(|child| child.contains_cursor(pos))
+            .find(|cell| cell.read().contains_cursor(pos))
     }
 
-    fn hovered_child_write(&self, pos: MousePos) -> Option<&mut dyn Element<'a, Cx>> {
-        self.children_write()
+    fn focused_child(&self) -> Option<&'a Cx::ElementCell> {
+        self.children()
             .into_iter()
-            .find(|child| child.contains_cursor(pos))
-    }
-
-    fn focused_child_read(&self) -> Option<&dyn Element<'a, Cx>> {
-        self.children_read()
-            .into_iter()
-            .find(|child| child.is_focused())
-    }
-
-    fn focused_child_write(&self) -> Option<&mut dyn Element<'a, Cx>> {
-        self.children_write()
-            .into_iter()
-            .find(|child| child.is_focused())
-    }
-
-    fn handle(&self, child: &dyn Element<'a, Cx>) -> Option<<Cx::Arena as Arena>::Handle> {
-        for handle in self.handles() {
-            if let Some(e) = self.child_read(*handle) {
-                if std::ptr::eq(e, child) {
-                    return Some(*handle);
-                }
-            }
-        }
-        None
+            .find(|cell| cell.read().is_focused())
     }
 
     /// The buttons currently being dragged.
@@ -244,18 +201,20 @@ where
     Cx: ProvideUiTy<'a>,
 {
     fn is_focused(&self) -> bool {
-        self.focused_child_read().is_some()
+        self.focused_child().is_some()
     }
 
     fn set_focused(&mut self, focused: bool) {
         if focused {
-            if self.focused_child_read().is_none()
-                && let Some(first_child) = self.children_write().first_mut()
+            if self.focused_child().is_none()
+                && let Some(first_child) = self.children().first()
             {
-                first_child.focus();
+                {
+                    first_child.write().focus();
+                }
             }
-        } else if let Some(focused_child) = self.focused_child_write() {
-            focused_child.set_focused(false);
+        } else if let Some(focused_child) = self.focused_child() {
+            focused_child.write().set_focused(false);
         }
     }
 }
@@ -298,20 +257,16 @@ where
         button: Cx::Button,
         state: ButtonState,
     ) -> EventPropagation {
-        match self.hovered_child_read(pos).and_then(|c| self.handle(c)) {
-            Some(handle) => match state {
+        match self.hovered_child(pos) {
+            Some(cell) => match state {
                 ButtonState::Pressed => {
-                    let propagation = Element::on_mouse_button(
-                        self.child_write(handle).unwrap(),
-                        pos,
-                        button.clone(),
-                        state,
-                    );
+                    let propagation =
+                        Element::on_mouse_button(&mut *cell.write(), pos, button.clone(), state);
                     match propagation {
                         EventPropagation::Handled => {}
                         EventPropagation::NotHandled => {
                             Focusable::set_focused(self, false);
-                            self.child_write(handle).unwrap().focus();
+                            cell.write().focus();
                             self.dragging_buttons_mut().push(button);
                         }
                     };
@@ -320,17 +275,15 @@ where
                 ButtonState::Idle => {
                     if self.dragging_buttons().contains(&button) {
                         self.dragging_buttons_mut().retain(|b| b != &button);
-                        self.focused_child_write()
-                            .map_or(EventPropagation::NotHandled, |child| {
-                                Element::on_mouse_button(child, pos, button, state)
+                        self.focused_child()
+                            .map_or(EventPropagation::NotHandled, |cell| {
+                                Element::on_mouse_button(&mut *cell.write(), pos, button, state)
                             })
                     } else {
                         EventPropagation::NotHandled
                     }
                 }
-                _ => {
-                    Element::on_mouse_button(self.child_write(handle).unwrap(), pos, button, state)
-                }
+                _ => Element::on_mouse_button(&mut *cell.write(), pos, button, state),
             },
             None => EventPropagation::NotHandled,
         }
@@ -343,9 +296,9 @@ where
         button: Cx::Button,
     ) -> EventPropagation {
         if self.dragging_buttons().contains(&button) {
-            self.focused_child_write()
-                .map_or(EventPropagation::NotHandled, |child| {
-                    Element::on_mouse_drag(child, pos, delta_pos, button)
+            self.focused_child()
+                .map_or(EventPropagation::NotHandled, |cell| {
+                    Element::on_mouse_drag(&mut *cell.write(), pos, delta_pos, button)
                 })
         } else {
             EventPropagation::NotHandled
@@ -353,8 +306,8 @@ where
     }
 
     fn on_mouse_scroll(&mut self, pos: MousePos, scroll: MouseScroll) -> EventPropagation {
-        match self.hovered_child_write(pos) {
-            Some(child) => Element::on_mouse_scroll(child, pos, scroll),
+        match self.hovered_child(pos) {
+            Some(cell) => Element::on_mouse_scroll(&mut *cell.write(), pos, scroll),
             None => EventPropagation::NotHandled,
         }
     }
@@ -365,15 +318,15 @@ where
         modifiers: &[Cx::Modifier],
         state: KeyState,
     ) -> EventPropagation {
-        match self.focused_child_write() {
-            Some(child) => Element::on_keyboard_key(child, key, modifiers, state),
+        match self.focused_child() {
+            Some(cell) => Element::on_keyboard_key(&mut *cell.write(), key, modifiers, state),
             None => EventPropagation::NotHandled,
         }
     }
 
     fn on_char_type(&mut self, c: char, modifiers: &[Cx::Modifier]) -> EventPropagation {
-        match self.focused_child_write() {
-            Some(child) => Element::on_char_type(child, c, modifiers),
+        match self.focused_child() {
+            Some(cell) => Element::on_char_type(&mut *cell.write(), c, modifiers),
             None => EventPropagation::NotHandled,
         }
     }
