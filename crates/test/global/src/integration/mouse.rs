@@ -1,7 +1,6 @@
 //! `rimecraft-client-mouse` integrations.
 
 #![cfg(feature = "mouse")]
-#![allow(missing_docs)]
 
 use mouse::{ProvideMouseTy, button::MouseButton};
 

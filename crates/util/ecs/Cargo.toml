@@ -1,9 +1,9 @@
 [package]
-name = "rimecraft-window"
+name = "rimecraft-ecs"
 version = "0.1.0"
 edition = "2024"
 authors = ["KrLite"]
-description = "Window management for Rimecraft"
+description = "Entity Component System for Rimecraft"
 repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = ["game-development"]
@@ -13,12 +13,9 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 rimecraft-global-cx = { path = "../../core/global-cx" }
-glam = "0.30"
-serde = { version = "1.0", features = ["derive"], optional = true }
 
 [features]
 default = []
-serde = ["dep:serde"]
 
 [lints]
 workspace = true

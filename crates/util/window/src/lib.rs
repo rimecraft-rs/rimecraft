@@ -1,4 +1,4 @@
-//! Window management.
+//! Window management for Rimecraft.
 
 use rimecraft_global_cx::GlobalContext;
 
