@@ -30,60 +30,16 @@ pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
 
 //TODO: PLACEHOLDERS
 
-/// Placeholder of type `ServerWorld`.
-#[deprecated = "isolate server from core"]
-pub(crate) type ServerWorld<'w, Cx> = placeholder::ServerWorld<'w, Cx>;
-
 /// Placeholder of type `World`.
 pub type World<'w, Cx> = placeholder::World<'w, Cx>;
 
-/// Placeholder of type `Entity`.
-#[deprecated = "entity is already implemented"]
-pub(crate) type Entity<'w, Cx> = placeholder::Entity<'w, Cx>; // Should be atomic reference counted with internal mutability.
-
 #[allow(missing_docs, missing_debug_implementations)]
 mod placeholder {
-    use std::{marker::PhantomData, sync::Arc};
-
-    use crate::chunk::ChunkCx;
+    use std::marker::PhantomData;
 
     type Invariant<'a> = fn(&'a ()) -> &'a ();
 
-    pub struct ServerWorld<'w, Cx>(PhantomData<(Cx, Invariant<'w>)>);
-
-    impl<'w, Cx> AsRef<World<'w, Cx>> for ServerWorld<'w, Cx>
-    where
-        Cx: ChunkCx<'w>,
-    {
-        fn as_ref(&self) -> &World<'w, Cx> {
-            &World(PhantomData)
-        }
-    }
-
-    impl<'w, Cx> ServerWorld<'w, Cx>
-    where
-        Cx: ChunkCx<'w>,
-    {
-        pub fn downcast_ref_from_world<'s>(world: &'s World<'w, Cx>) -> Option<&'s Self> {
-            let _unused = world;
-            unimplemented!("dummy impl")
-        }
-
-        pub fn downcast_arc_from_world(world: Arc<World<'w, Cx>>) -> Option<Arc<Self>> {
-            let _unused = world;
-            unimplemented!("dummy impl")
-        }
-    }
-
     pub struct World<'w, Cx>(PhantomData<(Cx, Invariant<'w>)>);
-
-    pub struct Entity<'w, Cx>(PhantomData<&'w Cx>);
-
-    impl<Cx> Clone for Entity<'_, Cx> {
-        fn clone(&self) -> Self {
-            Self(PhantomData)
-        }
-    }
 }
 
 /// A trait for types that can provide access to an [`Arc`] or [`Weak`].
