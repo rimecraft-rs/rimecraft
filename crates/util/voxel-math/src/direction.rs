@@ -5,7 +5,7 @@ use std::fmt;
 use glam::IVec3;
 
 macro_rules! directions {
-    ($($i:literal => $dir:ident: $doc:literal {
+    ($($(#[$outer:meta])* $i:literal => $dir:ident {
         opposite: $oppo:ident,
         vec: ($x:literal, $y:literal, $z:literal),
         axis: $axis:ident,
@@ -19,7 +19,7 @@ macro_rules! directions {
         #[repr(u8)]
         pub enum Direction {
             $(
-                #[doc = $doc]
+                $(#[$outer])*
                 $dir = $i,
             )*
         }
@@ -139,42 +139,48 @@ macro_rules! directions {
 }
 
 directions! {
-    0 => Down: "The negative Y direction." {
+    /// The negative Y direction.
+    0 => Down {
         opposite: Up,
         vec: (0, -1, 0),
         axis: Y,
         axis_dir: Negative,
         name: "down",
     },
-    1 => Up: "The positive Y direction." {
+    /// The positive Y direction.
+    1 => Up {
         opposite: Down,
         vec: (0, 1, 0),
         axis: Y,
         axis_dir: Positive,
         name: "up",
     },
-    2 => North: "The negative Z direction." {
+    /// The negative Z direction.
+    2 => North {
         opposite: South,
         vec: (0, 0, -1),
         axis: Z,
         axis_dir: Negative,
         name: "north",
     },
-    3 => South: "The positive Z direction." {
+    /// The positive Z direction.
+    3 => South {
         opposite: North,
         vec: (0, 0, 1),
         axis: Z,
         axis_dir: Positive,
         name: "south",
     },
-    4 => West: "The negative X direction." {
+    /// The negative X direction.
+    4 => West {
         opposite: East,
         vec: (-1, 0, 0),
         axis: X,
         axis_dir: Negative,
         name: "west",
     },
-    5 => East: "The positive X direction." {
+    /// The positive X direction.
+    5 => East {
         opposite: West,
         vec: (1, 0, 0),
         axis: X,

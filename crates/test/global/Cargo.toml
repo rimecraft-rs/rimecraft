@@ -27,6 +27,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde-update = { path = "../../util/serde-update", package = "rimecraft-serde-update" }
 parking_lot = "0.12"
 freezer = { path = "../../util/freezer", package = "rimecraft-freezer" }
+slotmap = { version = "1.0", optional = true }
 # core components
 registry = { path = "../../core/registry", package = "rimecraft-registry", optional = true }
 text = { path = "../../core/text", package = "rimecraft-text", optional = true }
@@ -51,7 +52,7 @@ mouse = ["dep:mouse"]
 render = ["dep:render"]
 key-bind = ["dep:key-bind", "keyboard", "mouse"]
 ui = ["dep:ui", "keyboard", "mouse"]
-arena = ["dep:arena"]
+arena = ["dep:arena", "dep:slotmap"]
 
 [lints]
 workspace = true

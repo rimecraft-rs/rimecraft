@@ -3,11 +3,11 @@
 //! All traits defined in this module are implemented for unit type `()`.
 
 macro_rules! define_button_trait {
-    ($($($doc:expr)* ;)? $vis:vis $name:ident { $($variant:ident $(: $variant_doc:expr)?),* $(,)? }) => {
-        $($(#[doc = $doc])*)?
+    ($(#[$outer:meta])* $vis:vis $name:ident { $($(#[$variant_outer:meta])* $variant:ident),* $(,)? }) => {
+        $(#[$outer])*
         $vis trait $name {
             $(
-                $(#[doc = $variant_doc])?
+                $(#[$variant_outer])*
                 const $variant: Self;
             )*
         }
@@ -19,10 +19,13 @@ macro_rules! define_button_trait {
 }
 
 define_button_trait! {
-    "Mouse buttons.";
+    /// Mouse buttons.
     pub MouseButton {
-        BUTTON_PRIMARY: "The primary button, typically the left mouse button.",
-        BUTTON_SECONDARY: "The secondary button, typically the right mouse button.",
-        BUTTON_SCROLL_WHEEL: "The scroll wheel button, typically the middle mouse button.",
+        /// The primary button, typically the left mouse button.
+        BUTTON_PRIMARY,
+        /// The secondary button, typically the right mouse button.
+        BUTTON_SECONDARY,
+        /// The scroll wheel button, typically the middle mouse button.
+        BUTTON_SCROLL_WHEEL,
     }
 }
