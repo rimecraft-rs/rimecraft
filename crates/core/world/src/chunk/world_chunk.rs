@@ -430,52 +430,23 @@ where
         //TODO: update chunk manager
         //TODO: update lighting
 
-        // Remove old block entity if present
-        //TODO: move this into server side
-        /*
+        // Generic callbacks
+        Cx::replace_block_state_callback(
+            pos,
+            state,
+            old_state,
+            SetBlockStateFlags::MOVED,
+            &mut this,
+        );
+
         if old_state.block != state.block
             && dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*old_state.block => BlockEntityConstructor<Cx>)
         {
-            if !is_client
-                && !flags.contains(SetBlockStateFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK)
-            {
-                let ty =
-                    dsyn_ty!(cached this.dsyn_cache(), local_cx => BlockEntityOnBlockReplaced<Cx>);
-                let wa = this.wca_as_wc().world_ptr.clone();
-
-                Self::__peek_block_entity_typed(
-                    this.reclaim(),
-                    pos,
-                    |cell| {
-                        let mut guard = cell.lock();
-                        let f = (**guard.ty())
-                            .descriptors()
-                            .get(ty)
-                            .unwrap_or(default_block_entity_on_block_replaced());
-                        f(
-                            &mut **guard,
-                            &wa,
-                            pos,
-                            old_state,
-                            local_cx,
-                            BlockEntityOnBlockReplacedMarker,
-                        );
-                    },
-                    CreationType::Immediate,
-                );
-            }
-            Self::__remove_block_entity(this.reclaim(), pos);
-        }
-        */
-
-        // Generic callbacks
-        if !is_client && old_state != state {
-            Cx::replace_block_state_callback(
+            Self::__remove_block_entity(
+                //SAFETY: because of restrictions of Rust's borrow checker, the only way to get through this complex type system is through this.
+                // due to the anonymous lifetime this is safe to do. they will do nothing to the extended lifetime.
+                unsafe { this.reclaim_unsafe() },
                 pos,
-                state,
-                old_state,
-                SetBlockStateFlags::MOVED,
-                &mut this,
             );
         }
 
@@ -930,7 +901,7 @@ where
 
     fn reclaim(&mut self) -> Self::Reclaim<'_>;
 
-    // this is safe if the recalimed value is only used by external functions that
+    // this is safe if the reclaimed value is only used by external functions that
     // will not care about the what exactly is the given lifetime
     unsafe fn reclaim_unsafe(&mut self) -> Self;
 

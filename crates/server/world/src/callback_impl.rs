@@ -2,10 +2,17 @@ use std::ops::DerefMut as _;
 
 use block::BlockState;
 use block_entity::BlockEntityCell;
-use local_cx::{LocalContext, dsyn_instanceof};
+use fluid::BsToFs;
+use local_cx::{LocalContext, dsyn_instanceof, dsyn_ty};
 use parking_lot::MutexGuard;
+use serde::de::DeserializeOwned;
 use voxel_math::BlockPos;
-use world::{chunk::ChunkCx, view::block::SetBlockStateFlags};
+use world::{
+    behave::BlockEntityConstructor,
+    chunk::{ChunkCx, ComputeIndex, CreationType, WorldChunk, WorldChunkLocalCx},
+    event::ServerChunkEventCallback,
+    view::block::SetBlockStateFlags,
+};
 
 use crate::{behave::*, chunk::ServerWorldChunkAccess};
 
@@ -17,13 +24,49 @@ pub fn builtin_callback_replace_block_state<'w, Cx, Chunk>(
     flags: SetBlockStateFlags,
     chunk: &mut Chunk,
 ) where
-    Cx: ChunkCx<'w>,
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + ServerChunkEventCallback<'w, Chunk>,
     Cx::LocalContext<'w>: LocalContext<dsyn::Type<BlockAlwaysReplaceState>>
-        + LocalContext<dsyn::Type<BlockOnStateReplaced<Cx>>>,
+        + LocalContext<dsyn::Type<BlockOnStateReplaced<Cx>>>
+        + LocalContext<dsyn::Type<BlockEntityOnBlockReplaced<Cx>>>
+        + WorldChunkLocalCx<'w, Cx>,
+    Cx::Id: DeserializeOwned,
     Chunk: ServerWorldChunkAccess<'w, Cx>,
 {
+    let block_diff = old.block != new.block;
     let local_cx = chunk.local_cx();
-    if (old.block != new.block || {
+    if !flags.contains(SetBlockStateFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK)
+        && block_diff
+        && dsyn_instanceof!(local_cx, &*old.block => BlockEntityConstructor<Cx>)
+    {
+        let ty = dsyn_ty!(local_cx => BlockEntityOnBlockReplaced<Cx>);
+
+        WorldChunk::__peek_block_entity_typed(
+            //SAFETY: lifetime does not matter here
+            unsafe { chunk.reclaim_unsafe() },
+            pos,
+            |cell| {
+                let mut guard = cell.lock();
+                let f = (**guard.ty())
+                    .descriptors()
+                    .get(ty)
+                    .unwrap_or(default_block_entity_on_block_replaced());
+                f(
+                    &mut **guard,
+                    chunk.wca_as_wc().world_ptr(),
+                    pos,
+                    old,
+                    local_cx,
+                    BlockEntityOnBlockReplacedMarker,
+                );
+            },
+            CreationType::Immediate,
+        );
+    }
+
+    if (block_diff || {
         bool::from(
             dsyn_instanceof!(local_cx, &*new.block => export BlockAlwaysReplaceState)
                 .unwrap_or(default_block_always_replace_state()),
