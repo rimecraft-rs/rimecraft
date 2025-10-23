@@ -1,7 +1,9 @@
 //! Minecraft client UI framework.
 
+use rimecraft_arena::Arena;
 use rimecraft_client_narration::Narratable;
 use rimecraft_keyboard::{KeyState, ProvideKeyboardTy};
+use rimecraft_local_cx::LocalContext;
 use rimecraft_mouse::{ButtonState, MousePos, MouseScroll, ProvideMouseTy};
 use rimecraft_render_math::screen::ScreenRect;
 
@@ -10,7 +12,10 @@ use crate::nav::{NavDirection, WithNavIndex, screen::ScreenRectExt};
 pub mod item;
 pub mod nav;
 
-pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {}
+pub trait ProvideUiTy<'a>: ProvideKeyboardTy + ProvideMouseTy {
+    type Arena: Arena<Item = dyn Element<Self>, Handle: Copy + Eq>;
+    type ArenaLocalContext: LocalContext<Self::Arena>;
+}
 
 /// The selection state of a UI component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -59,21 +64,21 @@ pub trait Selectable: Narratable + WithNavIndex {
     fn state(&self) -> Option<SelectionState>;
 }
 
-pub trait ImmutablyFocusable<Cx> {
+pub trait Focusable<Cx> {
     /// Whether this component is focused.
     fn is_focused(&self) -> bool;
 
     /// Sets whether this component is focused.
-    fn set_focused(&self, focused: bool);
+    fn set_focused(&mut self, focused: bool);
 
     /// Focuses this component.
-    fn focus(&self) {
+    fn focus(&mut self) {
         self.set_focused(true);
     }
 }
 
 /// A UI element that can handle input events.
-pub trait Element<Cx>: WithNavIndex + ImmutablyFocusable<Cx>
+pub trait Element<Cx>: WithNavIndex + Focusable<Cx>
 where
     Cx: ProvideUiTy,
 {
@@ -153,48 +158,36 @@ pub trait ParentElement<Cx>: Element<Cx>
 where
     Cx: ProvideUiTy,
 {
-    /// The child elements of this parent element.
-    fn children(&self) -> &[&dyn Element<Cx>];
+    fn local_cx(&self) -> Cx::ArenaLocalContext;
 
-    /// The mutable child elements of this parent element.
-    fn children_mut(&mut self) -> &mut [&mut dyn Element<Cx>];
+    fn handles(&self) -> &[<Cx::Arena as Arena>::Handle];
 
-    /// Finds the first child element that is hovered by the given mouse position.
-    fn hovered_child(&self, pos: MousePos) -> Option<&dyn Element<Cx>> {
-        self.children()
+    fn handles_mut(&mut self) -> &mut [<Cx::Arena as Arena>::Handle];
+
+    fn children(&self) -> Vec<&dyn Element<Cx>> {
+        self.handles()
             .iter()
-            .find(|child| child.contains_cursor(pos))
-            .map(|v| &**v)
+            .flat_map(|handle| self.local_cx().acquire().get(*handle))
+            .collect::<Vec<_>>()
     }
 
-    /// Finds the first child element that is hovered by the given mouse position, in mutable form.
-    fn hovered_child_mut(&mut self, pos: MousePos) -> Option<&mut dyn Element<Cx>> {
-        self.children_mut()
-            .iter_mut()
-            .find(|child| child.contains_cursor(pos))
-            .map(|v| &mut **v)
-    }
+    // fn hovered_child(&self, pos: MousePos) -> Option<Arc<dyn Element<Cx>>> {
+    //     self.children()
+    //         .iter()
+    //         .flat_map(|child| self.local_cx().acquire().get(*child).cloned())
+    //         .find(|child| child.contains_cursor(pos))
+    // }
 
-    /// Finds the first focused child element.
-    fn focused_child(&self) -> Option<&dyn Element<Cx>> {
-        self.children()
-            .iter()
-            .find(|child| child.is_focused())
-            .map(|v| &**v)
-    }
+    // fn focused_child(&self) -> Option<&<Cx::Arena as Arena>::Handle> {
+    //     self.children()
+    //         .iter()
+    //         .find(|child| child.is_focused())
+    //         .map(|v| &**v)
+    // }
 
-    /// Finds the first focused child element, in mutable form.
-    fn focused_child_mut(&mut self) -> Option<&mut dyn Element<Cx>> {
-        self.children_mut()
-            .iter_mut()
-            .find(|child| child.is_focused())
-            .map(|v| &mut **v)
-    }
-
-    /// Finds the index of the first child element that is equal to the given element.
-    fn child_index(&self, child: &dyn Element<Cx>) -> Option<usize> {
-        self.children().iter().position(|c| std::ptr::eq(*c, child))
-    }
+    // fn child_index(&self, child: &<Cx::Arena as Arena>::Handle) -> Option<usize> {
+    //     self.children().iter().position(|c| std::ptr::eq(*c, child))
+    // }
 
     /// The buttons currently being dragged.
     fn dragging_buttons(&self) -> &[Cx::Button];
@@ -211,14 +204,14 @@ where
         self.focused_child().is_some()
     }
 
-    fn set_focused(&self, focused: bool) {
+    fn set_focused(&mut self, focused: bool) {
         if focused {
             if self.focused_child().is_none()
-                && let Some(first_child) = self.children().first()
+                && let Some(first_child) = self.children_mut().first()
             {
                 first_child.focus();
             }
-        } else if let Some(focused_child) = self.focused_child() {
+        } else if let Some(focused_child) = self.focused_child_mut() {
             focused_child.set_focused(false);
         }
     }
@@ -237,7 +230,7 @@ where
 {
 }
 
-impl<T, Cx> ImmutablyFocusable<Cx> for T
+impl<T, Cx> Focusable<Cx> for T
 where
     T: ParentElementFocusableExt<Cx> + ?Sized,
     Cx: ProvideUiTy,
@@ -274,7 +267,7 @@ where
                     match propagation {
                         EventPropagation::Handled => {}
                         EventPropagation::NotHandled => {
-                            ImmutablyFocusable::set_focused(self, false);
+                            Focusable::set_focused(self, false);
                             self.children_mut()[index].focus();
                             self.dragging_buttons_mut().push(button);
                         }

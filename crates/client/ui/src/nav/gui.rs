@@ -6,7 +6,7 @@ use rimecraft_keyboard::ProvideKeyboardTy;
 use rimecraft_mouse::ProvideMouseTy;
 
 use crate::{
-    Element, ImmutablyFocusable, ParentElement, ProvideUiTy,
+    Element, Focusable, ParentElement, ProvideUiTy,
     nav::{NavAxis, NavDirection},
 };
 
@@ -80,7 +80,7 @@ where
     }
 }
 
-impl<Cx> ImmutablyFocusable<Cx> for GuiNavigationPath<'_, Cx>
+impl<Cx> Focusable<Cx> for GuiNavigationPath<'_, Cx>
 where
     Cx: ProvideUiTy,
 {
@@ -129,7 +129,7 @@ where
     pub fn leaf<E>(element: &'g E) -> Self
     where
         E: Element<Cx> + 'static,
-        Cx: ProvideKeyboardTy + ProvideMouseTy,
+        Cx: ProvideUiTy,
     {
         GuiNavigationPath::Leaf(element)
     }
@@ -137,7 +137,7 @@ where
     pub fn node<E>(element: &'g E, child: GuiNavigationPath<'g, Cx>) -> Self
     where
         E: ParentElement<Cx> + 'static,
-        Cx: ProvideKeyboardTy + ProvideMouseTy,
+        Cx: ProvideUiTy,
     {
         GuiNavigationPath::Node {
             element,
@@ -148,7 +148,7 @@ where
     pub fn path<E>(leaf: &'g E, parents: Vec<&'g dyn ParentElement<Cx>>) -> Self
     where
         E: Element<Cx> + 'static,
-        Cx: ProvideKeyboardTy + ProvideMouseTy,
+        Cx: ProvideUiTy,
     {
         let mut current = GuiNavigationPath::leaf(leaf);
 
