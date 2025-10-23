@@ -6,7 +6,7 @@ use std::{
     fmt::Debug,
     hash::Hash,
     ops::{Deref, DerefMut},
-    sync::{Arc, atomic::AtomicBool},
+    sync::atomic::AtomicBool,
 };
 
 use ahash::AHashMap;
@@ -26,7 +26,6 @@ use rimecraft_voxel_math::{BlockPos, ChunkSectionPos};
 
 use crate::{
     chunk::light::ChunkSkyLight,
-    event::game_event,
     heightmap::{self, Heightmap},
     view::{
         HeightLimit,
@@ -84,11 +83,15 @@ where
 
     /// The type of biomes.
     type Biome: 'w;
+
     /// The type of biome id list.
     type BiomeList;
 
     /// The `Heightmap.Type` type of heightmaps.
     type HeightmapType: heightmap::Type<'w, Self> + Hash + Eq;
+
+    /// The extension type of world chunks.
+    type WorldChunkExt;
 }
 
 /// A generic chunk data structure.
@@ -303,26 +306,6 @@ where
         Cx: ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
     {
         BaseChunk::__csl_refresh_surface_y(self.as_base_chunk_access());
-    }
-
-    /// Peeks the [`game_event::Dispatcher`] of given Y section coordinate.
-    #[inline]
-    fn peek_game_event_dispatcher<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>
-    where
-        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
-    {
-        let _ = y_section_coord;
-        drop(f);
-        None
-    }
-
-    /// Gets the [`game_event::Dispatcher`] of given Y section coordinate.
-    #[inline]
-    fn game_event_dispatcher(
-        &mut self,
-        y_section_coord: i32,
-    ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
-        self.peek_game_event_dispatcher(y_section_coord, Arc::clone)
     }
 
     /// Returns an iterator over all blocks in this chunk.

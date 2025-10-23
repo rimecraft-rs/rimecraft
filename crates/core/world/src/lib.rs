@@ -132,7 +132,8 @@ mod __dsyn_cache {
     macro_rules! dsyn_caches_init {
     ($($f:ident=>$t:ty),*$(,)?) => {
         #[derive(Debug)]
-        pub(crate) struct DsynCache<'w, Cx>
+        #[doc(hidden)]
+        pub struct DsynCache<'w, Cx>
         where
             Cx: ChunkCx<'w>,
         {
@@ -159,9 +160,6 @@ mod __dsyn_cache {
 
     dsyn_caches_init! {
         be_constructor => BlockEntityConstructor<Cx>,
-        be_on_block_replaced => BlockEntityOnBlockReplaced<Cx>,
-        be_get_game_event_listener => BlockEntityGetGameEventListener<Cx>,
-        b_always_replace_state => BlockAlwaysReplaceState,
         b_on_block_added => BlockOnBlockAdded<Cx>,
     }
 }

@@ -1,24 +1,28 @@
-use block::BlockState;
-use local_cx::{LocalContext, dsyn_instanceof};
-use voxel_math::BlockPos;
-use world::{ArcAccess, World, behave::*, chunk::ChunkCx, view::block::SetBlockStateFlags};
+use std::ops::DerefMut as _;
 
-use crate::behave::*;
+use block::BlockState;
+use block_entity::BlockEntityCell;
+use local_cx::{LocalContext, dsyn_instanceof};
+use parking_lot::MutexGuard;
+use voxel_math::BlockPos;
+use world::{chunk::ChunkCx, view::block::SetBlockStateFlags};
+
+use crate::{behave::*, chunk::ServerWorldChunkAccess};
 
 /// Built-in callback when a block state is replaced inside a chunk.
-pub fn builtin_callback_replace_block_state<'w, Cx, WA>(
+pub fn builtin_callback_replace_block_state<'w, Cx, Chunk>(
     pos: BlockPos,
     new: BlockState<'w, Cx>,
     old: BlockState<'w, Cx>,
-    world: &WA,
     flags: SetBlockStateFlags,
-    local_cx: Cx::LocalContext<'w>,
+    chunk: &mut Chunk,
 ) where
     Cx: ChunkCx<'w>,
-    WA: ArcAccess<World<'w, Cx>>,
     Cx::LocalContext<'w>: LocalContext<dsyn::Type<BlockAlwaysReplaceState>>
         + LocalContext<dsyn::Type<BlockOnStateReplaced<Cx>>>,
+    Chunk: ServerWorldChunkAccess<'w, Cx>,
 {
+    let local_cx = chunk.local_cx();
     if (old.block != new.block || {
         bool::from(
             dsyn_instanceof!(local_cx, &*new.block => export BlockAlwaysReplaceState)
@@ -31,11 +35,43 @@ pub fn builtin_callback_replace_block_state<'w, Cx, WA>(
             .unwrap_or(default_block_on_state_replaced());
         f(
             old,
-            world,
+            chunk.wca_as_wc().world_ptr(),
             pos,
             flags.contains(SetBlockStateFlags::MOVED),
             local_cx,
             BlockOnStateReplacedMarker,
         );
     }
+}
+
+/// Built-in callback when a block entity is added to a chunk.
+pub fn builtin_callback_add_block_entity<'w, Cx, Chunk>(
+    be: &BlockEntityCell<'w, Cx>,
+    chunk: &mut Chunk,
+) where
+    Cx: ChunkCx<'w>,
+    Chunk: ServerWorldChunkAccess<'w, Cx>,
+    Cx::LocalContext<'w>: LocalContext<dsyn::Type<BlockEntityGetGameEventListener<Cx>>>,
+{
+    crate::chunk::wc_update_game_event_listener(
+        chunk.reclaim_server(),
+        be,
+        MutexGuard::map(be.lock(), Box::deref_mut),
+    );
+}
+
+/// Built-in callback when a block entity is removed from a chunk.
+pub fn builtin_callback_remove_block_entity<'w, Cx, Chunk>(
+    be: &BlockEntityCell<'w, Cx>,
+    chunk: &mut Chunk,
+) where
+    Cx: ChunkCx<'w>,
+    Chunk: ServerWorldChunkAccess<'w, Cx>,
+    Cx::LocalContext<'w>: LocalContext<dsyn::Type<BlockEntityGetGameEventListener<Cx>>>,
+{
+    crate::chunk::wc_remove_game_event_listener(
+        chunk.reclaim_server(),
+        be,
+        MutexGuard::map(be.lock(), Box::deref_mut),
+    );
 }

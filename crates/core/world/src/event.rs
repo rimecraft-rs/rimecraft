@@ -1,26 +1,36 @@
 //! Event triggers.
 
 use rimecraft_block::BlockState;
+use rimecraft_block_entity::BlockEntityCell;
 use rimecraft_voxel_math::BlockPos;
 
-use crate::{ArcAccess, World, chunk::ChunkCx, view::block::SetBlockStateFlags};
-
-pub mod game_event;
+use crate::{chunk::ChunkCx, view::block::SetBlockStateFlags};
 
 /// Server event callbacks implemented on a global context.
 ///
 /// This should be implemented in a pure-client environment as well but will do nothing there.
-pub trait ServerEventCallback<'w>: ChunkCx<'w> {
+pub trait ServerChunkEventCallback<'w, Access>: ChunkCx<'w> {
     /// Called after a block state is replaced.
     #[inline(always)]
-    fn replace_block_state(
+    fn replace_block_state_callback(
         pos: BlockPos,
         new: BlockState<'w, Self>,
         old: BlockState<'w, Self>,
-        world: &impl ArcAccess<World<'w, Self>>,
         flags: SetBlockStateFlags,
-        local_cx: Self::LocalContext<'w>,
+        chunk: &mut Access,
     ) {
-        let _ = (pos, new, old, world, flags, local_cx);
+        let _ = (pos, new, old, flags, chunk);
+    }
+
+    /// Called after a block entity is added.
+    #[inline(always)]
+    fn add_block_entity_callback(be: &BlockEntityCell<'w, Self>, chunk: &mut Access) {
+        let _ = (be, chunk);
+    }
+
+    /// Called after a block entity is removed, and _before it is marked as removed._
+    #[inline(always)]
+    fn remove_block_entity_callback(be: &BlockEntityCell<'w, Self>, chunk: &mut Access) {
+        let _ = (be, chunk);
     }
 }

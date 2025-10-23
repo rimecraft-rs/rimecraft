@@ -11,7 +11,7 @@ use serde::Deserialize;
 use crate::{
     LightType,
     chunk::{self, Chunk, ChunkCx, ChunkStatus, ComputeIndex, WorldChunk, WorldChunkLocalCx},
-    event::ServerEventCallback,
+    event::ServerChunkEventCallback,
 };
 
 /// A view that provides set of chunks.
@@ -103,7 +103,7 @@ where
     Cx: ChunkCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ServerEventCallback<'w>,
+        + for<'a> ServerChunkEventCallback<'w, &'a WorldChunk<'w, Cx>>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
