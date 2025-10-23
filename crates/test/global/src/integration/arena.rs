@@ -1,0 +1,1 @@
+//! `rimecraft-arena` integrations.

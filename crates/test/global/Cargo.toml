@@ -39,7 +39,7 @@ ui = { path = "../../client/ui", package = "rimecraft-client-ui", optional = tru
 # util components
 keyboard = { path = "../../util/keyboard", package = "rimecraft-keyboard", optional = true }
 mouse = { path = "../../util/mouse", package = "rimecraft-mouse", optional = true }
-ecs = { path = "../../util/ecs", package = "rimecraft-ecs", optional = true }
+arena = { path = "../../util/arena", package = "rimecraft-arena", optional = true }
 
 [features]
 registry = ["dep:registry"]
@@ -51,7 +51,7 @@ mouse = ["dep:mouse"]
 render = ["dep:render"]
 key-bind = ["dep:key-bind", "keyboard", "mouse"]
 ui = ["dep:ui", "keyboard", "mouse"]
-ecs = ["dep:ecs"]
+arena = ["dep:arena"]
 
 [lints]
 workspace = true
