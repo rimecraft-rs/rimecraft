@@ -33,6 +33,7 @@ pub mod integration {
     pub mod render;
     pub mod text;
     pub mod tooltip;
+    pub mod ui;
 }
 
 pub use identifier::Id;

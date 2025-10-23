@@ -21,10 +21,7 @@ glam = "0.30"
 serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
-rimecraft-test-global = { path = "../../test/global", features = [
-    "keyboard",
-    "mouse",
-] }
+rimecraft-test-global = { path = "../../test/global", features = ["ui"] }
 
 [features]
 default = []

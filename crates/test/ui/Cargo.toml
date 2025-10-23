@@ -1,9 +1,9 @@
 [package]
-name = "rimecraft-client-key-bind-test"
+name = "rimecraft-client-ui-test"
 version = "0.1.0"
 edition = "2024"
 authors = ["KrLite"]
-description = "Essential tests for rimecraft-client-key-bind that require a context"
+description = "Essential tests for rimecraft-client-ui that require a context"
 repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
@@ -13,11 +13,11 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 test-global = { path = "../global", package = "rimecraft-test-global", features = [
-    "key-bind",
+    "ui",
 ] }
 keyboard = { path = "../../util/keyboard", package = "rimecraft-keyboard" }
 mouse = { path = "../../util/mouse", package = "rimecraft-mouse" }
-key_bind = { path = "../../client/key-bind", package = "rimecraft-client-key-bind" }
+ui = { path = "../../client/ui", package = "rimecraft-client-ui" }
 
 [lints]
 workspace = true

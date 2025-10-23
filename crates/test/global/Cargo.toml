@@ -35,6 +35,7 @@ render = { path = "../../core/render", package = "rimecraft-render", optional = 
 # client components
 tooltip = { path = "../../client/tooltip", package = "rimecraft-client-tooltip", optional = true }
 key-bind = { path = "../../client/key-bind", package = "rimecraft-client-key-bind", optional = true }
+ui = { path = "../../client/ui", package = "rimecraft-client-ui", optional = true }
 # util components
 keyboard = { path = "../../util/keyboard", package = "rimecraft-keyboard", optional = true }
 mouse = { path = "../../util/mouse", package = "rimecraft-mouse", optional = true }
@@ -48,6 +49,7 @@ keyboard = ["dep:keyboard"]
 mouse = ["dep:mouse"]
 render = ["dep:render"]
 key-bind = ["dep:key-bind", "keyboard", "mouse"]
+ui = ["dep:ui", "keyboard", "mouse"]
 
 [lints]
 workspace = true
