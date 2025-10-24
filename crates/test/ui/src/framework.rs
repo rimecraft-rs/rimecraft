@@ -1,36 +1,51 @@
-use std::{hash::Hash, thread};
+use std::{hash::Hash, sync::Arc, thread};
 
 use test_global::integration::ui::framework::{
-    SimpleQueue, TestCommand, TestCommandKind, TestOptimizer, TestStore,
+    SimpleQueue, TestCommand, TestCommandKind, TestKey, TestOptimizer, TestStore,
 };
-use ui::framework::{Command, CommandOptimizer, CommandQueue, UiStore, UiStoreRead, run_pipeline};
+use ui::framework::{
+    Command, CommandOptimizer, CommandQueue, UiHandle, UiStore, UiStoreRead, run_pipeline,
+};
 
 #[test]
 fn pipeline_applies_main_submitted_commands() {
     let mut store = TestStore::new();
-    let queue = SimpleQueue::new();
+    let queue = Arc::new(SimpleQueue::new());
     let opt = TestOptimizer;
 
-    store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create("one", 0))));
-    store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState("one", 123))));
+    store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(
+        TestKey("one"),
+        0,
+    ))));
+    store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState(
+        TestKey("one"),
+        123,
+    ))));
 
-    run_pipeline::<&str, _, _, _>(&mut store, &queue, &opt);
+    run_pipeline(&mut store, queue.as_ref(), &opt);
 
-    assert_eq!(store.get("one"), Some(&123));
+    assert_eq!(store.get(TestKey("one")), Some(&123));
 }
 
 #[test]
 fn pipeline_applies_queue_submitted_commands() {
     let mut store = TestStore::new();
-    let queue = SimpleQueue::new();
+    let queue = Arc::new(SimpleQueue::new());
+    let handle = UiHandle::<TestKey<u32>>::new(queue.clone());
     let opt = TestOptimizer;
 
-    queue.submit(Box::new(TestCommand(TestCommandKind::Create(2, 0))));
-    queue.submit(Box::new(TestCommand(TestCommandKind::SetState(2, 7))));
+    handle.submit(Box::new(TestCommand(TestCommandKind::Create(
+        TestKey(2),
+        0,
+    ))));
+    handle.submit(Box::new(TestCommand(TestCommandKind::SetState(
+        TestKey(2),
+        7,
+    ))));
 
-    run_pipeline::<u32, _, _, _>(&mut store, &queue, &opt);
+    run_pipeline(&mut store, queue.as_ref(), &opt);
 
-    assert_eq!(store.get(2), Some(&7));
+    assert_eq!(store.get(TestKey(2)), Some(&7));
 }
 
 /// Optimizer that prunes earlier SetState commands and keeps only the last
@@ -83,35 +98,53 @@ where
 
 #[test]
 fn pruning_optimizer_keeps_last_set_state() {
-    let mut store = TestStore::<i32, u32>::new();
-    let queue = SimpleQueue::new();
+    let mut store = TestStore::<_, u32>::new();
+    let queue = Arc::new(SimpleQueue::new());
     let opt = PruningOptimizer::<u32>::default();
 
-    store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(10, 0_u32))));
-    store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState(10, 1_u32))));
-    store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState(10, 2_u32))));
+    store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(
+        TestKey(10),
+        0_u32,
+    ))));
+    store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState(
+        TestKey(10),
+        1_u32,
+    ))));
+    store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState(
+        TestKey(10),
+        2_u32,
+    ))));
 
-    run_pipeline::<i32, _, _, _>(&mut store, &queue, &opt);
+    run_pipeline(&mut store, queue.as_ref(), &opt);
 
-    assert_eq!(store.get(10), Some(&2));
+    assert_eq!(store.get(TestKey(10)), Some(&2));
 }
 
 #[test]
 fn remove_then_late_set_state_is_noop() {
-    let mut store = TestStore::<i32, i32>::new();
+    let mut store = TestStore::<_, i32>::new();
     let queue = SimpleQueue::new();
     let opt = TestOptimizer;
 
-    store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(11, 0))));
-    store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState(11, 5))));
-    store.submit_from_main(Box::new(TestCommand(TestCommandKind::<i32, i32>::Remove(
-        11,
+    store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(
+        TestKey(11),
+        0,
     ))));
-    store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState(11, 9))));
+    store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState(
+        TestKey(11),
+        5,
+    ))));
+    store.submit_from_main(Box::new(TestCommand(TestCommandKind::<_, i32>::Remove(
+        TestKey(11),
+    ))));
+    store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState(
+        TestKey(11),
+        9,
+    ))));
 
-    run_pipeline::<i32, _, _, _>(&mut store, &queue, &opt);
+    run_pipeline(&mut store, &queue, &opt);
 
-    assert_eq!(store.get(11), None);
+    assert_eq!(store.get(TestKey(11)), None);
 }
 
 #[test]
@@ -124,9 +157,12 @@ fn concurrent_queue_submissions() {
     for i in 0..8u64 {
         let q = queue.clone();
         handles.push(thread::spawn(move || {
-            q.submit(Box::new(TestCommand(TestCommandKind::Create(100 + i, 0))));
+            q.submit(Box::new(TestCommand(TestCommandKind::Create(
+                TestKey(100 + i),
+                0,
+            ))));
             q.submit(Box::new(TestCommand(TestCommandKind::SetState(
-                100 + i,
+                TestKey(100 + i),
                 (i as i32) + 1,
             ))));
         }));
@@ -136,9 +172,9 @@ fn concurrent_queue_submissions() {
         h.join().unwrap();
     }
 
-    run_pipeline::<u64, _, _, _>(&mut store, &queue, &opt);
+    run_pipeline(&mut store, &queue, &opt);
 
     for i in 0..8u64 {
-        assert_eq!(store.get(100 + i), Some(&((i as i32) + 1)));
+        assert_eq!(store.get(TestKey(100 + i)), Some(&((i as i32) + 1)));
     }
 }

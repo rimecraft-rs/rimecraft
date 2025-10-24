@@ -4,17 +4,35 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 use slotmap::{SlotMap, new_key_type};
-use ui::framework::{Command, CommandOptimizer, CommandQueue, UiStore, UiStoreRead};
+use ui::framework::{
+    Command, CommandOptimizer, CommandQueue, GenerationalKey, UiStore, UiStoreRead,
+};
 
 new_key_type! {
     struct TestId;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TestKey<K>(pub K)
+where
+    K: Copy + Eq;
+
+impl<K> GenerationalKey for TestKey<K>
+where
+    K: Copy + Eq,
+{
+    type I = K;
+
+    fn generation(&self) -> Self::I {
+        self.0
+    }
 }
 
 /// A tiny command enum used by tests.
 #[derive(Clone, PartialEq, Eq)]
 pub enum TestCommandKind<K, V>
 where
-    K: Copy + Eq + Hash,
+    K: Copy + Eq,
 {
     Create(K, V),
     Remove(K),
@@ -25,11 +43,11 @@ where
 #[derive(Clone)]
 pub struct TestCommand<K, V>(pub TestCommandKind<K, V>)
 where
-    K: Copy + Eq + Hash;
+    K: Copy + Eq;
 
 impl<K, V> Command<K> for TestCommand<K, V>
 where
-    K: Copy + Eq + Hash + Send + 'static,
+    K: Copy + Eq + Send + 'static,
     V: Send + 'static,
 {
     fn apply(&self, _store: &mut dyn UiStore<K>) {

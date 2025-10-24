@@ -4,6 +4,17 @@ use std::any::Any;
 use std::fmt::{self, Debug};
 use std::sync::Arc;
 
+/// Trait that indicates a key contains a generation token (generational id).
+///
+/// Implementors should provide a stable way to read the generation so callers
+/// can detect stale/invalid handles (e.g. from a slotmap or generational index).
+pub trait GenerationalKey {
+    type I: Copy + Eq;
+
+    /// Return the generation / version token of this id.
+    fn generation(&self) -> Self::I;
+}
+
 /// A single UI mutation described as a value object.
 pub trait Command<K>: Send {
     /// Applies this command to `store`.
@@ -100,7 +111,7 @@ impl<K> Debug for UiHandle<K> {
 
 impl<K> UiHandle<K>
 where
-    K: 'static,
+    K: GenerationalKey + 'static,
 {
     /// Creates a new handle from a boxed queue implementation.
     pub fn new(queue: Arc<dyn CommandQueue<K>>) -> Self {
@@ -125,7 +136,7 @@ pub trait UiCoordinator<K>: Send {
 /// resulting batch on `store`.
 pub fn run_pipeline<K, S, Q, O>(store: &mut S, queue: &Q, optimizer: &O)
 where
-    K: Copy + 'static,
+    K: Copy + GenerationalKey + 'static,
     S: UiStore<K>,
     Q: CommandQueue<K>,
     O: CommandOptimizer<K>,
