@@ -1,16 +1,25 @@
 //! Minecraft client UI framework.
 
 use rimecraft_client_narration::Narratable;
-use rimecraft_keyboard::ProvideKeyboardTy;
-use rimecraft_mouse::ProvideMouseTy;
+use rimecraft_keyboard::{KeyState, ProvideKeyboardTy};
+use rimecraft_mouse::{ButtonState, MousePos, MouseScroll, ProvideMouseTy};
+use rimecraft_render_math::screen::ScreenSize;
 
-use crate::nav::WithNavIndex;
+use crate::{
+    layout::{LayoutPack, LayoutValue, position::PositionConstraints, size::SizeConstraints},
+    nav::WithNavIndex,
+};
 
 pub mod framework;
 pub mod item;
+pub mod layout;
 pub mod nav;
 
-pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {}
+pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
+    type UiEventExt;
+    type SizeConstraintsExt;
+    type StoreKey: Copy + Eq;
+}
 
 /// The selection state of a UI component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -59,7 +68,95 @@ impl EventPropagation {
     }
 }
 
-pub trait Element<Cx>
+pub trait Focusable {
+    /// Whether this component is currently focused.
+    fn is_focused(&self) -> bool;
+
+    fn set_focused(&mut self, focused: bool);
+
+    fn focus(&mut self) {
+        self.set_focused(true);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum UiEvent<'a, Cx>
+where
+    Cx: ProvideUiTy,
+{
+    MouseMove(MousePos),
+    MouseButton {
+        pos: MousePos,
+        button: Cx::Button,
+        state: ButtonState,
+    },
+    MouseDrag {
+        pos: MousePos,
+        delta_pos: MousePos,
+        button: Cx::Button,
+    },
+    MouseScroll {
+        pos: MousePos,
+        scroll: MouseScroll,
+    },
+    KeyboardKey {
+        key: Cx::Key,
+        modifiers: &'a [Cx::Modifier],
+        state: KeyState,
+    },
+    CharInput {
+        c: char,
+        modifiers: &'a [Cx::Modifier],
+    },
+    Generic {
+        ext: Cx::UiEventExt,
+    },
+}
+
+pub trait Element<Cx>: Focusable
+where
+    Cx: ProvideUiTy,
+{
+}
+
+pub trait ParentElement<Cx>: Element<Cx>
+where
+    Cx: ProvideUiTy,
+{
+    fn children(&self) -> Vec<Cx::StoreKey>;
+}
+
+pub trait PositionElement<Cx>: Element<Cx>
+where
+    Cx: ProvideUiTy,
+{
+    fn position_constraints(&self) -> Option<PositionConstraints>;
+}
+
+pub trait LayoutElement<Cx>: Element<Cx>
+where
+    Cx: ProvideUiTy,
+{
+    fn measure(
+        &self,
+        constraints: SizeConstraints<Cx::SizeConstraintsExt>,
+    ) -> LayoutPack<Option<LayoutValue>> {
+        constraints.maximum_size()
+    }
+
+    fn layout(&mut self, size: ScreenSize);
+}
+
+pub trait InteractiveElement<Cx>: Element<Cx>
+where
+    Cx: ProvideUiTy,
+{
+    /// Handles a UI event.
+    fn handle_event(&mut self, event: &UiEvent<'_, Cx>) -> EventPropagation;
+}
+
+pub trait ParentInteractiveElement<Cx>: InteractiveElement<Cx>
 where
     Cx: ProvideUiTy,
 {
