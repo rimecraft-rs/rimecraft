@@ -6,6 +6,7 @@ use rimecraft_mouse::ProvideMouseTy;
 
 use crate::nav::WithNavIndex;
 
+pub mod framework;
 pub mod item;
 pub mod nav;
 
