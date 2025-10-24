@@ -223,4 +223,22 @@ where
     }
 }
 
+impl<T: HoldLocalContext + ?Sized> HoldLocalContext for &T {
+    type LocalCx = T::LocalCx;
+
+    #[inline(always)]
+    fn local_context(&self) -> Self::LocalCx {
+        (**self).local_context()
+    }
+}
+
+impl<T: HoldLocalContext + ?Sized> HoldLocalContext for &mut T {
+    type LocalCx = T::LocalCx;
+
+    #[inline(always)]
+    fn local_context(&self) -> Self::LocalCx {
+        (**self).local_context()
+    }
+}
+
 mod tests;

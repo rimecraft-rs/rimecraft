@@ -29,7 +29,7 @@ use crate::{
     heightmap::{self, Heightmap},
     view::{
         HeightLimit,
-        block::{BlockEntityView, BlockView},
+        block::{MutBlockEntityView, MutBlockView},
         light::{BlockLuminanceView, LightSourceView},
     },
 };
@@ -237,8 +237,8 @@ type SectionReadShorthand<'a, 'w, Chunk, Cx> =
 pub trait Chunk<'w, Cx>
 where
     Self: AsBaseChunkAccess<'w, Cx>
-        + BlockView<'w, Cx>
-        + BlockEntityView<'w, Cx>
+        + MutBlockView<'w, Cx>
+        + MutBlockEntityView<'w, Cx>
         + BlockLuminanceView<'w, Cx>
         + LightSourceView<'w, Cx>,
     Cx: ChunkCx<'w>,

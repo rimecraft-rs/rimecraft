@@ -7,10 +7,10 @@ use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_fluid::ProvideFluidStateExtTy;
 use rimecraft_voxel_math::BlockPos;
 
-use crate::{DEFAULT_MAX_LIGHT_LEVEL, chunk::light::ChunkSkyLight, view::block::BlockView};
+use crate::{DEFAULT_MAX_LIGHT_LEVEL, chunk::light::ChunkSkyLight, view::block::MutBlockView};
 
 /// View of block luminance source levels.
-pub trait BlockLuminanceView<'w, Cx>: BlockView<'w, Cx>
+pub trait BlockLuminanceView<'w, Cx>: MutBlockView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
@@ -27,7 +27,7 @@ where
 }
 
 /// View of light sources in a chunk.
-pub trait LightSourceView<'w, Cx>: BlockView<'w, Cx>
+pub trait LightSourceView<'w, Cx>: MutBlockView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {

@@ -6,6 +6,7 @@ pub mod block;
 pub mod chunk;
 pub mod light;
 mod state_option;
+pub mod world;
 
 pub use state_option::StateOption;
 

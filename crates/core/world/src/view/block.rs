@@ -11,7 +11,20 @@ use rimecraft_fluid::{FluidState, ProvideFluidStateExtTy};
 use rimecraft_voxel_math::BlockPos;
 
 /// A scoped, immutable view of [`BlockState`]s and [`FluidState`]s.
-pub trait BlockView<'w, Cx>: Sized
+pub trait BlockView<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+{
+    /// Returns the [`BlockState`] at the given position.
+    fn block_state(&self, pos: BlockPos) -> Option<BlockState<'w, Cx>>;
+
+    /// Returns the [`FluidState`] at the given position.
+    fn fluid_state(&self, pos: BlockPos) -> Option<FluidState<'w, Cx>>;
+}
+
+/// [`BlockView`] but takes mutable reference to the _type_ for unifying the interface of locked access
+/// and lock-free access, where the latter one requires mutability.
+pub trait MutBlockView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
@@ -26,6 +39,18 @@ where
 ///
 /// This is an affiliation of [`BlockView`].
 pub trait BlockEntityView<'w, Cx>: BlockView<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+{
+    /// Peeks the [`BlockEntity`] at the given position.
+    fn peek_block_entity<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
+    where
+        F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T;
+}
+
+/// [`BlockEntityView`] but takes mutable reference to the _type_ for unifying the interface of locked access
+/// and lock-free access, where the latter one requires mutability.
+pub trait MutBlockEntityView<'w, Cx>: MutBlockView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
@@ -68,7 +93,7 @@ bitflags! {
 }
 
 /// Mutable variant of [`BlockView`], without internal mutability.
-pub trait BlockViewMut<'w, Cx>: BlockView<'w, Cx>
+pub trait BlockViewMut<'w, Cx>: MutBlockView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
@@ -84,7 +109,7 @@ where
 }
 
 /// Mutable variant of [`BlockEntityView`], without internal mutability.
-pub trait BlockEntityViewMut<'w, Cx>: BlockEntityView<'w, Cx> + BlockViewMut<'w, Cx>
+pub trait BlockEntityViewMut<'w, Cx>: MutBlockEntityView<'w, Cx> + BlockViewMut<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
 {

@@ -2,7 +2,7 @@
 
 use dsyn::HoldDescriptors as _;
 use glam::IVec3;
-use local_cx::{LocalContext, dsyn_instanceof, dsyn_ty};
+use local_cx::{HoldLocalContext, LocalContext, dsyn_instanceof, dsyn_ty};
 use parking_lot::Mutex;
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
@@ -15,7 +15,7 @@ use rimecraft_voxel_math::BlockPos;
 use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{
-    DsynCache, World,
+    DsynCache, Environment, World,
     behave::*,
     chunk::{AsBaseChunkAccess, BaseChunkAccess, light::ChunkSkyLight},
     event::ServerChunkEventCallback,
@@ -58,7 +58,7 @@ where
     /// The `BaseChunk`.
     pub base: BaseChunk<'w, Cx>,
 
-    is_client: bool,
+    env: Environment,
     loaded_to_world: bool,
     world_ptr: Weak<World<'w, Cx>>,
 
@@ -123,7 +123,7 @@ where
 
     #[inline]
     fn can_tick_block_entities(&self) -> bool {
-        self.loaded_to_world || self.is_client
+        self.loaded_to_world || self.env.is_client()
     }
 
     #[inline]
@@ -309,8 +309,8 @@ where
         pos: BlockPos,
     ) -> Option<Box<BlockEntity<'w, Cx>>> {
         let bs = Self::__block_state(this.reclaim(), pos)?;
-        dsyn_instanceof!(cached this.dsyn_cache(), this.local_cx(), &*bs.block => export BlockEntityConstructor<Cx>)
-                .map(|f| f(pos, bs, this.local_cx(), BlockEntityConstructorMarker))
+        dsyn_instanceof!(cached this.dsyn_cache(), this.local_context(), &*bs.block => export BlockEntityConstructor<Cx>)
+                .map(|f| f(pos, bs, this.local_context(), BlockEntityConstructorMarker))
     }
 
     fn __set_block_entity(
@@ -319,7 +319,7 @@ where
         return_cell: bool,
     ) -> Option<BlockEntityCell<'w, Cx>> {
         let dsyn_ty =
-            dsyn_ty!(cached this.dsyn_cache(), this.local_cx() => BlockEntityConstructor<Cx>);
+            dsyn_ty!(cached this.dsyn_cache(), this.local_context() => BlockEntityConstructor<Cx>);
         let bs_w = Self::__block_state(this.reclaim(), block_entity.pos())
             .filter(|bs| (*bs.block).descriptors().contains(dsyn_ty))?;
 
@@ -388,7 +388,7 @@ where
         let _span =
             tracing::trace_span!("set block state", pos = %pos, block = %state.block).entered();
 
-        let local_cx = this.local_cx();
+        let local_cx = this.local_context();
 
         let section_index = this.wca_as_bc().height_limit.section_index(pos.y());
         let mut section = this.reclaim().bca().write_chunk_section(section_index)?;
@@ -609,22 +609,37 @@ where
     }
 }
 
-impl<'w, Cx> BlockView<'w, Cx> for &WorldChunk<'w, Cx>
+impl<'w, Cx> MutBlockView<'w, Cx> for &WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
 {
     #[inline]
     fn block_state(&mut self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
-        WorldChunk::__block_state(*self, pos)
+        BlockView::block_state(*self, pos)
     }
 
     #[inline]
     fn fluid_state(&mut self, pos: BlockPos) -> Option<FluidState<'w, Cx>> {
-        WorldChunk::__fluid_state(*self, pos)
+        BlockView::fluid_state(*self, pos)
     }
 }
 
 impl<'w, Cx> BlockView<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+{
+    #[inline]
+    fn block_state(&self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
+        WorldChunk::__block_state(self, pos)
+    }
+
+    #[inline]
+    fn fluid_state(&self, pos: BlockPos) -> Option<FluidState<'w, Cx>> {
+        WorldChunk::__fluid_state(self, pos)
+    }
+}
+
+impl<'w, Cx> MutBlockView<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
 {
@@ -639,7 +654,7 @@ where
     }
 }
 
-impl<'w, Cx> BlockEntityView<'w, Cx> for &WorldChunk<'w, Cx>
+impl<'w, Cx> MutBlockEntityView<'w, Cx> for &WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
@@ -653,11 +668,30 @@ where
     where
         F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
     {
+        // identical code but different restrictions compared with the one below. so can't redirect.
         self.peek_block_entity_typed(pos, pk, CreationType::Check)
     }
 }
 
 impl<'w, Cx> BlockEntityView<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + for<'a> ServerChunkEventCallback<'w, &'a Self>,
+    Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
+{
+    #[inline]
+    fn peek_block_entity<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
+    where
+        F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
+    {
+        self.peek_block_entity_typed(pos, pk, CreationType::Check)
+    }
+}
+
+impl<'w, Cx> MutBlockEntityView<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
@@ -851,7 +885,7 @@ where
 }
 
 #[allow(missing_docs)]
-pub trait WorldChunkAccess<'w, Cx>
+pub trait WorldChunkAccess<'w, Cx>: HoldLocalContext<LocalCx = Cx::LocalContext<'w>>
 where
     Cx: ChunkCx<'w>,
 {
@@ -876,10 +910,17 @@ where
     fn dsyn_cache(&self) -> &DsynCache<'w, Cx> {
         &self.wca_as_wc().dsyn_cache
     }
+}
+
+impl<'w, Cx> HoldLocalContext for WorldChunk<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
+    type LocalCx = Cx::LocalContext<'w>;
 
     #[inline]
-    fn local_cx(&self) -> Cx::LocalContext<'w> {
-        self.wca_as_wc().local_cx
+    fn local_context(&self) -> Self::LocalCx {
+        self.local_cx
     }
 }
 

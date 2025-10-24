@@ -75,7 +75,13 @@ where
 
     /// Whether the chunk at the given chunk position is already loaded into this view.
     fn is_chunk_loaded(&self, x: i32, z: i32) -> bool;
+}
 
+/// [`ChunkView`] along with mutable (locked) operations.
+pub trait ChunkViewMut<'w, Cx>: ChunkView<'w, Cx>
+where
+    Cx: ChunkCx<'w>,
+{
     /// Ticks the view.
     ///
     /// The `tick_notifier` is for supplying boolean values indicating whether the view should keep ticking.

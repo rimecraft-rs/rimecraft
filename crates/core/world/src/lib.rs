@@ -80,6 +80,7 @@ impl<T> ArcAccess<T> for Weak<T> {
 pub(crate) use __dsyn_cache::DsynCache;
 use rimecraft_voxel_math::direction::Direction;
 
+//TODO: deprecate this
 mod __dsyn_cache {
     use crate::behave::*;
 
@@ -204,5 +205,29 @@ impl Default for NestedBlockStateExt<'_> {
             opacity: 15,
             luminance: 0,
         }
+    }
+}
+
+/// The runtime environment of an instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(clippy::exhaustive_enums)]
+pub enum Environment {
+    /// The server environment.
+    Server,
+    /// The client environment.
+    Client,
+}
+
+impl Environment {
+    /// Whether this environment is the server environment.
+    #[inline]
+    pub const fn is_server(self) -> bool {
+        matches!(self, Self::Server)
+    }
+
+    /// Whether this environment is the client environment.
+    #[inline]
+    pub const fn is_client(self) -> bool {
+        matches!(self, Self::Client)
     }
 }

@@ -36,7 +36,7 @@ pub fn builtin_callback_replace_block_state<'w, Cx, Chunk>(
     Chunk: ServerWorldChunkAccess<'w, Cx>,
 {
     let block_diff = old.block != new.block;
-    let local_cx = chunk.local_cx();
+    let local_cx = chunk.local_context();
     if !flags.contains(SetBlockStateFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK)
         && block_diff
         && dsyn_instanceof!(local_cx, &*old.block => BlockEntityConstructor<Cx>)
@@ -98,7 +98,7 @@ pub fn builtin_callback_add_block_state<'w, Cx, Chunk>(
     Cx::LocalContext<'w>: LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>,
 {
     if !flags.contains(SetBlockStateFlags::SKIP_BlOCK_ADDED_CALLBACK) {
-        let local_cx = chunk.local_cx();
+        let local_cx = chunk.local_context();
         let f = dsyn_instanceof!(local_cx, &*new.block => export BlockOnBlockAdded<Cx>)
             .unwrap_or(default_block_on_block_added());
         f(
