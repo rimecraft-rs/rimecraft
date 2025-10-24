@@ -3,20 +3,16 @@
 use std::ops::{Deref, DerefMut};
 
 use local_cx::{HoldLocalContext, LocalContext, LocalContextExt};
-use rimecraft_block::BlockState;
-use rimecraft_fluid::BsToFs;
 use rimecraft_voxel_math::{ChunkPos, ChunkSectionPos};
-use serde::Deserialize;
 
 use crate::{
     LightType,
-    chunk::{self, Chunk, ChunkCx, ChunkStatus, ComputeIndex, WorldChunk, WorldChunkLocalCx},
-    event::ServerChunkEventCallback,
+    chunk::{self, Chunk, ChunkCx, ChunkStatus},
 };
 
-/// A view that provides set of chunks.
+/// A view that provides set of chunks with locked access.
 #[doc(alias = "ChunkProvider")]
-pub trait ProvideChunk<'w, Cx>
+pub trait ProvideLockedChunk<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
@@ -25,57 +21,59 @@ where
     where
         Self: 'a;
 
-    /// Returns the chunk at the given **chunk position**.
+    /// Returns the chunk at the given chunk position.
     fn chunk<'a>(&'a self, pos: ChunkPos) -> Option<impl Deref<Target = Self::Chunk<'a>>>
     where
-        for<'e> &'e Self::Chunk<'a>: Chunk<'w, Cx>,
         Self: 'a;
 }
 
-/// View of world chunks.
+/// View of chunks with more access options compared to [`ProvideLockedChunk`].
 ///
 /// This view is intended to be high-level as a singular existence per-world so the methods
 /// all take immutable references and inner-mutability is intended.
 ///
 /// Corresponds to the `ChunkManager` in vanilla Minecraft.
 #[doc(alias = "ChunkManager")]
-pub trait WorldChunkView<'w, Cx>
+pub trait ChunkView<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
-    /// Returns the world chunk at the given **chunk position** and the least-required status.
-    fn world_chunk(
+    /// The chunk type.
+    type Chunk;
+
+    /// Returns the chunk at the given chunk position and the least-required status.
+    fn chunk(
         &self,
         pos: ChunkPos,
         least: ChunkStatus<'w, Cx>,
-    ) -> Option<impl Deref<Target = WorldChunk<'w, Cx>>>;
+    ) -> Option<impl Deref<Target = Self::Chunk>>;
 
-    /// Returns the lock-free accessible world chunk at the given **chunk position** and the least-required status.
-    fn world_chunk_mut(
+    /// Returns the lock-free accessible chunk at the given chunk position and the least-required status.
+    fn chunk_mut(
         &self,
         pos: ChunkPos,
         least: ChunkStatus<'w, Cx>,
-    ) -> Option<impl DerefMut<Target = WorldChunk<'w, Cx>>>;
+    ) -> Option<impl DerefMut<Target = Self::Chunk>>;
 
-    /// Returns the world chunk at the given **chunk position** and the least-required status,
+    /// Returns the chunk at the given chunk position and the least-required status,
     /// or introduces it into the view if absent.
-    #[doc(alias = "world_chunk_or_create")]
-    fn world_chunk_or_load(
+    #[doc(alias = "chunk_or_create")]
+    fn chunk_or_load(
         &self,
         pos: ChunkPos,
         least: ChunkStatus<'w, Cx>,
-    ) -> impl Deref<Target = WorldChunk<'w, Cx>>;
+    ) -> impl Deref<Target = Self::Chunk>;
 
-    /// Returns the lock-free accessible world chunk at the given **chunk position** and the least-required status,
+    /// Returns the lock-free accessible chunk at the given chunk position and the least-required status,
     /// or introduces it into the view if absent.
-    #[doc(alias = "world_chunk_or_create_mut")]
-    fn world_chunk_or_load_mut(
+    #[doc(alias = "chunk_or_create_mut")]
+    fn chunk_or_load_mut(
         &self,
         pos: ChunkPos,
         least: ChunkStatus<'w, Cx>,
-    ) -> impl DerefMut<Target = WorldChunk<'w, Cx>>;
+    ) -> impl DerefMut<Target = Self::Chunk>;
 
-    /// Whether the chunk at the given **chunk position** is already loaded into this view.
+    /// Whether the chunk at the given chunk position is already loaded into this view.
     fn is_chunk_loaded(&self, x: i32, z: i32) -> bool;
 
     /// Ticks the view.
@@ -95,21 +93,17 @@ where
     }
 }
 
-/// The default implementation of [`ProvideChunk`] on a [`WorldChunkView`].
+/// The default implementation of [`ProvideLockedChunk`] on a [`ChunkView`].
 /// The obtained chunks are all locked variant in this case.
-impl<'w, T, Cx> ProvideChunk<'w, Cx> for T
+impl<'w, T, Cx> ProvideLockedChunk<'w, Cx> for T
 where
-    T: WorldChunkView<'w, Cx> + HoldLocalContext,
+    T: ChunkView<'w, Cx> + HoldLocalContext,
     T::LocalCx: LocalContext<chunk::status::Full<'w, Cx>>,
-    Cx: ChunkCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + for<'a> ServerChunkEventCallback<'w, &'a WorldChunk<'w, Cx>>,
-    Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
+    for<'e> &'e <T as ChunkView<'w, Cx>>::Chunk: Chunk<'w, Cx>,
+    Cx: ChunkCx<'w>,
 {
     type Chunk<'a>
-        = WorldChunk<'w, Cx>
+        = <T as ChunkView<'w, Cx>>::Chunk
     where
         for<'e> &'e Self::Chunk<'a>: Chunk<'w, Cx>,
         Self: 'a;
@@ -117,12 +111,12 @@ where
     #[inline]
     fn chunk<'a>(&'a self, pos: ChunkPos) -> Option<impl Deref<Target = Self::Chunk<'a>>>
     where
-        for<'e> &'e Self::Chunk<'a>: Chunk<'w, Cx>,
+        Self: 'a,
     {
         let full_status = self
             .local_context()
             .acquire_within::<chunk::status::Full<'w, Cx>>()
             .0;
-        self.world_chunk(pos, full_status)
+        self.chunk(pos, full_status)
     }
 }

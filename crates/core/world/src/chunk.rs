@@ -234,8 +234,6 @@ type SectionReadShorthand<'a, 'w, Chunk, Cx> =
     <<Chunk as AsBaseChunkAccess<'w, Cx>>::Access<'a> as BaseChunkAccess<'w, Cx>>::ChunkSectionRead;
 
 /// Chunk behaviors.
-///
-/// You may also want to override [`Chunk::peek_game_event_dispatcher`] in any case.
 pub trait Chunk<'w, Cx>
 where
     Self: AsBaseChunkAccess<'w, Cx>
