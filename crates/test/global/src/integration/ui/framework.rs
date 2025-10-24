@@ -1,26 +1,38 @@
 use std::any::Any;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
+use slotmap::{SlotMap, new_key_type};
 use ui::framework::{Command, CommandOptimizer, CommandQueue, UiStore, UiStoreRead};
 
-/// Test id type used in the simple test implementations.
-pub type TestId = u64;
+new_key_type! {
+    struct TestId;
+}
 
 /// A tiny command enum used by tests.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TestCommandKind {
-    Create(TestId),
-    Remove(TestId),
-    SetState(TestId, i32),
+#[derive(Clone, PartialEq, Eq)]
+pub enum TestCommandKind<K, V>
+where
+    K: Copy + Eq + Hash,
+{
+    Create(K, V),
+    Remove(K),
+    SetState(K, V),
 }
 
 /// Boxable command value used by the test queue/store.
-#[derive(Debug, Clone)]
-pub struct TestCommand(pub TestCommandKind);
+#[derive(Clone)]
+pub struct TestCommand<K, V>(pub TestCommandKind<K, V>)
+where
+    K: Copy + Eq + Hash;
 
-impl Command<TestId> for TestCommand {
-    fn apply(&self, _store: &mut dyn UiStore<TestId>) {
+impl<K, V> Command<K> for TestCommand<K, V>
+where
+    K: Copy + Eq + Hash + Send + 'static,
+    V: Send + 'static,
+{
+    fn apply(&self, _store: &mut dyn UiStore<K>) {
         // The concrete TestStore inspects and applies commands itself
         // Commands are data-only here so apply is a no-op
     }
@@ -28,15 +40,25 @@ impl Command<TestId> for TestCommand {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
 }
 
 /// Simple thread-safe queue for submitting test commands.
-#[derive(Debug, Default, Clone)]
-pub struct SimpleQueue {
-    inner: Arc<Mutex<Vec<Box<dyn Command<TestId>>>>>,
+#[derive(Default, Clone)]
+pub struct SimpleQueue<K>
+where
+    K: Copy + Eq + Hash,
+{
+    inner: Arc<Mutex<Vec<Box<dyn Command<K>>>>>,
 }
 
-impl SimpleQueue {
+impl<K> SimpleQueue<K>
+where
+    K: Copy + Eq + Hash,
+{
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(Vec::new())),
@@ -44,93 +66,128 @@ impl SimpleQueue {
     }
 }
 
-impl CommandQueue<TestId> for SimpleQueue {
-    fn submit(&self, cmd: Box<dyn Command<TestId>>) {
+impl<K> CommandQueue<K> for SimpleQueue<K>
+where
+    K: Copy + Eq + Hash + Send + 'static,
+{
+    fn submit(&self, cmd: Box<dyn Command<K>>) {
         let mut guard = self.inner.lock().unwrap();
         guard.push(cmd);
     }
 
-    fn drain_into(&self, out: &mut Vec<Box<dyn Command<TestId>>>) {
+    fn drain_into(&self, out: &mut Vec<Box<dyn Command<K>>>) {
         let mut guard = self.inner.lock().unwrap();
         out.append(&mut *guard);
     }
 }
 
 // Small read-only wrapper used for optimizer snapshots.
-#[derive(Debug)]
-#[allow(single_use_lifetimes)]
-pub struct SimpleStoreRead<'a> {
-    map: &'a HashMap<TestId, i32>,
+pub struct SimpleStoreRead<'a, K, V>
+where
+    K: Eq + Hash,
+{
+    index: &'a HashMap<K, TestId>,
+    elems: &'a SlotMap<TestId, V>,
 }
 
 #[allow(single_use_lifetimes)]
-impl<'a> UiStoreRead<TestId> for SimpleStoreRead<'a> {
-    fn exists(&self, id: TestId) -> bool {
-        self.map.contains_key(&id)
+impl<'a, K, V> UiStoreRead<K> for SimpleStoreRead<'a, K, V>
+where
+    K: Eq + Hash,
+{
+    fn exists(&self, id: K) -> bool {
+        self.index.contains_key(&id)
     }
 }
 
 /// A minimal in-memory UiStore used by tests. It stores a simple map
 /// from id -> integer state and processes `TestCommand` values.
-#[derive(Debug, Default)]
-pub struct TestStore {
+#[derive(Default)]
+pub struct TestStore<K, V>
+where
+    K: Copy + Eq + Hash,
+{
     // Commands submitted from main thread
-    pending: Vec<Box<dyn Command<TestId>>>,
+    pending: Vec<Box<dyn Command<K>>>,
     // Commands submitted from other threads
-    external: Arc<Mutex<Vec<Box<dyn Command<TestId>>>>>,
-    // Simple element state map
-    pub elems: HashMap<TestId, i32>,
+    external: Arc<Mutex<Vec<Box<dyn Command<K>>>>>,
+    index: HashMap<K, TestId>,
+    elems: SlotMap<TestId, V>,
 }
 
-impl TestStore {
+impl<K, V> TestStore<K, V>
+where
+    K: Copy + Eq + Hash,
+{
     pub fn new() -> Self {
         Self {
             pending: Vec::new(),
             external: Arc::new(Mutex::new(Vec::new())),
-            elems: HashMap::new(),
+            index: HashMap::new(),
+            elems: SlotMap::with_key(),
+        }
+    }
+
+    fn id(&self, key: K) -> Option<TestId> {
+        self.index.get(&key).copied()
+    }
+
+    fn insert(&mut self, key: K, value: V) {
+        let id = self.elems.insert(value);
+        self.index.insert(key, id);
+    }
+
+    fn remove(&mut self, key: K) {
+        if let Some(id) = self.index.remove(&key) {
+            self.elems.remove(id);
         }
     }
 }
 
-impl UiStore<TestId> for TestStore {
-    fn submit_from_main(&mut self, cmd: Box<dyn Command<TestId>>) {
+impl<K, V> UiStore<K> for TestStore<K, V>
+where
+    K: Copy + Eq + Hash + Send + 'static,
+    V: Send + 'static,
+{
+    fn submit_from_main(&mut self, cmd: Box<dyn Command<K>>) {
         self.pending.push(cmd);
     }
 
-    fn submit_from_other(&self, cmd: Box<dyn Command<TestId>>) {
+    fn submit_from_other(&self, cmd: Box<dyn Command<K>>) {
         let mut guard = self.external.lock().unwrap();
         guard.push(cmd);
     }
 
-    fn drain_pending(&mut self, out: &mut Vec<Box<dyn Command<TestId>>>) {
+    fn drain_pending(&mut self, out: &mut Vec<Box<dyn Command<K>>>) {
         out.append(&mut self.pending);
 
         let mut guard = self.external.lock().unwrap();
         out.append(&mut *guard);
     }
 
-    fn apply_batch(&mut self, cmds: Vec<Box<dyn Command<TestId>>>) {
+    fn apply_batch(&mut self, cmds: Vec<Box<dyn Command<K>>>) {
         for cmd in cmds.into_iter() {
-            if let Some(tc) = cmd.as_any().downcast_ref::<TestCommand>() {
-                match &tc.0 {
-                    TestCommandKind::Create(id) => {
-                        self.elems.insert(*id, 0);
+            if let Some(tc) = cmd.into_any().downcast::<TestCommand<K, V>>().ok() {
+                match tc.0 {
+                    TestCommandKind::Create(k, v) => self.insert(k, v),
+                    TestCommandKind::Remove(k) => {
+                        self.remove(k);
                     }
-                    TestCommandKind::Remove(id) => {
-                        self.elems.remove(id);
-                    }
-                    TestCommandKind::SetState(id, v) => {
-                        if let Some(e) = self.elems.get_mut(id) {
-                            *e = *v;
-                        }
+                    TestCommandKind::SetState(k, v) => {
+                        self.id(k)
+                            .and_then(|id| self.elems.get_mut(id))
+                            .map(|e| *e = v);
                     }
                 }
             }
         }
     }
 
-    fn as_read(&self) -> Box<dyn UiStoreRead<TestId> + '_> {
-        Box::new(SimpleStoreRead { map: &self.elems })
+    fn as_read(&self) -> Box<dyn UiStoreRead<K> + '_> {
+        Box::new(SimpleStoreRead {
+            index: &self.index,
+            elems: &self.elems,
+        })
     }
 }
 

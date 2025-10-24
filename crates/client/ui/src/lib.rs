@@ -10,7 +10,7 @@ pub mod framework;
 pub mod item;
 pub mod nav;
 
-pub trait ProvideUiTy<'a>: ProvideKeyboardTy + ProvideMouseTy {}
+pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {}
 
 /// The selection state of a UI component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -28,6 +28,17 @@ impl SelectionState {
     pub fn is_focused(&self) -> bool {
         matches!(self, SelectionState::Focused)
     }
+}
+
+/// A selectable UI component.
+pub trait Selectable: Narratable + WithNavIndex {
+    /// Whether this component can be narrated.
+    fn can_be_narrated(&self) -> bool {
+        true
+    }
+
+    /// The [`SelectionState`] of this component, if any.
+    fn state(&self) -> Option<SelectionState>;
 }
 
 /// The result of an event handling operation.
@@ -48,13 +59,8 @@ impl EventPropagation {
     }
 }
 
-/// A selectable UI component.
-pub trait Selectable: Narratable + WithNavIndex {
-    /// Whether this component can be narrated.
-    fn can_be_narrated(&self) -> bool {
-        true
-    }
-
-    /// The [`SelectionState`] of this component, if any.
-    fn state(&self) -> Option<SelectionState>;
+pub trait Element<Cx>
+where
+    Cx: ProvideUiTy,
+{
 }

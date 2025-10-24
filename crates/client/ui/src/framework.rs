@@ -5,12 +5,14 @@ use std::fmt;
 use std::sync::Arc;
 
 /// A single UI mutation described as a value object.
-pub trait Command<Id>: Send + fmt::Debug {
+pub trait Command<Id>: Send {
     /// Apply this command to `store`.
     fn apply(&self, store: &mut dyn UiStore<Id>);
 
     /// Downcast helper.
     fn as_any(&self) -> &dyn Any;
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 
 // Note: we intentionally do not provide a blanket impl for `Command` to

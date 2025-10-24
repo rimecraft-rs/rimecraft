@@ -1,6 +1,6 @@
 use std::thread;
 
-use test_global::integration::ui::{
+use test_global::integration::ui::framework::{
     SimpleQueue, TestCommand, TestCommandKind, TestId, TestOptimizer, TestStore,
 };
 use ui::framework::{CommandQueue, UiStore, run_pipeline};
