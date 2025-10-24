@@ -10,8 +10,7 @@ use crate::{
     },
 };
 
-//TODO: do CollisionView
-//TODO: do EntityView
+//TODO: CollisionView
 
 /// A scoped view of a world like structure that contains chunks bounded in a dimension.
 pub trait WorldView<'w, Cx>:
@@ -30,3 +29,5 @@ where
     /// Returns the height limit of this world.
     fn height_limit(&self) -> HeightLimit;
 }
+
+// pub trait WorldViewMut<'w,Cx>: WorldView<'w,Cx>

@@ -92,7 +92,7 @@ bitflags! {
     }
 }
 
-/// Mutable variant of [`BlockView`], without internal mutability.
+/// Mutable variant of [`BlockView`].
 pub trait BlockViewMut<'w, Cx>: MutBlockView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
@@ -102,6 +102,22 @@ where
     /// If the target block state is changed, the old block state is returned.
     fn set_block_state(
         &mut self,
+        pos: BlockPos,
+        state: BlockState<'w, Cx>,
+        flags: SetBlockStateFlags,
+    ) -> Option<BlockState<'w, Cx>>;
+}
+
+/// [`BlockViewMut`] with internal mutability.
+pub trait ConstBlockViewMut<'w, Cx>: BlockView<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+{
+    /// Sets the block state at the given position.
+    ///
+    /// If the target block state is changed, the old block state is returned.
+    fn set_block_state(
+        &self,
         pos: BlockPos,
         state: BlockState<'w, Cx>,
         flags: SetBlockStateFlags,
@@ -118,4 +134,16 @@ where
 
     /// Removes a [`BlockEntity`] from this view, and returns it if presents.
     fn remove_block_entity(&mut self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>>;
+}
+
+/// [`BlockEntityViewMut`] with internal mutability.
+pub trait ConstBlockEntityViewMut<'w, Cx>: ConstBlockViewMut<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
+{
+    /// Adds a [`BlockEntity`] to this view.
+    fn set_block_entity(&self, block_entity: Box<BlockEntity<'w, Cx>>);
+
+    /// Removes a [`BlockEntity`] from this view, and returns it if presents.
+    fn remove_block_entity(&self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>>;
 }

@@ -729,6 +729,26 @@ where
     }
 }
 
+impl<'w, Cx> ConstBlockViewMut<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: WorldCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + for<'a> ServerChunkEventCallback<'w, &'a Self>,
+    Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
+{
+    #[inline]
+    fn set_block_state(
+        &self,
+        pos: BlockPos,
+        state: BlockState<'w, Cx>,
+        flags: SetBlockStateFlags,
+    ) -> Option<BlockState<'w, Cx>> {
+        WorldChunk::__set_block_state(self, pos, state, flags)
+    }
+}
+
 impl<'w, Cx> BlockViewMut<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: WorldCx<'w>
@@ -766,6 +786,26 @@ where
     #[inline]
     fn remove_block_entity(&mut self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>> {
         WorldChunk::__remove_block_entity(*self, pos)
+    }
+}
+
+impl<'w, Cx> ConstBlockEntityViewMut<'w, Cx> for WorldChunk<'w, Cx>
+where
+    Cx: WorldCx<'w>
+        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
+        + BsToFs<'w>
+        + for<'a> ServerChunkEventCallback<'w, &'a Self>,
+    Cx::Id: for<'de> Deserialize<'de>,
+    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
+{
+    #[inline]
+    fn set_block_entity(&self, block_entity: Box<BlockEntity<'w, Cx>>) {
+        WorldChunk::__set_block_entity(self, block_entity, false);
+    }
+
+    #[inline]
+    fn remove_block_entity(&self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>> {
+        WorldChunk::__remove_block_entity(self, pos)
     }
 }
 
