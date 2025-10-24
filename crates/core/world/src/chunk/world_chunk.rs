@@ -601,26 +601,13 @@ where
         f(&this.bca().read_chunk_sky_light())
     }
 
+    // there's another manual implementation in the locked variant of light view.
+    // check for it if this is going to be modified.
     fn __light_sources(
         this: &mut impl Chunk<'w, Cx>,
     ) -> impl Iterator<Item = (BlockPos, BlockState<'w, Cx>)> {
         this.blocks()
             .filter(|(_, bs)| bs.data().get_held().luminance() > 0)
-    }
-}
-
-impl<'w, Cx> MutBlockView<'w, Cx> for &WorldChunk<'w, Cx>
-where
-    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
-{
-    #[inline]
-    fn block_state(&mut self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
-        BlockView::block_state(*self, pos)
-    }
-
-    #[inline]
-    fn fluid_state(&mut self, pos: BlockPos) -> Option<FluidState<'w, Cx>> {
-        BlockView::fluid_state(*self, pos)
     }
 }
 
@@ -651,25 +638,6 @@ where
     #[inline]
     fn fluid_state(&mut self, pos: BlockPos) -> Option<FluidState<'w, Cx>> {
         WorldChunk::__fluid_state(self, pos)
-    }
-}
-
-impl<'w, Cx> MutBlockEntityView<'w, Cx> for &WorldChunk<'w, Cx>
-where
-    Cx: WorldCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + ServerChunkEventCallback<'w, Self>,
-    Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
-{
-    #[inline]
-    fn peek_block_entity<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
-    where
-        F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
-    {
-        // identical code but different restrictions compared with the one below. so can't redirect.
-        self.peek_block_entity_typed(pos, pk, CreationType::Check)
     }
 }
 
@@ -706,26 +674,6 @@ where
         F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
     {
         self.peek_block_entity_typed_lf(pos, pk, CreationType::Check)
-    }
-}
-
-impl<'w, Cx> BlockViewMut<'w, Cx> for &WorldChunk<'w, Cx>
-where
-    Cx: WorldCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + ServerChunkEventCallback<'w, Self>,
-    Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
-{
-    #[inline]
-    fn set_block_state(
-        &mut self,
-        pos: BlockPos,
-        state: BlockState<'w, Cx>,
-        flags: SetBlockStateFlags,
-    ) -> Option<BlockState<'w, Cx>> {
-        WorldChunk::__set_block_state(*self, pos, state, flags)
     }
 }
 
@@ -769,26 +717,6 @@ where
     }
 }
 
-impl<'w, Cx> BlockEntityViewMut<'w, Cx> for &WorldChunk<'w, Cx>
-where
-    Cx: WorldCx<'w>
-        + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
-        + BsToFs<'w>
-        + ServerChunkEventCallback<'w, Self>,
-    Cx::Id: for<'de> Deserialize<'de>,
-    Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
-{
-    #[inline]
-    fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>) {
-        WorldChunk::__set_block_entity(*self, block_entity, false);
-    }
-
-    #[inline]
-    fn remove_block_entity(&mut self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>> {
-        WorldChunk::__remove_block_entity(*self, pos)
-    }
-}
-
 impl<'w, Cx> ConstBlockEntityViewMut<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: WorldCx<'w>
@@ -829,22 +757,22 @@ where
     }
 }
 
-impl<'w, Cx> BlockLuminanceView<'w, Cx> for &WorldChunk<'w, Cx>
+impl<'w, Cx> BlockLuminanceView<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ServerChunkEventCallback<'w, Self>,
+        + for<'a> ServerChunkEventCallback<'w, &'a Self>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
-    fn luminance(&mut self, pos: BlockPos) -> u32 {
-        WorldChunk::__luminance(*self, pos)
+    fn luminance(&self, pos: BlockPos) -> u32 {
+        WorldChunk::__luminance(self, pos)
     }
 }
 
-impl<'w, Cx> BlockLuminanceView<'w, Cx> for WorldChunk<'w, Cx>
+impl<'w, Cx> MutBlockLuminanceView<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
@@ -856,30 +784,31 @@ where
     }
 }
 
-impl<'w, Cx> LightSourceView<'w, Cx> for &WorldChunk<'w, Cx>
+impl<'w, Cx> LightSourceView<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ServerChunkEventCallback<'w, Self>,
+        + for<'a> ServerChunkEventCallback<'w, &'a WorldChunk<'w, Cx>>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
-    fn peek_chunk_sky_light<F, U>(&mut self, f: F) -> U
+    fn peek_chunk_sky_light<F, U>(&self, f: F) -> U
     where
         F: FnOnce(&ChunkSkyLight) -> U,
     {
-        WorldChunk::__peek_chunk_sky_light(*self, f)
+        WorldChunk::__peek_chunk_sky_light(self, f)
     }
 
-    #[inline]
-    fn light_sources(&mut self) -> impl Iterator<Item = (BlockPos, BlockState<'w, Cx>)> {
-        WorldChunk::__light_sources(self)
+    fn light_sources(&self) -> impl Iterator<Item = (BlockPos, BlockState<'w, Cx>)> {
+        // have to implement this manually due to the type system pattern we are using for now
+        crate::chunk::iter::blocks(&self.base)
+            .filter(|(_, bs)| bs.data().get_held().luminance() > 0)
     }
 }
 
-impl<'w, Cx> LightSourceView<'w, Cx> for WorldChunk<'w, Cx>
+impl<'w, Cx> MutLightSourceView<'w, Cx> for WorldChunk<'w, Cx>
 where
     Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
@@ -907,7 +836,7 @@ where
     Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + ServerChunkEventCallback<'w, Self>,
+        + for<'a> ServerChunkEventCallback<'w, &'a WorldChunk<'w, Cx>>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {

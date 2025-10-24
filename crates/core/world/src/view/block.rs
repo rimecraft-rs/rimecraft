@@ -147,3 +147,33 @@ where
     /// Removes a [`BlockEntity`] from this view, and returns it if presents.
     fn remove_block_entity(&self, pos: BlockPos) -> Option<BlockEntityCell<'w, Cx>>;
 }
+
+impl<'w, Cx, T> MutBlockView<'w, Cx> for &T
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    T: BlockView<'w, Cx>,
+{
+    #[inline(always)]
+    fn block_state(&mut self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
+        BlockView::block_state(*self, pos)
+    }
+
+    #[inline(always)]
+    fn fluid_state(&mut self, pos: BlockPos) -> Option<FluidState<'w, Cx>> {
+        BlockView::fluid_state(*self, pos)
+    }
+}
+
+impl<'w, Cx, T> MutBlockEntityView<'w, Cx> for &T
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    T: BlockEntityView<'w, Cx>,
+{
+    #[inline(always)]
+    fn peek_block_entity<F, U>(&mut self, pos: BlockPos, pk: F) -> Option<U>
+    where
+        F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> U,
+    {
+        BlockEntityView::peek_block_entity(*self, pos, pk)
+    }
+}

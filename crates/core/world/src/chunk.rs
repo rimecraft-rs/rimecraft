@@ -26,7 +26,7 @@ use crate::{
     view::{
         HeightLimit,
         block::{MutBlockEntityView, MutBlockView},
-        light::{BlockLuminanceView, LightSourceView},
+        light::{MutBlockLuminanceView, MutLightSourceView},
     },
 };
 
@@ -201,8 +201,8 @@ where
     Self: AsBaseChunkAccess<'w, Cx>
         + MutBlockView<'w, Cx>
         + MutBlockEntityView<'w, Cx>
-        + BlockLuminanceView<'w, Cx>
-        + LightSourceView<'w, Cx>,
+        + MutBlockLuminanceView<'w, Cx>
+        + MutLightSourceView<'w, Cx>,
     Cx: WorldCx<'w>,
 {
     /// Returns the array of chunk sections of this chunk.
