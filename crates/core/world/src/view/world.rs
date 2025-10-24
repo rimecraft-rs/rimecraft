@@ -3,13 +3,19 @@
 use crate::{
     Environment,
     chunk::ChunkCx,
-    view::{HeightLimit, block::BlockView, chunk::ChunkView},
+    view::{
+        HeightLimit,
+        block::{BlockEntityView, BlockView},
+        chunk::ChunkView,
+    },
 };
 
 //TODO: do CollisionView
+//TODO: do EntityView
 
 /// A scoped view of a world like structure that contains chunks bounded in a dimension.
-pub trait WorldView<'w, Cx>: ChunkView<'w, Cx> + BlockView<'w, Cx>
+pub trait WorldView<'w, Cx>:
+    ChunkView<'w, Cx> + BlockView<'w, Cx> + BlockEntityView<'w, Cx>
 where
     Cx: ChunkCx<'w>,
 {
