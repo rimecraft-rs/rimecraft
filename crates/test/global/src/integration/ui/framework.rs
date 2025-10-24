@@ -1,7 +1,3 @@
-//! `rimecraft-client-ui` integrations.
-
-#![cfg(feature = "ui")]
-
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
