@@ -1,23 +1,15 @@
 //! Minecraft client UI framework.
 
-use rimecraft_arena::Arena;
-use rimecraft_cell::Cell;
 use rimecraft_client_narration::Narratable;
-use rimecraft_keyboard::{KeyState, ProvideKeyboardTy};
-use rimecraft_local_cx::LocalContext;
-use rimecraft_mouse::{ButtonState, MousePos, MouseScroll, ProvideMouseTy};
-use rimecraft_render_math::screen::ScreenRect;
+use rimecraft_keyboard::ProvideKeyboardTy;
+use rimecraft_mouse::ProvideMouseTy;
 
-use crate::nav::{NavDirection, WithNavIndex, screen::ScreenRectExt};
+use crate::nav::WithNavIndex;
 
 pub mod item;
 pub mod nav;
 
-pub trait ProvideUiTy<'a>: ProvideKeyboardTy + ProvideMouseTy {
-    type ElementCell: Cell<Box<dyn Element<'a, Self>>>;
-    type Arena: Arena<Item = Self::ElementCell, Handle: Copy + Eq>;
-    type ArenaLocalContext: LocalContext<&'a Self::Arena>;
-}
+pub trait ProvideUiTy<'a>: ProvideKeyboardTy + ProvideMouseTy {}
 
 /// The selection state of a UI component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

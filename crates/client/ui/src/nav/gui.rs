@@ -2,14 +2,7 @@
 
 use std::fmt::Debug;
 
-use rimecraft_arena::Arena;
-use rimecraft_cell::Cell;
-use rimecraft_local_cx::{LocalContext, LocalContextExt, WithLocalCx};
-
-use crate::{
-    Focusable, ProvideUiTy,
-    nav::{NavAxis, NavDirection},
-};
+use crate::nav::{NavAxis, NavDirection};
 
 /// A navigation action in the GUI.
 pub trait GuiNavigation {
@@ -57,119 +50,119 @@ impl GuiNavigation for GuiTabNavigation {
     }
 }
 
-#[derive(Clone)]
-#[allow(clippy::exhaustive_enums)]
-pub enum GuiNavigationPath<'g, Cx>
-where
-    Cx: ProvideUiTy<'g>,
-{
-    Node {
-        element: <Cx::Arena as Arena>::Handle,
-        child: Box<GuiNavigationPath<'g, Cx>>,
-    },
-    Leaf(<Cx::Arena as Arena>::Handle),
-}
+// #[derive(Clone)]
+// #[allow(clippy::exhaustive_enums)]
+// pub enum GuiNavigationPath<'g, Cx>
+// where
+//     Cx: ProvideUiTy<'g>,
+// {
+//     Node {
+//         element: <Cx::Arena as Arena>::Handle,
+//         child: Box<GuiNavigationPath<'g, Cx>>,
+//     },
+//     Leaf(<Cx::Arena as Arena>::Handle),
+// }
 
-impl<'g, Cx> Debug for GuiNavigationPath<'g, Cx>
-where
-    Cx: ProvideUiTy<'g>,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GuiNavigationPath::Node { .. } => f.debug_struct("GuiNavigationPath::Node").finish(),
-            GuiNavigationPath::Leaf(_) => f.debug_struct("GuiNavigationPath::Leaf").finish(),
-        }
-    }
-}
+// impl<'g, Cx> Debug for GuiNavigationPath<'g, Cx>
+// where
+//     Cx: ProvideUiTy<'g>,
+// {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             GuiNavigationPath::Node { .. } => f.debug_struct("GuiNavigationPath::Node").finish(),
+//             GuiNavigationPath::Leaf(_) => f.debug_struct("GuiNavigationPath::Leaf").finish(),
+//         }
+//     }
+// }
 
-pub type GuiNavigationPathWithCx<'g, Cx> =
-    WithLocalCx<&'g GuiNavigationPath<'g, Cx>, <Cx as ProvideUiTy<'g>>::ArenaLocalContext>;
+// pub type GuiNavigationPathWithCx<'g, Cx> =
+//     WithLocalCx<&'g GuiNavigationPath<'g, Cx>, <Cx as ProvideUiTy<'g>>::ArenaLocalContext>;
 
-impl<'g, Cx> Focusable<Cx> for GuiNavigationPathWithCx<'g, Cx>
-where
-    Cx: ProvideUiTy<'g>,
-{
-    fn is_focused(&self) -> bool {
-        match &self.inner {
-            GuiNavigationPath::Node { element, child: _ } => {
-                if let Some(cell) = self.local_cx.acquire().get(*element) {
-                    cell.read().is_focused()
-                } else {
-                    false
-                }
-            }
-            GuiNavigationPath::Leaf(element) => self
-                .local_cx
-                .acquire()
-                .get(*element)
-                .map_or(false, |cell| cell.read().is_focused()),
-        }
-    }
+// impl<'g, Cx> Focusable<Cx> for GuiNavigationPathWithCx<'g, Cx>
+// where
+//     Cx: ProvideUiTy<'g>,
+// {
+//     fn is_focused(&self) -> bool {
+//         match &self.inner {
+//             GuiNavigationPath::Node { element, child: _ } => {
+//                 if let Some(cell) = self.local_cx.acquire().get(*element) {
+//                     cell.read().is_focused()
+//                 } else {
+//                     false
+//                 }
+//             }
+//             GuiNavigationPath::Leaf(element) => self
+//                 .local_cx
+//                 .acquire()
+//                 .get(*element)
+//                 .map_or(false, |cell| cell.read().is_focused()),
+//         }
+//     }
 
-    fn set_focused(&mut self, focused: bool) {
-        match &self.inner {
-            GuiNavigationPath::Node { element, child } => {
-                if let Some(cell) = self.local_cx.acquire().get(*element) {
-                    {
-                        cell.write().set_focused(false);
-                    }
+//     fn set_focused(&mut self, focused: bool) {
+//         match &self.inner {
+//             GuiNavigationPath::Node { element, child } => {
+//                 if let Some(cell) = self.local_cx.acquire().get(*element) {
+//                     {
+//                         cell.write().set_focused(false);
+//                     }
 
-                    self.local_cx.with(child.as_ref()).set_focused(focused);
-                }
-            }
-            GuiNavigationPath::Leaf(element) => {
-                if let Some(cell) = self.local_cx.acquire().get(*element) {
-                    cell.write().set_focused(focused);
-                }
-            }
-        }
-    }
-}
+//                     self.local_cx.with(child.as_ref()).set_focused(focused);
+//                 }
+//             }
+//             GuiNavigationPath::Leaf(element) => {
+//                 if let Some(cell) = self.local_cx.acquire().get(*element) {
+//                     cell.write().set_focused(focused);
+//                 }
+//             }
+//         }
+//     }
+// }
 
-impl<'g, Cx> GuiNavigationPath<'g, Cx>
-where
-    Cx: ProvideUiTy<'g>,
-{
-    pub fn handle(&self) -> <Cx::Arena as Arena>::Handle {
-        match self {
-            GuiNavigationPath::Node { element, .. } => *element,
-            GuiNavigationPath::Leaf(element) => *element,
-        }
-    }
+// impl<'g, Cx> GuiNavigationPath<'g, Cx>
+// where
+//     Cx: ProvideUiTy<'g>,
+// {
+//     pub fn handle(&self) -> <Cx::Arena as Arena>::Handle {
+//         match self {
+//             GuiNavigationPath::Node { element, .. } => *element,
+//             GuiNavigationPath::Leaf(element) => *element,
+//         }
+//     }
 
-    pub fn leaf(element: <Cx::Arena as Arena>::Handle) -> Self
-    where
-        Cx: ProvideUiTy<'g>,
-    {
-        GuiNavigationPath::Leaf(element)
-    }
+//     pub fn leaf(element: <Cx::Arena as Arena>::Handle) -> Self
+//     where
+//         Cx: ProvideUiTy<'g>,
+//     {
+//         GuiNavigationPath::Leaf(element)
+//     }
 
-    pub fn node(element: <Cx::Arena as Arena>::Handle, child: GuiNavigationPath<'g, Cx>) -> Self
-    where
-        Cx: ProvideUiTy<'g>,
-    {
-        GuiNavigationPath::Node {
-            element,
-            child: Box::new(child),
-        }
-    }
+//     pub fn node(element: <Cx::Arena as Arena>::Handle, child: GuiNavigationPath<'g, Cx>) -> Self
+//     where
+//         Cx: ProvideUiTy<'g>,
+//     {
+//         GuiNavigationPath::Node {
+//             element,
+//             child: Box::new(child),
+//         }
+//     }
 
-    pub fn path(
-        leaf: <Cx::Arena as Arena>::Handle,
-        parents: Vec<<Cx::Arena as Arena>::Handle>,
-    ) -> Self
-    where
-        Cx: ProvideUiTy<'g>,
-    {
-        let mut current = GuiNavigationPath::leaf(leaf);
+//     pub fn path(
+//         leaf: <Cx::Arena as Arena>::Handle,
+//         parents: Vec<<Cx::Arena as Arena>::Handle>,
+//     ) -> Self
+//     where
+//         Cx: ProvideUiTy<'g>,
+//     {
+//         let mut current = GuiNavigationPath::leaf(leaf);
 
-        for parent in parents.into_iter().rev() {
-            current = GuiNavigationPath::Node {
-                element: parent,
-                child: Box::new(current),
-            };
-        }
+//         for parent in parents.into_iter().rev() {
+//             current = GuiNavigationPath::Node {
+//                 element: parent,
+//                 child: Box::new(current),
+//             };
+//         }
 
-        current
-    }
-}
+//         current
+//     }
+// }
