@@ -17,8 +17,6 @@ rimecraft-render-math = { path = "../../util/render-math" }
 rimecraft-client-narration = { path = "../narration" }
 rimecraft-keyboard = { path = "../../util/keyboard" }
 rimecraft-mouse = { path = "../../util/mouse" }
-rimecraft-arena = { path = "../../util/arena" }
-rimecraft-cell = { path = "../../util/cell" }
 num-traits = "0.2"
 glam = "0.30"
 serde = { version = "1.0", features = ["derive"], optional = true }
