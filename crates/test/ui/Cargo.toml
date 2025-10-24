@@ -12,12 +12,14 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+local-cx = { path = "../../core/local-cx", package = "rimecraft-local-cx" }
 test-global = { path = "../global", package = "rimecraft-test-global", features = [
     "ui",
 ] }
 keyboard = { path = "../../util/keyboard", package = "rimecraft-keyboard" }
 mouse = { path = "../../util/mouse", package = "rimecraft-mouse" }
 ui = { path = "../../client/ui", package = "rimecraft-client-ui" }
+arena = { path = "../../util/arena", package = "rimecraft-arena" }
 
 [lints]
 workspace = true
