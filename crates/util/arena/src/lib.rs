@@ -9,7 +9,7 @@ pub trait ProvideArenaTy: GlobalContext {
 
 pub trait Arena {
     /// The stored item type.
-    type Item: Send + Sync;
+    type Item;
 
     /// The handle type used to look up items in the arena.
     type Handle: Copy + Eq + Send + Sync;

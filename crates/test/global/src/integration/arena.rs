@@ -6,12 +6,12 @@ use arena::Arena;
 use slotmap::{SlotMap, new_key_type};
 
 new_key_type! {
-    pub struct TestArenaItem;
+    pub struct TestArenaHandle;
 }
 
 #[derive(Debug, Default)]
 pub struct TestArena<V> {
-    storage: SlotMap<TestArenaItem, V>,
+    storage: SlotMap<TestArenaHandle, V>,
 }
 
 impl<V> TestArena<V> {
@@ -22,12 +22,9 @@ impl<V> TestArena<V> {
     }
 }
 
-impl<V> Arena for TestArena<V>
-where
-    V: Send + Sync,
-{
+impl<V> Arena for TestArena<V> {
     type Item = V;
-    type Handle = TestArenaItem;
+    type Handle = TestArenaHandle;
 
     fn insert(&mut self, item: Self::Item) -> Self::Handle {
         self.storage.insert(item)

@@ -14,7 +14,7 @@ pub mod item;
 pub mod nav;
 
 pub trait ProvideUiTy<'a>: ProvideKeyboardTy + ProvideMouseTy {
-    type ElementCell: Cell<dyn Element<'a, Self>>;
+    type ElementCell: Cell<Box<dyn Element<'a, Self>>>;
     type Arena: Arena<Item = Self::ElementCell, Handle: Copy + Eq>;
     type ArenaLocalContext: LocalContext<&'a Self::Arena>;
 }
@@ -261,7 +261,7 @@ where
             Some(cell) => match state {
                 ButtonState::Pressed => {
                     let propagation =
-                        Element::on_mouse_button(&mut *cell.write(), pos, button.clone(), state);
+                        Element::on_mouse_button(cell.write().as_mut(), pos, button.clone(), state);
                     match propagation {
                         EventPropagation::Handled => {}
                         EventPropagation::NotHandled => {
@@ -277,13 +277,13 @@ where
                         self.dragging_buttons_mut().retain(|b| b != &button);
                         self.focused_child()
                             .map_or(EventPropagation::NotHandled, |cell| {
-                                Element::on_mouse_button(&mut *cell.write(), pos, button, state)
+                                Element::on_mouse_button(cell.write().as_mut(), pos, button, state)
                             })
                     } else {
                         EventPropagation::NotHandled
                     }
                 }
-                _ => Element::on_mouse_button(&mut *cell.write(), pos, button, state),
+                _ => Element::on_mouse_button(cell.write().as_mut(), pos, button, state),
             },
             None => EventPropagation::NotHandled,
         }
@@ -298,7 +298,7 @@ where
         if self.dragging_buttons().contains(&button) {
             self.focused_child()
                 .map_or(EventPropagation::NotHandled, |cell| {
-                    Element::on_mouse_drag(&mut *cell.write(), pos, delta_pos, button)
+                    Element::on_mouse_drag(cell.write().as_mut(), pos, delta_pos, button)
                 })
         } else {
             EventPropagation::NotHandled
@@ -307,7 +307,7 @@ where
 
     fn on_mouse_scroll(&mut self, pos: MousePos, scroll: MouseScroll) -> EventPropagation {
         match self.hovered_child(pos) {
-            Some(cell) => Element::on_mouse_scroll(&mut *cell.write(), pos, scroll),
+            Some(cell) => Element::on_mouse_scroll(cell.write().as_mut(), pos, scroll),
             None => EventPropagation::NotHandled,
         }
     }
@@ -319,14 +319,14 @@ where
         state: KeyState,
     ) -> EventPropagation {
         match self.focused_child() {
-            Some(cell) => Element::on_keyboard_key(&mut *cell.write(), key, modifiers, state),
+            Some(cell) => Element::on_keyboard_key(cell.write().as_mut(), key, modifiers, state),
             None => EventPropagation::NotHandled,
         }
     }
 
     fn on_char_type(&mut self, c: char, modifiers: &[Cx::Modifier]) -> EventPropagation {
         match self.focused_child() {
-            Some(cell) => Element::on_char_type(&mut *cell.write(), c, modifiers),
+            Some(cell) => Element::on_char_type(cell.write().as_mut(), c, modifiers),
             None => EventPropagation::NotHandled,
         }
     }

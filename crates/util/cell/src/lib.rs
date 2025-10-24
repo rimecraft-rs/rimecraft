@@ -23,7 +23,10 @@ where
 }
 
 #[cfg(feature = "refcell")]
-impl<T> Cell<T> for std::cell::RefCell<T> {
+impl<T> Cell<T> for std::cell::RefCell<T>
+where
+    T: ?Sized,
+{
     type ReadGuard<'a>
         = std::cell::Ref<'a, T>
     where
@@ -43,7 +46,10 @@ impl<T> Cell<T> for std::cell::RefCell<T> {
 }
 
 #[cfg(feature = "rwlock")]
-impl<T> Cell<T> for std::sync::RwLock<T> {
+impl<T> Cell<T> for std::sync::RwLock<T>
+where
+    T: ?Sized,
+{
     type ReadGuard<'a>
         = std::sync::RwLockReadGuard<'a, T>
     where

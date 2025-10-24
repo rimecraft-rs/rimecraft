@@ -41,6 +41,9 @@ ui = { path = "../../client/ui", package = "rimecraft-client-ui", optional = tru
 keyboard = { path = "../../util/keyboard", package = "rimecraft-keyboard", optional = true }
 mouse = { path = "../../util/mouse", package = "rimecraft-mouse", optional = true }
 arena = { path = "../../util/arena", package = "rimecraft-arena", optional = true }
+cell = { path = "../../util/cell", package = "rimecraft-cell", optional = true, features = [
+    "refcell",
+] }
 
 [features]
 registry = ["dep:registry"]
@@ -51,7 +54,7 @@ keyboard = ["dep:keyboard"]
 mouse = ["dep:mouse"]
 render = ["dep:render"]
 key-bind = ["dep:key-bind", "keyboard", "mouse"]
-ui = ["dep:ui", "keyboard", "mouse"]
+ui = ["dep:ui", "dep:cell", "arena", "keyboard", "mouse"]
 arena = ["dep:arena", "dep:slotmap"]
 
 [lints]
