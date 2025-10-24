@@ -837,13 +837,6 @@ where
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
-    // #[inline]
-    // fn peek_game_event_dispatcher<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>
-    // where
-    //     F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
-    // {
-    //     WorldChunk::__peek_game_event_dispatcher(&**self, y_section_coord, f)
-    // }
 }
 
 impl<'w, Cx> Chunk<'w, Cx> for WorldChunk<'w, Cx>
@@ -855,16 +848,9 @@ where
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
-    // #[inline]
-    // fn peek_game_event_dispatcher<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>
-    // where
-    //     F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
-    // {
-    //     WorldChunk::__peek_game_event_dispatcher(self, y_section_coord, f)
-    // }
 }
 
-#[doc(hidden)]
+#[allow(missing_docs)]
 pub trait WorldChunkAccess<'w, Cx>
 where
     Cx: ChunkCx<'w>,
@@ -880,7 +866,10 @@ where
     fn reclaim(&mut self) -> Self::Reclaim<'_>;
 
     // this is safe if the reclaimed value is only used by external functions that
-    // will not care about the what exactly is the given lifetime
+    // will not care about the what exactly is the given lifetime.
+    /// # Safety
+    ///
+    /// This copies a mutable reference.
     unsafe fn reclaim_unsafe(&mut self) -> Self;
 
     #[inline]

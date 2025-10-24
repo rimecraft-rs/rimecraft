@@ -62,7 +62,7 @@ where
     }
 }
 
-#[doc(hidden)]
+#[allow(missing_docs)]
 pub trait ServerWorldChunkAccess<'w, Cx>: WorldChunkAccess<'w, Cx>
 where
     Cx: ChunkCx<'w>,
