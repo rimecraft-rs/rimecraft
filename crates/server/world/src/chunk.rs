@@ -166,7 +166,7 @@ pub(crate) fn wc_update_game_event_listener<'w, Cx>(
 {
     let y = be.pos().y();
     let listener_fn =
-        dsyn_instanceof!(this.local_cx(), &*be => export BlockEntityGetGameEventListener<Cx>)
+        dsyn_instanceof!(this.local_context(), &*be => export BlockEntityGetGameEventListener<Cx>)
             .unwrap_or(default_block_entity_get_game_event_listener());
 
     // release the guard
@@ -174,7 +174,7 @@ pub(crate) fn wc_update_game_event_listener<'w, Cx>(
 
     if let Some(listener) = listener_fn(
         be_cell,
-        this.local_cx(),
+        this.local_context(),
         BlockEntityGetGameEventListenerMarker,
     ) {
         wc_peek_game_event_dispatcher(this.reclaim_server(), coord_section_from_block(y), |d| {
@@ -196,7 +196,7 @@ pub(crate) fn wc_remove_game_event_listener<'w, Cx>(
 {
     let y = be.pos().y();
     let listener_fn =
-        dsyn_instanceof!(this.local_cx(), &*be => export BlockEntityGetGameEventListener<Cx>)
+        dsyn_instanceof!(this.local_context(), &*be => export BlockEntityGetGameEventListener<Cx>)
             .unwrap_or(default_block_entity_get_game_event_listener());
 
     // release the guard
@@ -204,7 +204,7 @@ pub(crate) fn wc_remove_game_event_listener<'w, Cx>(
 
     if let Some(listener) = listener_fn(
         be_cell,
-        this.local_cx(),
+        this.local_context(),
         BlockEntityGetGameEventListenerMarker,
     ) {
         wc_peek_game_event_dispatcher(this.reclaim_server(), coord_section_from_block(y), |d| {
