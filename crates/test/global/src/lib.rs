@@ -25,7 +25,6 @@ pub use local_cx;
 
 /// Integration with several Rimecraft crates.
 pub mod integration {
-    pub mod arena;
     pub mod component;
     pub mod key_bind;
     pub mod keyboard;
