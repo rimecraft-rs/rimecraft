@@ -128,6 +128,14 @@ where
         }
     }
 
+    pub fn get(&self, key: K) -> Option<&V> {
+        self.id(key).and_then(|id| self.elems.get(id))
+    }
+
+    pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
+        self.id(key).and_then(move |id| self.elems.get_mut(id))
+    }
+
     fn id(&self, key: K) -> Option<TestId> {
         self.index.get(&key).copied()
     }
@@ -167,16 +175,16 @@ where
 
     fn apply_batch(&mut self, cmds: Vec<Box<dyn Command<K>>>) {
         for cmd in cmds.into_iter() {
-            if let Some(tc) = cmd.into_any().downcast::<TestCommand<K, V>>().ok() {
+            if let Ok(tc) = cmd.into_any().downcast::<TestCommand<K, V>>() {
                 match tc.0 {
                     TestCommandKind::Create(k, v) => self.insert(k, v),
                     TestCommandKind::Remove(k) => {
                         self.remove(k);
                     }
                     TestCommandKind::SetState(k, v) => {
-                        self.id(k)
-                            .and_then(|id| self.elems.get_mut(id))
-                            .map(|e| *e = v);
+                        if let Some(e) = self.get_mut(k) {
+                            *e = v;
+                        }
                     }
                 }
             }
@@ -192,15 +200,18 @@ where
 }
 
 /// A trivial optimizer used in tests: currently just forwards the commands.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct TestOptimizer;
 
-impl CommandOptimizer<TestId> for TestOptimizer {
+impl<K> CommandOptimizer<K> for TestOptimizer
+where
+    K: Copy + Eq + Hash + Send + Sync,
+{
     fn optimize(
         &self,
-        cmds: Vec<Box<dyn Command<TestId>>>,
-        _store: &dyn UiStoreRead<TestId>,
-    ) -> Vec<Box<dyn Command<TestId>>> {
+        cmds: Vec<Box<dyn Command<K>>>,
+        _store: &dyn UiStoreRead<K>,
+    ) -> Vec<Box<dyn Command<K>>> {
         cmds
     }
 }

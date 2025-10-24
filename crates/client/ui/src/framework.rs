@@ -124,14 +124,14 @@ pub trait UiCoordinator<Id>: Send {
 ///
 /// This helper drains pending commands, runs the optimizer and applies the
 /// resulting batch on `store`.
-pub fn run_pipeline<Id, S, Q, O>(store: &mut S, queue: &Q, optimizer: &O)
+pub fn run_pipeline<K, S, Q, O>(store: &mut S, queue: &Q, optimizer: &O)
 where
-    Id: Copy + 'static,
-    S: UiStore<Id>,
-    Q: CommandQueue<Id>,
-    O: CommandOptimizer<Id>,
+    K: Copy + 'static,
+    S: UiStore<K>,
+    Q: CommandQueue<K>,
+    O: CommandOptimizer<K>,
 {
-    let mut pending: Vec<Box<dyn Command<Id>>> = Vec::new();
+    let mut pending: Vec<Box<dyn Command<K>>> = Vec::new();
 
     store.drain_pending(&mut pending);
     queue.drain_into(&mut pending);

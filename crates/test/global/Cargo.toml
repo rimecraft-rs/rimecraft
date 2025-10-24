@@ -50,7 +50,7 @@ keyboard = ["dep:keyboard"]
 mouse = ["dep:mouse"]
 render = ["dep:render"]
 key-bind = ["dep:key-bind", "keyboard", "mouse"]
-ui = ["dep:ui", "keyboard", "mouse"]
+ui = ["dep:ui", "dep:slotmap", "keyboard", "mouse"]
 
 [lints]
 workspace = true
