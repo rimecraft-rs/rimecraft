@@ -18,7 +18,7 @@ mod _impl;
 
 pub use _impl::*;
 
-use entity::ProvideEntityExtTy;
+use entity::EntityCx;
 use local_cx::GlobalProvideLocalCxTy;
 use maybe::Maybe;
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
@@ -49,7 +49,7 @@ where
         + ProvideNbtTy
         + ProvideBlockStateExtTy<BlockStateExt<'w>: Hold<NestedBlockStateExt<'w>>>
         + GlobalProvideLocalCxTy
-        + ProvideEntityExtTy,
+        + EntityCx<'w>,
 {
     /// The type of block state id list.
     type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>

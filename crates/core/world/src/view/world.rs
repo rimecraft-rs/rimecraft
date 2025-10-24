@@ -6,6 +6,7 @@ use crate::{
         HeightLimit,
         block::{BlockEntityView, BlockView},
         chunk::ChunkView,
+        entity::EntityView,
     },
 };
 
@@ -14,7 +15,7 @@ use crate::{
 
 /// A scoped view of a world like structure that contains chunks bounded in a dimension.
 pub trait WorldView<'w, Cx>:
-    ChunkView<'w, Cx> + BlockView<'w, Cx> + BlockEntityView<'w, Cx>
+    ChunkView<'w, Cx> + BlockView<'w, Cx> + BlockEntityView<'w, Cx> + EntityView<'w, Cx>
 where
     Cx: WorldCx<'w>,
 {

@@ -47,16 +47,8 @@ pub trait EntityCx<'a>:
     + ProvideLocalCxTy
     + EntityDataCx<'a>
 {
-}
-
-impl<'a, T> EntityCx<'a> for T where
-    T: ProvideIdTy
-        + ProvideNbtTy
-        + ProvideEntityExtTy
-        + ProvideBlockStateExtTy
-        + ProvideLocalCxTy
-        + EntityDataCx<'a>
-{
+    /// The data type of a player entity, can either be a concrete type or a supertype.
+    type PlayerEntityData: ?Sized + 'a;
 }
 
 /// Global context types providing an extension types to entities.
@@ -115,7 +107,8 @@ impl ChangeListener {
 }
 
 /// Boxed entity cell with internal mutability and reference-counting.
-pub type EntityCell<'w, Cx> = Arc<Mutex<Box<Entity<'w, Cx>>>>;
+pub type EntityCell<'w, Cx, T = dyn ErasedData<'w, Cx> + 'w> =
+    Arc<Mutex<Box<RawEntity<'w, T, Cx>>>>;
 
 /// A type of [`Entity`].
 pub trait RawEntityType<'a, Cx>: HoldDescriptors<'static, 'a>

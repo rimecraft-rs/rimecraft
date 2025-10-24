@@ -25,7 +25,7 @@ pub trait TypeFilter<T: ?Sized> {
     /// - The lifetime in `Self::Output` is not guaranteed to be valid.
     unsafe fn cast_mut(&self, obj: *mut T) -> Option<*mut Self::Output>;
 
-    /// Returns the type id of the output subtype, if known as a concrete type.
+    /// Returns the type id of the output subtype, if known as, and only if is a _concrete type._
     #[inline(always)]
     fn hint_typeid(&self) -> Option<TypeId> {
         None
@@ -51,6 +51,20 @@ where
 
     #[inline]
     fn hint_typeid(&self) -> Option<TypeId> {
-        Some(typeid::of::<T>())
+        Some(typeid::of::<RawEntity<'a, T, Cx>>())
+    }
+}
+
+impl<T: ?Sized> TypeFilter<T> for () {
+    type Output = T;
+
+    #[inline(always)]
+    unsafe fn cast_const(&self, obj: *const T) -> Option<*const Self::Output> {
+        Some(obj)
+    }
+
+    #[inline(always)]
+    unsafe fn cast_mut(&self, obj: *mut T) -> Option<*mut Self::Output> {
+        Some(obj)
     }
 }

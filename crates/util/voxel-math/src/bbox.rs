@@ -8,6 +8,7 @@ use crate::BlockPos;
 ///
 /// The box is defined by its minimum and maximum corners.
 #[derive(PartialEq, Clone, Copy)]
+#[doc(alias = "AABB")]
 pub struct BBox {
     min: DVec3,
     max: DVec3,
