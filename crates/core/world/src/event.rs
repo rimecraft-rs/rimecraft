@@ -10,9 +10,23 @@ use crate::{chunk::ChunkCx, view::block::SetBlockStateFlags};
 ///
 /// This should be implemented in a pure-client environment as well but will do nothing there.
 pub trait ServerChunkEventCallback<'w, Access>: ChunkCx<'w> {
-    /// Called after a block state is replaced.
+    /// Called after a block state is been replaced.
     #[inline(always)]
     fn replace_block_state_callback(
+        pos: BlockPos,
+        new: BlockState<'w, Self>,
+        old: BlockState<'w, Self>,
+        flags: SetBlockStateFlags,
+        chunk: &mut Access,
+    ) {
+        let _ = (pos, new, old, flags, chunk);
+    }
+
+    /// Called after a block state is been added.
+    ///
+    /// This is called after [`ServerChunkEventCallback::replace_block_state_callback`] and the removal of block entity.
+    #[inline(always)]
+    fn add_block_state_callback(
         pos: BlockPos,
         new: BlockState<'w, Self>,
         old: BlockState<'w, Self>,

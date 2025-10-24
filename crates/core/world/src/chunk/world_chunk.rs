@@ -36,7 +36,6 @@ pub trait WorldChunkLocalCx<'w, Cx>:
     LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
     + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
     + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
-    + LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>
 where
     Cx: ChunkCx<'w>,
 {
@@ -47,8 +46,7 @@ where
     Cx: ChunkCx<'w>,
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
-        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
-        + LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>,
+        + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>,
 {
 }
 
@@ -391,7 +389,6 @@ where
             tracing::trace_span!("set block state", pos = %pos, block = %state.block).entered();
 
         let local_cx = this.local_cx();
-        let is_client = this.wca_as_wc().is_client;
 
         let section_index = this.wca_as_bc().height_limit.section_index(pos.y());
         let mut section = this.reclaim().bca().write_chunk_section(section_index)?;
@@ -402,9 +399,8 @@ where
         }
 
         // Set state inside chunk section.
-        let pos_sec = pos.0 & (BORDER_LEN as i32 - 1);
-        let old_state =
-            section.set_block_state(pos_sec.x as u32, pos_sec.y as u32, pos_sec.z as u32, state);
+        let pos_sec = pos.0.as_uvec3() % BORDER_LEN; // first four bits. TODO: make this follow BORDER_LEN constant
+        let old_state = section.set_block_state(pos_sec.x, pos_sec.y, pos_sec.z, state);
 
         drop(section);
 
@@ -421,9 +417,13 @@ where
             //SAFETY: This is safe because the `hms` is a valid pointer, and `__block_state` does not interact with heightmaps.
             let mut this_short_life = unsafe { this.reclaim_unsafe() };
             if let Some(hm) = this.reclaim().bca().write_heightmaps().get_mut(ty) {
-                hm.track_update(pos_sec.x, pos.y(), pos_sec.z, state, |pos, pred| {
-                    pred(Self::__block_state(this_short_life.reclaim(), pos))
-                });
+                hm.track_update(
+                    pos_sec.x as i32,
+                    pos.y(),
+                    pos_sec.z as i32,
+                    state,
+                    |pos, pred| pred(Self::__block_state(this_short_life.reclaim(), pos)),
+                );
             }
         }
 
@@ -431,13 +431,7 @@ where
         //TODO: update lighting
 
         // Generic callbacks
-        Cx::replace_block_state_callback(
-            pos,
-            state,
-            old_state,
-            SetBlockStateFlags::MOVED,
-            &mut this,
-        );
+        Cx::replace_block_state_callback(pos, state, old_state, flags, &mut this);
 
         if old_state.block != state.block
             && dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*old_state.block => BlockEntityConstructor<Cx>)
@@ -452,26 +446,10 @@ where
 
         let section = this.reclaim().bca().read_chunk_section(section_index)?;
         #[allow(clippy::if_then_some_else_none)] // too complex
-        if section
-            .block_state(pos_sec.x as u32, pos_sec.y as u32, pos_sec.z as u32)
-            .block
-            == state.block
-        {
+        if section.block_state(pos_sec.x, pos_sec.y, pos_sec.z).block == state.block {
             drop(section);
             // Generic callback
-            if !is_client && !flags.contains(SetBlockStateFlags::SKIP_BlOCK_ADDED_CALLBACK) {
-                let f = dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*state.block => export BlockOnBlockAdded<Cx>)
-                    .unwrap_or(default_block_on_block_added());
-                f(
-                    state,
-                    old_state,
-                    &this.wca_as_wc().world_ptr,
-                    pos,
-                    flags.contains(SetBlockStateFlags::MOVED),
-                    local_cx,
-                    BlockOnBlockAddedMarker,
-                );
-            }
+            Cx::add_block_state_callback(pos, state, old_state, flags, &mut this);
 
             // Update block entity
             if let Some(be_constructor) = dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*state.block => export BlockEntityConstructor<Cx>)

@@ -16,7 +16,7 @@ use world::{
 
 use crate::{behave::*, chunk::ServerWorldChunkAccess};
 
-/// Built-in callback when a block state is replaced inside a chunk.
+/// Built-in callback when a block state is been replaced inside a chunk.
 pub fn builtin_callback_replace_block_state<'w, Cx, Chunk>(
     pos: BlockPos,
     new: BlockState<'w, Cx>,
@@ -41,8 +41,6 @@ pub fn builtin_callback_replace_block_state<'w, Cx, Chunk>(
         && block_diff
         && dsyn_instanceof!(local_cx, &*old.block => BlockEntityConstructor<Cx>)
     {
-        let ty = dsyn_ty!(local_cx => BlockEntityOnBlockReplaced<Cx>);
-
         WorldChunk::__peek_block_entity_typed(
             //SAFETY: lifetime does not matter here
             unsafe { chunk.reclaim_unsafe() },
@@ -51,7 +49,7 @@ pub fn builtin_callback_replace_block_state<'w, Cx, Chunk>(
                 let mut guard = cell.lock();
                 let f = (**guard.ty())
                     .descriptors()
-                    .get(ty)
+                    .get(dsyn_ty!(local_cx => BlockEntityOnBlockReplaced<Cx>))
                     .unwrap_or(default_block_entity_on_block_replaced());
                 f(
                     &mut **guard,
@@ -83,6 +81,34 @@ pub fn builtin_callback_replace_block_state<'w, Cx, Chunk>(
             flags.contains(SetBlockStateFlags::MOVED),
             local_cx,
             BlockOnStateReplacedMarker,
+        );
+    }
+}
+
+/// Built-in callback when a block state is added inside a chunk.
+pub fn builtin_callback_add_block_state<'w, Cx, Chunk>(
+    pos: BlockPos,
+    new: BlockState<'w, Cx>,
+    old: BlockState<'w, Cx>,
+    flags: SetBlockStateFlags,
+    chunk: &mut Chunk,
+) where
+    Cx: ChunkCx<'w>,
+    Chunk: ServerWorldChunkAccess<'w, Cx>,
+    Cx::LocalContext<'w>: LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>,
+{
+    if !flags.contains(SetBlockStateFlags::SKIP_BlOCK_ADDED_CALLBACK) {
+        let local_cx = chunk.local_cx();
+        let f = dsyn_instanceof!(local_cx, &*new.block => export BlockOnBlockAdded<Cx>)
+            .unwrap_or(default_block_on_block_added());
+        f(
+            new,
+            old,
+            chunk.wca_as_wc().world_ptr(),
+            pos,
+            flags.contains(SetBlockStateFlags::MOVED),
+            local_cx,
+            BlockOnBlockAddedMarker,
         );
     }
 }

@@ -116,7 +116,6 @@ mod __dsyn_cache {
 
     dsyn_caches_init! {
         be_constructor => BlockEntityConstructor<Cx>,
-        b_on_block_added => BlockOnBlockAdded<Cx>,
     }
 }
 
