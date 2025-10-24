@@ -7,7 +7,7 @@ use rimecraft_block::BlockState;
 use rimecraft_voxel_math::{BlockPos, ChunkSectionPos};
 
 use crate::chunk::{
-    BORDER_LEN, BaseChunkAccess, ChunkCx, ChunkSection, SECTION_HEIGHT, section::ComputeIndex,
+    BORDER_LEN, BaseChunkAccess, WorldCx, ChunkSection, SECTION_HEIGHT, section::ComputeIndex,
 };
 
 /// An iterator over all blocks in a chunk.
@@ -16,7 +16,7 @@ use crate::chunk::{
 #[repr(transparent)] // this is important as we need to do some hacks
 pub struct Blocks<'w, I, S, Cx>(BlocksInner<'w, I, S, Cx>)
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     I: Iterator<Item = (ChunkSectionPos, S)>;
 
 pub(super) fn blocks<'w, Cx, Access>(
@@ -28,7 +28,7 @@ pub(super) fn blocks<'w, Cx, Access>(
     Cx,
 >
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Access: BaseChunkAccess<'w, Cx>,
 {
     let hl: crate::view::HeightLimit = chunk.bca_as_bc().height_limit;
@@ -52,7 +52,7 @@ where
 
 impl<'w, I, S, Cx> FusedIterator for Blocks<'w, I, S, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
     I: DoubleEndedIterator<Item = (ChunkSectionPos, S)>,
     S: Deref<Target = ChunkSection<'w, Cx>>,
 {
@@ -60,7 +60,7 @@ where
 
 impl<'w, I, S, Cx> ExactSizeIterator for Blocks<'w, I, S, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
     I: DoubleEndedIterator<Item = (ChunkSectionPos, S)>,
     S: Deref<Target = ChunkSection<'w, Cx>>,
 {
@@ -74,7 +74,7 @@ where
 
 impl<'w, I, S, Cx> Iterator for Blocks<'w, I, S, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
     I: DoubleEndedIterator<Item = (ChunkSectionPos, S)>,
     S: Deref<Target = ChunkSection<'w, Cx>>,
 {
@@ -139,7 +139,7 @@ where
 
 struct BlocksInner<'w, I, S, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     I: Iterator<Item = (ChunkSectionPos, S)>,
 {
     sections_iter: I,
@@ -160,7 +160,7 @@ where
 
 impl<'w, I, S, Cx> BlocksInner<'w, I, S, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
     I: DoubleEndedIterator<Item = (ChunkSectionPos, S)>,
     S: Deref<Target = ChunkSection<'w, Cx>>,
 {
@@ -257,7 +257,7 @@ where
 
 impl<'w, I, S, Cx> Iterator for BlocksInner<'w, I, S, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
     I: Iterator<Item = (ChunkSectionPos, S)>,
     S: Deref<Target = ChunkSection<'w, Cx>>,
 {
@@ -306,7 +306,7 @@ where
 
 impl<'w, I, S, Cx> Debug for BlocksInner<'w, I, S, Cx>
 where
-    Cx: ChunkCx<'w> + Debug,
+    Cx: WorldCx<'w> + Debug,
     I: Iterator<Item = (ChunkSectionPos, S)> + Debug,
     S: Deref<Target = ChunkSection<'w, Cx>>,
     Cx::Id: Debug,
@@ -325,7 +325,7 @@ where
 
 impl<'w, I, S, Cx> Debug for Blocks<'w, I, S, Cx>
 where
-    Cx: ChunkCx<'w> + Debug,
+    Cx: WorldCx<'w> + Debug,
     I: Iterator<Item = (ChunkSectionPos, S)> + Debug,
     S: Deref<Target = ChunkSection<'w, Cx>>,
     Cx::Id: Debug,

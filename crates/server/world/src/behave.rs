@@ -8,7 +8,7 @@ use dsyn::primitives::PointerLikeBool;
 use local_cx::ProvideLocalCxTy;
 use maybe::Maybe;
 use voxel_math::BlockPos;
-use world::{ArcAccess, World, chunk::ChunkCx};
+use world::{ArcAccess, World, WorldCx};
 
 use crate::game_event::DynListener;
 
@@ -39,7 +39,7 @@ pub type BlockOnStateReplaced<Cx> = for<'env> fn(
 #[inline]
 pub const fn default_block_on_state_replaced<'w, Cx>() -> BlockOnStateReplaced<Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     |_, _, _, _, _, _| {}
 }
@@ -72,7 +72,7 @@ pub type BlockOnBlockAdded<Cx> = for<'env> fn(
 #[inline]
 pub const fn default_block_on_block_added<'w, Cx>() -> BlockOnBlockAdded<Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     |_, _, _, _, _, _, _| {}
 }
@@ -97,7 +97,7 @@ pub type BlockEntityGetGameEventListener<Cx> =
 pub const fn default_block_entity_get_game_event_listener<'w, Cx>()
 -> BlockEntityGetGameEventListener<Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     |_, _, _| None
 }
@@ -127,7 +127,7 @@ pub type BlockEntityOnBlockReplaced<Cx> = for<'env> fn(
 #[inline(always)]
 pub const fn default_block_entity_on_block_replaced<'w, Cx>() -> BlockEntityOnBlockReplaced<Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     |_, _, _, _, _, _| {}
 }

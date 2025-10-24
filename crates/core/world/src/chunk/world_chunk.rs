@@ -23,7 +23,7 @@ use crate::{
     view::{block::*, light::*},
 };
 
-use super::{BORDER_LEN, BaseChunk, BlockEntityCell, Chunk, ChunkCx, section::ComputeIndex};
+use super::{BORDER_LEN, BaseChunk, BlockEntityCell, Chunk, WorldCx, section::ComputeIndex};
 
 use std::{
     fmt::Debug,
@@ -37,13 +37,13 @@ pub trait WorldChunkLocalCx<'w, Cx>:
     + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
     + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
 }
 
 impl<'w, Cx, L> WorldChunkLocalCx<'w, Cx> for L
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
         + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>,
@@ -53,7 +53,7 @@ where
 /// Chunk for worlds.
 pub struct WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// The `BaseChunk`.
     pub base: BaseChunk<'w, Cx>,
@@ -72,7 +72,7 @@ where
 
 impl<'w, Cx> Debug for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + Debug,
+    Cx: WorldCx<'w> + Debug,
     Cx::Id: Debug,
     Cx::BlockStateExt<'w>: Debug,
     Cx::BlockStateList: Debug,
@@ -101,7 +101,7 @@ pub enum CreationType {
 
 impl<'w, Cx> WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Returns the weak world pointer of this chunk.
     #[inline]
@@ -162,7 +162,7 @@ where
 
 impl<'w, Cx> WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -514,7 +514,7 @@ where
 
 impl<'r, 'w, Cx> AsBaseChunkAccess<'w, Cx> for &'r WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     type Access<'a>
         = &'r BaseChunk<'w, Cx>
@@ -534,7 +534,7 @@ where
 
 impl<'w, Cx> AsBaseChunkAccess<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     type Access<'a>
         = &'a mut BaseChunk<'w, Cx>
@@ -554,7 +554,7 @@ where
 
 impl<'w, Cx> WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
 {
     fn __block_state(
         this: impl WorldChunkAccess<'w, Cx>,
@@ -611,7 +611,7 @@ where
 
 impl<'w, Cx> MutBlockView<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
 {
     #[inline]
     fn block_state(&mut self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
@@ -626,7 +626,7 @@ where
 
 impl<'w, Cx> BlockView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
 {
     #[inline]
     fn block_state(&self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
@@ -641,7 +641,7 @@ where
 
 impl<'w, Cx> MutBlockView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
 {
     #[inline]
     fn block_state(&mut self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
@@ -656,7 +656,7 @@ where
 
 impl<'w, Cx> MutBlockEntityView<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + ServerChunkEventCallback<'w, Self>,
@@ -675,7 +675,7 @@ where
 
 impl<'w, Cx> BlockEntityView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + for<'a> ServerChunkEventCallback<'w, &'a Self>,
@@ -693,7 +693,7 @@ where
 
 impl<'w, Cx> MutBlockEntityView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + for<'a> ServerChunkEventCallback<'w, &'a mut Self>,
@@ -711,7 +711,7 @@ where
 
 impl<'w, Cx> BlockViewMut<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + ServerChunkEventCallback<'w, Self>,
@@ -731,7 +731,7 @@ where
 
 impl<'w, Cx> BlockViewMut<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + for<'a> ServerChunkEventCallback<'w, &'a mut Self>,
@@ -751,7 +751,7 @@ where
 
 impl<'w, Cx> BlockEntityViewMut<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + ServerChunkEventCallback<'w, Self>,
@@ -771,7 +771,7 @@ where
 
 impl<'w, Cx> BlockEntityViewMut<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + for<'a> ServerChunkEventCallback<'w, &'a mut Self>,
@@ -791,7 +791,7 @@ where
 
 impl<'w, Cx> BlockLuminanceView<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + ServerChunkEventCallback<'w, Self>,
@@ -806,7 +806,7 @@ where
 
 impl<'w, Cx> BlockLuminanceView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>> + BsToFs<'w>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -818,7 +818,7 @@ where
 
 impl<'w, Cx> LightSourceView<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + ServerChunkEventCallback<'w, Self>,
@@ -841,7 +841,7 @@ where
 
 impl<'w, Cx> LightSourceView<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + for<'a> ServerChunkEventCallback<'w, &'a mut Self>,
@@ -864,7 +864,7 @@ where
 
 impl<'w, Cx> Chunk<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + ServerChunkEventCallback<'w, Self>,
@@ -875,7 +875,7 @@ where
 
 impl<'w, Cx> Chunk<'w, Cx> for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + for<'a> ServerChunkEventCallback<'w, &'a mut Self>,
@@ -887,7 +887,7 @@ where
 #[allow(missing_docs)]
 pub trait WorldChunkAccess<'w, Cx>: HoldLocalContext<LocalCx = Cx::LocalContext<'w>>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     fn wca_as_wc(&self) -> &WorldChunk<'w, Cx>;
     fn wca_as_bc(&self) -> &BaseChunk<'w, Cx>;
@@ -914,7 +914,7 @@ where
 
 impl<'w, Cx> HoldLocalContext for WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     type LocalCx = Cx::LocalContext<'w>;
 
@@ -926,7 +926,7 @@ where
 
 impl<'w, Cx> WorldChunkAccess<'w, Cx> for &WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     type Reclaim<'e>
         = &'e WorldChunk<'w, Cx>
@@ -961,7 +961,7 @@ where
 
 impl<'w, Cx> WorldChunkAccess<'w, Cx> for &mut WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     type Reclaim<'e>
         = &'e mut WorldChunk<'w, Cx>

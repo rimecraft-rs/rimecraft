@@ -18,12 +18,57 @@ mod _impl;
 
 pub use _impl::*;
 
+use entity::ProvideEntityExtTy;
+use local_cx::GlobalProvideLocalCxTy;
+use maybe::Maybe;
+use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
+use rimecraft_chunk_palette::{
+    IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, IntoIteratorRef,
+};
+use rimecraft_fluid::ProvideFluidStateExtTy;
+use rimecraft_global_cx::{Hold, ProvideIdTy, ProvideNbtTy};
+
 use std::{
     fmt::Debug,
+    hash::Hash,
     sync::{Arc, Weak},
 };
 
 pub use ahash::{AHashMap, AHashSet};
+
+/// Types associated with a `Chunk`.
+///
+/// # Generics
+///
+/// - `'w`: The world lifetime. See the crate document for more information.
+pub trait WorldCx<'w>
+where
+    Self: ProvideBlockStateExtTy
+        + ProvideFluidStateExtTy
+        + ProvideIdTy
+        + ProvideNbtTy
+        + ProvideBlockStateExtTy<BlockStateExt<'w>: Hold<NestedBlockStateExt<'w>>>
+        + GlobalProvideLocalCxTy
+        + ProvideEntityExtTy,
+{
+    /// The type of block state id list.
+    type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>
+        + for<'a> PalIndexToRaw<&'a BlockState<'w, Self>>
+        + for<'a> IntoIteratorRef<'a, Item = &'a BlockState<'w, Self>, IntoIter: ExactSizeIterator>
+        + Clone;
+
+    /// The type of biomes.
+    type Biome: 'w;
+
+    /// The type of biome id list.
+    type BiomeList;
+
+    /// The `Heightmap.Type` type of heightmaps.
+    type HeightmapType: heightmap::Type<'w, Self> + Hash + Eq;
+
+    /// The extension type of world chunks.
+    type WorldChunkExt;
+}
 
 /// The default max light level of Minecraft.
 pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
@@ -84,7 +129,7 @@ use rimecraft_voxel_math::direction::Direction;
 mod __dsyn_cache {
     use crate::behave::*;
 
-    use crate::chunk::ChunkCx;
+    use crate::WorldCx;
 
     macro_rules! dsyn_caches_init {
     ($($f:ident=>$t:ty),*$(,)?) => {
@@ -92,7 +137,7 @@ mod __dsyn_cache {
         #[doc(hidden)]
         pub struct DsynCache<'w, Cx>
         where
-            Cx: ChunkCx<'w>,
+            Cx: WorldCx<'w>,
         {
             $($f: std::sync::OnceLock<dsyn::Type<$t>>,)*
             _marker: std::marker::PhantomData<&'w ()>,
@@ -101,7 +146,7 @@ mod __dsyn_cache {
         $(
         impl<'w, Cx> local_cx::dsyn::DescriptorTypeCache<$t> for DsynCache<'w, Cx>
         where
-            Cx: ChunkCx<'w>,
+            Cx: WorldCx<'w>,
         {
             #[inline]
             fn get_or_cache<F>(&self, f: F) -> dsyn::Type<$t>

@@ -12,21 +12,24 @@ use ident_hash::IHashMap;
 use local_cx::{LocalContext, dsyn_instanceof};
 use parking_lot::{Mutex, MutexGuard};
 use voxel_math::coord_section_from_block;
-use world::chunk::{Chunk, ChunkCx, WorldChunk, WorldChunkAccess};
+use world::{
+    WorldCx,
+    chunk::{Chunk, WorldChunk, WorldChunkAccess},
+};
 
 use crate::{behave::*, game_event};
 
 /// Server-only chunk extension nested type.
 pub struct NestedWorldChunkExt<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     game_event_dispatchers: Mutex<IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>,
 }
 
 impl<'w, Cx> Debug for NestedWorldChunkExt<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -39,7 +42,7 @@ where
 /// Server-only [`Chunk`] extension trait.
 pub trait ServerChunk<'w, Cx>: Chunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Peeks the [`game_event::Dispatcher`] of given Y section coordinate.
     #[inline]
@@ -65,7 +68,7 @@ where
 #[allow(missing_docs)]
 pub trait ServerWorldChunkAccess<'w, Cx>: WorldChunkAccess<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     type GameEventDispatchersRead: Deref<
         Target = IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>,
@@ -82,7 +85,7 @@ where
 
 impl<'a, 'w, Cx> ServerWorldChunkAccess<'w, Cx> for &'a WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Cx::WorldChunkExt: Hold<NestedWorldChunkExt<'w, Cx>>,
     WorldChunk<'w, Cx>: WorldChunkAccess<'w, Cx>,
 {
@@ -109,7 +112,7 @@ where
 
 impl<'a, 'w, Cx> ServerWorldChunkAccess<'w, Cx> for &'a mut WorldChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Cx::WorldChunkExt: HoldMut<NestedWorldChunkExt<'w, Cx>>,
     WorldChunk<'w, Cx>: WorldChunkAccess<'w, Cx>,
 {
@@ -143,7 +146,7 @@ pub(crate) fn wc_peek_game_event_dispatcher<'w, Cx, F, U>(
 ) -> U
 where
     F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> U,
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     let mut g = this.write_game_event_dispatchers();
     if let Some(d) = g.get(&y_section_coord) {
@@ -161,7 +164,7 @@ pub(crate) fn wc_update_game_event_listener<'w, Cx>(
     be_cell: &BlockEntityCell<'w, Cx>,
     be: impl Deref<Target = BlockEntity<'w, Cx>>,
 ) where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Cx::LocalContext<'w>: LocalContext<dsyn::Type<BlockEntityGetGameEventListener<Cx>>>,
 {
     let y = be.pos().y();
@@ -191,7 +194,7 @@ pub(crate) fn wc_remove_game_event_listener<'w, Cx>(
     be_cell: &BlockEntityCell<'w, Cx>,
     be: impl Deref<Target = BlockEntity<'w, Cx>>,
 ) where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Cx::LocalContext<'w>: LocalContext<dsyn::Type<BlockEntityGetGameEventListener<Cx>>>,
 {
     let y = be.pos().y();

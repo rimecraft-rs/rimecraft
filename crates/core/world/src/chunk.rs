@@ -4,29 +4,25 @@
 
 use std::{
     fmt::Debug,
-    hash::Hash,
     ops::{Deref, DerefMut},
     sync::atomic::AtomicBool,
 };
 
 use ahash::AHashMap;
-use entity::ProvideEntityExtTy;
-use local_cx::{GlobalProvideLocalCxTy, LocalContext};
+use local_cx::LocalContext;
 use parking_lot::{Mutex, RwLock};
-use rimecraft_block::{BlockState, ProvideBlockStateExtTy, RawBlock};
+use rimecraft_block::{BlockState, RawBlock};
 use rimecraft_block_entity::BlockEntityCell;
 use rimecraft_chunk_palette::{
-    IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, IntoIteratorRef, Maybe,
-    container::ProvidePalette,
+    IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe, container::ProvidePalette,
 };
-use rimecraft_fluid::ProvideFluidStateExtTy;
-use rimecraft_global_cx::{Hold, ProvideIdTy, ProvideNbtTy};
 use rimecraft_registry::Registry;
 use rimecraft_voxel_math::{BlockPos, ChunkSectionPos};
 
 use crate::{
+    WorldCx,
     chunk::light::ChunkSkyLight,
-    heightmap::{self, Heightmap},
+    heightmap::Heightmap,
     view::{
         HeightLimit,
         block::{MutBlockEntityView, MutBlockView},
@@ -60,45 +56,11 @@ pub const BORDER_LEN: u32 = 16;
 /// The height of a chunk section.
 pub const SECTION_HEIGHT: u32 = BORDER_LEN;
 
-/// Types associated with a `Chunk`.
-///
-/// # Generics
-///
-/// - `'w`: The world lifetime. See the crate document for more information.
-pub trait ChunkCx<'w>
-where
-    Self: ProvideBlockStateExtTy
-        + ProvideFluidStateExtTy
-        + ProvideIdTy
-        + ProvideNbtTy
-        + ProvideBlockStateExtTy<BlockStateExt<'w>: Hold<crate::NestedBlockStateExt<'w>>>
-        + GlobalProvideLocalCxTy
-        + ProvideEntityExtTy,
-{
-    /// The type of block state id list.
-    type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>
-        + for<'a> PalIndexToRaw<&'a BlockState<'w, Self>>
-        + for<'a> IntoIteratorRef<'a, Item = &'a BlockState<'w, Self>, IntoIter: ExactSizeIterator>
-        + Clone;
-
-    /// The type of biomes.
-    type Biome: 'w;
-
-    /// The type of biome id list.
-    type BiomeList;
-
-    /// The `Heightmap.Type` type of heightmaps.
-    type HeightmapType: heightmap::Type<'w, Self> + Hash + Eq;
-
-    /// The extension type of world chunks.
-    type WorldChunkExt;
-}
-
 /// A generic chunk data structure.
 #[non_exhaustive]
 pub struct BaseChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Position of this chunk.
     pub pos: ChunkPos,
@@ -125,7 +87,7 @@ where
 
 impl<'w, Cx> Debug for BaseChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + Debug,
+    Cx: WorldCx<'w> + Debug,
     Cx::Id: Debug,
     Cx::BlockStateExt<'w>: Debug,
     Cx::BlockStateList: Debug,
@@ -147,7 +109,7 @@ where
 
 impl<'w, Cx> BaseChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
@@ -216,7 +178,7 @@ where
 /// Types that can represent an access to a [`BaseChunk`].
 pub trait AsBaseChunkAccess<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// The accessor type.
     type Access<'a>: BaseChunkAccess<'w, Cx>
@@ -241,7 +203,7 @@ where
         + MutBlockEntityView<'w, Cx>
         + BlockLuminanceView<'w, Cx>
         + LightSourceView<'w, Cx>,
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Returns the array of chunk sections of this chunk.
     #[inline]
@@ -333,7 +295,7 @@ where
 #[allow(missing_docs)]
 pub trait BaseChunkAccess<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     fn bca_as_bc(&self) -> &BaseChunk<'w, Cx>;
 
@@ -374,7 +336,7 @@ where
     fn mark_needs_saving(self);
 }
 
-impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> {
+impl<'a, 'w, Cx: WorldCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> {
     type HeighmapsRead =
         parking_lot::RwLockReadGuard<'a, AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
     type HeighmapsWrite =
@@ -473,7 +435,7 @@ impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> 
     }
 }
 
-impl<'a, 'w, Cx: ChunkCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, Cx> {
+impl<'a, 'w, Cx: WorldCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, Cx> {
     type HeighmapsRead = Self::HeighmapsWrite;
     type HeighmapsWrite = &'a mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>;
     type BlockEntitiesRead = Self::BlockEntitiesWrite;

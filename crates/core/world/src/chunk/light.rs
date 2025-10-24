@@ -9,7 +9,7 @@ use rimecraft_voxel_math::{BlockPos, coord_block_from_section, direction::Direct
 
 use crate::{
     NestedBlockStateExt,
-    chunk::{BORDER_LEN, BaseChunk, BaseChunkAccess, ChunkCx, section::ComputeIndex},
+    chunk::{BORDER_LEN, BaseChunk, BaseChunkAccess, WorldCx, section::ComputeIndex},
     view::HeightLimit,
 };
 
@@ -52,7 +52,7 @@ fn skl_packed_index(local_x: i32, local_z: i32) -> i32 {
 
 impl<'w, Cx> BaseChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
 {
     pub(in crate::chunk) fn __csl_refresh_surface_y(mut this: impl BaseChunkAccess<'w, Cx>) {
         let i = this
@@ -134,7 +134,7 @@ pub fn opaque_shape_of_state<'a, Cx>(
     direction: Direction,
 ) -> &'a Arc<voxel_shape::Slice<'a>>
 where
-    Cx: ChunkCx<'a>,
+    Cx: WorldCx<'a>,
 {
     if is_trivial_for_lighting(state) {
         voxel_shape::empty()
@@ -147,14 +147,14 @@ where
 #[inline]
 pub(crate) fn is_trivial_for_lighting<'a, Cx>(state: &BlockState<'a, Cx>) -> bool
 where
-    Cx: ChunkCx<'a>,
+    Cx: WorldCx<'a>,
 {
     !state.settings().opaque || !state.has_sided_transparency()
 }
 
 fn face_blocks_light<'a, Cx>(upper: &BlockState<'a, Cx>, lower: &BlockState<'a, Cx>) -> bool
 where
-    Cx: ChunkCx<'a>,
+    Cx: WorldCx<'a>,
 {
     if lower.data().opacity() == 0 {
         let shape_up = opaque_shape_of_state(upper, Direction::Down);
@@ -167,7 +167,7 @@ where
 
 fn face_blocks_light_upper_air<'a, Cx>(lower: &BlockState<'a, Cx>) -> bool
 where
-    Cx: ChunkCx<'a>,
+    Cx: WorldCx<'a>,
 {
     if lower.data().opacity() == 0 {
         let shape_up = voxel_shape::empty();

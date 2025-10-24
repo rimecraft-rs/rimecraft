@@ -9,12 +9,12 @@ use rimecraft_chunk_palette::{
 use rimecraft_fluid::{BlockStateExt as _, BsToFs};
 use rimecraft_registry::Registry;
 
-use super::{ChunkCx, internal_types::*};
+use super::{WorldCx, internal_types::*};
 
 /// Section on a `Chunk`.
 pub struct ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     bsc: PalettedContainer<Cx::BlockStateList, BlockState<'w, Cx>, Cx>,
     bic: PalettedContainer<Cx::BiomeList, IBiome<'w, Cx>, Cx>,
@@ -26,7 +26,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: BsToFs<'w> + ChunkCx<'w>,
+    Cx: BsToFs<'w> + WorldCx<'w>,
     Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>,
     for<'a> &'a Cx::BlockStateList: IntoIterator,
     for<'a> <&'a Cx::BlockStateList as IntoIterator>::IntoIter: ExactSizeIterator,
@@ -77,7 +77,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Returns the block state container of the chunk section.
     #[inline]
@@ -140,7 +140,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
 {
     /// Returns the block state at the given position.
     ///
@@ -171,7 +171,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::Biome, IBiome<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::Biome, IBiome<'w, Cx>>,
     Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>,
 {
     /// Returns the biome at the given position.
@@ -183,7 +183,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: BsToFs<'w> + ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: BsToFs<'w> + WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
         + Clone,
@@ -237,7 +237,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ProvidePalette<Cx::BlockStateList, BlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
@@ -287,7 +287,7 @@ where
 
 impl<'w, Cx> Debug for ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w> + Debug,
+    Cx: WorldCx<'w> + Debug,
     Cx::Id: Debug,
     Cx::BlockStateExt<'w>: Debug,
     Cx::BlockStateList: Debug,
@@ -324,7 +324,7 @@ mod _edcode {
 
     impl<'w, Cx, B> Encode<B> for ChunkSection<'w, Cx>
     where
-        Cx: ChunkCx<'w>,
+        Cx: WorldCx<'w>,
         Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>,
         Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>,
         B: BufMut,
@@ -338,7 +338,7 @@ mod _edcode {
 
     impl<'w, 'de, Cx, B> Decode<'de, B> for ChunkSection<'w, Cx>
     where
-        Cx: ChunkCx<'w>,
+        Cx: WorldCx<'w>,
         Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, BlockState<'w, Cx>> + Clone,
         Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
             + for<'s> PalIndexFromRaw<'s, IBiome<'w, Cx>>
@@ -367,7 +367,7 @@ mod _edcode {
 
     impl<'w, Cx> ChunkSection<'w, Cx>
     where
-        Cx: ChunkCx<'w>,
+        Cx: WorldCx<'w>,
         Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
             + for<'s> PalIndexFromRaw<'s, IBiome<'w, Cx>>
             + for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>

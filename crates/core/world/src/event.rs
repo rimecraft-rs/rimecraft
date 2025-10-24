@@ -4,12 +4,12 @@ use rimecraft_block::BlockState;
 use rimecraft_block_entity::BlockEntityCell;
 use rimecraft_voxel_math::BlockPos;
 
-use crate::{chunk::ChunkCx, view::block::SetBlockStateFlags};
+use crate::{WorldCx, view::block::SetBlockStateFlags};
 
 /// Server event callbacks implemented on a global context.
 ///
 /// This should be implemented in a pure-client environment as well but will do nothing there.
-pub trait ServerChunkEventCallback<'w, Access>: ChunkCx<'w> {
+pub trait ServerChunkEventCallback<'w, Access>: WorldCx<'w> {
     /// Called after a block state is been replaced.
     #[inline(always)]
     fn replace_block_state_callback(

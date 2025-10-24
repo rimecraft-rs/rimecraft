@@ -8,8 +8,9 @@ use parking_lot::MutexGuard;
 use serde::de::DeserializeOwned;
 use voxel_math::BlockPos;
 use world::{
+    WorldCx,
     behave::BlockEntityConstructor,
-    chunk::{ChunkCx, ComputeIndex, CreationType, WorldChunk, WorldChunkLocalCx},
+    chunk::{ComputeIndex, CreationType, WorldChunk, WorldChunkLocalCx},
     event::ServerChunkEventCallback,
     view::block::SetBlockStateFlags,
 };
@@ -24,7 +25,7 @@ pub fn builtin_callback_replace_block_state<'w, Cx, Chunk>(
     flags: SetBlockStateFlags,
     chunk: &mut Chunk,
 ) where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
         + ServerChunkEventCallback<'w, Chunk>,
@@ -93,7 +94,7 @@ pub fn builtin_callback_add_block_state<'w, Cx, Chunk>(
     flags: SetBlockStateFlags,
     chunk: &mut Chunk,
 ) where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Chunk: ServerWorldChunkAccess<'w, Cx>,
     Cx::LocalContext<'w>: LocalContext<dsyn::Type<BlockOnBlockAdded<Cx>>>,
 {
@@ -118,7 +119,7 @@ pub fn builtin_callback_add_block_entity<'w, Cx, Chunk>(
     be: &BlockEntityCell<'w, Cx>,
     chunk: &mut Chunk,
 ) where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Chunk: ServerWorldChunkAccess<'w, Cx>,
     Cx::LocalContext<'w>: LocalContext<dsyn::Type<BlockEntityGetGameEventListener<Cx>>>,
 {
@@ -134,7 +135,7 @@ pub fn builtin_callback_remove_block_entity<'w, Cx, Chunk>(
     be: &BlockEntityCell<'w, Cx>,
     chunk: &mut Chunk,
 ) where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Chunk: ServerWorldChunkAccess<'w, Cx>,
     Cx::LocalContext<'w>: LocalContext<dsyn::Type<BlockEntityGetGameEventListener<Cx>>>,
 {

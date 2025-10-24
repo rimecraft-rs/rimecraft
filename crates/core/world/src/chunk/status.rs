@@ -6,7 +6,7 @@ use ahash::AHashSet;
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
 
-use crate::chunk::ChunkCx;
+use crate::WorldCx;
 
 /// Type of a chunk specifying whether it is loaded into a world.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -21,7 +21,7 @@ pub enum ChunkType {
 /// The underlying type for registration [`ChunkStatus`].
 pub struct RawChunkStatus<'w, Cx>(Arc<ChunkStatusInner<'w, Cx>>)
 where
-    Cx: ChunkCx<'w>;
+    Cx: WorldCx<'w>;
 
 /// Descriptor to loading status of a chunk.
 ///
@@ -30,7 +30,7 @@ pub type ChunkStatus<'w, Cx> = Reg<'w, <Cx as ProvideIdTy>::Id, RawChunkStatus<'
 
 struct ChunkStatusInner<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     index: usize,
     heightmap_types: AHashSet<Cx::HeightmapType>,
@@ -41,7 +41,7 @@ where
 
 impl<'w, Cx> RawChunkStatus<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Creates a new chunk status, increasing index value from the previous status or 0 if absent.
     pub fn new(
@@ -86,7 +86,7 @@ where
 
 impl<'w, Cx> Debug for RawChunkStatus<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Cx::HeightmapType: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -101,11 +101,11 @@ where
 // built-in local context extractors
 
 /// A chunk status that is fully loaded.
-pub struct Full<'w, Cx: ChunkCx<'w>>(pub ChunkStatus<'w, Cx>);
+pub struct Full<'w, Cx: WorldCx<'w>>(pub ChunkStatus<'w, Cx>);
 
-impl<'w, Cx: ChunkCx<'w>> Debug for Full<'w, Cx>
+impl<'w, Cx: WorldCx<'w>> Debug for Full<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

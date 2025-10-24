@@ -1,8 +1,7 @@
 //! World views.
 
 use crate::{
-    Environment,
-    chunk::ChunkCx,
+    Environment, WorldCx,
     view::{
         HeightLimit,
         block::{BlockEntityView, BlockView},
@@ -17,7 +16,7 @@ use crate::{
 pub trait WorldView<'w, Cx>:
     ChunkView<'w, Cx> + BlockView<'w, Cx> + BlockEntityView<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Returns the top Y level of the given heightmap type at the specified position.
     fn top_y(&self, heightmap_ty: &Cx::HeightmapType, x: i32, y: i32) -> i32;

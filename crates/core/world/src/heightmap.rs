@@ -6,10 +6,7 @@ use rimecraft_block::BlockState;
 use rimecraft_packed_int_array::PackedIntArray;
 use rimecraft_voxel_math::BlockPos;
 
-use crate::{
-    chunk::{BORDER_LEN, ChunkCx},
-    view::HeightLimit,
-};
+use crate::{WorldCx, chunk::BORDER_LEN, view::HeightLimit};
 
 const STORAGE_LEN: usize = 256;
 
@@ -24,7 +21,7 @@ pub struct RawHeightmap<'w, P, Cx> {
 
 impl<'w, P, Cx> RawHeightmap<'w, P, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     Cx::HeightmapType: Type<'w, Cx, Predicate = P>,
 {
     /// Creates a new heightmap.
@@ -46,7 +43,7 @@ where
 
 impl<'w, P, Cx> RawHeightmap<'w, P, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Returns the highest block at the given coordinate.
     #[inline]
@@ -70,7 +67,7 @@ where
 
 impl<'w, P, Cx> RawHeightmap<'w, P, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
     P: for<'s> FnMut(Option<BlockState<'w, Cx>>) -> bool,
 {
     /// Updates this heightmap when the given [`BlockState`] at the location in this map is updated,
@@ -120,7 +117,7 @@ const fn to_index(x: i32, z: i32) -> usize {
 
 /// Several different heightmaps check and store highest block of different types,
 /// and are used for different purposes.
-pub trait Type<'w, Cx: ChunkCx<'w>>: 'w {
+pub trait Type<'w, Cx: WorldCx<'w>>: 'w {
     /// Predicate of block states.
     type Predicate: for<'s> Fn(Option<BlockState<'w, Cx>>) -> bool;
 
@@ -134,4 +131,4 @@ pub trait Type<'w, Cx: ChunkCx<'w>>: 'w {
 
 /// [`RawHeightmap`] with predicate type filled with [`Type::Predicate`].
 pub type Heightmap<'w, Cx> =
-    RawHeightmap<'w, <<Cx as ChunkCx<'w>>::HeightmapType as Type<'w, Cx>>::Predicate, Cx>;
+    RawHeightmap<'w, <<Cx as WorldCx<'w>>::HeightmapType as Type<'w, Cx>>::Predicate, Cx>;

@@ -6,15 +6,15 @@ use local_cx::{HoldLocalContext, LocalContext, LocalContextExt};
 use rimecraft_voxel_math::{ChunkPos, ChunkSectionPos};
 
 use crate::{
-    LightType,
-    chunk::{self, Chunk, ChunkCx, ChunkStatus},
+    LightType, WorldCx,
+    chunk::{self, Chunk, ChunkStatus},
 };
 
 /// A view that provides set of chunks with locked access.
 #[doc(alias = "ChunkProvider")]
 pub trait ProvideLockedChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// The chunk type.
     type Chunk<'a>
@@ -36,7 +36,7 @@ where
 #[doc(alias = "ChunkManager")]
 pub trait ChunkView<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// The chunk type.
     type Chunk;
@@ -80,7 +80,7 @@ where
 /// [`ChunkView`] along with mutable (locked) operations.
 pub trait ChunkViewMut<'w, Cx>: ChunkView<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Ticks the view.
     ///
@@ -106,7 +106,7 @@ where
     T: ChunkView<'w, Cx> + HoldLocalContext,
     T::LocalCx: LocalContext<chunk::status::Full<'w, Cx>>,
     for<'e> &'e <T as ChunkView<'w, Cx>>::Chunk: Chunk<'w, Cx>,
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     type Chunk<'a>
         = <T as ChunkView<'w, Cx>>::Chunk
