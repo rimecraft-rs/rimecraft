@@ -34,6 +34,10 @@ impl BBox {
     /// min `x,y,z`` and max `x,y,z`.
     #[inline]
     pub fn from_raw(min: DVec3, max: DVec3) -> Self {
+        debug_assert!(
+            min.cmple(max).all(),
+            "min must be less than or equal to max"
+        );
         Self { min, max }
     }
 

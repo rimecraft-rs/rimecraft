@@ -13,7 +13,7 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 num-integer = "0.1"
-num-traits = "0.2.19"
+num-traits = "0.2"
 
 [lints]
 workspace = true

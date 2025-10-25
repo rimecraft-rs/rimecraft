@@ -38,6 +38,12 @@ pub fn full_cube() -> &'static Arc<Slice<'static>> {
     })
 }
 
+/// An unbounded shape.
+pub fn unbounded() -> &'static Arc<Slice<'static>> {
+    static UNBOUNDED: OnceLock<Arc<Slice<'static>>> = OnceLock::new();
+    UNBOUNDED.get_or_init(|| cuboid(BBox::from_raw(DVec3::NEG_INFINITY, DVec3::INFINITY)))
+}
+
 /// Builds a cuboid shape within given bounding box which use coordinates from 0 to 1 in each axis.
 ///
 /// # Voxel Representation

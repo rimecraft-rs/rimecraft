@@ -4,7 +4,7 @@ use crate::{
     Environment, WorldCx,
     view::{
         HeightLimit,
-        block::{BlockEntityView, BlockView},
+        block::{BlockEntityView, BlockView, ConstBlockEntityViewMut, ConstBlockViewMut},
         chunk::ChunkView,
         entity::EntityView,
     },
@@ -30,4 +30,10 @@ where
     fn height_limit(&self) -> HeightLimit;
 }
 
-// pub trait WorldViewMut<'w,Cx>: WorldView<'w,Cx>
+/// [`WorldView`] with mutable access.
+pub trait WorldViewMut<'w, Cx>:
+    WorldView<'w, Cx> + ConstBlockViewMut<'w, Cx> + ConstBlockEntityViewMut<'w, Cx>
+where
+    Cx: WorldCx<'w>,
+{
+}

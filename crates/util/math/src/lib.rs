@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use num_traits::Num;
+use num_traits::{Float, Num, NumCast, Signed};
 
 pub mod int;
 
@@ -80,4 +80,15 @@ where
         }
     }
     (min != max).then_some(min)
+}
+
+/// Linearly interpolates between `start` and `end` by the given `delta`.
+#[allow(clippy::missing_panics_doc)]
+#[inline]
+pub fn lerp<T, Delta>(delta: Delta, start: T, end: T) -> T
+where
+    T: Signed + NumCast + Copy,
+    Delta: Float,
+{
+    start + T::from((delta * Delta::from(end - start).unwrap()).floor()).unwrap()
 }

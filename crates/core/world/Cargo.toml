@@ -33,6 +33,7 @@ dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 voxel-shape = { path = "../../util/voxel-shape", package = "rimecraft-voxel-shape" }
 rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2" }
+math = { path = "../../util/math", package = "rimecraft-math" }
 # External utils
 serde = { version = "1.0", features = ["derive"] }
 serde-private = "1.0"
@@ -43,6 +44,7 @@ ahash = "0.8"
 glam = "0.30"
 bitflags = "2.9"
 tracing = { version = "0.1", optional = true }
+approx = "0.5"
 
 [features]
 tracing = ["dep:tracing"]
