@@ -2,6 +2,7 @@
 
 use crate::{
     Environment, WorldCx,
+    border::{WorldBorder, WorldBorderMut},
     view::{
         HeightLimit,
         block::{BlockEntityView, BlockView, ConstBlockEntityViewMut, ConstBlockViewMut},
@@ -12,9 +13,29 @@ use crate::{
 
 //TODO: CollisionView
 
+/// A view which shows the collision within a world.
+pub trait CollisionView<'w, Cx>: BlockView<'w, Cx>
+where
+    Cx: WorldCx<'w>,
+{
+    /// Peeks the world border of this view.
+    fn peek_world_border<F, U>(&self, f: F) -> U
+    where
+        F: FnOnce(&WorldBorder<'w>) -> U;
+
+    /// Peeks the world border mutably of this view.
+    fn peek_world_border_mut<F, U>(&self, f: F) -> U
+    where
+        F: FnOnce(&mut WorldBorderMut<'w>) -> U;
+}
+
 /// A scoped view of a world like structure that contains chunks bounded in a dimension.
 pub trait WorldView<'w, Cx>:
-    ChunkView<'w, Cx> + BlockView<'w, Cx> + BlockEntityView<'w, Cx> + EntityView<'w, Cx>
+    ChunkView<'w, Cx>
+    + BlockView<'w, Cx>
+    + BlockEntityView<'w, Cx>
+    + EntityView<'w, Cx>
+    + CollisionView<'w, Cx>
 where
     Cx: WorldCx<'w>,
 {

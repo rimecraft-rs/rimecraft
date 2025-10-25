@@ -399,7 +399,7 @@ where
         }
 
         // Set state inside chunk section.
-        let pos_sec = pos.0.as_uvec3() % BORDER_LEN; // first four bits. TODO: make this follow BORDER_LEN constant
+        let pos_sec = pos.0.as_uvec3() % BORDER_LEN;
         let old_state = section.set_block_state(pos_sec.x, pos_sec.y, pos_sec.z, state);
 
         drop(section);
