@@ -112,3 +112,6 @@ impl<T: ?Sized> TypeFilter<T> for () {
         Some(obj)
     }
 }
+
+//SAFETY: identical casts
+unsafe impl<T: ?Sized> SafeTypeFilter<T> for () {}
