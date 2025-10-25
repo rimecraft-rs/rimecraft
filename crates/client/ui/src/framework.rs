@@ -9,10 +9,10 @@ use std::sync::Arc;
 /// Implementors should provide a stable way to read the generation so callers
 /// can detect stale/invalid handles (e.g. from a slotmap or generational index).
 pub trait GenerationalKey {
-    type I: Copy + Eq;
+    type Id: Copy + Eq;
 
     /// Return the generation / version token of this id.
-    fn generation(&self) -> Self::I;
+    fn generation(&self) -> Self::Id;
 }
 
 /// A single UI mutation described as a value object.
@@ -39,9 +39,27 @@ pub trait CommandQueue<K>: Send + Sync {
 }
 
 /// Read-only view of a UiStore used by optimizers.
-pub trait UiStoreRead<K> {
+pub trait UiStoreRead<K>
+where
+    K: Copy + Eq,
+{
     /// Whether the element identified by `key` currently exists.
     fn exists(&self, key: K) -> bool;
+}
+
+pub trait MetaProvider<K, M>
+where
+    K: Copy + Eq,
+{
+    fn get_meta(&self, key: K) -> Option<M>;
+}
+
+pub trait ChildrenProvider<K, I>
+where
+    K: Copy + Eq,
+    I: IntoIterator<Item = K>,
+{
+    fn children_of(&self, parent: K) -> I;
 }
 
 /// Optimize/prune/merge a batch of commands given a read-only store view.
@@ -73,7 +91,6 @@ impl<K> CommandOptimizer<K> for NoopOptimizer {
     }
 }
 
-/// Minimal write API for a UiStore.
 pub trait UiStore<K>: Send {
     /// Submits a command from the main-thread (may avoid synchronization).
     fn submit_from_main(&mut self, cmd: Box<dyn Command<K>>);
@@ -153,5 +170,3 @@ where
 
     store.apply_batch(optimized);
 }
-
-// End of module

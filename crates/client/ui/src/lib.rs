@@ -1,11 +1,14 @@
 //! Minecraft client UI framework.
 
+use std::any::Any;
+
 use rimecraft_client_narration::Narratable;
 use rimecraft_keyboard::{KeyState, ProvideKeyboardTy};
 use rimecraft_mouse::{ButtonState, MousePos, MouseScroll, ProvideMouseTy};
 use rimecraft_render_math::screen::ScreenSize;
 
 use crate::{
+    framework::{Command, UiStoreRead},
     layout::{LayoutPack, LayoutValue, position::PositionConstraints, size::SizeConstraints},
     nav::WithNavIndex,
 };
@@ -19,6 +22,7 @@ pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
     type UiEventExt;
     type SizeConstraintsExt;
     type StoreKey: Copy + Eq;
+    type ElementMeta: ElementMeta;
 }
 
 /// The selection state of a UI component.
@@ -79,52 +83,69 @@ pub trait Focusable {
     }
 }
 
+/// Common UI events.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum UiEvent<'a, Cx>
 where
     Cx: ProvideUiTy,
 {
+    /// The mouse was moved.
     MouseMove(MousePos),
+    /// A mouse button toggle event.
     MouseButton {
+        /// The position of the mouse.
         pos: MousePos,
+        /// The button that was toggled.
         button: Cx::Button,
+        /// The new state of the button.
         state: ButtonState,
     },
+    /// A mouse drag event.
     MouseDrag {
+        /// The position of the mouse.
         pos: MousePos,
+        /// The change in position of the mouse.
         delta_pos: MousePos,
+        /// The button that was toggled.
         button: Cx::Button,
     },
+    /// A mouse scroll event.
     MouseScroll {
+        /// The position of the mouse.
         pos: MousePos,
+        /// The scroll delta.
         scroll: MouseScroll,
     },
+    /// A keyboard key event.
     KeyboardKey {
+        /// The position of the mouse.
         key: Cx::Key,
+        /// The modifiers active during input.
         modifiers: &'a [Cx::Modifier],
+        /// The new state of the key.
         state: KeyState,
     },
+    /// A character input event.
     CharInput {
+        /// The character that was input.
         c: char,
+        /// The modifiers active during input.
         modifiers: &'a [Cx::Modifier],
     },
+    /// A generic event.
     Generic {
+        /// The extension data.
         ext: Cx::UiEventExt,
     },
 }
 
-pub trait Element<Cx>: Focusable
-where
-    Cx: ProvideUiTy,
-{
-}
+pub trait ElementMeta: Clone + Sized {}
 
-pub trait ParentElement<Cx>: Element<Cx>
+pub trait Element<Cx>
 where
     Cx: ProvideUiTy,
 {
-    fn children(&self) -> Vec<Cx::StoreKey>;
 }
 
 pub trait PositionElement<Cx>: Element<Cx>
@@ -148,16 +169,68 @@ where
     fn layout(&mut self, size: ScreenSize);
 }
 
+/// Read-only, pure-decision event handler for element implementations.
+///
+/// Implementors should not perform mutations on the store in this method.
+/// Instead they return zero-or-more `Command<K>` values which will be
+/// collected by the coordinator and applied in a single `apply_batch` call.
 pub trait InteractiveElement<Cx>: Element<Cx>
 where
     Cx: ProvideUiTy,
 {
-    /// Handles a UI event.
-    fn handle_event(&mut self, event: &UiEvent<'_, Cx>) -> EventPropagation;
+    /// Decides how to react to `ev` using only the read-only `store` view.
+    /// Returns a propagation decision and a list of commands to apply.
+    fn handle_event_read(
+        &self,
+        ev: &dyn Any,
+        store: &dyn UiStoreRead<Cx::StoreKey>,
+    ) -> (EventPropagation, Vec<Box<dyn Command<Cx::StoreKey>>>) {
+        if let Some(_ui_ev) = ev.downcast_ref::<UiEvent<'_, Cx>>() {
+            self.handle_ui_event_read(_ui_ev, store)
+        } else {
+            (EventPropagation::NotHandled, Vec::new())
+        }
+    }
+
+    /// Decides how to react to a typed UI event using only the read-only `store` view.
+    /// Returns a propagation decision and a list of commands to apply.
+    ///
+    /// This function should never be called directly; instead, use [`InteractiveElement::handle_event_read`].
+    fn handle_ui_event_read(
+        &self,
+        ev: &UiEvent<'_, Cx>,
+        store: &dyn UiStoreRead<Cx::StoreKey>,
+    ) -> (EventPropagation, Vec<Box<dyn Command<Cx::StoreKey>>>) {
+        let _ = (ev, store);
+        (EventPropagation::NotHandled, Vec::new())
+    }
 }
 
-pub trait ParentInteractiveElement<Cx>: InteractiveElement<Cx>
+/// Helper for container implementations: iterate children and invoke a
+/// per-child read-time handler. Collects commands returned by children and
+/// respects propagation (stops if a child returns `Handled`).
+pub fn container_handle_event_read<K, I, F>(
+    children: I,
+    ev: &dyn Any,
+    store: &dyn UiStoreRead<K>,
+    mut call_child: F,
+) -> (EventPropagation, Vec<Box<dyn Command<K>>>)
 where
-    Cx: ProvideUiTy,
+    I: IntoIterator<Item = K>,
+    K: Copy + Eq,
+    F: FnMut(K, &dyn Any, &dyn UiStoreRead<K>) -> (EventPropagation, Vec<Box<dyn Command<K>>>),
 {
+    let mut out_cmds: Vec<Box<dyn Command<K>>> = Vec::new();
+    for child in children {
+        if !store.exists(child) {
+            continue;
+        }
+
+        let (prop, mut cmds) = call_child(child, ev, store);
+        out_cmds.append(&mut cmds);
+        if prop.should_stop() {
+            return (EventPropagation::Handled, out_cmds);
+        }
+    }
+    (EventPropagation::NotHandled, out_cmds)
 }

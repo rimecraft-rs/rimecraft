@@ -4,13 +4,28 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 use slotmap::{SlotMap, new_key_type};
+use ui::ElementMeta;
 use ui::framework::{
-    Command, CommandOptimizer, CommandQueue, GenerationalKey, UiStore, UiStoreRead,
+    Command, CommandOptimizer, CommandQueue, GenerationalKey, MetaProvider, UiStore, UiStoreRead,
 };
 
 new_key_type! {
     struct TestId;
 }
+
+/// Test-local metadata type used by the test store read snapshot. Kept in the
+/// test crate so the framework crate doesn't depend on a concrete meta type.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TestElementMeta<K>
+where
+    K: Copy + Eq,
+{
+    pub focused: bool,
+    pub parent: Option<K>,
+    pub children_count: usize,
+}
+
+impl<K> ElementMeta for TestElementMeta<K> where K: Copy + Eq {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TestKey<K>(pub K)
@@ -21,9 +36,9 @@ impl<K> GenerationalKey for TestKey<K>
 where
     K: Copy + Eq,
 {
-    type I = K;
+    type Id = K;
 
-    fn generation(&self) -> Self::I {
+    fn generation(&self) -> Self::Id {
         self.0
     }
 }
@@ -111,10 +126,23 @@ where
 #[allow(single_use_lifetimes)]
 impl<'a, K, V> UiStoreRead<K> for SimpleStoreRead<'a, K, V>
 where
-    K: Eq + Hash,
+    K: Copy + Eq + Hash + 'static,
 {
     fn exists(&self, id: K) -> bool {
         self.index.contains_key(&id)
+    }
+}
+
+impl<K, V> MetaProvider<K, TestElementMeta<K>> for SimpleStoreRead<'_, K, V>
+where
+    K: Copy + Eq + Hash + 'static,
+{
+    fn get_meta(&self, id: K) -> Option<TestElementMeta<K>> {
+        self.index.contains_key(&id).then_some(TestElementMeta {
+            focused: false,
+            parent: None,
+            children_count: 0,
+        })
     }
 }
 

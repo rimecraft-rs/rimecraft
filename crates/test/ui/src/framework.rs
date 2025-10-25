@@ -1,11 +1,14 @@
 use std::{hash::Hash, sync::Arc, thread};
 
+use std::any::Any;
+use test_global::TestContext;
 use test_global::integration::ui::framework::{
     SimpleQueue, TestCommand, TestCommandKind, TestKey, TestOptimizer, TestStore,
 };
 use ui::framework::{
     Command, CommandOptimizer, CommandQueue, UiHandle, UiStore, UiStoreRead, run_pipeline,
 };
+use ui::{Element, EventPropagation, InteractiveElement};
 
 #[test]
 fn pipeline_applies_main_submitted_commands() {
@@ -177,4 +180,64 @@ fn concurrent_queue_submissions() {
     for i in 0..8u64 {
         assert_eq!(store.get(TestKey(100 + i)), Some(&((i as i32) + 1)));
     }
+}
+
+#[test]
+fn parent_dispatches_child_events() {
+    // Setup store and optimizer
+    let mut store = TestStore::<_, u32>::new();
+    let queue = Arc::new(SimpleQueue::new());
+    let opt = TestOptimizer;
+
+    // Create a child element in the store with key 1
+    store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(
+        TestKey(1u32),
+        0u32,
+    ))));
+    run_pipeline(&mut store, queue.as_ref(), &opt);
+
+    // A minimal ElementRead implementation: when it sees the string "click"
+    // it returns a SetState command for the target id.
+    struct Child;
+
+    impl Element<TestContext> for Child {}
+
+    impl InteractiveElement<TestContext> for Child {
+        fn handle_event_read(
+            &self,
+            ev: &dyn Any,
+            store_read: &dyn UiStoreRead<TestKey<u32>>,
+        ) -> (EventPropagation, Vec<Box<dyn Command<TestKey<u32>>>>) {
+            if let Some(s) = ev.downcast_ref::<&'static str>()
+                && *s == "click"
+            {
+                // Only emit command if the element exists in the store
+                if store_read.exists(TestKey(1u32)) {
+                    let cmd: Box<dyn Command<TestKey<u32>>> =
+                        Box::new(TestCommand(TestCommandKind::SetState(TestKey(1u32), 42u32)));
+                    return (EventPropagation::Handled, vec![cmd]);
+                }
+            }
+            (EventPropagation::NotHandled, Vec::new())
+        }
+    }
+
+    let child = Child;
+
+    // Coordinator-like flow: take a read snapshot, ask child what to do,
+    // then optimize and apply.
+    let snapshot = store.as_read();
+    let (prop, cmds) = child.handle_event_read(&"click", snapshot.as_ref());
+    drop(snapshot);
+
+    assert!(prop.should_stop());
+
+    // Run optimizer on the commands produced by elements and apply
+    let snapshot2 = store.as_read();
+    let optimized = opt.optimize(cmds, snapshot2.as_ref());
+    drop(snapshot2);
+
+    store.apply_batch(optimized);
+
+    assert_eq!(store.get(TestKey(1u32)), Some(&42u32));
 }
