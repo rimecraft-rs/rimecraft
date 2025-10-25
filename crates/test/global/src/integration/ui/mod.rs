@@ -2,6 +2,8 @@
 
 #![cfg(feature = "ui")]
 
+use std::vec::IntoIter;
+
 use ui::ProvideUiTy;
 
 use crate::{
@@ -16,4 +18,5 @@ impl ProvideUiTy for TestContext {
     type SizeConstraintsExt = ();
     type StoreKey = TestKey<u32>;
     type ElementMeta = TestElementMeta<TestKey<u32>>;
+    type ChildrenIter = IntoIter<TestKey<u32>>;
 }

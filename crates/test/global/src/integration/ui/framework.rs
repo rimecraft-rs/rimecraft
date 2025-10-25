@@ -4,10 +4,13 @@ use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 use slotmap::{SlotMap, new_key_type};
-use ui::ElementMeta;
 use ui::framework::{
-    Command, CommandOptimizer, CommandQueue, GenerationalKey, MetaProvider, UiStore, UiStoreRead,
+    ChildrenProvider, Command, CommandOptimizer, CommandQueue, GenerationalKey, MetaProvider,
+    UiStore, UiStoreRead,
 };
+use ui::{ElementMeta, ProvideUiTy};
+
+use crate::TestContext;
 
 new_key_type! {
     struct TestId;
@@ -60,12 +63,11 @@ pub struct TestCommand<K, V>(pub TestCommandKind<K, V>)
 where
     K: Copy + Eq;
 
-impl<K, V> Command<K> for TestCommand<K, V>
+impl<V> Command<TestContext> for TestCommand<<TestContext as ProvideUiTy>::StoreKey, V>
 where
-    K: Copy + Eq + Send + 'static,
     V: Send + 'static,
 {
-    fn apply(&self, _store: &mut dyn UiStore<K>) {
+    fn apply(&self, _store: &mut dyn UiStore<TestContext>) {
         // The concrete TestStore inspects and applies commands itself
         // Commands are data-only here so apply is a no-op
     }
@@ -81,17 +83,11 @@ where
 
 /// Simple thread-safe queue for submitting test commands.
 #[derive(Default, Clone)]
-pub struct SimpleQueue<K>
-where
-    K: Copy + Eq + Hash,
-{
-    inner: Arc<Mutex<Vec<Box<dyn Command<K>>>>>,
+pub struct SimpleQueue {
+    inner: Arc<Mutex<Vec<Box<dyn Command<TestContext>>>>>,
 }
 
-impl<K> SimpleQueue<K>
-where
-    K: Copy + Eq + Hash,
-{
+impl SimpleQueue {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(Vec::new())),
@@ -99,129 +95,173 @@ where
     }
 }
 
-impl<K> CommandQueue<K> for SimpleQueue<K>
-where
-    K: Copy + Eq + Hash + Send + 'static,
-{
-    fn submit(&self, cmd: Box<dyn Command<K>>) {
+impl CommandQueue<TestContext> for SimpleQueue {
+    fn submit(&self, cmd: Box<dyn Command<TestContext>>) {
         let mut guard = self.inner.lock().unwrap();
         guard.push(cmd);
     }
 
-    fn drain_into(&self, out: &mut Vec<Box<dyn Command<K>>>) {
+    fn drain_into(&self, out: &mut Vec<Box<dyn Command<TestContext>>>) {
         let mut guard = self.inner.lock().unwrap();
         out.append(&mut *guard);
     }
 }
 
 // Small read-only wrapper used for optimizer snapshots.
-pub struct SimpleStoreRead<'a, K, V>
-where
-    K: Eq + Hash,
-{
-    index: &'a HashMap<K, TestId>,
+#[derive(Debug, Clone, Copy)]
+pub struct SimpleStoreRead<'a, V> {
+    index: &'a HashMap<<TestContext as ProvideUiTy>::StoreKey, TestId>,
     elems: &'a SlotMap<TestId, V>,
+    metas: &'a HashMap<
+        <TestContext as ProvideUiTy>::StoreKey,
+        <TestContext as ProvideUiTy>::ElementMeta,
+    >,
 }
 
 #[allow(single_use_lifetimes)]
-impl<'a, K, V> UiStoreRead<K> for SimpleStoreRead<'a, K, V>
-where
-    K: Copy + Eq + Hash + 'static,
-{
-    fn exists(&self, id: K) -> bool {
+impl<'a, V> UiStoreRead<TestContext> for SimpleStoreRead<'a, V> {
+    fn exists(&self, id: <TestContext as ProvideUiTy>::StoreKey) -> bool {
         self.index.contains_key(&id)
     }
 }
 
-impl<K, V> MetaProvider<K, TestElementMeta<K>> for SimpleStoreRead<'_, K, V>
-where
-    K: Copy + Eq + Hash + 'static,
-{
-    fn get_meta(&self, id: K) -> Option<TestElementMeta<K>> {
-        self.index.contains_key(&id).then_some(TestElementMeta {
-            focused: false,
-            parent: None,
-            children_count: 0,
-        })
+impl<V> MetaProvider<<TestContext as ProvideUiTy>::StoreKey> for SimpleStoreRead<'_, V> {
+    type Meta = TestElementMeta<<TestContext as ProvideUiTy>::StoreKey>;
+
+    fn get_meta(&self, id: <TestContext as ProvideUiTy>::StoreKey) -> Option<&Self::Meta> {
+        self.metas.get(&id)
+    }
+}
+
+impl<V> ChildrenProvider<<TestContext as ProvideUiTy>::StoreKey> for SimpleStoreRead<'_, V> {
+    type Iter = <TestContext as ProvideUiTy>::ChildrenIter;
+
+    fn children_of(&self, parent: <TestContext as ProvideUiTy>::StoreKey) -> Self::Iter {
+        let mut out = Vec::new();
+        for (k, meta) in self.metas.iter() {
+            if let Some(p) = meta.parent
+                && p == parent
+            {
+                out.push(*k);
+            }
+        }
+        out.into_iter()
     }
 }
 
 /// A minimal in-memory UiStore used by tests. It stores a simple map
 /// from id -> integer state and processes `TestCommand` values.
 #[derive(Default)]
-pub struct TestStore<K, V>
-where
-    K: Copy + Eq + Hash,
-{
+pub struct TestStore<V> {
     // Commands submitted from main thread
-    pending: Vec<Box<dyn Command<K>>>,
+    pending: Vec<Box<dyn Command<TestContext>>>,
     // Commands submitted from other threads
-    external: Arc<Mutex<Vec<Box<dyn Command<K>>>>>,
-    index: HashMap<K, TestId>,
+    external: Arc<Mutex<Vec<Box<dyn Command<TestContext>>>>>,
+    index: HashMap<<TestContext as ProvideUiTy>::StoreKey, TestId>,
     elems: SlotMap<TestId, V>,
+    metas:
+        HashMap<<TestContext as ProvideUiTy>::StoreKey, <TestContext as ProvideUiTy>::ElementMeta>,
 }
 
-impl<K, V> TestStore<K, V>
-where
-    K: Copy + Eq + Hash,
-{
+impl<V> TestStore<V> {
     pub fn new() -> Self {
         Self {
             pending: Vec::new(),
             external: Arc::new(Mutex::new(Vec::new())),
             index: HashMap::new(),
             elems: SlotMap::with_key(),
+            metas: HashMap::new(),
         }
     }
 
-    pub fn get(&self, key: K) -> Option<&V> {
+    pub fn get(&self, key: <TestContext as ProvideUiTy>::StoreKey) -> Option<&V> {
         self.id(key).and_then(|id| self.elems.get(id))
     }
 
-    pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
+    pub fn get_mut(&mut self, key: <TestContext as ProvideUiTy>::StoreKey) -> Option<&mut V> {
         self.id(key).and_then(move |id| self.elems.get_mut(id))
     }
 
-    fn id(&self, key: K) -> Option<TestId> {
+    fn id(&self, key: <TestContext as ProvideUiTy>::StoreKey) -> Option<TestId> {
         self.index.get(&key).copied()
     }
 
-    fn insert(&mut self, key: K, value: V) {
+    fn insert(&mut self, key: <TestContext as ProvideUiTy>::StoreKey, value: V) {
         let id = self.elems.insert(value);
         self.index.insert(key, id);
+        // Initialize metadata entry for the new element.
+        self.metas.insert(
+            key,
+            TestElementMeta {
+                focused: false,
+                parent: None,
+                children_count: 0,
+            },
+        );
     }
 
-    fn remove(&mut self, key: K) {
+    fn remove(&mut self, key: <TestContext as ProvideUiTy>::StoreKey) {
         if let Some(id) = self.index.remove(&key) {
             self.elems.remove(id);
+            self.metas.remove(&key);
+        }
+    }
+
+    pub fn set_focused(&mut self, key: <TestContext as ProvideUiTy>::StoreKey, focused: bool) {
+        if let Some(meta) = self.metas.get_mut(&key) {
+            meta.focused = focused;
+        }
+    }
+
+    pub fn set_parent(
+        &mut self,
+        child: <TestContext as ProvideUiTy>::StoreKey,
+        parent: Option<<TestContext as ProvideUiTy>::StoreKey>,
+    ) {
+        if let Some(old_parent) = self.metas.get(&child).and_then(|m| m.parent)
+            && let Some(mp) = self.metas.get_mut(&old_parent)
+        {
+            mp.children_count = mp.children_count.saturating_sub(1);
+        }
+
+        if let Some(meta) = self.metas.get_mut(&child) {
+            meta.parent = parent;
+        }
+
+        if let Some(new_parent) = parent
+            && let Some(np) = self.metas.get_mut(&new_parent)
+        {
+            np.children_count = np.children_count.saturating_add(1);
         }
     }
 }
 
-impl<K, V> UiStore<K> for TestStore<K, V>
+impl<V> UiStore<TestContext> for TestStore<V>
 where
-    K: Copy + Eq + Hash + Send + 'static,
     V: Send + 'static,
 {
-    fn submit_from_main(&mut self, cmd: Box<dyn Command<K>>) {
+    fn submit_from_main(&mut self, cmd: Box<dyn Command<TestContext>>) {
         self.pending.push(cmd);
     }
 
-    fn submit_from_other(&self, cmd: Box<dyn Command<K>>) {
+    fn submit_from_other(&self, cmd: Box<dyn Command<TestContext>>) {
         let mut guard = self.external.lock().unwrap();
         guard.push(cmd);
     }
 
-    fn drain_pending(&mut self, out: &mut Vec<Box<dyn Command<K>>>) {
+    fn drain_pending(&mut self, out: &mut Vec<Box<dyn Command<TestContext>>>) {
         out.append(&mut self.pending);
 
         let mut guard = self.external.lock().unwrap();
         out.append(&mut *guard);
     }
 
-    fn apply_batch(&mut self, cmds: Vec<Box<dyn Command<K>>>) {
+    fn apply_batch(&mut self, cmds: Vec<Box<dyn Command<TestContext>>>) {
         for cmd in cmds.into_iter() {
-            if let Ok(tc) = cmd.into_any().downcast::<TestCommand<K, V>>() {
+            if let Ok(tc) = cmd
+                .into_any()
+                .downcast::<TestCommand<<TestContext as ProvideUiTy>::StoreKey, V>>()
+            {
                 match tc.0 {
                     TestCommandKind::Create(k, v) => self.insert(k, v),
                     TestCommandKind::Remove(k) => {
@@ -237,10 +277,11 @@ where
         }
     }
 
-    fn as_read(&self) -> Box<dyn UiStoreRead<K> + '_> {
+    fn as_read(&self) -> Box<dyn UiStoreRead<TestContext> + '_> {
         Box::new(SimpleStoreRead {
             index: &self.index,
             elems: &self.elems,
+            metas: &self.metas,
         })
     }
 }
@@ -249,15 +290,12 @@ where
 #[derive(Debug, Clone, Copy)]
 pub struct TestOptimizer;
 
-impl<K> CommandOptimizer<K> for TestOptimizer
-where
-    K: Copy + Eq + Hash + Send + Sync,
-{
+impl CommandOptimizer<TestContext> for TestOptimizer {
     fn optimize(
         &self,
-        cmds: Vec<Box<dyn Command<K>>>,
-        _store: &dyn UiStoreRead<K>,
-    ) -> Vec<Box<dyn Command<K>>> {
+        cmds: Vec<Box<dyn Command<TestContext>>>,
+        _store: &dyn UiStoreRead<TestContext>,
+    ) -> Vec<Box<dyn Command<TestContext>>> {
         cmds
     }
 }

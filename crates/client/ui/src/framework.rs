@@ -4,6 +4,8 @@ use std::any::Any;
 use std::fmt::{self, Debug};
 use std::sync::Arc;
 
+use crate::ProvideUiTy;
+
 /// Trait that indicates a key contains a generation token (generational id).
 ///
 /// Implementors should provide a stable way to read the generation so callers
@@ -16,9 +18,12 @@ pub trait GenerationalKey {
 }
 
 /// A single UI mutation described as a value object.
-pub trait Command<K>: Send {
+pub trait Command<Cx>: Send
+where
+    Cx: ProvideUiTy,
+{
     /// Applies this command to `store`.
-    fn apply(&self, store: &mut dyn UiStore<K>);
+    fn apply(&self, store: &mut dyn UiStore<Cx>);
 
     fn as_any(&self) -> &dyn Any;
 
@@ -30,40 +35,50 @@ pub trait Command<K>: Send {
 // implement `Command<Id>` explicitly.
 
 /// Abstract queue for submitting commands.
-pub trait CommandQueue<K>: Send + Sync {
+pub trait CommandQueue<Cx>: Send + Sync
+where
+    Cx: ProvideUiTy,
+{
     /// Submit a command.
-    fn submit(&self, cmd: Box<dyn Command<K>>);
+    fn submit(&self, cmd: Box<dyn Command<Cx>>);
 
     /// Drain all queued commands into `out`.
-    fn drain_into(&self, out: &mut Vec<Box<dyn Command<K>>>);
+    fn drain_into(&self, out: &mut Vec<Box<dyn Command<Cx>>>);
+}
+
+pub trait MetaProvider<K>
+where
+    K: Copy + Eq,
+{
+    type Meta;
+
+    fn get_meta(&self, key: K) -> Option<&Self::Meta>;
+}
+
+pub trait ChildrenProvider<K>
+where
+    K: Copy + Eq,
+{
+    type Iter: IntoIterator<Item = K>;
+
+    fn children_of(&self, parent: K) -> Self::Iter;
 }
 
 /// Read-only view of a UiStore used by optimizers.
-pub trait UiStoreRead<K>
+pub trait UiStoreRead<Cx>:
+    MetaProvider<Cx::StoreKey, Meta = Cx::ElementMeta>
+    + ChildrenProvider<Cx::StoreKey, Iter = Cx::ChildrenIter>
 where
-    K: Copy + Eq,
+    Cx: ProvideUiTy,
 {
-    /// Whether the element identified by `key` currently exists.
-    fn exists(&self, key: K) -> bool;
-}
-
-pub trait MetaProvider<K, M>
-where
-    K: Copy + Eq,
-{
-    fn get_meta(&self, key: K) -> Option<M>;
-}
-
-pub trait ChildrenProvider<K, I>
-where
-    K: Copy + Eq,
-    I: IntoIterator<Item = K>,
-{
-    fn children_of(&self, parent: K) -> I;
+    fn exists(&self, key: Cx::StoreKey) -> bool;
 }
 
 /// Optimize/prune/merge a batch of commands given a read-only store view.
-pub trait CommandOptimizer<K>: Send + Sync {
+pub trait CommandOptimizer<Cx>: Send + Sync
+where
+    Cx: ProvideUiTy,
+{
     /// Optimizes/prunes a batch of commands.
     ///
     /// Receives ownership of `cmds` and a read-only view of the store for
@@ -71,54 +86,66 @@ pub trait CommandOptimizer<K>: Send + Sync {
     /// command list that is safe to apply and semantically equivalent.
     fn optimize(
         &self,
-        cmds: Vec<Box<dyn Command<K>>>,
-        store: &dyn UiStoreRead<K>,
-    ) -> Vec<Box<dyn Command<K>>>;
+        cmds: Vec<Box<dyn Command<Cx>>>,
+        store: &dyn UiStoreRead<Cx>,
+    ) -> Vec<Box<dyn Command<Cx>>>;
 }
 
 /// Default optimizer that returns commands unchanged.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoopOptimizer;
 
-impl<K> CommandOptimizer<K> for NoopOptimizer {
+impl<Cx> CommandOptimizer<Cx> for NoopOptimizer
+where
+    Cx: ProvideUiTy,
+{
     fn optimize(
         &self,
-        cmds: Vec<Box<dyn Command<K>>>,
-        store: &dyn UiStoreRead<K>,
-    ) -> Vec<Box<dyn Command<K>>> {
+        cmds: Vec<Box<dyn Command<Cx>>>,
+        store: &dyn UiStoreRead<Cx>,
+    ) -> Vec<Box<dyn Command<Cx>>> {
         let _ = store;
         cmds
     }
 }
 
-pub trait UiStore<K>: Send {
+pub trait UiStore<Cx>: Send
+where
+    Cx: ProvideUiTy,
+{
     /// Submits a command from the main-thread (may avoid synchronization).
-    fn submit_from_main(&mut self, cmd: Box<dyn Command<K>>);
+    fn submit_from_main(&mut self, cmd: Box<dyn Command<Cx>>);
 
     /// Submits a command from other threads / systems. The store may choose
     /// to push this into an internal thread-safe queue.
-    fn submit_from_other(&self, cmd: Box<dyn Command<K>>);
+    fn submit_from_other(&self, cmd: Box<dyn Command<Cx>>);
 
     /// Drains both main and external queues into the provided vector. This
     /// method should be called by the owner at a single, well-defined
     /// point (e.g. at frame start) so `&mut self` is available to apply.
-    fn drain_pending(&mut self, out: &mut Vec<Box<dyn Command<K>>>);
+    fn drain_pending(&mut self, out: &mut Vec<Box<dyn Command<Cx>>>);
 
     /// Applies a batch of commands (after optional optimization). The store
     /// implementation performs the actual mutations here under `&mut self`.
-    fn apply_batch(&mut self, cmds: Vec<Box<dyn Command<K>>>);
+    fn apply_batch(&mut self, cmds: Vec<Box<dyn Command<Cx>>>);
 
     /// Provides a read-only snapshot view for the optimizer.
-    fn as_read(&self) -> Box<dyn UiStoreRead<K> + '_>;
+    fn as_read(&self) -> Box<dyn UiStoreRead<Cx> + '_>;
 }
 
 /// Lightweight handle for submitting commands.
 #[derive(Clone)]
-pub struct UiHandle<K> {
-    queue: Arc<dyn CommandQueue<K>>,
+pub struct UiHandle<Cx>
+where
+    Cx: ProvideUiTy,
+{
+    queue: Arc<dyn CommandQueue<Cx>>,
 }
 
-impl<K> Debug for UiHandle<K> {
+impl<Cx> Debug for UiHandle<Cx>
+where
+    Cx: ProvideUiTy,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("UiHandle")
             .field("queue", &"<command-queue>")
@@ -126,23 +153,27 @@ impl<K> Debug for UiHandle<K> {
     }
 }
 
-impl<K> UiHandle<K>
+impl<Cx> UiHandle<Cx>
 where
-    K: GenerationalKey + 'static,
+    Cx: ProvideUiTy,
+    Cx::StoreKey: GenerationalKey,
 {
     /// Creates a new handle from a boxed queue implementation.
-    pub fn new(queue: Arc<dyn CommandQueue<K>>) -> Self {
+    pub fn new(queue: Arc<dyn CommandQueue<Cx>>) -> Self {
         Self { queue }
     }
 
     /// Submits a command via the shared queue.
-    pub fn submit(&self, cmd: Box<dyn Command<K>>) {
+    pub fn submit(&self, cmd: Box<dyn Command<Cx>>) {
         self.queue.submit(cmd);
     }
 }
 
 /// Optional coordinator trait.
-pub trait UiCoordinator<K>: Send {
+pub trait UiCoordinator<Cx>: Send
+where
+    Cx: ProvideUiTy,
+{
     /// Drain pending commands, call optimizer and apply the final batch.
     fn flush_frame(&mut self);
 }
@@ -151,14 +182,15 @@ pub trait UiCoordinator<K>: Send {
 ///
 /// This helper drains pending commands, runs the optimizer and applies the
 /// resulting batch on `store`.
-pub fn run_pipeline<K, S, Q, O>(store: &mut S, queue: &Q, optimizer: &O)
+pub fn run_pipeline<Cx, S, Q, O>(store: &mut S, queue: &Q, optimizer: &O)
 where
-    K: Copy + GenerationalKey + 'static,
-    S: UiStore<K>,
-    Q: CommandQueue<K>,
-    O: CommandOptimizer<K>,
+    Cx: ProvideUiTy,
+    Cx::StoreKey: GenerationalKey,
+    S: UiStore<Cx>,
+    Q: CommandQueue<Cx>,
+    O: CommandOptimizer<Cx>,
 {
-    let mut pending: Vec<Box<dyn Command<K>>> = Vec::new();
+    let mut pending: Vec<Box<dyn Command<Cx>>> = Vec::new();
 
     store.drain_pending(&mut pending);
     queue.drain_into(&mut pending);

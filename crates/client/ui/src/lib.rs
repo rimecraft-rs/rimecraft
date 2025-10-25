@@ -23,6 +23,7 @@ pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
     type SizeConstraintsExt;
     type StoreKey: Copy + Eq;
     type ElementMeta: ElementMeta;
+    type ChildrenIter: IntoIterator<Item = Self::StoreKey>;
 }
 
 /// The selection state of a UI component.
@@ -183,8 +184,8 @@ where
     fn handle_event_read(
         &self,
         ev: &dyn Any,
-        store: &dyn UiStoreRead<Cx::StoreKey>,
-    ) -> (EventPropagation, Vec<Box<dyn Command<Cx::StoreKey>>>) {
+        store: &dyn UiStoreRead<Cx>,
+    ) -> (EventPropagation, Vec<Box<dyn Command<Cx>>>) {
         if let Some(_ui_ev) = ev.downcast_ref::<UiEvent<'_, Cx>>() {
             self.handle_ui_event_read(_ui_ev, store)
         } else {
@@ -199,8 +200,8 @@ where
     fn handle_ui_event_read(
         &self,
         ev: &UiEvent<'_, Cx>,
-        store: &dyn UiStoreRead<Cx::StoreKey>,
-    ) -> (EventPropagation, Vec<Box<dyn Command<Cx::StoreKey>>>) {
+        store: &dyn UiStoreRead<Cx>,
+    ) -> (EventPropagation, Vec<Box<dyn Command<Cx>>>) {
         let _ = (ev, store);
         (EventPropagation::NotHandled, Vec::new())
     }
@@ -209,18 +210,21 @@ where
 /// Helper for container implementations: iterate children and invoke a
 /// per-child read-time handler. Collects commands returned by children and
 /// respects propagation (stops if a child returns `Handled`).
-pub fn container_handle_event_read<K, I, F>(
-    children: I,
+pub fn container_handle_event_read<Cx, F>(
+    children: Cx::ChildrenIter,
     ev: &dyn Any,
-    store: &dyn UiStoreRead<K>,
+    store: &dyn UiStoreRead<Cx>,
     mut call_child: F,
-) -> (EventPropagation, Vec<Box<dyn Command<K>>>)
+) -> (EventPropagation, Vec<Box<dyn Command<Cx>>>)
 where
-    I: IntoIterator<Item = K>,
-    K: Copy + Eq,
-    F: FnMut(K, &dyn Any, &dyn UiStoreRead<K>) -> (EventPropagation, Vec<Box<dyn Command<K>>>),
+    Cx: ProvideUiTy,
+    F: FnMut(
+        Cx::StoreKey,
+        &dyn Any,
+        &dyn UiStoreRead<Cx>,
+    ) -> (EventPropagation, Vec<Box<dyn Command<Cx>>>),
 {
-    let mut out_cmds: Vec<Box<dyn Command<K>>> = Vec::new();
+    let mut out_cmds: Vec<Box<dyn Command<Cx>>> = Vec::new();
     for child in children {
         if !store.exists(child) {
             continue;
