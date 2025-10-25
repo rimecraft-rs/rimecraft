@@ -33,11 +33,6 @@ mod filter;
 
 pub use filter::{SafeTypeFilter, TypeFilter};
 
-//TODO: give this to global context for implementation.
-const POS_XZ_BOUND: f64 = 3.0000512e7;
-const POS_Y_BOUND: f64 = 2.0e7;
-const VELOCITY_BOUND: f64 = 10.0;
-
 /// Global context types satisfying use of entities.
 pub trait EntityCx<'a>:
     ProvideIdTy
@@ -49,6 +44,13 @@ pub trait EntityCx<'a>:
 {
     /// The data type of a player entity, can either be a concrete type or a supertype.
     type PlayerEntityData: ?Sized + 'a;
+
+    /// The maximum position of an entity in X and Z axis.
+    const POS_XZ_BOUND: f64 = 3.0000512e7;
+    /// The maximum position of an entity in Y axis.
+    const POS_Y_BOUND: f64 = 2.0e7;
+    /// The maximum velocity of an entity.
+    const VELOCITY_BOUND: f64 = 10.0;
 }
 
 /// Global context types providing an extension types to entities.

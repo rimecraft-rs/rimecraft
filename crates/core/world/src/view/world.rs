@@ -11,8 +11,6 @@ use crate::{
     },
 };
 
-//TODO: CollisionView
-
 /// A view which shows the collision within a world.
 pub trait CollisionView<'w, Cx>: BlockView<'w, Cx>
 where
