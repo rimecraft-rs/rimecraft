@@ -15,7 +15,7 @@ use rimecraft_voxel_math::BlockPos;
 use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{
-    DsynCache, Environment, World,
+    Environment, World,
     behave::*,
     chunk::{AsBaseChunkAccess, BaseChunkAccess, light::ChunkSkyLight},
     event::ServerChunkEventCallback,
@@ -63,7 +63,6 @@ where
     world_ptr: Weak<World<'w, Cx>>,
 
     local_cx: Cx::LocalContext<'w>,
-    dsyn_cache: Arc<DsynCache<'w, Cx>>,
 
     ext: Cx::WorldChunkExt,
 
@@ -309,8 +308,8 @@ where
         pos: BlockPos,
     ) -> Option<Box<BlockEntity<'w, Cx>>> {
         let bs = Self::__block_state(this.reclaim(), pos)?;
-        dsyn_instanceof!(cached this.dsyn_cache(), this.local_context(), &*bs.block => export BlockEntityConstructor<Cx>)
-                .map(|f| f(pos, bs, this.local_context(), BlockEntityConstructorMarker))
+        dsyn_instanceof!(this.local_context(), &*bs.block => export BlockEntityConstructor<Cx>)
+            .map(|f| f(pos, bs, this.local_context(), BlockEntityConstructorMarker))
     }
 
     fn __set_block_entity(
@@ -318,8 +317,7 @@ where
         mut block_entity: Box<BlockEntity<'w, Cx>>,
         return_cell: bool,
     ) -> Option<BlockEntityCell<'w, Cx>> {
-        let dsyn_ty =
-            dsyn_ty!(cached this.dsyn_cache(), this.local_context() => BlockEntityConstructor<Cx>);
+        let dsyn_ty = dsyn_ty!(this.local_context() => BlockEntityConstructor<Cx>);
         let bs_w = Self::__block_state(this.reclaim(), block_entity.pos())
             .filter(|bs| (*bs.block).descriptors().contains(dsyn_ty))?;
 
@@ -434,7 +432,7 @@ where
         Cx::replace_block_state_callback(pos, state, old_state, flags, &mut this);
 
         if old_state.block != state.block
-            && dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*old_state.block => BlockEntityConstructor<Cx>)
+            && dsyn_instanceof!(local_cx, &*old_state.block => BlockEntityConstructor<Cx>)
         {
             Self::__remove_block_entity(
                 //SAFETY: because of restrictions of Rust's borrow checker, the only way to get through this complex type system is through this.
@@ -452,7 +450,8 @@ where
             Cx::add_block_state_callback(pos, state, old_state, flags, &mut this);
 
             // Update block entity
-            if let Some(be_constructor) = dsyn_instanceof!(cached this.dsyn_cache(), local_cx, &*state.block => export BlockEntityConstructor<Cx>)
+            if let Some(be_constructor) =
+                dsyn_instanceof!(local_cx, &*state.block => export BlockEntityConstructor<Cx>)
             {
                 #[derive(Clone, Copy, PartialEq, Eq)]
                 enum PeekResult {
@@ -874,11 +873,6 @@ where
     ///
     /// This copies a mutable reference.
     unsafe fn reclaim_unsafe(&mut self) -> Self;
-
-    #[inline]
-    fn dsyn_cache(&self) -> &DsynCache<'w, Cx> {
-        &self.wca_as_wc().dsyn_cache
-    }
 }
 
 impl<'w, Cx> HoldLocalContext for WorldChunk<'w, Cx>

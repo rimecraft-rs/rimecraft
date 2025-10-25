@@ -28,6 +28,7 @@ use rimecraft_chunk_palette::{
 };
 use rimecraft_fluid::ProvideFluidStateExtTy;
 use rimecraft_global_cx::{Hold, ProvideIdTy, ProvideNbtTy};
+use rimecraft_voxel_math::direction::Direction;
 
 use std::{
     fmt::Debug,
@@ -120,49 +121,6 @@ impl<T> ArcAccess<T> for Weak<T> {
     #[inline]
     fn access_weak(self) -> Weak<T> {
         self.clone()
-    }
-}
-
-pub(crate) use __dsyn_cache::DsynCache;
-use rimecraft_voxel_math::direction::Direction;
-
-//TODO: deprecate this
-mod __dsyn_cache {
-    use crate::behave::*;
-
-    use crate::WorldCx;
-
-    macro_rules! dsyn_caches_init {
-    ($($f:ident=>$t:ty),*$(,)?) => {
-        #[derive(Debug)]
-        #[doc(hidden)]
-        pub struct DsynCache<'w, Cx>
-        where
-            Cx: WorldCx<'w>,
-        {
-            $($f: std::sync::OnceLock<dsyn::Type<$t>>,)*
-            _marker: std::marker::PhantomData<&'w ()>,
-        }
-
-        $(
-        impl<'w, Cx> local_cx::dsyn::DescriptorTypeCache<$t> for DsynCache<'w, Cx>
-        where
-            Cx: WorldCx<'w>,
-        {
-            #[inline]
-            fn get_or_cache<F>(&self, f: F) -> dsyn::Type<$t>
-            where
-                F: FnOnce() -> dsyn::Type<$t>,
-            {
-                *self.$f.get_or_init(f)
-            }
-        }
-        )*
-    };
-    }
-
-    dsyn_caches_init! {
-        be_constructor => BlockEntityConstructor<Cx>,
     }
 }
 
