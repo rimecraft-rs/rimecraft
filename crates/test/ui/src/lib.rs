@@ -27,13 +27,13 @@ fn parent_dispatches_child_events() {
 
     // Create a child element in the store with key 1
     store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(
-        TestKey(1u32),
-        0u32,
+        TestKey(1),
+        0,
     ))));
     run_pipeline(&mut store, queue.as_ref(), &opt);
 
     // A minimal ElementRead implementation: when it sees the string "click"
-    // it returns a SetState command for the target id.
+    // it returns a SetState command for the target id
     struct Child;
 
     impl Element<TestContext> for Child {}
@@ -60,7 +60,7 @@ fn parent_dispatches_child_events() {
     let child = Child;
 
     // Coordinator-like flow: take a read snapshot, ask child what to do,
-    // then optimize and apply.
+    // then optimize and apply
     let snapshot = store.as_read();
     let (prop, cmds) = child.handle_event_read(&"click", snapshot.as_ref());
     drop(snapshot);
@@ -85,22 +85,22 @@ fn children_and_meta_queries() {
 
     store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(
         TestKey(10),
-        0i32,
+        0,
     ))));
     store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(
         TestKey(11),
-        0i32,
+        0,
     ))));
     store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(
         TestKey(12),
-        0i32,
+        0,
     ))));
 
     run_pipeline(&mut store, queue.as_ref(), &opt);
 
-    // parent = 10, children = 11,12
-    store.set_parent(TestKey(11), Some(TestKey(10u32)));
-    store.set_parent(TestKey(12), Some(TestKey(10u32)));
+    // parent = 10, children = [11, 12]
+    store.set_parent(TestKey(11), Some(TestKey(10)));
+    store.set_parent(TestKey(12), Some(TestKey(10)));
     store.set_focused(TestKey(11), true);
 
     let snapshot = store.as_read();
@@ -110,7 +110,7 @@ fn children_and_meta_queries() {
 
     let meta = snapshot.get_meta(TestKey(11)).expect("meta");
     assert!(meta.focused);
-    assert_eq!(meta.parent, Some(TestKey(10u32)));
+    assert_eq!(meta.parent, Some(TestKey(10)));
     drop(snapshot);
 }
 
@@ -146,33 +146,33 @@ fn optimizer_prunes_non_focused_set_state() {
     let mut store = TestStore::<i32>::new();
     let queue = Arc::new(SimpleQueue::new());
 
-    // create two elements
+    // Create two elements
     store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(
-        TestKey(20u32),
-        0i32,
+        TestKey(20),
+        0,
     ))));
     store.submit_from_main(Box::new(TestCommand(TestCommandKind::Create(
-        TestKey(21u32),
-        0i32,
+        TestKey(21),
+        0,
     ))));
 
     run_pipeline(&mut store, queue.as_ref(), &TestOptimizer);
 
-    // focus only 20
-    store.set_focused(TestKey(20u32), true);
+    // Focus only 20
+    store.set_focused(TestKey(20), true);
 
-    // submit setstate for both
+    // Submit SetState for both
     store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState(
-        TestKey(20u32),
-        7i32,
+        TestKey(20),
+        7,
     ))));
     store.submit_from_main(Box::new(TestCommand(TestCommandKind::SetState(
-        TestKey(21u32),
-        9i32,
+        TestKey(21),
+        9,
     ))));
 
     run_pipeline(&mut store, queue.as_ref(), &FocusOnlyOptimizer);
 
-    assert_eq!(store.get(TestKey(20u32)), Some(&7));
-    assert_eq!(store.get(TestKey(21u32)), Some(&0));
+    assert_eq!(store.get(TestKey(20)), Some(&7));
+    assert_eq!(store.get(TestKey(21)), Some(&0));
 }

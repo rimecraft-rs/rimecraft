@@ -1,4 +1,4 @@
-use std::{hash::Hash, sync::Arc, thread};
+use std::{sync::Arc, thread};
 
 use test_global::{
     TestContext,

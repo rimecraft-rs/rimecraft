@@ -74,7 +74,7 @@ where
     fn exists(&self, key: Cx::StoreKey) -> bool;
 }
 
-/// Optimize/prune/merge a batch of commands given a read-only store view.
+/// Optimizes/prunes/merges a batch of commands given a read-only store view.
 pub trait CommandOptimizer<Cx>: Send + Sync
 where
     Cx: ProvideUiTy,
@@ -174,7 +174,7 @@ pub trait UiCoordinator<Cx>: Send
 where
     Cx: ProvideUiTy,
 {
-    /// Drain pending commands, call optimizer and apply the final batch.
+    /// Drains pending commands, calls optimizer and applies the final batch.
     fn flush_frame(&mut self);
 }
 
