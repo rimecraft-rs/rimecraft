@@ -3,7 +3,7 @@
 use dsyn::HoldDescriptors as _;
 use glam::IVec3;
 use local_cx::{HoldLocalContext, LocalContext, dsyn_instanceof, dsyn_ty};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, MutexGuard};
 use rimecraft_block::BlockState;
 use rimecraft_block_entity::{
     BlockEntity, DynErasedRawBlockEntityType, component::RawErasedComponentType,
@@ -11,7 +11,7 @@ use rimecraft_block_entity::{
 use rimecraft_fluid::{BsToFs, FluidState};
 use rimecraft_global_cx::Hold;
 use rimecraft_registry::Registry;
-use rimecraft_voxel_math::BlockPos;
+use rimecraft_voxel_math::{BlockPos, ChunkPos};
 use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{
@@ -28,6 +28,7 @@ use super::{BORDER_LEN, BaseChunk, BlockEntityCell, Chunk, WorldCx, section::Com
 use std::{
     fmt::Debug,
     marker::PhantomData,
+    ops::{Deref, DerefMut},
     sync::{Arc, Weak},
 };
 
@@ -60,10 +61,11 @@ where
 
     env: Environment,
     loaded_to_world: bool,
+    //TODO: should we conserve this?
     world_ptr: Weak<World<'w, Cx>>,
+    unsaved_listener: Mutex<Box<dyn Fn(ChunkPos) + Send + Sync + 'w>>,
 
     local_cx: Cx::LocalContext<'w>,
-
     ext: Cx::WorldChunkExt,
 
     _invariant_marker: PhantomData<fn(&'w ()) -> &'w ()>,
@@ -125,10 +127,13 @@ where
         self.loaded_to_world || self.env.is_client()
     }
 
-    #[inline]
-    fn __mark_needs_saving(this: impl WorldChunkAccess<'w, Cx>) {
-        this.bca().mark_needs_saving();
-        //TODO: call dirty chunk listener
+    fn __mark_needs_saving(mut this: impl WorldChunkAccess<'w, Cx>) {
+        let dirty = this.reclaim().bca().needs_saving();
+        if !dirty {
+            this.reclaim().bca().mark_needs_saving();
+            let pos = this.wca_as_bc().pos;
+            (**this.reclaim().read_unsaved_listener())(pos);
+        }
     }
 
     /// Downcasts a [`Chunk`] to a [`WorldChunk`].
@@ -136,7 +141,6 @@ where
     /// # Errors
     ///
     /// Returns the chunk if it is not a [`WorldChunk`], or it is **a reference of it.**
-    #[inline]
     pub fn downcast<C: Chunk<'w, Cx>>(value: C) -> Result<Self, C> {
         //SAFETY: 'w is invariant here. won't produce lifetime soundness issues
         unsafe { rcutil::try_cast(value) }
@@ -147,7 +151,6 @@ where
     /// # Errors
     ///
     /// Returns the chunk if it is not a [`WorldChunk`].
-    #[inline]
     pub fn downcast_ref<C: Chunk<'w, Cx>>(value: &C) -> Option<&Self> {
         unsafe {
             //SAFETY: 'w is invariant here. won't produce lifetime soundness issues
@@ -156,6 +159,30 @@ where
                 .or_else(|value| rcutil::try_cast::<_, &Self>(value))
                 .ok()
         }
+    }
+
+    #[inline]
+    fn __set_unsaved_listener<L>(this: impl WorldChunkAccess<'w, Cx>, listener: L)
+    where
+        L: Fn(ChunkPos) + Send + Sync + 'w,
+    {
+        *this.write_unsaved_listener() = Box::new(listener);
+    }
+
+    /// Sets the unsaved listener.
+    pub fn set_unsaved_listener<L>(&mut self, listener: L)
+    where
+        L: Fn(ChunkPos) + Send + Sync + 'w,
+    {
+        Self::__set_unsaved_listener(self, listener);
+    }
+
+    /// Sets the unsaved listener with locking behavior.
+    pub fn set_unsaved_listener_locked<L>(&self, listener: L)
+    where
+        L: Fn(ChunkPos) + Send + Sync + 'w,
+    {
+        Self::__set_unsaved_listener(self, listener);
     }
 }
 
@@ -425,8 +452,8 @@ where
             }
         }
 
-        //TODO: update chunk manager
         //TODO: update lighting
+        //TODO: update chunk manager
 
         // Generic callbacks
         Cx::replace_block_state_callback(pos, state, old_state, flags, &mut this);
@@ -873,6 +900,12 @@ where
     ///
     /// This copies a mutable reference.
     unsafe fn reclaim_unsafe(&mut self) -> Self;
+
+    type UnsavedListenerRead: Deref<Target = Box<dyn Fn(ChunkPos) + Send + Sync + 'w>>;
+    type UnsavedListenerWrite: DerefMut<Target = Box<dyn Fn(ChunkPos) + Send + Sync + 'w>>;
+
+    fn read_unsaved_listener(self) -> Self::UnsavedListenerRead;
+    fn write_unsaved_listener(self) -> Self::UnsavedListenerWrite;
 }
 
 impl<'w, Cx> HoldLocalContext for WorldChunk<'w, Cx>
@@ -887,7 +920,7 @@ where
     }
 }
 
-impl<'w, Cx> WorldChunkAccess<'w, Cx> for &WorldChunk<'w, Cx>
+impl<'a, 'w, Cx> WorldChunkAccess<'w, Cx> for &'a WorldChunk<'w, Cx>
 where
     Cx: WorldCx<'w>,
 {
@@ -920,9 +953,23 @@ where
     fn reclaim(&mut self) -> Self::Reclaim<'_> {
         *self
     }
+
+    type UnsavedListenerRead = Self::UnsavedListenerWrite;
+
+    type UnsavedListenerWrite = MutexGuard<'a, Box<dyn Fn(ChunkPos) + Send + Sync + 'w>>;
+
+    #[inline]
+    fn read_unsaved_listener(self) -> Self::UnsavedListenerRead {
+        self.write_unsaved_listener()
+    }
+
+    #[inline]
+    fn write_unsaved_listener(self) -> Self::UnsavedListenerWrite {
+        self.unsaved_listener.lock()
+    }
 }
 
-impl<'w, Cx> WorldChunkAccess<'w, Cx> for &mut WorldChunk<'w, Cx>
+impl<'a, 'w, Cx> WorldChunkAccess<'w, Cx> for &'a mut WorldChunk<'w, Cx>
 where
     Cx: WorldCx<'w>,
 {
@@ -954,5 +1001,19 @@ where
     #[inline]
     fn reclaim(&mut self) -> Self::Reclaim<'_> {
         &mut **self
+    }
+
+    type UnsavedListenerRead = Self::UnsavedListenerWrite;
+
+    type UnsavedListenerWrite = &'a mut Box<dyn Fn(ChunkPos) + Send + Sync + 'w>;
+
+    #[inline]
+    fn read_unsaved_listener(self) -> Self::UnsavedListenerRead {
+        self.write_unsaved_listener()
+    }
+
+    #[inline]
+    fn write_unsaved_listener(self) -> Self::UnsavedListenerWrite {
+        self.unsaved_listener.get_mut()
     }
 }

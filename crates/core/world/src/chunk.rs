@@ -334,6 +334,7 @@ where
     fn write_chunk_sky_light(self) -> Self::ChunkSkyLightWrite;
 
     fn mark_needs_saving(self);
+    fn needs_saving(self) -> bool;
 }
 
 impl<'a, 'w, Cx: WorldCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> {
@@ -433,6 +434,11 @@ impl<'a, 'w, Cx: WorldCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> 
         self.needs_saving
             .store(true, std::sync::atomic::Ordering::Relaxed);
     }
+
+    #[inline]
+    fn needs_saving(self) -> bool {
+        self.needs_saving.load(std::sync::atomic::Ordering::Relaxed)
+    }
 }
 
 impl<'a, 'w, Cx: WorldCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, Cx> {
@@ -527,5 +533,10 @@ impl<'a, 'w, Cx: WorldCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, 
     #[inline]
     fn mark_needs_saving(self) {
         *self.needs_saving.get_mut() = true;
+    }
+
+    #[inline]
+    fn needs_saving(self) -> bool {
+        *self.needs_saving.get_mut()
     }
 }
