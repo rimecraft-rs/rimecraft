@@ -11,11 +11,14 @@ use std::{
 use glam::{DVec3, DVec4};
 use maybe::{Maybe, SimpleOwned};
 use rimecraft_voxel_math::{BBox, BlockPos};
+use serde::{Deserialize, Serialize};
 use voxel_shape::VoxelShapeSlice;
 
 const DEFAULT_SIZE: f64 = 5.999997e7;
 
 /// Border of a world.
+///
+/// See [`Properties`] and [`Self::as_props`] for serialization.
 #[derive(Debug)]
 pub struct WorldBorder<'a> {
     area: Area,
@@ -46,7 +49,20 @@ pub trait Listener {
     /// Called when the size of the world border is interpolated.
     fn on_interpolate_size(&mut self, border: &WorldBorder<'_>, from: f64, to: f64, time: Duration);
 
-    //TODO: implement more if needed in future.
+    /// Called when the center of the world border changes.
+    fn on_center_changed(&mut self, border: &WorldBorder<'_>, x: f64, z: f64);
+
+    /// Called when the damage per block of the world border changes.
+    fn on_damage_per_block_changed(&mut self, border: &WorldBorder<'_>, damage: f64);
+
+    /// Called when the safe zone of the world border changes.
+    fn on_safe_zone_changed(&mut self, border: &WorldBorder<'_>, safe_zone: f64);
+
+    /// Called when the warning time of the world border changes.
+    fn on_warning_blocks_changed(&mut self, border: &WorldBorder<'_>, warning_blocks: u32);
+
+    /// Called when the warning time of the world border changes.
+    fn on_warning_time_changed(&mut self, border: &WorldBorder<'_>, warning_time: u32);
 }
 
 /// Key of a [`Listener`].
@@ -231,6 +247,21 @@ impl WorldBorder<'_> {
     pub fn max_radius(&self) -> u32 {
         self.max_radius
     }
+
+    /// Returns the properties of the world border.
+    pub fn as_props(&self) -> Properties {
+        Properties {
+            center_x: self.center_x,
+            center_z: self.center_z,
+            damage_per_block: self.damage_per_block,
+            safe_zone: self.safe_zone,
+            warning_blocks: self.warning_blocks,
+            warning_time: self.warning_time,
+            size: self.size(),
+            size_lerp_time: self.area.size_lerp_time().as_millis() as u64,
+            size_lerp_target: self.area.size_lerp_target(),
+        }
+    }
 }
 
 impl<'a> WorldBorderMut<'a> {
@@ -275,9 +306,61 @@ impl<'a> WorldBorderMut<'a> {
     }
 
     /// Sets the size of the world border, and notifies listeners.
+    ///
+    /// See [`Self::interpolate_size`] for transitioning size linearly by time.
     pub fn set_size(&mut self, size: f64) {
         self.immut.area = Area::Static(StaticArea::new(size, self.area_cx()));
         notify!(self.listeners => on_size_change(&self.immut, size));
+    }
+
+    /// Sets the center of the world border, and notifies listeners.
+    pub fn set_center(&mut self, x: f64, z: f64) {
+        self.immut.center_x = x;
+        self.immut.center_z = z;
+        self.immut.area.on_center_changed(self.area_cx());
+        notify!(self.listeners => on_center_changed(&self.immut, x, z));
+    }
+
+    /// Sets the damage per block of the world border, and notifies listeners.
+    pub fn set_damage_per_block(&mut self, damage_per_block: f64) {
+        self.immut.damage_per_block = damage_per_block;
+        notify!(self.listeners => on_damage_per_block_changed(&self.immut, damage_per_block));
+    }
+
+    /// Sets the safe zone of the world border, and notifies listeners.
+    pub fn set_safe_zone(&mut self, safe_zone: f64) {
+        self.immut.safe_zone = safe_zone;
+        notify!(self.listeners => on_safe_zone_changed(&self.immut, safe_zone));
+    }
+
+    /// Sets the warning time of the world border, and notifies listeners.
+    pub fn set_warning_blocks(&mut self, warning_blocks: u32) {
+        self.immut.warning_blocks = warning_blocks;
+        notify!(self.listeners => on_warning_blocks_changed(&self.immut, warning_blocks))
+    }
+
+    /// Sets the warning time of the world border, and notifies listeners.
+    pub fn set_warning_time(&mut self, warning_time: u32) {
+        self.immut.warning_time = warning_time;
+        notify!(self.listeners => on_warning_time_changed(&self.immut, warning_time));
+    }
+
+    /// Loads the world border from the given properties.
+    pub fn load_from_props(&mut self, props: Properties) {
+        self.set_center(props.center_x, props.center_z);
+        self.set_damage_per_block(props.damage_per_block);
+        self.set_safe_zone(props.safe_zone);
+        self.set_warning_blocks(props.warning_blocks);
+        self.set_warning_time(props.warning_time);
+        if props.size_lerp_time > 0 {
+            self.interpolate_size(
+                props.size,
+                props.size_lerp_target,
+                Duration::from_millis(props.size_lerp_time),
+            );
+        } else {
+            self.set_size(props.size);
+        }
     }
 }
 
@@ -367,6 +450,29 @@ impl Area {
                     area.new_size
                 }
             }
+        }
+    }
+
+    #[inline]
+    fn size_lerp_time(&self) -> Duration {
+        match self {
+            Area::Static(_) => Duration::ZERO,
+            Area::Moving(area) => area.end.saturating_duration_since(Instant::now()),
+        }
+    }
+
+    #[inline]
+    fn size_lerp_target(&self) -> f64 {
+        match self {
+            Area::Static(area) => area.size,
+            Area::Moving(area) => area.new_size,
+        }
+    }
+
+    #[inline]
+    fn on_center_changed(&mut self, cx: AreaLocalCx) {
+        if let Area::Static(area) = self {
+            area.calculate_bounds(cx);
         }
     }
 
@@ -525,5 +631,76 @@ impl Debug for WorldBorderMut<'_> {
         f.debug_tuple("WorldBorderMut")
             .field(&self.immut)
             .finish_non_exhaustive()
+    }
+}
+
+/// Represents bare, serializable properties of a [`WorldBorder`].
+#[derive(Debug, Clone, Copy)]
+#[allow(missing_docs)]
+#[non_exhaustive]
+pub struct Properties {
+    pub center_x: f64,
+    pub center_z: f64,
+    pub damage_per_block: f64,
+    pub safe_zone: f64,
+    pub warning_blocks: u32,
+    pub warning_time: u32,
+    pub size: f64,
+    pub size_lerp_time: u64,
+    pub size_lerp_target: f64,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct PropertiesSerialized {
+    border_center_x: f64,
+    border_center_z: f64,
+    border_size: f64,
+    border_size_lerp_time: u64,
+    border_size_lerp_target: f64,
+    border_safe_zone: f64,
+    border_damage_per_block: f64,
+    border_warning_blocks: u32,
+    border_warning_time: u32,
+}
+
+impl Serialize for Properties {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let serialized = PropertiesSerialized {
+            border_center_x: self.center_x,
+            border_center_z: self.center_z,
+            border_size: self.size,
+            border_size_lerp_time: self.size_lerp_time,
+            border_size_lerp_target: self.size_lerp_target,
+            border_safe_zone: self.safe_zone,
+            border_damage_per_block: self.damage_per_block,
+            border_warning_blocks: self.warning_blocks,
+            border_warning_time: self.warning_time,
+        };
+        serialized.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Properties {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let serialized = PropertiesSerialized::deserialize(deserializer)?;
+        const BOUND: f64 = 9999984e7;
+        Ok(Self {
+            center_x: serialized.border_center_x.clamp(-BOUND, BOUND),
+            center_z: serialized.border_center_z.clamp(-BOUND, BOUND),
+            size: serialized.border_size,
+            size_lerp_time: serialized.border_size_lerp_time,
+            size_lerp_target: serialized.border_size_lerp_target,
+            safe_zone: serialized.border_safe_zone,
+            damage_per_block: serialized.border_damage_per_block,
+            warning_blocks: serialized.border_warning_blocks,
+            warning_time: serialized.border_warning_time,
+        })
     }
 }
