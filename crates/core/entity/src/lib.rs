@@ -31,7 +31,7 @@ mod _serde;
 pub mod data;
 mod filter;
 
-pub use filter::TypeFilter;
+pub use filter::{SafeTypeFilter, TypeFilter};
 
 //TODO: give this to global context for implementation.
 const POS_XZ_BOUND: f64 = 3.0000512e7;

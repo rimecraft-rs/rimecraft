@@ -17,7 +17,7 @@ where
         bbox: BBox,
     ) -> impl Iterator<Item = &'a Filter::Output>
     where
-        Filter: entity::TypeFilter<Entity<'w, Cx>>,
+        Filter: entity::SafeTypeFilter<Entity<'w, Cx>>,
         Filter::Output: 'a;
 
     /// Returns an iterator over players in this view.

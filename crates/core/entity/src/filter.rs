@@ -30,7 +30,51 @@ pub trait TypeFilter<T: ?Sized> {
     fn hint_typeid(&self) -> Option<TypeId> {
         None
     }
+
+    /// Guarantees the soundness of the cast.
+    ///
+    /// # Safety
+    ///
+    /// The conversion itself, the input-to-output type conversion, must be safe and sound.
+    #[inline(always)]
+    unsafe fn make_safe(&self) -> impl SafeTypeFilter<T> {
+        #[repr(transparent)]
+        struct Safe<'a, T: ?Sized>(&'a T);
+
+        impl<T: ?Sized, In: ?Sized> TypeFilter<In> for Safe<'_, T>
+        where
+            T: TypeFilter<In>,
+        {
+            type Output = T::Output;
+
+            #[inline(always)]
+            unsafe fn cast_const(&self, obj: *const In) -> Option<*const Self::Output> {
+                unsafe { self.0.cast_const(obj) }
+            }
+
+            #[inline(always)]
+            unsafe fn cast_mut(&self, obj: *mut In) -> Option<*mut Self::Output> {
+                unsafe { self.0.cast_mut(obj) }
+            }
+
+            #[inline(always)]
+            fn hint_typeid(&self) -> Option<TypeId> {
+                self.0.hint_typeid()
+            }
+        }
+
+        unsafe impl<T: ?Sized, In: ?Sized> SafeTypeFilter<In> for Safe<'_, T> where T: TypeFilter<In> {}
+
+        Safe(self)
+    }
 }
+
+/// A [`TypeFilter`] that guarantees the soundness of the cast.
+///
+/// # Safety
+///
+/// The conversion itself, the input-to-output type conversion, must be safe and sound.
+pub unsafe trait SafeTypeFilter<T: ?Sized>: TypeFilter<T> {}
 
 impl<'a, Cx, T, In: ?Sized> TypeFilter<RawEntity<'a, In, Cx>> for PhantomData<RawEntity<'a, T, Cx>>
 where
