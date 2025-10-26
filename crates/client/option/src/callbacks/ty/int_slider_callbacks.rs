@@ -1,4 +1,4 @@
-use rimecraft_math::MathExt as _;
+use rimecraft_math::MathDeltaExt as _;
 use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::{Callbacks, ty::SliderCallbacks};
