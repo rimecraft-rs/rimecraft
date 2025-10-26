@@ -9,6 +9,7 @@ use std::{
 };
 
 use glam::{DVec3, DVec4};
+use math::MathDeltaExt as _;
 use maybe::{Maybe, SimpleOwned};
 use rimecraft_voxel_math::{BBox, BlockPos};
 use serde::{Deserialize, Serialize};
@@ -445,7 +446,7 @@ impl Area {
             Area::Moving(area) => {
                 let d = area.start.elapsed().div_duration_f64(area.duration);
                 if d < 1.0 {
-                    math::lerp(d, area.old_size, area.new_size)
+                    area.old_size.lerp(area.new_size, d)
                 } else {
                     area.new_size
                 }
