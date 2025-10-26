@@ -1,4 +1,4 @@
-use rimecraft_math::MathDeltaExt as _;
+use math::MathDeltaExt as _;
 use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::{

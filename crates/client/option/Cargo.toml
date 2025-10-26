@@ -13,8 +13,8 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 rimecraft-text = { path = "../../core/text" }
-rimecraft-math = { path = "../../util/math" }
 rimecraft-client-tooltip = { path = "../tooltip" }
+math = { path = "../../util/math", package = "rimecraft-math" }
 enum-iterator = "2.0.0"
 
 [dev-dependencies]
