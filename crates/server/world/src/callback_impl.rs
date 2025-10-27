@@ -8,7 +8,7 @@ use parking_lot::MutexGuard;
 use serde::de::DeserializeOwned;
 use voxel_math::BlockPos;
 use world::{
-    WorldCx,
+    WorldCx, WorldDowncastAccess,
     behave::BlockEntityConstructor,
     chunk::{ComputeIndex, CreationType, WorldChunk, WorldChunkLocalCx},
     event::ServerChunkEventCallback,
@@ -54,7 +54,7 @@ pub fn builtin_callback_replace_block_state<'w, Cx, Chunk>(
                     .unwrap_or(default_block_entity_on_block_replaced());
                 f(
                     &mut **guard,
-                    chunk.wca_as_wc().world_ptr(),
+                    &WorldDowncastAccess(chunk.wca_as_wc().world_ptr()),
                     pos,
                     old,
                     local_cx,
@@ -77,7 +77,7 @@ pub fn builtin_callback_replace_block_state<'w, Cx, Chunk>(
             .unwrap_or(default_block_on_state_replaced());
         f(
             old,
-            chunk.wca_as_wc().world_ptr(),
+            &WorldDowncastAccess(chunk.wca_as_wc().world_ptr()),
             pos,
             flags.contains(SetBlockStateFlags::MOVED),
             local_cx,
@@ -105,7 +105,7 @@ pub fn builtin_callback_add_block_state<'w, Cx, Chunk>(
         f(
             new,
             old,
-            chunk.wca_as_wc().world_ptr(),
+            &WorldDowncastAccess(chunk.wca_as_wc().world_ptr()),
             pos,
             flags.contains(SetBlockStateFlags::MOVED),
             local_cx,

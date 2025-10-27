@@ -8,9 +8,9 @@ use dsyn::primitives::PointerLikeBool;
 use local_cx::ProvideLocalCxTy;
 use maybe::Maybe;
 use voxel_math::BlockPos;
-use world::{ArcAccess, World, WorldCx};
+use world::{ArcAccess, WorldCx};
 
-use crate::game_event::DynListener;
+use crate::{ServerWorld, game_event::DynListener};
 
 /// Marker type for [`BlockOnStateReplaced`] to make it differs from other functions.
 #[derive(Debug, Clone, Copy, Default)]
@@ -28,7 +28,7 @@ pub struct BlockOnStateReplacedMarker;
 /// 4. Whether the block was **moved** by thing like piston.
 pub type BlockOnStateReplaced<Cx> = for<'env> fn(
     BlockState<'env, Cx>,
-    &(dyn ArcAccess<World<'env, Cx>> + '_),
+    &(dyn ArcAccess<ServerWorld<'env, Cx>> + '_),
     BlockPos,
     bool,
     <Cx as ProvideLocalCxTy>::LocalContext<'env>,
@@ -61,7 +61,7 @@ pub struct BlockOnBlockAddedMarker;
 pub type BlockOnBlockAdded<Cx> = for<'env> fn(
     BlockState<'env, Cx>,
     BlockState<'env, Cx>,
-    &(dyn ArcAccess<World<'env, Cx>> + '_),
+    &(dyn ArcAccess<ServerWorld<'env, Cx>> + '_),
     BlockPos,
     bool,
     <Cx as ProvideLocalCxTy>::LocalContext<'env>,
@@ -116,7 +116,7 @@ pub struct BlockEntityOnBlockReplacedMarker;
 /// 4. The old block state.
 pub type BlockEntityOnBlockReplaced<Cx> = for<'env> fn(
     &mut BlockEntity<'env, Cx>,
-    &(dyn ArcAccess<World<'env, Cx>> + '_),
+    &(dyn ArcAccess<ServerWorld<'env, Cx>> + '_),
     BlockPos,
     BlockState<'env, Cx>,
     <Cx as ProvideLocalCxTy>::LocalContext<'env>,

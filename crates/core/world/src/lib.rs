@@ -33,6 +33,7 @@ use rimecraft_voxel_math::direction::Direction;
 use std::{
     fmt::Debug,
     hash::Hash,
+    marker::PhantomData,
     sync::{Arc, Weak},
 };
 
@@ -72,27 +73,17 @@ where
     type WorldChunkExt;
 }
 
+/// A marker type for invariant lifetime marking.
+#[allow(missing_debug_implementations)] // should not have an instance
+pub struct InvariantLifetime<'a>(PhantomData<fn(&'a ()) -> &'a ()>);
+
 /// The default max light level of Minecraft.
 pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
-
-//TODO: PLACEHOLDERS
-
-/// Placeholder of type `World`.
-pub type World<'w, Cx> = placeholder::World<'w, Cx>;
-
-#[allow(missing_docs, missing_debug_implementations)]
-mod placeholder {
-    use std::marker::PhantomData;
-
-    type Invariant<'a> = fn(&'a ()) -> &'a ();
-
-    pub struct World<'w, Cx>(PhantomData<(Cx, Invariant<'w>)>);
-}
 
 /// A trait for types that can provide access to an [`Arc`] or [`Weak`].
 ///
 /// This is most useful for self-referential types but need lazy access due to performance considerations.
-pub trait ArcAccess<T> {
+pub trait ArcAccess<T: ?Sized> {
     /// Returns an [`Arc`] to the wrapped value.
     fn access_arc(self) -> Arc<T>;
 
@@ -100,10 +91,10 @@ pub trait ArcAccess<T> {
     fn access_weak(self) -> Weak<T>;
 }
 
-impl<T> ArcAccess<T> for Arc<T> {
+impl<T: ?Sized> ArcAccess<T> for Arc<T> {
     #[inline]
     fn access_arc(self) -> Arc<T> {
-        self.clone()
+        self
     }
 
     #[inline]
@@ -112,7 +103,31 @@ impl<T> ArcAccess<T> for Arc<T> {
     }
 }
 
-impl<T> ArcAccess<T> for Weak<T> {
+impl<T: ?Sized> ArcAccess<T> for &Arc<T> {
+    #[inline]
+    fn access_arc(self) -> Arc<T> {
+        self.clone()
+    }
+
+    #[inline]
+    fn access_weak(self) -> Weak<T> {
+        Arc::downgrade(self)
+    }
+}
+
+impl<T: ?Sized> ArcAccess<T> for Weak<T> {
+    #[inline]
+    fn access_arc(self) -> Arc<T> {
+        self.upgrade().expect("wrapped value was dropped")
+    }
+
+    #[inline]
+    fn access_weak(self) -> Weak<T> {
+        self
+    }
+}
+
+impl<T: ?Sized> ArcAccess<T> for &Weak<T> {
     #[inline]
     fn access_arc(self) -> Arc<T> {
         self.upgrade().expect("wrapped value was dropped")

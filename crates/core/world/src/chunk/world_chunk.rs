@@ -15,7 +15,7 @@ use rimecraft_voxel_math::{BlockPos, ChunkPos};
 use serde::{Deserialize, de::DeserializeSeed};
 
 use crate::{
-    Environment, World,
+    DynCompatibleWorld, Environment,
     behave::*,
     chunk::{AsBaseChunkAccess, BaseChunkAccess, light::ChunkSkyLight},
     event::ServerChunkEventCallback,
@@ -59,13 +59,13 @@ where
     /// The `BaseChunk`.
     pub base: BaseChunk<'w, Cx>,
 
-    env: Environment,
     loaded_to_world: bool,
-    //TODO: should we conserve this?
-    world_ptr: Weak<World<'w, Cx>>,
+    world_ptr: Weak<dyn DynCompatibleWorld<'w, Cx> + Send + Sync + 'w>,
+
     unsaved_listener: Mutex<Box<dyn Fn(ChunkPos) + Send + Sync + 'w>>,
 
     local_cx: Cx::LocalContext<'w>,
+    env: Environment,
     ext: Cx::WorldChunkExt,
 
     _invariant_marker: PhantomData<fn(&'w ()) -> &'w ()>,
@@ -106,7 +106,7 @@ where
 {
     /// Returns the weak world pointer of this chunk.
     #[inline]
-    pub fn world_ptr(&self) -> &Weak<World<'w, Cx>> {
+    pub fn world_ptr(&self) -> &Weak<dyn DynCompatibleWorld<'w, Cx> + Send + Sync + 'w> {
         &self.world_ptr
     }
 
@@ -270,10 +270,10 @@ where
         W: WorldChunkAccess<'w, Cx>,
         Cx: ServerChunkEventCallback<'w, W>,
     {
-        if let Some(cell) = Self::__set_block_entity(this.reclaim(), block_entity, true) {
+        let cell = Self::__set_block_entity(this.reclaim(), block_entity, true);
+        if let Some(cell) = cell {
             Cx::add_block_entity_callback(&cell, &mut this);
-            //PLACEHOLDER
-            let _ = ();
+            //TODO: load the block entity into world. this requires interaction with world, cant implement by now
             //TODO: Update tickers
         }
     }
@@ -452,8 +452,9 @@ where
             }
         }
 
+        // all the two todos require to call the world instance, or at least chunk manager. cant implement by now.
         //TODO: update lighting
-        //TODO: update chunk manager
+        //TODO: update chunk manager for section changes
 
         // Generic callbacks
         Cx::replace_block_state_callback(pos, state, old_state, flags, &mut this);

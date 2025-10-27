@@ -16,7 +16,9 @@ use maybe::Maybe;
 use parking_lot::Mutex;
 use registry::Reg;
 use voxel_math::glam;
-use world::{World, WorldCx};
+use world::WorldCx;
+
+use crate::ServerWorld;
 
 /// Raw type of a [`GameEvent`], consisting of its notification radius.
 #[derive(Debug)]
@@ -69,7 +71,7 @@ where
     /// Listens to an incoming game event.
     fn listen(
         &self,
-        world: &World<'w, Cx>,
+        world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -96,7 +98,7 @@ where
 {
     fn _erased_listen(
         &mut self,
-        world: &World<'w, Cx>,
+        world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -106,7 +108,7 @@ where
     fn _erased_trigger_order(&self) -> TriggerOrder;
 
     // Flatten position source
-    fn _erased_ps_pos(&self, world: &World<'w, Cx>) -> Option<DVec3>;
+    fn _erased_ps_pos(&self, world: &ServerWorld<'w, Cx>) -> Option<DVec3>;
     fn _erased_ps_ty(&self) -> PositionSourceType<'w, Cx>;
 }
 
@@ -124,7 +126,7 @@ where
 {
     fn _erased_listen(
         &mut self,
-        world: &World<'w, Cx>,
+        world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
         emitter_pos: DVec3,
@@ -140,7 +142,7 @@ where
     fn _erased_trigger_order(&self) -> TriggerOrder {
         self.trigger_order()
     }
-    fn _erased_ps_pos(&self, world: &World<'w, Cx>) -> Option<DVec3> {
+    fn _erased_ps_pos(&self, world: &ServerWorld<'w, Cx>) -> Option<DVec3> {
         self.position_source().pos(world)
     }
     fn _erased_ps_ty(&self) -> PositionSourceType<'w, Cx> {
@@ -357,7 +359,7 @@ where
     /// Firing event to any listener should be done by given `callback`, who receives listener and its position.
     ///
     /// Returns whether the callback was triggered.
-    pub fn dispatch<F>(&self, world: &World<'w, Cx>, pos: DVec3, mut callback: F) -> bool
+    pub fn dispatch<F>(&self, world: &ServerWorld<'w, Cx>, pos: DVec3, mut callback: F) -> bool
     where
         F: for<'env> FnMut(&'env dyn ErasedListener<'w, Cx>, DVec3),
     {
@@ -421,7 +423,7 @@ where
     Cx: WorldCx<'w>,
 {
     /// Gets position of this source.
-    fn pos(&self, world: &World<'w, Cx>) -> Option<DVec3>;
+    fn pos(&self, world: &ServerWorld<'w, Cx>) -> Option<DVec3>;
 
     /// Gets the type of this position source.
     fn ty(&self) -> PositionSourceType<'w, Cx>;
