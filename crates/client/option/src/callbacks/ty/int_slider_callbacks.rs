@@ -1,4 +1,4 @@
-use math::MathDeltaExt as _;
+use math::MathDeltaExt;
 use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::{Callbacks, ty::SliderCallbacks};
@@ -16,22 +16,22 @@ where
 
     /// Converts a value to slider progress (0.0 to 1.0).
     fn to_slider_progress(&self, value: i32) -> f32 {
-        (value as f32 + 0.5)
-            .map(
-                self.min_inclusive() as f32..self.max_inclusive() as f32 + 1.0,
-                0.0..1.0,
-            )
-            .clamp(0.0, 1.0)
+        <f32 as MathDeltaExt<f32>>::map(
+            value as f32 + 0.5,
+            self.min_inclusive() as f32..self.max_inclusive() as f32 + 1.0,
+            0.0..1.0,
+        )
+        .clamp(0.0, 1.0)
     }
 
     /// Converts slider progress (0.0 to 1.0) to a value.
     fn to_value(&self, slider_progress: f32) -> i32 {
-        slider_progress
-            .map(
-                0.0..1.0,
-                self.min_inclusive() as f32..self.max_inclusive() as f32 + 1.0,
-            )
-            .floor() as i32
+        <f32 as MathDeltaExt<f32>>::map(
+            slider_progress,
+            0.0..1.0,
+            self.min_inclusive() as f32..self.max_inclusive() as f32 + 1.0,
+        )
+        .floor() as i32
     }
 
     /// Validates the given `i32` value, returning `Some(validated_value)` if valid,
