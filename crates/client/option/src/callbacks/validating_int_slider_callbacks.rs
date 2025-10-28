@@ -1,4 +1,4 @@
-use rimecraft_math::MathDeltaExt as _;
+use rimecraft_math::MathDeltaExt;
 use rimecraft_text::ProvideTextTy;
 
 use crate::callbacks::{
@@ -46,27 +46,27 @@ where
     }
 
     fn to_slider_progress(&self, value: i32) -> f32 {
-        (value as f32 + 0.5)
-            .map(
-                <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
-                    ..<ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::max_inclusive(self)
-                        as f32
-                        + 1.0,
-                0.0..1.0,
-            )
-            .clamp(0.0, 1.0)
+        <f32 as MathDeltaExt<f32>>::map(
+            value as f32 + 0.5,
+            <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
+                ..<ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::max_inclusive(self)
+                    as f32
+                    + 1.0,
+            0.0..1.0,
+        )
+        .clamp(0.0, 1.0)
     }
 
     fn to_value(&self, slider_progress: f32) -> i32 {
-        slider_progress
-            .map(
-                0.0..1.0,
-                <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
-                    ..<ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::max_inclusive(self)
-                        as f32
-                        + 1.0,
-            )
-            .floor() as i32
+        <f32 as MathDeltaExt<f32>>::map(
+            slider_progress,
+            0.0..1.0,
+            <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
+                ..<ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::max_inclusive(self)
+                    as f32
+                    + 1.0,
+        )
+        .floor() as i32
     }
 
     fn i32_validate(&self, value: i32) -> Option<i32> {
