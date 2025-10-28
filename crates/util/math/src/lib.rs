@@ -2,62 +2,42 @@
 
 use std::ops::Range;
 
-use num_traits::Num;
+use num_traits::{Float, NumCast, Signed, Zero};
 
 pub mod int;
 
-/// Extension trait for common mathematical operations.
-pub trait MathExt
+/// Extension trait for mathematical operations involving deltas and ranges.
+pub trait MathDeltaExt<Delta>
 where
-    Self: Copy + Num,
+    Self: Copy + Signed + NumCast,
+    Delta: Float,
 {
-    /// The type used as interpolation factors.
-    type Factor: Sized + Copy;
-
-    /// Converts `self` to a factor.
-    fn to_factor(self) -> Self::Factor;
-
-    /// Converts a factor back to the original type.
-    fn from_factor(factor: Self::Factor) -> Self;
-
-    /// Lerps between `self` and `to` by the given `factor`.
-    fn lerp(self, to: Self, factor: Self::Factor) -> Self {
-        self + (to - self) * Self::from_factor(factor)
+    /// Linearly interpolates between `self` and `to` by the given `delta` (0.0 to 1.0).
+    fn lerp(self, to: Self, delta: Delta) -> Self {
+        self + Self::from((delta * <Delta as NumCast>::from(to - self).unwrap()).floor()).unwrap()
     }
 
-    /// Calculates the progress of `self` within the given `range`.
-    fn progress(self, range: Range<Self>) -> Self::Factor {
-        ((self - range.start) / (range.end - range.start)).to_factor()
+    /// Calculates the normalized delta of `self` within the given `range`.
+    fn delta(self, range: Range<Self>) -> Delta {
+        if range.start == range.end {
+            return Zero::zero();
+        }
+        let delta = self - range.start;
+        let span = range.end - range.start;
+        <Delta as NumCast>::from(delta).unwrap() / <Delta as NumCast>::from(span).unwrap()
     }
 
-    /// Maps `self` from the `from` range to the `to` range, preserving the relative position.
+    /// Maps `self` from the `from` range to the `to` range.
     fn map(self, from: Range<Self>, to: Range<Self>) -> Self {
-        to.start.lerp(to.end, self.progress(from))
+        to.start.lerp(to.end, self.delta(from))
     }
 }
 
-impl MathExt for f32 {
-    type Factor = f32;
-
-    fn to_factor(self) -> Self::Factor {
-        self
-    }
-
-    fn from_factor(factor: Self::Factor) -> Self {
-        factor
-    }
-}
-
-impl MathExt for i32 {
-    type Factor = f32;
-
-    fn to_factor(self) -> Self::Factor {
-        self as Self::Factor
-    }
-
-    fn from_factor(factor: Self::Factor) -> Self {
-        factor as Self
-    }
+impl<T, D> MathDeltaExt<D> for T
+where
+    T: Copy + Signed + NumCast,
+    D: Float,
+{
 }
 
 /// Finds the minimum value in the given range that satisfies the *monotonic predicate* `p`.
@@ -80,4 +60,49 @@ where
         }
     }
     (min != max).then_some(min)
+}
+
+#[test]
+fn test_math_delta_ext_integers() {
+    assert_eq!(5i32.lerp(15, 0.0), 5);
+    assert_eq!(5i32.lerp(15, 0.5), 10);
+    assert_eq!(5i32.lerp(15, 1.0), 15);
+    assert_eq!(5i32.lerp(15, -1.0), -5);
+    assert_eq!(5i32.lerp(15, 2.0), 25);
+
+    assert_eq!(<i32 as MathDeltaExt<f32>>::delta(5, 0..10), 0.5);
+    assert_eq!(<i32 as MathDeltaExt<f32>>::delta(0, 0..0), 0.0);
+
+    assert_eq!(<i32 as MathDeltaExt<f32>>::map(5, 0..10, 10..20), 15);
+}
+
+#[test]
+fn test_math_delta_ext_floats() {
+    assert_eq!(5.0f32.lerp(15.0, 0.0), 5.0);
+    assert_eq!(5.0f32.lerp(15.0, 0.5), 10.0);
+    assert_eq!(5.0f32.lerp(15.0, 1.0), 15.0);
+    assert_eq!(5.0f32.lerp(15.0, -1.0), -5.0);
+    assert_eq!(5.0f32.lerp(15.0, 2.0), 25.0);
+
+    assert_eq!(<f32 as MathDeltaExt<f32>>::delta(5.0, 0.0..10.0), 0.5);
+    assert_eq!(<f32 as MathDeltaExt<f32>>::delta(0.0, 0.0..0.0), 0.0);
+
+    assert_eq!(
+        <f32 as MathDeltaExt<f32>>::map(5.0, 0.0..10.0, 10.0..20.0),
+        15.0
+    );
+}
+
+#[test]
+fn test_binary_search_ie_u32() {
+    let range = 0..100;
+    let target = 73;
+    let result = binary_search_ie_u32(range.clone(), |x| x >= target);
+    assert_eq!(result, Some(target));
+
+    let result_none = binary_search_ie_u32(range.clone(), |x| x >= 150);
+    assert_eq!(result_none, None);
+
+    let result_start = binary_search_ie_u32(range.clone(), |_| true);
+    assert_eq!(result_start, Some(0));
 }
