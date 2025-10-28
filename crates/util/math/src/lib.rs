@@ -2,33 +2,29 @@
 
 use std::ops::Range;
 
-use num_traits::{Float, NumCast, Signed};
+use num_traits::{Float, NumCast, Signed, Zero};
 
 pub mod int;
 
 /// Extension trait for mathematical operations involving deltas and ranges.
-pub trait MathDeltaExt
+pub trait MathDeltaExt<Delta>
 where
     Self: Copy + Signed + NumCast,
+    Delta: Float,
 {
-    /// The floating-point type used for delta calculations.
-    type Delta: Float;
-
     /// Linearly interpolates between `self` and `to` by the given `delta` (0.0 to 1.0).
-    fn lerp(self, to: Self, delta: Self::Delta) -> Self {
-        self + Self::from((delta * <Self::Delta as NumCast>::from(to - self).unwrap()).floor())
-            .unwrap()
+    fn lerp(self, to: Self, delta: Delta) -> Self {
+        self + Self::from((delta * <Delta as NumCast>::from(to - self).unwrap()).floor()).unwrap()
     }
 
     /// Calculates the normalized delta of `self` within the given `range`.
-    fn delta(self, range: Range<Self>) -> Self::Delta {
+    fn delta(self, range: Range<Self>) -> Delta {
         if range.start == range.end {
-            return NumCast::from(0.0).unwrap();
+            return Zero::zero();
         }
         let delta = self - range.start;
         let span = range.end - range.start;
-        <Self::Delta as NumCast>::from(delta).unwrap()
-            / <Self::Delta as NumCast>::from(span).unwrap()
+        <Delta as NumCast>::from(delta).unwrap() / <Delta as NumCast>::from(span).unwrap()
     }
 
     /// Maps `self` from the `from` range to the `to` range.
@@ -37,36 +33,11 @@ where
     }
 }
 
-impl MathDeltaExt for f32 {
-    type Delta = f32;
-}
-
-impl MathDeltaExt for f64 {
-    type Delta = f64;
-}
-
-impl MathDeltaExt for i8 {
-    type Delta = f32;
-}
-
-impl MathDeltaExt for i16 {
-    type Delta = f32;
-}
-
-impl MathDeltaExt for i32 {
-    type Delta = f32;
-}
-
-impl MathDeltaExt for i64 {
-    type Delta = f64;
-}
-
-impl MathDeltaExt for i128 {
-    type Delta = f64;
-}
-
-impl MathDeltaExt for isize {
-    type Delta = f64;
+impl<T, D> MathDeltaExt<D> for T
+where
+    T: Copy + Signed + NumCast,
+    D: Float,
+{
 }
 
 /// Finds the minimum value in the given range that satisfies the *monotonic predicate* `p`.
@@ -99,10 +70,10 @@ fn test_math_delta_ext_integers() {
     assert_eq!(5i32.lerp(15, -1.0), -5);
     assert_eq!(5i32.lerp(15, 2.0), 25);
 
-    assert_eq!(5i32.delta(0..10), 0.5);
-    assert_eq!(0i32.delta(0..0), 0.0);
+    assert_eq!(<i32 as MathDeltaExt<f32>>::delta(5, 0..10), 0.5);
+    assert_eq!(<i32 as MathDeltaExt<f32>>::delta(0, 0..0), 0.0);
 
-    assert_eq!(5i32.map(0..10, 10..20), 15);
+    assert_eq!(<i32 as MathDeltaExt<f32>>::map(5, 0..10, 10..20), 15);
 }
 
 #[test]
@@ -113,10 +84,13 @@ fn test_math_delta_ext_floats() {
     assert_eq!(5.0f32.lerp(15.0, -1.0), -5.0);
     assert_eq!(5.0f32.lerp(15.0, 2.0), 25.0);
 
-    assert_eq!(5.0f32.delta(0.0..10.0), 0.5);
-    assert_eq!(0.0f32.delta(0.0..0.0), 0.0);
+    assert_eq!(<f32 as MathDeltaExt<f32>>::delta(5.0, 0.0..10.0), 0.5);
+    assert_eq!(<f32 as MathDeltaExt<f32>>::delta(0.0, 0.0..0.0), 0.0);
 
-    assert_eq!(5.0f32.map(0.0..10.0, 10.0..20.0), 15.0);
+    assert_eq!(
+        <f32 as MathDeltaExt<f32>>::map(5.0, 0.0..10.0, 10.0..20.0),
+        15.0
+    );
 }
 
 #[test]
