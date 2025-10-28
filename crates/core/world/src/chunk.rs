@@ -110,10 +110,10 @@ where
 impl<'w, Cx> BaseChunk<'w, Cx>
 where
     Cx: WorldCx<'w>
-        + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
+        + ProvidePalette<Cx::BlockStateList, BlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
-    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
-        + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>
+    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
+        + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
         + Clone,
     &'w Registry<Cx::Id, Cx::Biome>: Into<Cx::BiomeList>,
     Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>

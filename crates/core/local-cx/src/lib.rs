@@ -31,6 +31,7 @@ pub trait HoldLocalContext {
 /// A local context provides data to the global context.
 pub trait LocalContext<T>: BaseLocalContext {
     /// Acquire the data from the local context.
+    #[must_use]
     fn acquire(self) -> T;
 }
 
@@ -103,6 +104,7 @@ where
 pub trait LocalContextExt {
     /// Create a [`WithLocalCx`] with the given inner data.
     #[inline]
+    #[must_use]
     fn with<T>(self, inner: T) -> WithLocalCx<T, Self>
     where
         Self: Sized,
@@ -117,6 +119,7 @@ pub trait LocalContextExt {
     ///
     /// This is a shorthand for [`LocalContext::acquire`] but with better generic bounding experience.
     #[inline(always)]
+    #[must_use]
     fn acquire_within<T>(self) -> T
     where
         Self: LocalContext<T>,

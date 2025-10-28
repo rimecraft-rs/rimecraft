@@ -6,7 +6,7 @@ use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
     container::{PalettedContainer, ProvidePalette},
 };
-use rimecraft_fluid::{BlockStateExt as _, BsToFs};
+use rimecraft_fluid::{BlockStateExt as _, BsToFs, FluidState};
 use rimecraft_registry::Registry;
 
 use super::{WorldCx, internal_types::*};
@@ -161,7 +161,7 @@ where
     ///
     /// Panics when the given position out of bounds.
     #[inline]
-    pub fn fluid_state(&self, x: u32, y: u32, z: u32) -> IFluidState<'w, Cx>
+    pub fn fluid_state(&self, x: u32, y: u32, z: u32) -> FluidState<'w, Cx>
     where
         Cx: BsToFs<'w>,
     {

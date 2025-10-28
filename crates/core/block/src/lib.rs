@@ -221,7 +221,7 @@ where
     Cx::BlockStateExt<'a>: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("IBlockState")
+        f.debug_struct("BlockState")
             .field("block", &self.block)
             .field("state", &self.state)
             .finish()
