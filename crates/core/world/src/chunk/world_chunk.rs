@@ -2,11 +2,15 @@
 
 use dsyn::HoldDescriptors as _;
 use glam::IVec3;
-use local_cx::{HoldLocalContext, LocalContext, dsyn_instanceof, dsyn_ty};
+use local_cx::{HoldLocalContext, LocalContext, LocalContextExt, dsyn_instanceof, dsyn_ty};
+use maybe::Maybe;
 use parking_lot::{Mutex, MutexGuard};
-use rimecraft_block::BlockState;
+use rimecraft_block::{BlockState, RawBlock};
 use rimecraft_block_entity::{
     BlockEntity, DynErasedRawBlockEntityType, component::RawErasedComponentType,
+};
+use rimecraft_chunk_palette::{
+    IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, container::ProvidePalette,
 };
 use rimecraft_fluid::{BsToFs, FluidState};
 use rimecraft_global_cx::Hold;
@@ -17,9 +21,9 @@ use serde::{Deserialize, de::DeserializeSeed};
 use crate::{
     DynCompatibleWorld, Environment,
     behave::*,
-    chunk::{AsBaseChunkAccess, BaseChunkAccess, light::ChunkSkyLight},
+    chunk::{self, AsBaseChunkAccess, BaseChunkAccess, IBiome, UpgradeData, light::ChunkSkyLight},
     event::ServerChunkEventCallback,
-    heightmap,
+    heightmap::Heightmap,
     view::{block::*, light::*},
 };
 
@@ -98,6 +102,89 @@ pub enum CreationType {
     Queued,
     /// Checks if the block entity exists.
     Check,
+}
+
+impl<'w, Cx> WorldChunk<'w, Cx>
+where
+    Cx: WorldCx<'w>,
+    Cx::LocalContext<'w>: LocalContext<chunk::status::Full<'w, Cx>>,
+{
+    /// Creates a new [`WorldChunk`] from scratch.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the height limit of given base chunk is not equal to the world's height limit.
+    #[must_use]
+    pub fn new(
+        world: Arc<dyn DynCompatibleWorld<'w, Cx> + Send + Sync + 'w>,
+        base: BaseChunk<'w, Cx>,
+        ext: Cx::WorldChunkExt,
+    ) -> Self {
+        let cx = world.local_context();
+        let mut this = Self {
+            base,
+            loaded_to_world: false,
+            world_ptr: Arc::downgrade(&world),
+            unsaved_listener: Mutex::new(Box::new(|_| ())),
+            local_cx: cx,
+            env: world.env(),
+            ext,
+            _invariant_marker: PhantomData,
+        };
+
+        assert_eq!(
+            this.base.height_limit,
+            world.height_limit(),
+            "height limit mismatch between world and chunk"
+        );
+
+        let status_full = cx.acquire_within::<chunk::status::Full<'w, Cx>>().0;
+        let full_heightmap_types = status_full.heightmap_types();
+        let heightmaps = this.base.heightmaps.get_mut();
+        for &ty in full_heightmap_types {
+            heightmaps.insert(ty, Heightmap::new(this.base.height_limit, ty));
+        }
+
+        this
+    }
+}
+
+impl<'w, Cx> WorldChunk<'w, Cx>
+where
+    Cx: WorldCx<'w>
+        + ProvidePalette<Cx::BlockStateList, BlockState<'w, Cx>>
+        + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
+    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
+        + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
+        + Clone,
+    &'w Registry<Cx::Id, Cx::Biome>: Into<Cx::BiomeList>,
+    Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>
+        + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
+        + Clone,
+    Cx::LocalContext<'w>: LocalContext<chunk::status::Full<'w, Cx>>
+        + LocalContext<&'w Registry<Cx::Id, Cx::Biome>>
+        + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+        + LocalContext<Cx::BlockStateList>,
+{
+    /// Creates a new [`WorldChunk`] with defaulted empty values.
+    ///
+    /// See [`Self::new`] for creating from scratch.
+    #[must_use]
+    pub fn empty(
+        world: Arc<dyn DynCompatibleWorld<'w, Cx> + Send + Sync + 'w>,
+        pos: ChunkPos,
+        ext: Cx::WorldChunkExt,
+    ) -> Self {
+        let base = BaseChunk::new::<std::iter::Empty<_>, _>(
+            pos,
+            UpgradeData::empty(),
+            world.height_limit(),
+            0,
+            None,
+            world.local_context(),
+        );
+        Self::new(world, base, ext)
+    }
 }
 
 impl<'w, Cx> WorldChunk<'w, Cx>
@@ -438,7 +525,7 @@ where
 
         // Update height maps
         // (vanilla) MOTION_BLOCKING,MOTION_BLOCKING_NO_LEAVES, OCEAN_FLOOR, OCEAN_FLOOR, WORLD_SURFACE.
-        for ty in <Cx::HeightmapType as heightmap::Type<'w, Cx>>::iter_block_update_types_wc() {
+        for ty in Cx::iter_block_update_types_wc() {
             //SAFETY: This is safe because the `hms` is a valid pointer, and `__block_state` does not interact with heightmaps.
             let mut this_short_life = unsafe { this.reclaim_unsafe() };
             if let Some(hm) = this.reclaim().bca().write_heightmaps().get_mut(ty) {
@@ -830,8 +917,7 @@ where
 
     fn light_sources(&self) -> impl Iterator<Item = (BlockPos, BlockState<'w, Cx>)> {
         // have to implement this manually due to the type system pattern we are using for now
-        crate::chunk::iter::blocks(&self.base)
-            .filter(|(_, bs)| bs.data().get_held().luminance() > 0)
+        chunk::iter::blocks(&self.base).filter(|(_, bs)| bs.data().get_held().luminance() > 0)
     }
 }
 

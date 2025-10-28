@@ -4,11 +4,14 @@ use std::{
     sync::{Arc, Weak},
 };
 
+use local_cx::HoldLocalContext;
 use parking_lot::RwLock;
 use rimecraft_block_entity::BlockEntityCell;
 use rimecraft_registry::RegistryKey;
 
-use crate::{ArcAccess, Environment, InvariantLifetime, WorldCx, border::WorldBorderMut};
+use crate::{
+    ArcAccess, Environment, InvariantLifetime, WorldCx, border::WorldBorderMut, view::HeightLimit,
+};
 
 /// Type of light.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -72,7 +75,8 @@ pub unsafe trait WorldMarker {
 }
 
 /// An abstracted subset of world behaviors that are essential to chunk operations.
-pub trait DynCompatibleWorld<'w, Cx>: WorldMarker<Lifetime = InvariantLifetime<'w>>
+pub trait DynCompatibleWorld<'w, Cx>:
+    WorldMarker<Lifetime = InvariantLifetime<'w>> + HoldLocalContext<LocalCx = Cx::LocalContext<'w>>
 where
     Cx: WorldCx<'w>,
 {
@@ -81,6 +85,12 @@ where
     fn load_block_entity(&self, be: &BlockEntityCell<'w, Cx>) {
         let _ = (be,);
     }
+
+    /// Returns the environment of this world.
+    fn env(&self) -> Environment;
+
+    /// Returns the height limit of this world.
+    fn height_limit(&self) -> HeightLimit;
 }
 
 unsafe fn downcast_world_const<'w, World>(

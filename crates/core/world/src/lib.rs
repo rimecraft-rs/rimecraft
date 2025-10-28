@@ -67,10 +67,14 @@ where
     type BiomeList;
 
     /// The `Heightmap.Type` type of heightmaps.
-    type HeightmapType: heightmap::Type<'w, Self> + Hash + Eq;
+    type HeightmapType: heightmap::Type<'w, Self> + Copy + Hash + Eq;
 
     /// The extension type of world chunks.
     type WorldChunkExt;
+
+    /// Returns an [`Iterator`] of this type, containing all types that is required
+    /// to be updated on block state updates in `WorldChunk`.
+    fn iter_block_update_types_wc() -> impl Iterator<Item = &'w Self::HeightmapType>;
 }
 
 /// A marker type for invariant lifetime marking.

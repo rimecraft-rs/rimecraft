@@ -126,7 +126,10 @@ pub trait Type<'w, Cx: WorldCx<'w>>: 'w {
 
     /// Returns an [`Iterator`] of this type, containing all types that is required
     /// to be updated on block state updates in `WorldChunk`.
-    fn iter_block_update_types_wc() -> impl Iterator<Item = &'w Self>;
+    #[deprecated = "use `ChunkCx::iter_block_update_types_wc` instead"]
+    fn iter_block_update_types_wc() -> impl Iterator<Item = &'w Self> {
+        std::iter::empty()
+    }
 }
 
 /// [`RawHeightmap`] with predicate type filled with [`Type::Predicate`].

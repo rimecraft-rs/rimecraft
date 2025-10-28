@@ -37,6 +37,37 @@ struct TickedReg<'r, T, K>(Reg<'r, K, T>);
 impl<'w, Cx> UpgradeData<'w, Cx>
 where
     Cx: WorldCx<'w>,
+{
+    /// Creates an empty upgrade data.
+    #[must_use]
+    pub fn empty() -> Self {
+        const VERTICAL_SECTIONS_EMPTY: usize = HeightLimit::new(0, 0).count_vertical_sections();
+        const __CHECK_SECTIONS_COUNT_IS_ZERO: () =
+            assert!(VERTICAL_SECTIONS_EMPTY == 0, "invalid empty sections count");
+        let _: () = __CHECK_SECTIONS_COUNT_IS_ZERO;
+
+        Self {
+            sides_to_upgrade: vec![],
+            center_indices_upgrade: Box::new([]),
+            block_ticks: vec![],
+            fluid_ticks: vec![],
+        }
+    }
+}
+
+impl<'w, Cx> Default for UpgradeData<'w, Cx>
+where
+    Cx: WorldCx<'w>,
+{
+    #[inline]
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+impl<'w, Cx> UpgradeData<'w, Cx>
+where
+    Cx: WorldCx<'w>,
     Cx::Id: Hash + Eq,
 {
     /// Creates a new upgrade data from given *serialized NBT data* and the height limit.
