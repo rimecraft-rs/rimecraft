@@ -93,9 +93,9 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FromStrError::Namespace(err) => write!(f, "parse namespace: {err}"),
-            FromStrError::Path(err) => write!(f, "parse path: {err}"),
-            FromStrError::Separate => write!(f, "separator not found"),
+            Self::Namespace(err) => write!(f, "parse namespace: {err}"),
+            Self::Path(err) => write!(f, "parse path: {err}"),
+            Self::Separate => write!(f, "separator not found"),
         }
     }
 }

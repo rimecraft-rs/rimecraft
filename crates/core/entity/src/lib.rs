@@ -12,7 +12,7 @@ use erased_serde::Serialize as ErasedSerialize;
 use glam::DVec3;
 use global_cx::{
     GlobalContext, ProvideIdTy, ProvideNbtTy,
-    rand::{LockedRng, ProvideRng, Rng as _},
+    rand::{LockedRng as _, ProvideRng, Rng as _},
 };
 use local_cx::ProvideLocalCxTy;
 use parking_lot::Mutex;

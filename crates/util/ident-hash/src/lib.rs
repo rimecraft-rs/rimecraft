@@ -34,7 +34,7 @@ impl Default for IdentityHasher {
 macro_rules! impl_hash_for_identity_hasher {
     ($($f:ident,$t:ty),*$(,)?) => {
         $(
-            #[inline(always)]
+            #[inline]
             #[allow(trivial_numeric_casts)]
             fn $f(&mut self, value: $t) {
                 self.inner = value as u64;
@@ -44,7 +44,7 @@ macro_rules! impl_hash_for_identity_hasher {
 }
 
 impl Hasher for IdentityHasher {
-    #[inline(always)]
+    #[inline]
     fn finish(&self) -> u64 {
         self.inner
     }
@@ -85,24 +85,24 @@ pub trait HashTableExt {
 }
 
 impl<K, V> HashTableExt for IHashMap<K, V> {
-    #[inline(always)]
+    #[inline]
     fn new() -> Self {
         Self::with_hasher(IdentityBuildHasher::new())
     }
 
-    #[inline(always)]
+    #[inline]
     fn with_capacity(capacity: usize) -> Self {
         Self::with_capacity_and_hasher(capacity, IdentityBuildHasher::new())
     }
 }
 
 impl<K> HashTableExt for IHashSet<K> {
-    #[inline(always)]
+    #[inline]
     fn new() -> Self {
         Self::with_hasher(IdentityBuildHasher::new())
     }
 
-    #[inline(always)]
+    #[inline]
     fn with_capacity(capacity: usize) -> Self {
         Self::with_capacity_and_hasher(capacity, IdentityBuildHasher::new())
     }

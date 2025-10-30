@@ -77,7 +77,7 @@ where
     fn position_source(&self) -> &Self::PositionSource;
 
     /// Gets this listener's trigger order.
-    #[inline(always)]
+    #[inline]
     fn trigger_order(&self) -> TriggerOrder {
         Default::default()
     }
@@ -155,7 +155,7 @@ pub enum ListenResult {
 
 impl ListenResult {
     /// Whether the listener has accepted the event.
-    #[inline(always)]
+    #[inline]
     pub const fn is_accepted(self) -> bool {
         matches!(self, Self::Accepted)
     }
@@ -465,7 +465,7 @@ mod sealed {
 mod _edcode {
     use edcode2::{Buf, BufMut, Decode, Encode};
     use local_cx::{
-        ForwardToWithLocalCx, LocalContext, LocalContextExt, WithLocalCx, dyn_cx::AsDynamicContext,
+        ForwardToWithLocalCx, LocalContext, LocalContextExt as _, WithLocalCx, dyn_cx::AsDynamicContext,
     };
     use rimecraft_registry::Registry;
 
@@ -511,11 +511,11 @@ mod _serde {
     use std::marker::PhantomData;
 
     use local_cx::{
-        LocalContext, LocalContextExt, WithLocalCx,
+        LocalContext, LocalContextExt as _, WithLocalCx,
         serde::{DeserializeWithCx, SerializeWithCx, TYPE_KEY},
     };
     use rimecraft_registry::Registry;
-    use serde::{Deserialize, Serialize, ser::SerializeMap};
+    use serde::{Deserialize, Serialize, ser::SerializeMap as _};
     use serde_private::de::ContentVisitor;
 
     use crate::{chunk::ChunkCx, event::game_event::PositionSourceType};
@@ -562,7 +562,7 @@ mod _serde {
         where
             A: serde::de::MapAccess<'de>,
         {
-            use serde::de::Error;
+            use serde::de::Error as _;
             use serde_private::de::Content;
             let mut buf: Vec<(Content<'de>, Content<'de>)> =
                 map.size_hint().map_or_else(Vec::new, Vec::with_capacity);

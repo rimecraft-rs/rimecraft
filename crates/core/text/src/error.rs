@@ -17,20 +17,20 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::FormattingWithoutColor(formatting) => {
+            Self::FormattingWithoutColor(formatting) => {
                 write!(
                     f,
                     "the given formatting does not contains a color: {}",
                     formatting.raw_name(),
                 )
             }
-            Error::ColorValueOutOfRange(value) => {
+            Self::ColorValueOutOfRange(value) => {
                 write!(f, "the color value is out of range: {value}")
             }
-            Error::InvalidColor(value) => {
+            Self::InvalidColor(value) => {
                 write!(f, "the color is invalid: {value}")
             }
-            Error::Formatting(err) => write!(f, "formatting error: {err}"),
+            Self::Formatting(err) => write!(f, "formatting error: {err}"),
         }
     }
 }
@@ -40,6 +40,6 @@ impl std::error::Error for Error {}
 impl From<rimecraft_fmt::Error> for Error {
     #[inline]
     fn from(err: rimecraft_fmt::Error) -> Self {
-        Error::Formatting(err)
+        Self::Formatting(err)
     }
 }

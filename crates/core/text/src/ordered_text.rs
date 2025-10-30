@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use rimecraft_fmt::Formatting;
 
-use crate::{ProvideTextTy, Style, style::Formattable};
+use crate::{ProvideTextTy, Style, style::Formattable as _};
 
 /// An item in an iterator over text items with associated [`Style`]s.
 ///

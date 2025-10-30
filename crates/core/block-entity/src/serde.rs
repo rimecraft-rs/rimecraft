@@ -28,7 +28,7 @@ bitflags! {
 
 impl Flags {
     /// Serializes the identifier and position.
-    #[inline(always)]
+    #[inline]
     pub fn identifying_data() -> Self {
         Self::POS | Self::ID
     }
@@ -58,7 +58,7 @@ where
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeMap;
+        use serde::ser::SerializeMap as _;
         let cx = serializer.local_cx;
         let mut map = serializer.inner.serialize_map(None)?;
         for flag in self.1.iter() {

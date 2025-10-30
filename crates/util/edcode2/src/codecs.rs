@@ -202,7 +202,7 @@ where
 {
     fn decode(mut buf: B) -> Result<Self, BoxedError<'de>> {
         let len = buf.get_variable::<u32>() as usize;
-        let mut vec = Vec::with_capacity(len);
+        let mut vec = Self::with_capacity(len);
         for _ in 0..len {
             vec.push(T::decode(&mut buf)?);
         }
@@ -309,7 +309,7 @@ impl<'de, B: Buf> Decode<'de, B> for String {
         if bytes.len() > MAX_STR_LEN {
             return Err("string too large".into());
         }
-        String::from_utf8(bytes).map_err(Into::into)
+        Self::from_utf8(bytes).map_err(Into::into)
     }
 }
 
@@ -409,7 +409,7 @@ where
 {
     fn decode(mut buf: B) -> Result<Self, BoxedError<'de>> {
         let len = buf.get_variable::<u32>() as usize;
-        let mut map = HashMap::with_capacity_and_hasher(len.min(u16::MAX as usize), S::default());
+        let mut map = Self::with_capacity_and_hasher(len.min(u16::MAX as usize), S::default());
         for _ in 0..len {
             let key = K::decode(&mut buf)?;
             let value = V::decode(&mut buf)?;
@@ -441,7 +441,7 @@ where
 {
     fn decode(mut buf: B) -> Result<Self, BoxedError<'de>> {
         let len = buf.get_variable::<u32>() as usize;
-        let mut map = BTreeMap::new();
+        let mut map = Self::new();
         for _ in 0..len {
             let key = K::decode(&mut buf)?;
             let value = V::decode(&mut buf)?;
@@ -471,7 +471,7 @@ where
 {
     fn decode(mut buf: B) -> Result<Self, BoxedError<'de>> {
         let len = buf.get_variable::<u32>() as usize;
-        let mut set = HashSet::with_capacity_and_hasher(len.min(u16::MAX as usize), S::default());
+        let mut set = Self::with_capacity_and_hasher(len.min(u16::MAX as usize), S::default());
         for _ in 0..len {
             set.insert(T::decode(&mut buf)?);
         }
@@ -498,7 +498,7 @@ where
 {
     fn decode(mut buf: B) -> Result<Self, BoxedError<'de>> {
         let len = buf.get_variable::<u32>() as usize;
-        let mut set = BTreeSet::new();
+        let mut set = Self::new();
         for _ in 0..len {
             set.insert(T::decode(&mut buf)?);
         }

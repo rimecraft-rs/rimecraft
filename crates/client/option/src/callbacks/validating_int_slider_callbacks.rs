@@ -48,8 +48,8 @@ where
     fn to_slider_progress(&self, value: i32) -> f32 {
         <f32 as MathDeltaExt<f32>>::map(
             value as f32 + 0.5,
-            <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
-                ..<ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::max_inclusive(self)
+            <Self as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
+                ..<Self as IntSliderCallbacks<Cx>>::max_inclusive(self)
                     as f32
                     + 1.0,
             0.0..1.0,
@@ -61,8 +61,8 @@ where
         <f32 as MathDeltaExt<f32>>::map(
             slider_progress,
             0.0..1.0,
-            <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
-                ..<ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::max_inclusive(self)
+            <Self as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
+                ..<Self as IntSliderCallbacks<Cx>>::max_inclusive(self)
                     as f32
                     + 1.0,
         )
@@ -147,11 +147,11 @@ where
     }
 
     fn to_slider_progress(&self, value: i32) -> f32 {
-        <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::to_slider_progress(self, value)
+        <Self as IntSliderCallbacks<Cx>>::to_slider_progress(self, value)
     }
 
     fn to_value(&self, slider_progress: f32) -> i32 {
-        <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::to_value(self, slider_progress)
+        <Self as IntSliderCallbacks<Cx>>::to_value(self, slider_progress)
     }
 }
 
@@ -160,6 +160,6 @@ where
     Cx: ProvideTextTy,
 {
     fn validate(&self, value: i32) -> Option<i32> {
-        <ValidatingIntSliderCallbacks as IntSliderCallbacks<Cx>>::i32_validate(self, value)
+        <Self as IntSliderCallbacks<Cx>>::i32_validate(self, value)
     }
 }

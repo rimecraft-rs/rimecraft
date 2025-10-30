@@ -46,7 +46,7 @@ impl Boxes<'_> {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn __next(&mut self) -> ControlFlow<(UVec3, UVec3)> {
         // z-axis iterates inclusive while others are exclusive
         // order: y -> x -> z
@@ -141,7 +141,7 @@ impl<'a, 's> Voxels<'a, 's> {
 }
 
 impl Voxels<'_, '_> {
-    #[inline(always)]
+    #[inline]
     fn __next(&mut self) -> ControlFlow<(UVec3, UVec3)> {
         if self.z >= self.props.len_z {
             self.z = 0;

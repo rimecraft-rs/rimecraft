@@ -3,7 +3,7 @@ use std::{borrow::Cow, marker::PhantomData};
 use glam::{DVec3, Vec2};
 use serde::{
     Deserialize, Serialize,
-    ser::{SerializeMap, SerializeSeq},
+    ser::{SerializeMap as _, SerializeSeq as _},
 };
 use serde_private::de::ContentVisitor;
 use serde_update::Update as _;

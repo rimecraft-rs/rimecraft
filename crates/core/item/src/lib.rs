@@ -85,8 +85,8 @@ impl From<Rarity> for Formatting {
     #[inline]
     fn from(value: Rarity) -> Self {
         match value {
-            Rarity::Common => Formatting::White,
-            Rarity::Uncommon => Formatting::Yellow,
+            Rarity::Common => Self::White,
+            Rarity::Uncommon => Self::Yellow,
             Rarity::Rare => Self::Aqua,
             Rarity::Epic => Self::LightPurple,
         }

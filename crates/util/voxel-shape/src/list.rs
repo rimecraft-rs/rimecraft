@@ -245,7 +245,7 @@ where
 }
 
 impl<I, T> From<(I, T)> for OffsetList<I, T> {
-    #[inline(always)]
+    #[inline]
     fn from(value: (I, T)) -> Self {
         Self {
             offset: value.0,

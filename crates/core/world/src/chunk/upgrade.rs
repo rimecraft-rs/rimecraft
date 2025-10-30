@@ -1,6 +1,6 @@
 use std::{cell::Cell, fmt::Debug, hash::Hash, marker::PhantomData};
 
-use local_cx::{LocalContext, LocalContextExt, serde::DeserializeWithCx};
+use local_cx::{LocalContext, LocalContextExt as _, serde::DeserializeWithCx};
 use rimecraft_block::RawBlock;
 use rimecraft_fluid::RawFluid;
 use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};

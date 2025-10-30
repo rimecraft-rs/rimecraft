@@ -25,11 +25,11 @@ pub enum ButtonState {
 impl ButtonState {
     /// Returns `true` if the button is currently idle.
     pub fn is_idle(&self) -> bool {
-        matches!(self, ButtonState::Idle)
+        matches!(self, Self::Idle)
     }
 
     /// Returns `true` if the button is currently pressed.
     pub fn is_pressed(&self) -> bool {
-        matches!(self, ButtonState::Pressed)
+        matches!(self, Self::Pressed)
     }
 }
