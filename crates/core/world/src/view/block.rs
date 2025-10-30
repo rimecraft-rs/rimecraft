@@ -153,12 +153,12 @@ where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
     T: BlockView<'w, Cx>,
 {
-    #[inline(always)]
+    #[inline]
     fn block_state(&mut self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
         BlockView::block_state(*self, pos)
     }
 
-    #[inline(always)]
+    #[inline]
     fn fluid_state(&mut self, pos: BlockPos) -> Option<FluidState<'w, Cx>> {
         BlockView::fluid_state(*self, pos)
     }
@@ -169,7 +169,7 @@ where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
     T: BlockEntityView<'w, Cx>,
 {
-    #[inline(always)]
+    #[inline]
     fn peek_block_entity<F, U>(&mut self, pos: BlockPos, pk: F) -> Option<U>
     where
         F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> U,

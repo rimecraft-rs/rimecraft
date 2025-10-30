@@ -147,12 +147,12 @@ impl<'w, Cx> ArcAccess<dyn WorldMarker<Lifetime = InvariantLifetime<'w>> + 'w>
 where
     Cx: WorldCx<'w>,
 {
-    #[inline(always)]
+    #[inline]
     fn access_arc(self) -> Arc<dyn WorldMarker<Lifetime = InvariantLifetime<'w>> + 'w> {
         ArcAccess::<dyn DynCompatibleWorld<'w, Cx> + Send + Sync + 'w>::access_arc(self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn access_weak(self) -> Weak<dyn WorldMarker<Lifetime = InvariantLifetime<'w>> + 'w> {
         ArcAccess::<dyn DynCompatibleWorld<'w, Cx> + Send + Sync + 'w>::access_weak(self)
     }

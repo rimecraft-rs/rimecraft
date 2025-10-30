@@ -2,7 +2,7 @@
 
 use dsyn::HoldDescriptors as _;
 use glam::IVec3;
-use local_cx::{HoldLocalContext, LocalContext, LocalContextExt, dsyn_instanceof, dsyn_ty};
+use local_cx::{HoldLocalContext, LocalContext, LocalContextExt as _, dsyn_instanceof, dsyn_ty};
 use maybe::Maybe;
 use parking_lot::{Mutex, MutexGuard};
 use rimecraft_block::{BlockState, RawBlock};
@@ -13,7 +13,7 @@ use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, container::ProvidePalette,
 };
 use rimecraft_fluid::{BsToFs, FluidState};
-use rimecraft_global_cx::Hold;
+use rimecraft_global_cx::Hold as _;
 use rimecraft_registry::Registry;
 use rimecraft_voxel_math::{BlockPos, ChunkPos};
 use serde::{Deserialize, de::DeserializeSeed};
@@ -765,7 +765,6 @@ where
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
-    #[inline]
     fn peek_block_entity<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
     where
         F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,
@@ -904,7 +903,7 @@ where
     Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + for<'a> ServerChunkEventCallback<'w, &'a WorldChunk<'w, Cx>>,
+        + for<'a> ServerChunkEventCallback<'w, &'a Self>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {

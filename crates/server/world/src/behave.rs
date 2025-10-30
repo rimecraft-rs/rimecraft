@@ -124,7 +124,7 @@ pub type BlockEntityOnBlockReplaced<Cx> = for<'env> fn(
 );
 
 /// The default implementation of [`BlockEntityOnBlockReplaced`], which is an empty function.
-#[inline(always)]
+#[inline]
 pub const fn default_block_entity_on_block_replaced<'w, Cx>() -> BlockEntityOnBlockReplaced<Cx>
 where
     Cx: WorldCx<'w>,
@@ -155,6 +155,6 @@ impl From<BlockAlwaysReplaceState> for bool {
 impl From<bool> for BlockAlwaysReplaceState {
     #[inline]
     fn from(value: bool) -> Self {
-        BlockAlwaysReplaceState(PointerLikeBool::new(value))
+        Self(PointerLikeBool::new(value))
     }
 }

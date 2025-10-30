@@ -209,7 +209,7 @@ where
     #[inline]
     #[deprecated = "this function should be provided by the nested block state extension types"]
     pub fn luminance(&self) -> u32 {
-        use behave::ProvideLuminance;
+        use behave::ProvideLuminance as _;
         self.state.data().luminance(self.state)
     }
 }

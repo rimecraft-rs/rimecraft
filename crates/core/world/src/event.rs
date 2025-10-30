@@ -11,7 +11,7 @@ use crate::{WorldCx, view::block::SetBlockStateFlags};
 /// This should be implemented in a pure-client environment as well but will do nothing there.
 pub trait ServerChunkEventCallback<'w, Access>: WorldCx<'w> {
     /// Called after a block state is been replaced.
-    #[inline(always)]
+    #[inline]
     fn replace_block_state_callback(
         pos: BlockPos,
         new: BlockState<'w, Self>,
@@ -25,7 +25,7 @@ pub trait ServerChunkEventCallback<'w, Access>: WorldCx<'w> {
     /// Called after a block state is been added.
     ///
     /// This is called after [`ServerChunkEventCallback::replace_block_state_callback`] and the removal of block entity.
-    #[inline(always)]
+    #[inline]
     fn add_block_state_callback(
         pos: BlockPos,
         new: BlockState<'w, Self>,
@@ -37,13 +37,13 @@ pub trait ServerChunkEventCallback<'w, Access>: WorldCx<'w> {
     }
 
     /// Called after a block entity is added.
-    #[inline(always)]
+    #[inline]
     fn add_block_entity_callback(be: &BlockEntityCell<'w, Self>, chunk: &mut Access) {
         let _ = (be, chunk);
     }
 
     /// Called after a block entity is removed, and _before it is marked as removed._
-    #[inline(always)]
+    #[inline]
     fn remove_block_entity_callback(be: &BlockEntityCell<'w, Self>, chunk: &mut Access) {
         let _ = (be, chunk);
     }

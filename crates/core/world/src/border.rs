@@ -416,11 +416,11 @@ impl Area {
         self.i_bounds(cx)
     }
 
-    #[inline(always)]
+    #[inline]
     fn i_bounds(&self, cx: AreaLocalCx) -> [f64; 4] {
         match self {
-            Area::Static(area) => area.bounds,
-            Area::Moving(_) => {
+            Self::Static(area) => area.bounds,
+            Self::Moving(_) => {
                 let radius = self.i_size() / 2.0;
                 let max_radius = cx.max_radius as f64;
                 DVec4::new(
@@ -439,11 +439,11 @@ impl Area {
         self.i_size()
     }
 
-    #[inline(always)]
+    #[inline]
     fn i_size(&self) -> f64 {
         match self {
-            Area::Static(area) => area.size,
-            Area::Moving(area) => {
+            Self::Static(area) => area.size,
+            Self::Moving(area) => {
                 let d = area.start.elapsed().div_duration_f64(area.duration);
                 if d < 1.0 {
                     area.old_size.lerp(area.new_size, d)
@@ -457,30 +457,30 @@ impl Area {
     #[inline]
     fn size_lerp_time(&self) -> Duration {
         match self {
-            Area::Static(_) => Duration::ZERO,
-            Area::Moving(area) => area.end.saturating_duration_since(Instant::now()),
+            Self::Static(_) => Duration::ZERO,
+            Self::Moving(area) => area.end.saturating_duration_since(Instant::now()),
         }
     }
 
     #[inline]
     fn size_lerp_target(&self) -> f64 {
         match self {
-            Area::Static(area) => area.size,
-            Area::Moving(area) => area.new_size,
+            Self::Static(area) => area.size,
+            Self::Moving(area) => area.new_size,
         }
     }
 
     #[inline]
     fn on_center_changed(&mut self, cx: AreaLocalCx) {
-        if let Area::Static(area) = self {
+        if let Self::Static(area) = self {
             area.calculate_bounds(cx);
         }
     }
 
     fn as_voxel_shape(&self, cx: AreaLocalCx) -> Maybe<'_, Arc<VoxelShapeSlice<'static>>> {
         match self {
-            Area::Static(area) => Maybe::Borrowed(&area.shape),
-            Area::Moving(_) => {
+            Self::Static(area) => Maybe::Borrowed(&area.shape),
+            Self::Moving(_) => {
                 let bounds = self.bounds(cx);
                 Maybe::Owned(SimpleOwned(
                     voxel_shape::combine_with(
@@ -506,10 +506,10 @@ impl Area {
     }
 
     fn tick(&mut self, cx: AreaLocalCx) {
-        if let Area::Moving(area) = self
+        if let Self::Moving(area) = self
             && area.end <= Instant::now()
         {
-            *self = Area::Static(StaticArea::new(area.new_size, cx))
+            *self = Self::Static(StaticArea::new(area.new_size, cx))
         }
     }
 }
@@ -603,7 +603,7 @@ impl StaticArea {
 
 impl IntoContainsDescriptor for ContainsDescriptor {
     #[inline]
-    fn descriptors(self) -> impl IntoIterator<Item = ContainsDescriptor> {
+    fn descriptors(self) -> impl IntoIterator<Item = Self> {
         std::iter::once(self)
     }
 }

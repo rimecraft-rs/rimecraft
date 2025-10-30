@@ -52,7 +52,7 @@ pub unsafe fn try_cast<L, R>(value: L) -> Result<R, L> {
 /// # Safety
 ///
 /// This function is unsafe because it transmutes a value to another type.
-#[inline(always)]
+#[inline]
 pub const unsafe fn transmute<L, R>(value: L) -> R {
     struct __TypeCheck<L, R>(PhantomData<(L, R)>);
 
@@ -79,7 +79,7 @@ pub const unsafe fn transmute<L, R>(value: L) -> R {
 /// # Safety
 ///
 /// This function is unsafe because it transmutes a value to another type.
-#[inline(always)]
+#[inline]
 pub const unsafe fn transmute_unchecked<L, R>(value: L) -> R {
     let mut r = MaybeUninit::<R>::uninit();
     unsafe { &mut *ptr::from_mut(&mut r).cast::<MaybeUninit<L>>() }.write(value);
@@ -88,7 +88,7 @@ pub const unsafe fn transmute_unchecked<L, R>(value: L) -> R {
 }
 
 /// Gets the [`TypeId`] of a type regardless of its lifetime.
-#[inline(always)]
+#[inline]
 pub fn typeid<T: ?Sized>() -> TypeId {
     typeid::of::<T>()
 }

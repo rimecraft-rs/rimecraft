@@ -26,7 +26,7 @@ pub trait TypeFilter<T: ?Sized> {
     unsafe fn cast_mut(&self, obj: *mut T) -> Option<*mut Self::Output>;
 
     /// Returns the type id of the output subtype, if known as, and only if is a _concrete type._
-    #[inline(always)]
+    #[inline]
     fn hint_typeid(&self) -> Option<TypeId> {
         None
     }
@@ -36,7 +36,7 @@ pub trait TypeFilter<T: ?Sized> {
     /// # Safety
     ///
     /// The conversion itself, the input-to-output type conversion, must be safe and sound.
-    #[inline(always)]
+    #[inline]
     unsafe fn make_safe(&self) -> impl SafeTypeFilter<T> {
         #[repr(transparent)]
         struct Safe<'a, T: ?Sized>(&'a T);
@@ -47,17 +47,17 @@ pub trait TypeFilter<T: ?Sized> {
         {
             type Output = T::Output;
 
-            #[inline(always)]
+            #[inline]
             unsafe fn cast_const(&self, obj: *const In) -> Option<*const Self::Output> {
                 unsafe { self.0.cast_const(obj) }
             }
 
-            #[inline(always)]
+            #[inline]
             unsafe fn cast_mut(&self, obj: *mut In) -> Option<*mut Self::Output> {
                 unsafe { self.0.cast_mut(obj) }
             }
 
-            #[inline(always)]
+            #[inline]
             fn hint_typeid(&self) -> Option<TypeId> {
                 self.0.hint_typeid()
             }
@@ -102,12 +102,12 @@ where
 impl<T: ?Sized> TypeFilter<T> for () {
     type Output = T;
 
-    #[inline(always)]
+    #[inline]
     unsafe fn cast_const(&self, obj: *const T) -> Option<*const Self::Output> {
         Some(obj)
     }
 
-    #[inline(always)]
+    #[inline]
     unsafe fn cast_mut(&self, obj: *mut T) -> Option<*mut Self::Output> {
         Some(obj)
     }

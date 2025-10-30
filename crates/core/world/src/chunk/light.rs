@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use rimecraft_block::{BlockState, BlockStateExt};
-use rimecraft_global_cx::Hold;
+use rimecraft_block::{BlockState, BlockStateExt as _};
+use rimecraft_global_cx::Hold as _;
 use rimecraft_packed_int_array::PackedIntArray;
 use rimecraft_voxel_math::{BlockPos, coord_block_from_section, direction::Direction};
 

@@ -2,7 +2,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use local_cx::{HoldLocalContext, LocalContext, LocalContextExt};
+use local_cx::{HoldLocalContext, LocalContext, LocalContextExt as _};
 use rimecraft_voxel_math::{ChunkPos, ChunkSectionPos};
 
 use crate::{
@@ -90,7 +90,7 @@ where
         F: FnMut() -> bool;
 
     /// Called when a chunk section occurs a light update.
-    #[inline(always)]
+    #[inline]
     #[doc(alias = "on_light_update")]
     fn light_update(&self, ty: LightType, pos: ChunkSectionPos) {
         // do nothing by default

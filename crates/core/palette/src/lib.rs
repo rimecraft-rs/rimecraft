@@ -459,7 +459,7 @@ where
 
     type IntoIter = <&'a T as IntoIterator>::IntoIter;
 
-    #[inline(always)]
+    #[inline]
     fn into_iter_ref(&'a self) -> Self::IntoIter {
         self.into_iter()
     }

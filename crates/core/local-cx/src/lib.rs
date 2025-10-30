@@ -47,7 +47,7 @@ impl<'a, L, T: 'a> PeekLocalContext<T> for L
 where
     L: LocalContext<&'a T>,
 {
-    #[inline(always)]
+    #[inline]
     fn peek_acquire<F, U>(self, f: F) -> U
     where
         F: FnOnce(&T) -> U,
@@ -118,7 +118,7 @@ pub trait LocalContextExt {
     /// Acquire the inner data within the local context.
     ///
     /// This is a shorthand for [`LocalContext::acquire`] but with better generic bounding experience.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     fn acquire_within<T>(self) -> T
     where
@@ -135,7 +135,7 @@ pub trait PeekLocalContextExt {
     /// Peek the inner data within the local context.
     ///
     /// This is a shorthand for [`PeekLocalContext::peek_acquire`] but with better generic bounding experience.
-    #[inline(always)]
+    #[inline]
     fn peek_within<T, F, U>(self, f: F) -> U
     where
         F: FnOnce(&T) -> U,
@@ -229,7 +229,7 @@ where
 impl<T: HoldLocalContext + ?Sized> HoldLocalContext for &T {
     type LocalCx = T::LocalCx;
 
-    #[inline(always)]
+    #[inline]
     fn local_context(&self) -> Self::LocalCx {
         (**self).local_context()
     }
@@ -238,7 +238,7 @@ impl<T: HoldLocalContext + ?Sized> HoldLocalContext for &T {
 impl<T: HoldLocalContext + ?Sized> HoldLocalContext for &mut T {
     type LocalCx = T::LocalCx;
 
-    #[inline(always)]
+    #[inline]
     fn local_context(&self) -> Self::LocalCx {
         (**self).local_context()
     }

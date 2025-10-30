@@ -97,13 +97,13 @@ pub trait ArcAccess<T: ?Sized> {
 
 impl<T: ?Sized> ArcAccess<T> for Arc<T> {
     #[inline]
-    fn access_arc(self) -> Arc<T> {
+    fn access_arc(self) -> Self {
         self
     }
 
     #[inline]
     fn access_weak(self) -> Weak<T> {
-        Arc::downgrade(&self)
+        Self::downgrade(&self)
     }
 }
 
@@ -126,7 +126,7 @@ impl<T: ?Sized> ArcAccess<T> for Weak<T> {
     }
 
     #[inline]
-    fn access_weak(self) -> Weak<T> {
+    fn access_weak(self) -> Self {
         self
     }
 }

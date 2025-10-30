@@ -80,12 +80,12 @@ where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
     T: BlockLuminanceView<'w, Cx>,
 {
-    #[inline(always)]
+    #[inline]
     fn luminance(&mut self, pos: BlockPos) -> u32 {
         BlockLuminanceView::luminance(*self, pos)
     }
 
-    #[inline(always)]
+    #[inline]
     fn max_light_level(&mut self) -> u32 {
         BlockLuminanceView::max_light_level(*self)
     }
@@ -96,7 +96,7 @@ where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
     T: LightSourceView<'w, Cx>,
 {
-    #[inline(always)]
+    #[inline]
     fn peek_chunk_sky_light<F, U>(&mut self, f: F) -> U
     where
         F: FnOnce(&ChunkSkyLight) -> U,
@@ -104,7 +104,7 @@ where
         LightSourceView::peek_chunk_sky_light(*self, f)
     }
 
-    #[inline(always)]
+    #[inline]
     fn light_sources(&mut self) -> impl Iterator<Item = (BlockPos, BlockState<'w, Cx>)> {
         LightSourceView::light_sources(*self)
     }

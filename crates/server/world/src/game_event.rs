@@ -275,8 +275,8 @@ pub struct ListenerKey(*const ());
 impl ListenerKey {
     /// Creates a new listener key from a reference-counted pointer.
     #[inline]
-    pub fn from_arc<'w, Cx: WorldCx<'w>>(arc: &Arc<DynListener<'w, Cx>>) -> ListenerKey {
-        ListenerKey(Arc::as_ptr(arc).cast())
+    pub fn from_arc<'w, Cx: WorldCx<'w>>(arc: &Arc<DynListener<'w, Cx>>) -> Self {
+        Self(Arc::as_ptr(arc).cast())
     }
 }
 
