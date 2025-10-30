@@ -1,7 +1,36 @@
 //! Minecraft text API.
 
+#[cfg(feature = "macros")]
+mod macros;
+
+#[doc(hidden)]
+pub mod __priv_macro_use {
+    pub use std::concat;
+    pub use std::string::{String, ToString};
+    pub use std::vec::Vec;
+
+    #[inline(always)]
+    pub const fn strip_dot_prefix(s: &str) -> &str {
+        assert!(s.len() >= ".".len());
+        __strip_dot_prefix(s)
+    }
+
+    const fn __strip_dot_prefix(s: &str) -> &str {
+        let prefix_len = ".".len();
+        let bytes = s.as_bytes();
+        let len = bytes.len() - prefix_len;
+        let ptr = bytes.as_ptr();
+        let bytes = unsafe { std::slice::from_raw_parts(ptr.add(prefix_len), len) };
+        unsafe { str::from_utf8_unchecked(bytes) }
+    }
+}
+
+#[cfg(feature = "macros")]
+pub use rimecraft_text_derive::Localize;
+
 mod error;
 mod iter;
+pub mod ordered_text;
 pub mod style;
 
 #[cfg(feature = "serde")]
@@ -13,6 +42,8 @@ pub use error::Error;
 pub use iter::{Iter, StyledIter};
 use rimecraft_global_cx::GlobalContext;
 pub use style::Style;
+
+use crate::style::Formattable;
 
 /// A raw text component.
 ///
@@ -180,7 +211,7 @@ where
     }
 }
 
-/// Global context for text.
+/// Global context for [`Text`].
 ///
 /// The associated type `Content` and `StyleExt` should be applied to [`Text`] when used.
 pub trait ProvideTextTy: GlobalContext {
@@ -188,7 +219,7 @@ pub trait ProvideTextTy: GlobalContext {
     type Content: Plain;
 
     /// Generic `StyleExt` that should be applied to [`Text`].
-    type StyleExt;
+    type StyleExt: Formattable;
 }
 
 /// Context type decorated [`RawText`].
@@ -206,6 +237,3 @@ pub type EdcodeSeed<Cx> = rimecraft_global_cx::edcode::Nbt<Text<Cx>, Cx>;
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(feature = "macros")]
-mod macros;

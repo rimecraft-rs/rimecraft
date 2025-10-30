@@ -26,8 +26,11 @@ pub use local_cx;
 /// Integration with several Rimecraft crates.
 pub mod integration {
     pub mod component;
+    pub mod keyboard;
+    pub mod mouse;
     pub mod registry;
     pub mod text;
+    pub mod tooltip;
 }
 
 pub use identifier::Id;
@@ -35,7 +38,7 @@ pub use identifier::Id;
 use registry::Registry;
 
 /// The global context.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[allow(clippy::exhaustive_enums)]
 pub enum TestContext {}
 
@@ -46,6 +49,7 @@ pub struct OwnedLocalTestContext<'a> {
     /// The component registry.
     #[cfg(feature = "component")]
     pub reg_components: Registry<Id, component::RawErasedComponentType<'a, TestContext>>,
+    _phantom: std::marker::PhantomData<&'a ()>,
 }
 
 impl Default for OwnedLocalTestContext<'_> {
@@ -53,6 +57,7 @@ impl Default for OwnedLocalTestContext<'_> {
         Self {
             #[cfg(feature = "component")]
             reg_components: integration::component::default_components_registry_builder().into(),
+            _phantom: std::marker::PhantomData,
         }
     }
 }

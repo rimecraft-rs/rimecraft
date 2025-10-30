@@ -1,23 +1,37 @@
-use super::*;
+use rimecraft_text::ProvideTextTy;
 
-pub struct PotentialValuesBasedCallbacks<T> {
-    values: Vec<T>,
+use crate::callbacks::{Callbacks, ty::CyclingCallbacks};
+
+/// A callback that provides cycling behavior based on a set of potential values.
+#[derive(Debug, Default, Clone)]
+pub struct PotentialValuesBasedCallbacks<V> {
+    /// The potential values for the option.
+    pub values: Vec<V>,
 }
 
-impl<T, Txt> CyclingCallbacks<T, Txt> for PotentialValuesBasedCallbacks<T>
+impl<V> PotentialValuesBasedCallbacks<V> {
+    /// Creates a new [`PotentialValuesBasedCallbacks`] with the given potential values.
+    pub fn new(values: Vec<V>) -> Self {
+        Self { values }
+    }
+}
+
+impl<V, Cx> CyclingCallbacks<V, Cx> for PotentialValuesBasedCallbacks<V>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
+    V: PartialEq,
 {
-    fn get_values(&self) {
+    fn values(&self) {
         todo!()
     }
 }
 
-impl<T, Txt> Callbacks<T, Txt> for PotentialValuesBasedCallbacks<T>
+impl<V, Cx> Callbacks<V, Cx> for PotentialValuesBasedCallbacks<V>
 where
-    Txt: ProvideTextTy,
+    Cx: ProvideTextTy,
+    V: PartialEq,
 {
-    fn validate(&self, value: Option<T>) -> Option<T> {
-        todo!()
+    fn validate(&self, value: V) -> Option<V> {
+        self.values.contains(&value).then_some(value)
     }
 }
