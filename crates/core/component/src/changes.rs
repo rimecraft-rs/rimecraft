@@ -230,13 +230,11 @@ where
             where
                 A: serde::de::MapAccess<'de>,
             {
-                let mut changes;
-
-                if let Some(hint) = map.size_hint() {
-                    changes = AHashMap::with_capacity(hint);
+                let mut changes = if let Some(hint) = map.size_hint() {
+                    AHashMap::with_capacity(hint)
                 } else {
-                    changes = AHashMap::new();
-                }
+                    AHashMap::new()
+                };
 
                 while let Some(ty) = map.next_key_seed(WithLocalCx {
                     inner: PhantomData::<Type<'a, Cx>>,

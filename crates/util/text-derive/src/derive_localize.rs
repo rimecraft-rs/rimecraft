@@ -297,7 +297,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_to_snake_case_ident() {
+    fn to_snake_case_ident_works() {
         assert_eq!(to_snake_case_ident("MyCase"), "my_case");
         assert_eq!(to_snake_case_ident("HTTPServer"), "http_server");
         assert_eq!(to_snake_case_ident("someValue"), "some_value");

@@ -7,7 +7,7 @@ use std::rc::Rc;
 use crate::*;
 
 #[test]
-fn test_key_bind_handle_release() {
+fn key_bind_handle_release() {
     let mode = Rc::new(RefCell::new(KeyBindMode::Hold));
     let mode_for_getter = mode.clone();
 
@@ -54,7 +54,7 @@ fn test_key_bind_handle_release() {
 }
 
 #[test]
-fn test_key_bind_default_key() {
+fn key_bind_default_key() {
     let key_bind = KeyBind::<TestContext, ()> {
         mode_getter: Box::new(|| KeyBindMode::Hold),
         default_key: Key::KeyboardKey(TestKey::A),
@@ -69,7 +69,7 @@ fn test_key_bind_default_key() {
 }
 
 #[test]
-fn test_key_bind_binding() {
+fn key_bind_binding() {
     let mut key_bind = KeyBind::<TestContext, ()> {
         mode_getter: Box::new(|| KeyBindMode::Hold),
         default_key: Key::KeyboardKey(TestKey::A),
