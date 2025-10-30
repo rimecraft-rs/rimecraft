@@ -63,7 +63,7 @@ where
 }
 
 #[test]
-fn test_math_delta_ext_integers() {
+fn math_delta_ext_integers() {
     assert_eq!(5i32.lerp(15, 0.0), 5);
     assert_eq!(5i32.lerp(15, 0.5), 10);
     assert_eq!(5i32.lerp(15, 1.0), 15);
@@ -77,7 +77,7 @@ fn test_math_delta_ext_integers() {
 }
 
 #[test]
-fn test_math_delta_ext_floats() {
+fn math_delta_ext_floats() {
     assert_eq!(5.0f32.lerp(15.0, 0.0), 5.0);
     assert_eq!(5.0f32.lerp(15.0, 0.5), 10.0);
     assert_eq!(5.0f32.lerp(15.0, 1.0), 15.0);
@@ -94,7 +94,7 @@ fn test_math_delta_ext_floats() {
 }
 
 #[test]
-fn test_binary_search_ie_u32() {
+fn binary_search_ie_u32_works() {
     let range = 0..100;
     let target = 73;
     let result = binary_search_ie_u32(range.clone(), |x| x >= target);
@@ -103,6 +103,6 @@ fn test_binary_search_ie_u32() {
     let result_none = binary_search_ie_u32(range.clone(), |x| x >= 150);
     assert_eq!(result_none, None);
 
-    let result_start = binary_search_ie_u32(range.clone(), |_| true);
+    let result_start = binary_search_ie_u32(range, |_| true);
     assert_eq!(result_start, Some(0));
 }

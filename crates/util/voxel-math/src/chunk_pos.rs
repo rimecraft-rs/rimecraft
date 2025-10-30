@@ -56,7 +56,7 @@ impl From<(i32, i32)> for ChunkPos {
 impl From<ChunkPos> for u64 {
     #[inline]
     fn from(ChunkPos { x, z }: ChunkPos) -> Self {
-        x as u64 & 0xFFFF_FFFF_u64 | ((z as u64 & 0xFFFF_FFFF_u64) << 32)
+        x as Self & 0xFFFF_FFFF_u64 | ((z as Self & 0xFFFF_FFFF_u64) << 32)
     }
 }
 

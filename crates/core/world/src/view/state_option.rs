@@ -34,8 +34,8 @@ impl<T> From<Option<T>> for StateOption<T> {
     #[inline]
     fn from(value: Option<T>) -> Self {
         match value {
-            Some(val) => StateOption::Some(val),
-            None => StateOption::None,
+            Some(val) => Self::Some(val),
+            None => Self::None,
         }
     }
 }

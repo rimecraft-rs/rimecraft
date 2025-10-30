@@ -7,7 +7,7 @@ use rimecraft_registry::{Reg, Registry};
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use crate::{Item, ItemSettings, ProvideSettingsTy, RawItem};
+use crate::{Item, ItemSettings as _, ProvideSettingsTy, RawItem};
 
 /// Global context used for item stacks.
 pub trait ItemStackCx: ProvideIdTy + ProvideSettingsTy + ProvideLocalCxTy {}
@@ -195,7 +195,7 @@ mod _serde {
         where
             S: serde::Serializer,
         {
-            use serde::ser::SerializeStruct;
+            use serde::ser::SerializeStruct as _;
 
             let cx = serializer.local_cx;
             let mut state = serializer

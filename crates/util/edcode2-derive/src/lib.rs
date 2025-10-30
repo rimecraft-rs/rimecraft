@@ -8,7 +8,7 @@ use proc_macro2::TokenTree;
 use quote::quote;
 use syn::{
     Attribute, Data, DataEnum, DeriveInput, Error, Expr, Fields, Ident, Meta, parse_macro_input,
-    spanned::Spanned,
+    spanned::Spanned as _,
 };
 
 macro_rules! unsupported_object {

@@ -315,7 +315,7 @@ where
 mod _edcode {
     use std::io::{self, ErrorKind};
 
-    use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
+    use edcode2::{Buf, BufExt as _, BufMut, BufMutExt as _, Decode, Encode};
 
     use super::*;
 
@@ -429,9 +429,9 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Uninitialized => write!(f, "use of an uninitialized palette"),
-            Error::UnknownEntry => write!(f, "unknown entry"),
-            Error::UnknownId(id) => write!(f, "unknown id: {id}"),
+            Self::Uninitialized => write!(f, "use of an uninitialized palette"),
+            Self::UnknownEntry => write!(f, "unknown entry"),
+            Self::UnknownId(id) => write!(f, "unknown id: {id}"),
         }
     }
 }

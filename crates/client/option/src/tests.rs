@@ -3,7 +3,7 @@ use rimecraft_test_global::{TestContext, integration::text::TextContent};
 use crate::*;
 
 #[test]
-fn test_callbacks() {
+fn callbacks() {
     let bool_callbacks = callbacks::bool::<TestContext>();
 
     assert_eq!(bool_callbacks.validate(true), Some(true));
@@ -11,7 +11,7 @@ fn test_callbacks() {
 }
 
 #[test]
-fn test_simple_options() {
+fn simple_options() {
     let mut bool_option = bool::<TestContext>(
         TextContent::from("test_bool_option").into(),
         Box::new(|_: &Text<TestContext>, b: &bool| TextContent::from(b.to_string()).into()),

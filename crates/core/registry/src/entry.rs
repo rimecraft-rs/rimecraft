@@ -184,7 +184,7 @@ mod serde {
 mod edcode {
     use std::{fmt::Display, hash::Hash};
 
-    use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
+    use edcode2::{Buf, BufExt as _, BufMut, BufMutExt as _, Decode, Encode};
     use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 
     use crate::{Reg, Registry};

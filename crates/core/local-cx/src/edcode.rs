@@ -11,22 +11,22 @@ impl<T, Cx> Buf for WithLocalCx<T, Cx>
 where
     T: Buf,
 {
-    #[inline(always)]
+    #[inline]
     fn remaining(&self) -> usize {
         self.inner.remaining()
     }
 
-    #[inline(always)]
+    #[inline]
     fn chunk(&self) -> &[u8] {
         self.inner.chunk()
     }
 
-    #[inline(always)]
+    #[inline]
     fn advance(&mut self, cnt: usize) {
         self.inner.advance(cnt)
     }
 
-    #[inline(always)]
+    #[inline]
     fn chunks_vectored<'a>(&'a self, dst: &mut [std::io::IoSlice<'a>]) -> usize {
         self.inner.chunks_vectored(dst)
     }
@@ -36,22 +36,22 @@ unsafe impl<T, Cx> BufMut for WithLocalCx<T, Cx>
 where
     T: BufMut,
 {
-    #[inline(always)]
+    #[inline]
     fn remaining_mut(&self) -> usize {
         self.inner.remaining_mut()
     }
 
-    #[inline(always)]
+    #[inline]
     unsafe fn advance_mut(&mut self, cnt: usize) {
         unsafe { self.inner.advance_mut(cnt) }
     }
 
-    #[inline(always)]
+    #[inline]
     fn chunk_mut(&mut self) -> &mut edcode2::UninitSlice {
         self.inner.chunk_mut()
     }
 
-    #[inline(always)]
+    #[inline]
     fn put<T1: Buf>(&mut self, src: T1)
     where
         Self: Sized,
@@ -59,12 +59,12 @@ where
         self.inner.put(src)
     }
 
-    #[inline(always)]
+    #[inline]
     fn put_slice(&mut self, src: &[u8]) {
         self.inner.put_slice(src)
     }
 
-    #[inline(always)]
+    #[inline]
     fn put_bytes(&mut self, val: u8, cnt: usize) {
         self.inner.put_bytes(val, cnt)
     }

@@ -99,7 +99,7 @@ where
     /// # Safety
     ///
     /// The returned type is not safe enough to exist.
-    #[inline(always)]
+    #[inline]
     pub unsafe fn as_unsafe_cx(&self) -> UnsafeDynamicContext<'_> {
         UnsafeDynamicContext(self)
     }

@@ -12,7 +12,7 @@ enum SimpleEnum {
 }
 
 #[test]
-fn test_simple_enum_default() {
+fn simple_enum_default() {
     assert_eq!(SimpleEnum::First.localization_key(), "first");
     assert_eq!(SimpleEnum::Second.localization_key(), "second");
     assert_eq!(SimpleEnum::Third.localization_key(), "third");
@@ -31,7 +31,7 @@ enum WithExplicitSegments {
 }
 
 #[test]
-fn test_explicit_segments() {
+fn explicit_segments() {
     assert_eq!(
         WithExplicitSegments::All.localization_key(),
         "options.particles.all"
@@ -62,7 +62,7 @@ enum WithUnderscorePlaceholder {
 }
 
 #[test]
-fn test_underscore_placeholder() {
+fn underscore_placeholder() {
     assert_eq!(
         WithUnderscorePlaceholder::Peaceful.localization_key(),
         "options.difficulty.peaceful"
@@ -97,7 +97,7 @@ enum MixedFormats {
 }
 
 #[test]
-fn test_mixed_formats() {
+fn mixed_formats() {
     assert_eq!(
         MixedFormats::First.localization_key(),
         "mixed.category.first.suffix"
@@ -123,7 +123,7 @@ enum WithStringLiterals {
 }
 
 #[test]
-fn test_string_literals() {
+fn string_literals() {
     assert_eq!(
         WithStringLiterals::Online.localization_key(),
         "status.online"
@@ -151,7 +151,7 @@ enum CamelCaseVariants {
 }
 
 #[test]
-fn test_camel_case_conversion() {
+fn camel_case_conversion() {
     assert_eq!(
         CamelCaseVariants::HTTPServer.localization_key(),
         "test.http_server"
@@ -180,7 +180,7 @@ enum EnumWithDataAndPrefixSuffix {
 }
 
 #[test]
-fn test_enum_with_data_and_prefix_suffix() {
+fn enum_with_data_and_prefix_suffix() {
     assert_eq!(
         EnumWithDataAndPrefixSuffix::Unit.localization_key(),
         "variant.unit.enum_with_data_and_prefix_suffix.end"
@@ -209,7 +209,7 @@ enum OnlyUnderscores {
 }
 
 #[test]
-fn test_only_underscores() {
+fn only_underscores() {
     assert_eq!(OnlyUnderscores::First.localization_key(), "first");
     assert_eq!(OnlyUnderscores::Second.localization_key(), "second");
 }
@@ -221,7 +221,7 @@ enum ComplexSegments {
 }
 
 #[test]
-fn test_complex_segments() {
+fn complex_segments() {
     assert_eq!(
         ComplexSegments::ComplexVariant.localization_key(),
         "prefix.middle.complex_variant.suffix.end"

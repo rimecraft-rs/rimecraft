@@ -54,8 +54,8 @@ impl From<&str> for TextContent {
 impl Display for TextContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TextContent::Plain { text } => write!(f, "{text}"),
-            TextContent::Translated {
+            Self::Plain { text } => write!(f, "{text}"),
+            Self::Translated {
                 translate,
                 fallback,
             } => write!(f, "{}", fallback.as_ref().unwrap_or(translate)),

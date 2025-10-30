@@ -165,8 +165,8 @@ where
                         })
                         .collect()
                 } else {
-                    (0..len)
-                        .map(|_| Mutex::new(ChunkSection::from_registries(cx)))
+                    std::iter::repeat_with(|| Mutex::new(ChunkSection::from_registries(cx)))
+                        .take(len)
                         .collect()
                 }
             },

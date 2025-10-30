@@ -765,6 +765,7 @@ where
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
     #[inline]
+    #[inline]
     fn peek_block_entity<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
     where
         F: for<'s> FnOnce(&'s BlockEntityCell<'w, Cx>) -> T,

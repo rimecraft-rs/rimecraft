@@ -296,27 +296,27 @@ impl DescriptorSetInner {
     #[inline]
     fn get(&self, index: usize) -> *const () {
         match self {
-            DescriptorSetInner::Slice(v) => v.get(index).copied().unwrap_or(std::ptr::null()),
-            DescriptorSetInner::Map(m) => m.get(&index).copied().unwrap_or(std::ptr::null()),
-            DescriptorSetInner::Empty => std::ptr::null(),
+            Self::Slice(v) => v.get(index).copied().unwrap_or(std::ptr::null()),
+            Self::Map(m) => m.get(&index).copied().unwrap_or(std::ptr::null()),
+            Self::Empty => std::ptr::null(),
         }
     }
 
     #[inline]
     fn contains(&self, index: usize) -> bool {
         match self {
-            DescriptorSetInner::Slice(v) => v.get(index).copied().is_some_and(|ptr| !ptr.is_null()),
-            DescriptorSetInner::Map(m) => m.contains_key(&index),
-            DescriptorSetInner::Empty => false,
+            Self::Slice(v) => v.get(index).copied().is_some_and(|ptr| !ptr.is_null()),
+            Self::Map(m) => m.contains_key(&index),
+            Self::Empty => false,
         }
     }
 
     #[inline]
     fn is_empty(&self) -> bool {
         match self {
-            DescriptorSetInner::Slice(v) => v.is_empty(),
-            DescriptorSetInner::Map(m) => m.is_empty(),
-            DescriptorSetInner::Empty => true,
+            Self::Slice(v) => v.is_empty(),
+            Self::Map(m) => m.is_empty(),
+            Self::Empty => true,
         }
     }
 }
