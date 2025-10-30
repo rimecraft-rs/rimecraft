@@ -204,13 +204,13 @@ impl<K: std::fmt::Debug, T> std::fmt::Debug for Reg<'_, K, T> {
 
 impl<'a, K, T> Reg<'a, K, T> {
     /// Gets the inner reference of this reference.
-    #[inline(always)]
+    #[inline]
     pub fn to_value(this: Self) -> &'a T {
         unsafe { this.entry.value().unwrap_unchecked() }
     }
 
     /// Gets the raw index of this reference.
-    #[inline(always)]
+    #[inline]
     pub fn to_raw_id(this: Self) -> usize {
         this.raw
     }
@@ -223,13 +223,13 @@ impl<'a, K, T> Reg<'a, K, T> {
     }
 
     /// Gets the ID of this registration.
-    #[inline(always)]
+    #[inline]
     pub fn to_id(this: Self) -> &'a K {
         Self::to_entry(this).key().value()
     }
 
     /// Gets the reference entry of this registration.
-    #[inline(always)]
+    #[inline]
     pub fn to_entry(this: Self) -> &'a RefEntry<K, T> {
         this.entry
     }
@@ -296,7 +296,7 @@ pub trait AsKey<K, T> {
 }
 
 impl<K, T> AsKey<K, T> for K {
-    #[inline(always)]
+    #[inline]
     fn as_key<'a>(&'a self, _registry: &'a Key<K, Registry<K, T>>) -> &'a K {
         self
     }

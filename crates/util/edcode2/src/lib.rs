@@ -34,7 +34,7 @@ pub trait Decode<'de, B>: Sized {
 
     /// Decodes this packet from the buffer in place.
     #[allow(clippy::missing_errors_doc)]
-    #[inline(always)]
+    #[inline]
     fn decode_in_place(&mut self, buf: B) -> Result<(), BoxedError<'de>> {
         *self = Decode::decode(buf)?;
         Ok(())
@@ -45,7 +45,7 @@ impl<B, T> Encode<B> for &T
 where
     T: Encode<B> + ?Sized,
 {
-    #[inline(always)]
+    #[inline]
     fn encode(&self, buf: B) -> Result<(), BoxedError<'static>> {
         Encode::encode(*self, buf)
     }
@@ -67,7 +67,7 @@ where
 {
     type Output = T;
 
-    #[inline(always)]
+    #[inline]
     fn decode(self, buf: B) -> Result<Self::Output, BoxedError<'de>> {
         Decode::decode(buf)
     }

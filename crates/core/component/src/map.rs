@@ -90,19 +90,13 @@ where
 
     /// Creates a **patched** component map with given base map and changes.
     #[inline]
-    pub fn with_changes(
-        base: &'a Self,
-        changes: ComponentChanges<'a, '_, Cx>,
-    ) -> Self {
+    pub fn with_changes(base: &'a Self, changes: ComponentChanges<'a, '_, Cx>) -> Self {
         Self::with_changes_raw(Maybe::Borrowed(base), changes)
     }
 
     /// Creates a **patched** component map with given base map and changes.
     #[inline]
-    pub fn arc_with_changes(
-        base: Arc<Self>,
-        changes: ComponentChanges<'a, '_, Cx>,
-    ) -> Self {
+    pub fn arc_with_changes(base: Arc<Self>, changes: ComponentChanges<'a, '_, Cx>) -> Self {
         Self::with_changes_raw(Maybe::Owned(base), changes)
     }
 
@@ -395,7 +389,7 @@ where
         self._len()
     }
 
-    #[inline(always)]
+    #[inline]
     fn _len(&self) -> usize {
         match &self.0 {
             MapInner::Empty => 0,

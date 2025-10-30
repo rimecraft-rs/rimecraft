@@ -9,7 +9,7 @@ pub mod __priv_macro_use {
     pub use std::string::{String, ToString};
     pub use std::vec::Vec;
 
-    #[inline(always)]
+    #[inline]
     pub const fn strip_dot_prefix(s: &str) -> &str {
         assert!(s.len() >= ".".len());
         __strip_dot_prefix(s)

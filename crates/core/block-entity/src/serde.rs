@@ -28,7 +28,7 @@ bitflags! {
 
 impl Flags {
     /// Serializes the identifier and position.
-    #[inline(always)]
+    #[inline]
     pub fn identifying_data() -> Self {
         Self::POS | Self::ID
     }

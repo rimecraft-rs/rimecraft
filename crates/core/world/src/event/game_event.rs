@@ -77,7 +77,7 @@ where
     fn position_source(&self) -> &Self::PositionSource;
 
     /// Gets this listener's trigger order.
-    #[inline(always)]
+    #[inline]
     fn trigger_order(&self) -> TriggerOrder {
         Default::default()
     }
@@ -155,7 +155,7 @@ pub enum ListenResult {
 
 impl ListenResult {
     /// Whether the listener has accepted the event.
-    #[inline(always)]
+    #[inline]
     pub const fn is_accepted(self) -> bool {
         matches!(self, Self::Accepted)
     }

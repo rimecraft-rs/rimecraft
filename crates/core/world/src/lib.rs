@@ -31,7 +31,7 @@ pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;
 pub struct Sealed<T>(pub(crate) T);
 
 impl<T> From<T> for Sealed<T> {
-    #[inline(always)]
+    #[inline]
     fn from(value: T) -> Self {
         Self(value)
     }
