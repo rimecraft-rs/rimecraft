@@ -75,7 +75,7 @@ where
 {
     #[inline]
     fn decode(mut buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
-        Ok(CodecId(buf.get_variable::<u32>()))
+        Ok(Self(buf.get_variable::<u32>()))
     }
 }
 

@@ -70,7 +70,7 @@ where
 
     /// Creates a **patched** component map with given base map.
     #[inline]
-    pub fn new(base: &'a ComponentMap<'a, Cx>) -> Self {
+    pub fn new(base: &'a Self) -> Self {
         Self(MapInner::Patched {
             base: Maybe::Borrowed(base),
             changes: AHashMap::new(),
@@ -80,7 +80,7 @@ where
 
     /// Creates a **patched** component map with given base map.
     #[inline]
-    pub fn arc_new(base: Arc<ComponentMap<'a, Cx>>) -> Self {
+    pub fn arc_new(base: Arc<Self>) -> Self {
         Self(MapInner::Patched {
             base: Maybe::Owned(base),
             changes: AHashMap::new(),
@@ -91,7 +91,7 @@ where
     /// Creates a **patched** component map with given base map and changes.
     #[inline]
     pub fn with_changes(
-        base: &'a ComponentMap<'a, Cx>,
+        base: &'a Self,
         changes: ComponentChanges<'a, '_, Cx>,
     ) -> Self {
         Self::with_changes_raw(Maybe::Borrowed(base), changes)
@@ -100,14 +100,14 @@ where
     /// Creates a **patched** component map with given base map and changes.
     #[inline]
     pub fn arc_with_changes(
-        base: Arc<ComponentMap<'a, Cx>>,
+        base: Arc<Self>,
         changes: ComponentChanges<'a, '_, Cx>,
     ) -> Self {
         Self::with_changes_raw(Maybe::Owned(base), changes)
     }
 
     fn with_changes_raw(
-        base: Maybe<'a, ComponentMap<'a, Cx>, Arc<ComponentMap<'a, Cx>>>,
+        base: Maybe<'a, Self, Arc<Self>>,
         changes: ComponentChanges<'a, '_, Cx>,
     ) -> Self {
         Self(MapInner::Patched {
@@ -791,7 +791,7 @@ where
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeMap;
+        use serde::ser::SerializeMap as _;
         let cx = serializer.local_cx;
         let mut map = serializer.inner.serialize_map(None)?;
 

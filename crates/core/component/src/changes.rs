@@ -6,7 +6,7 @@ use ahash::{AHashMap, AHashSet};
 use bytes::{Buf, BufMut};
 use edcode2::{BufExt as _, BufMutExt as _, Decode, Encode};
 use local_cx::{
-    BaseLocalContext, ForwardToWithLocalCx, LocalContext, LocalContextExt, ProvideLocalCxTy,
+    BaseLocalContext, ForwardToWithLocalCx, LocalContext, LocalContextExt as _, ProvideLocalCxTy,
     WithLocalCx,
     dyn_codecs::Any,
     serde::{DeserializeWithCx, SerializeWithCx},
@@ -14,7 +14,7 @@ use local_cx::{
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
 use rimecraft_registry::{Reg, Registry};
-use serde::{Serialize, de::DeserializeSeed, ser::SerializeMap};
+use serde::{Serialize, de::DeserializeSeed, ser::SerializeMap as _};
 
 use crate::{
     ComponentType, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,

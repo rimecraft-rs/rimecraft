@@ -153,7 +153,7 @@ impl From<u32> for ShadowColor {
 impl From<ShadowColor> for u32 {
     #[inline]
     fn from(color: ShadowColor) -> Self {
-        u32::from_be_bytes(color.argb.into())
+        Self::from_be_bytes(color.argb.into())
     }
 }
 
@@ -374,7 +374,7 @@ mod _serde {
 
     impl<'de> Deserialize<'de> for Color {
         #[inline]
-        fn deserialize<D>(deserializer: D) -> Result<Color, D::Error>
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {

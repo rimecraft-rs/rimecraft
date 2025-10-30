@@ -16,7 +16,7 @@ pub struct ColorIndex(pub Option<u32>);
 impl From<ColorIndex> for i32 {
     #[inline]
     fn from(ColorIndex(value): ColorIndex) -> Self {
-        value.map_or(-1, |val| val as i32)
+        value.map_or(-1, |val| val as Self)
     }
 }
 
@@ -235,9 +235,9 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::InvalidColorIndex(i) => write!(f, "no matching color index found: {i}"),
-            Error::InvalidCode(c) => write!(f, "invalid code: {c}"),
-            Error::InvalidName(n) => write!(f, "invalid name: {n}"),
+            Self::InvalidColorIndex(i) => write!(f, "no matching color index found: {i}"),
+            Self::InvalidCode(c) => write!(f, "invalid code: {c}"),
+            Self::InvalidName(n) => write!(f, "invalid name: {n}"),
         }
     }
 }

@@ -37,7 +37,7 @@ pub struct EmptyTooltipFactory;
 impl EmptyTooltipFactory {
     /// Creates a new [`EmptyTooltipFactory`].
     pub fn new() -> Self {
-        EmptyTooltipFactory
+        Self
     }
 }
 

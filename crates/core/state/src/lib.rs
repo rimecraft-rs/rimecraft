@@ -18,7 +18,7 @@ use regex::Regex;
 #[cfg(not(feature = "regex"))]
 use regex_lite::Regex;
 
-use crate::property::ErasedWrap;
+use crate::property::ErasedWrap as _;
 
 pub mod property;
 
@@ -383,18 +383,18 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::PropertyNotFound(prop) => write!(f, "property not found: {prop}"),
-            Error::TableNotPresent => write!(f, "table not present"),
-            Error::ValueNotFound(value) => write!(f, "value not found: {value}"),
-            Error::InvalidValue => write!(f, "invalid value"),
-            Error::InvalidPropertyName(name) => write!(f, "invalid property name: {name}"),
-            Error::PropertyContainsOneOrNoValue(prop) => {
+            Self::PropertyNotFound(prop) => write!(f, "property not found: {prop}"),
+            Self::TableNotPresent => write!(f, "table not present"),
+            Self::ValueNotFound(value) => write!(f, "value not found: {value}"),
+            Self::InvalidValue => write!(f, "invalid value"),
+            Self::InvalidPropertyName(name) => write!(f, "invalid property name: {name}"),
+            Self::PropertyContainsOneOrNoValue(prop) => {
                 write!(f, "property {prop} contains <= 1 possible values")
             }
-            Error::InvalidValueName { property, value } => {
+            Self::InvalidValueName { property, value } => {
                 write!(f, "invalid value name: {value} for property {property}")
             }
-            Error::DuplicatedProperty(prop) => write!(f, "duplicated property: {prop}"),
+            Self::DuplicatedProperty(prop) => write!(f, "duplicated property: {prop}"),
         }
     }
 }
@@ -404,7 +404,7 @@ impl std::error::Error for Error {}
 #[cfg(feature = "serde")]
 mod _serde {
     use rimecraft_serde_update::Update;
-    use serde::{Serialize, ser::SerializeMap};
+    use serde::{Serialize, ser::SerializeMap as _};
 
     use crate::State;
 

@@ -259,7 +259,7 @@ impl TestId {
         if let Some(test_id) = tests.get(&thread_id) {
             *test_id
         } else {
-            let test_id = TestId(TEST_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
+            let test_id = Self(TEST_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
             tests.insert(thread_id, test_id);
             test_id
         }

@@ -252,7 +252,7 @@ impl Storage {
     #[inline]
     fn as_array(&self) -> Option<&PackedIntArray> {
         match self {
-            Storage::PackedArray(array) => Some(array),
+            Self::PackedArray(array) => Some(array),
             _ => None,
         }
     }
@@ -260,7 +260,7 @@ impl Storage {
     #[inline]
     fn as_array_mut(&mut self) -> Option<&mut PackedIntArray> {
         match self {
-            Storage::PackedArray(array) => Some(array),
+            Self::PackedArray(array) => Some(array),
             _ => None,
         }
     }
@@ -277,8 +277,8 @@ impl Storage {
     #[inline]
     fn len(&self) -> usize {
         match self {
-            Storage::PackedArray(array) => array.len(),
-            Storage::Empty(len) => *len,
+            Self::PackedArray(array) => array.len(),
+            Self::Empty(len) => *len,
         }
     }
 }
@@ -286,7 +286,7 @@ impl Storage {
 impl From<PackedIntArray> for Storage {
     #[inline]
     fn from(value: PackedIntArray) -> Self {
-        Storage::PackedArray(value)
+        Self::PackedArray(value)
     }
 }
 

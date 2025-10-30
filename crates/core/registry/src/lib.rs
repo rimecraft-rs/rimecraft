@@ -518,7 +518,7 @@ where
                 r
             })
             .collect();
-        Registry {
+        Self {
             key: value.key,
             kv: entries
                 .iter()
@@ -619,7 +619,7 @@ mod serde {
 #[cfg(feature = "edcode")]
 mod edcode {
 
-    use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
+    use edcode2::{Buf, BufExt as _, BufMut, BufMutExt as _, Decode, Encode};
     use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 
     use crate::{Reg, Registry};

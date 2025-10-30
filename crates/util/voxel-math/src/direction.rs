@@ -235,9 +235,9 @@ impl Axis {
     #[inline(always)]
     pub fn choose<T>(self, x: T, y: T, z: T) -> T {
         match self {
-            Axis::X => x,
-            Axis::Y => y,
-            Axis::Z => z,
+            Self::X => x,
+            Self::Y => y,
+            Self::Z => z,
         }
     }
 }
@@ -258,8 +258,8 @@ impl AxisDirection {
     #[inline]
     pub const fn offset(self) -> i32 {
         match self {
-            AxisDirection::Positive => 1,
-            AxisDirection::Negative => -1,
+            Self::Positive => 1,
+            Self::Negative => -1,
         }
     }
 
@@ -267,8 +267,8 @@ impl AxisDirection {
     #[inline]
     pub const fn opposite(self) -> Self {
         match self {
-            AxisDirection::Positive => AxisDirection::Negative,
-            AxisDirection::Negative => AxisDirection::Positive,
+            Self::Positive => Self::Negative,
+            Self::Negative => Self::Positive,
         }
     }
 }
@@ -342,7 +342,7 @@ impl From<Direction> for EightWayDirection {
 
 impl From<EightWayDirection> for IVec3 {
     fn from(value: EightWayDirection) -> Self {
-        value.directions().iter().copied().map(IVec3::from).sum()
+        value.directions().iter().copied().map(Self::from).sum()
     }
 }
 

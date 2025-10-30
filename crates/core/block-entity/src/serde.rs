@@ -58,7 +58,7 @@ where
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeMap;
+        use serde::ser::SerializeMap as _;
         let cx = serializer.local_cx;
         let mut map = serializer.inner.serialize_map(None)?;
         for flag in self.1.iter() {
