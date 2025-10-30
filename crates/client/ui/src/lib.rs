@@ -149,27 +149,6 @@ where
 {
 }
 
-pub trait PositionElement<Cx>: Element<Cx>
-where
-    Cx: ProvideUiTy,
-{
-    fn position_constraints(&self) -> Option<PositionConstraints>;
-}
-
-pub trait LayoutElement<Cx>: Element<Cx>
-where
-    Cx: ProvideUiTy,
-{
-    fn measure(
-        &self,
-        constraints: SizeConstraints<Cx::SizeConstraintsExt>,
-    ) -> LayoutPack<Option<LayoutValue>> {
-        constraints.maximum_size()
-    }
-
-    fn layout(&mut self, size: ScreenSize);
-}
-
 /// Read-only, pure-decision event handler for element implementations.
 ///
 /// Implementors should not perform mutations on the store in this method.
@@ -186,8 +165,8 @@ where
         ev: &dyn Any,
         store: &dyn UiStoreRead<Cx>,
     ) -> (EventPropagation, Vec<Box<dyn Command<Cx>>>) {
-        if let Some(_ui_ev) = ev.downcast_ref::<UiEvent<'_, Cx>>() {
-            self.handle_ui_event_read(_ui_ev, store)
+        if let Some(ui_ev) = ev.downcast_ref::<UiEvent<'_, Cx>>() {
+            self.handle_ui_event_read(ui_ev, store)
         } else {
             (EventPropagation::NotHandled, Vec::new())
         }
@@ -230,7 +209,7 @@ where
             continue;
         }
 
-        let (prop, mut cmds) = call_child(child, ev, store);
+        let (prop, mut cmds) = store;
         out_cmds.append(&mut cmds);
         if prop.should_stop() {
             return (EventPropagation::Handled, out_cmds);

@@ -118,7 +118,6 @@ pub struct SimpleStoreRead<'a, V> {
     >,
 }
 
-#[allow(single_use_lifetimes)]
 impl<'a, V> UiStoreRead<TestContext> for SimpleStoreRead<'a, V> {
     fn exists(&self, id: <TestContext as ProvideUiTy>::StoreKey) -> bool {
         self.index.contains_key(&id)
