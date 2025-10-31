@@ -101,7 +101,7 @@ pub fn remap_fn(
     attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    remap_fn_inner(attr.into(), item.clone().into(), false).map_or(item, Into::into)
+    remap_fn_inner(attr.into(), item.clone().into(), false, true).map_or(item, Into::into)
 }
 
 /// Remaps an type or trait associated function, so-called a method.
@@ -112,7 +112,7 @@ pub fn remap_method(
     attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    remap_fn_inner(attr.into(), item.clone().into(), true).map_or(item, Into::into)
+    remap_fn_inner(attr.into(), item.clone().into(), true, true).map_or(item, Into::into)
 }
 
 /// Remaps an item.
@@ -121,10 +121,10 @@ pub fn remap(
     attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    remap_inner(attr.into(), item.clone().into()).map_or(item, Into::into)
+    remap_inner(attr.into(), item.clone().into(), true).map_or(item, Into::into)
 }
 
-fn remap_inner(attr: TokenStream, mut item: TokenStream) -> Option<TokenStream> {
+fn remap_inner(attr: TokenStream, mut item: TokenStream, cfg: bool) -> Option<TokenStream> {
     let names = parse_attr(attr);
     let mut iter = item.clone().into_iter().peekable();
     let mut vis = None;
@@ -163,6 +163,9 @@ fn remap_inner(attr: TokenStream, mut item: TokenStream) -> Option<TokenStream> 
             continue;
         }
 
+        if cfg {
+            item.extend(tt_cfg(name.span(), keys));
+        }
         item.extend(tt_doc_hidden(name.span()));
         item.extend(tt_allow_lint("unused_imports", name.span()));
         if let Some((vis, vis_g)) = &vis {
@@ -183,7 +186,12 @@ fn remap_inner(attr: TokenStream, mut item: TokenStream) -> Option<TokenStream> 
     Some(item)
 }
 
-fn remap_fn_inner(attr: TokenStream, item: TokenStream, use_self: bool) -> Option<TokenStream> {
+fn remap_fn_inner(
+    attr: TokenStream,
+    item: TokenStream,
+    use_self: bool,
+    cfg: bool,
+) -> Option<TokenStream> {
     let names = parse_attr(attr);
     let mut iter = item.clone().into_iter();
     iter.by_ref().find(|t| {
@@ -208,6 +216,9 @@ fn remap_fn_inner(attr: TokenStream, item: TokenStream, use_self: bool) -> Optio
         let mut generics = vec![];
         let mut is_async = false;
 
+        if cfg {
+            result.extend(tt_cfg(Span::call_site(), keys));
+        }
         result.extend(tt_doc_hidden(Span::call_site()));
         result.extend([
             // #[inline(always)]
@@ -318,6 +329,42 @@ fn tt_allow_lint(lint: &str, span: Span) -> [TokenTree; 2] {
                 TokenTree::Group(Group::new(
                     Delimiter::Parenthesis,
                     TokenStream::from_iter([TokenTree::Ident(Ident::new(lint, span))]),
+                )),
+            ]),
+        )),
+    ]
+}
+
+const CFG_KEY_NAME: &str = "rc_mapping";
+
+fn tt_cfg<I>(span: Span, iter: I) -> [TokenTree; 4]
+where
+    I: IntoIterator<Item = Ident>,
+{
+    let [a0, a1] = tt_allow_lint("unexpected_cfgs", span);
+    [
+        a0,
+        a1,
+        TokenTree::Punct(Punct::new('#', Spacing::Joint)),
+        TokenTree::Group(Group::new(
+            Delimiter::Bracket,
+            TokenStream::from_iter([
+                TokenTree::Ident(Ident::new("cfg", span)),
+                TokenTree::Group(Group::new(
+                    Delimiter::Parenthesis,
+                    TokenStream::from_iter([
+                        TokenTree::Ident(Ident::new("any", span)),
+                        TokenTree::Group(Group::new(
+                            Delimiter::Parenthesis,
+                            TokenStream::from_iter(iter.into_iter().flat_map(|ident| {
+                                [
+                                    TokenTree::Ident(Ident::new(CFG_KEY_NAME, ident.span())),
+                                    TokenTree::Punct(Punct::new('=', Spacing::Alone)),
+                                    TokenTree::Literal(Literal::string(&ident.to_smolstr())),
+                                ]
+                            })),
+                        )),
+                    ]),
                 )),
             ]),
         )),
