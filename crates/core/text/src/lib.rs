@@ -25,7 +25,7 @@ pub mod __priv_macro_use {
     }
 }
 
-use remap::remap;
+use remap::{remap, remap_method};
 #[cfg(feature = "macros")]
 pub use rimecraft_text_derive::Localize;
 
@@ -103,30 +103,35 @@ impl<T, StyleExt> RawText<T, StyleExt> {
 
     /// Returns the content of this text.
     #[inline]
+    #[remap_method(yarn = "getContent", mojmaps = "getContents")]
     pub fn content(&self) -> &T {
         &self.content
     }
 
     /// Returns the content of this text.
     #[inline]
+    #[remap_method(yarn = "getContentMut", mojmaps = "getContentsMut")]
     pub fn content_mut(&mut self) -> &mut T {
         &mut self.content
     }
 
     /// Returns the siblings of this text.
     #[inline]
+    #[remap_method(yarn = "getSiblings", mojmaps = "getSiblings")]
     pub fn sibs(&self) -> &[Self] {
         &self.sibs
     }
 
     /// Returns the siblings of this text.
     #[inline]
+    #[remap_method(yarn = "getSiblingsMut", mojmaps = "getSiblingsMut")]
     pub fn sibs_mut(&mut self) -> &mut Vec<Self> {
         &mut self.sibs
     }
 
     /// Returns the style of this text.
     #[inline]
+    #[remap_method(yarn = "append", mojmaps = "append")]
     pub fn push(&mut self, text: Self) {
         self.sibs.push(text);
     }
@@ -225,6 +230,7 @@ pub trait ProvideTextTy: GlobalContext {
 
 /// Context type decorated [`RawText`].
 #[remap(yarn = "Text", mojmaps = "Component")]
+#[remap(yarn = "MutableText", mojmaps = "MutableComponent")] // two in one
 pub type Text<Cx> = RawText<<Cx as ProvideTextTy>::Content, <Cx as ProvideTextTy>::StyleExt>;
 
 /// A localizable value.

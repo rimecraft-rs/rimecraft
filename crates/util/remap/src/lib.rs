@@ -511,6 +511,7 @@ impl<I: Iterator<Item = TokenTree>> Iterator for RemapFnIter<'_, I> {
                 if last_punct
                     .as_ref()
                     .is_some_and(|p| p.spacing() == Spacing::Joint)
+                    || ident == "mut"
                 {
                     last_punct = None;
                     continue;
