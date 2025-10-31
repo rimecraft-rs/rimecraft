@@ -2,6 +2,7 @@
 
 use std::fmt::Debug;
 
+use remap::remap;
 use rimecraft_fmt::Formatting;
 
 use crate::{ProvideTextTy, Style, style::Formattable as _};
@@ -23,6 +24,7 @@ where
 }
 
 /// An iterator over indexed [`char`]s with associated [`Style`]s.
+#[remap(yarn = "OrderedText", mojmaps = "FormattedCharSequence")]
 pub struct OrderedText<'a, Cx>(Box<dyn Iterator<Item = OrderedTextItem<Cx>> + 'a>)
 where
     Cx: ProvideTextTy;

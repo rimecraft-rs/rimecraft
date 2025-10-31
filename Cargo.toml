@@ -23,6 +23,9 @@ dyn-drop = "forbid"
 ellipsis-inclusive-range-patterns = "forbid"
 exported-private-dependencies = "forbid"
 uncommon-codepoints = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(rc_mapping, values("mojmaps", "yarn"))',
+] }
 
 [workspace.lints.clippy]
 missing-panics-doc = "warn"
