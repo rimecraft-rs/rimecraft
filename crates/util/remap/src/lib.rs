@@ -42,7 +42,7 @@ fn rewrite_ident_in_rust(literal: Literal) -> Ident {
     });
 
     // strip get_ prefixes
-    let output_slice = if let Some(body) = output.strip_suffix("get_")
+    let output_slice = if let Some(body) = output.strip_prefix("get_")
         && !body.starts_with("mut")
         && !body.starts_with("ref")
     {
