@@ -25,6 +25,7 @@ pub mod __priv_macro_use {
     }
 }
 
+use remap::remap;
 #[cfg(feature = "macros")]
 pub use rimecraft_text_derive::Localize;
 
@@ -223,6 +224,7 @@ pub trait ProvideTextTy: GlobalContext {
 }
 
 /// Context type decorated [`RawText`].
+#[remap(yarn = "Text", mojmaps = "Component")]
 pub type Text<Cx> = RawText<<Cx as ProvideTextTy>::Content, <Cx as ProvideTextTy>::StyleExt>;
 
 /// A localizable value.

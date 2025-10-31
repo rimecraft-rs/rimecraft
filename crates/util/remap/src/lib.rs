@@ -41,7 +41,17 @@ fn rewrite_ident_in_rust(literal: Literal) -> Ident {
         }
     });
 
-    Ident::new(output.as_str(), literal.span())
+    // strip get_ prefixes
+    let output_slice = if let Some(body) = output.strip_suffix("get_")
+        && !body.starts_with("mut")
+        && !body.starts_with("ref")
+    {
+        body
+    } else {
+        &output
+    };
+
+    Ident::new(output_slice, literal.span())
 }
 
 fn parse_attr(attr: TokenStream) -> HashMap<Ident, Vec<Ident>> {
