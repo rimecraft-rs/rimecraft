@@ -1,0 +1,23 @@
+[package]
+name = "rimecraft-remap"
+version = "0.1.0"
+edition = "2024"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Remap items into different mappings"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = [""]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[lib]
+proc-macro = true
+
+[dependencies]
+smol_str = "0.3"
+proc-macro2 = { version = "1.0", features = ["proc-macro"] }
+rustc-literal-escaper = "0.0.5"
+
+[lints]
+workspace = true
