@@ -383,9 +383,25 @@ mod _serde {
         where
             D: serde::Deserializer<'de>,
         {
-            <&str>::deserialize(deserializer)?
-                .parse()
-                .map_err(serde::de::Error::custom)
+            struct Visitor;
+
+            impl serde::de::Visitor<'_> for Visitor {
+                type Value = Color;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    formatter.write_str("a string")
+                }
+
+                #[inline]
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    v.parse().map_err(serde::de::Error::custom)
+                }
+            }
+
+            deserializer.deserialize_str(Visitor)
         }
     }
 
