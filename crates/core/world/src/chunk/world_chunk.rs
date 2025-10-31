@@ -506,7 +506,7 @@ where
         let mut section = this.reclaim().bca().write_chunk_section(section_index)?;
 
         // Skip setting empty block (eg air) inside empty sections.
-        if section.is_empty() && state.block.settings().is_empty {
+        if section.is_empty() && state.block.settings().empty {
             return None;
         }
 

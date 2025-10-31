@@ -28,12 +28,22 @@ where
     Cx: ProvideBlockStateExtTy,
 {
     /// Creates a new block with the given settings.
-    #[inline]
+    ///
+    /// # Panics
+    ///
+    /// Panics when the settings are invalid in the following case:
+    ///
+    /// - `opaque` and `transparent` are both `true`.
     pub const fn new(
         settings: Settings<'a, Cx>,
         states: States<'a, Cx::BlockStateExt<'a>>,
         descriptors: DescriptorSet<'static, 'a>,
     ) -> Self {
+        assert!(
+            !(settings.opaque && settings.transparent),
+            "block cannot be both opaque and transparent"
+        );
+
         Self {
             settings,
             states,
@@ -90,15 +100,21 @@ where
     pub random_ticks: bool,
     /// Whether this block is empty.
     #[doc(alias = "is_air")]
-    pub is_empty: bool,
+    pub empty: bool,
     /// Whether this block is opaque.
     pub opaque: bool,
     /// Whether this block is transparent.
-    pub is_transparent: bool,
+    pub transparent: bool,
 
     /// Whether the block's transparency depends on the side of the block.
+    ///
+    /// By default this simply returns `false`.
     pub has_sided_transparency: fn(&BlockState<'a, Cx>) -> bool,
-    /// The opacity of this block.
+
+    /// The opacity of this block from zero to [`MAX_OPACITY`].
+    ///
+    /// By default this returns `MAX_OPACITY` if the block is opaque (see [`BlockStateExt::is_opaque_full_cube`]),
+    /// zero if the block is transparent (see [`Self::transparent`])  and [`SEMI_TRANSPARENT_OPACITY`] otherwise.
     pub opacity: fn(&BlockState<'a, Cx>) -> u8,
 }
 
@@ -112,15 +128,15 @@ where
             resistance: 0.0,
             hardness: 0.0,
             random_ticks: false,
-            is_empty: false,
+            empty: false,
             opaque: true,
-            is_transparent: false,
+            transparent: false,
 
             has_sided_transparency: |_| false,
             opacity: |state| {
                 if state.data().is_opaque_full_cube() {
                     MAX_OPACITY
-                } else if state.settings().is_transparent {
+                } else if state.settings().transparent {
                     0
                 } else {
                     SEMI_TRANSPARENT_OPACITY

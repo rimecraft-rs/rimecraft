@@ -55,7 +55,7 @@ where
 
         self.bsc.count(|bs, count| {
             let fs = bs.to_fluid_state();
-            if !bs.block.settings().is_empty {
+            if !bs.block.settings().empty {
                 ne_block_c += count;
             }
             if bs.block.settings().random_ticks {
@@ -209,7 +209,7 @@ where
             Maybe::Owned(maybe::SimpleOwned(bs)) => bs,
         };
 
-        if !state_old.block.settings().is_empty {
+        if !state_old.block.settings().empty {
             self.ne_block_c -= 1;
             if state_old.block.settings().random_ticks {
                 self.rt_block_c -= 1;
@@ -220,7 +220,7 @@ where
             self.ne_fluid_c -= 1;
         }
 
-        if !state.block.settings().is_empty {
+        if !state.block.settings().empty {
             self.ne_block_c += 1;
             if state.block.settings().random_ticks {
                 self.rt_block_c += 1;
