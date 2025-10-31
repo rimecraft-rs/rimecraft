@@ -97,6 +97,7 @@ fn parse_attr(attr: TokenStream) -> HashMap<Ident, Vec<Ident>> {
 /// This couldn't be used to remap an associated function of a type or trait.
 /// If so, use [`remap_method`] instead.
 #[proc_macro_attribute]
+#[deprecated = "discouraged to use, use `remap` instead"]
 pub fn remap_fn(
     attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
@@ -105,8 +106,6 @@ pub fn remap_fn(
 }
 
 /// Remaps an type or trait associated function, so-called a method.
-///
-/// See [`remap_fn`] for remapping a standalone function.
 #[proc_macro_attribute]
 pub fn remap_method(
     attr: proc_macro::TokenStream,
@@ -116,6 +115,17 @@ pub fn remap_method(
 }
 
 /// Remaps an item.
+///
+/// # Examples
+///
+/// ```rust
+/// # use rimecraft_remap::remap;
+/// #[remap(mojmaps = "ResourceLocation")]
+/// pub struct Identifier;
+///
+/// #[remap(mojmaps = "EMPTY")]
+/// pub const EMPTY: Identifier = Identifier;
+/// ```
 #[proc_macro_attribute]
 pub fn remap(
     attr: proc_macro::TokenStream,
