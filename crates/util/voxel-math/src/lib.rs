@@ -15,22 +15,31 @@ pub use bbox::BBox;
 
 pub use glam;
 
-/// Converts a world coordinate to the corresponding chunk-section
-/// coordinate.
+/// Converts a world coordinate to the corresponding chunk-section coordinate.
 ///
 /// This function is equivalent to `coord >> 4`.
-/// To convert a floating-point coordinate, use [`section_coord_f64`].
+/// To convert a floating-point coordinate, use [`coord_section_from_block_f64`].
 #[inline]
-pub const fn section_coord(coord: i32) -> i32 {
+#[doc(alias = "section_coord")]
+pub const fn coord_section_from_block(coord: i32) -> i32 {
     coord >> 4
 }
 
-/// Converts a world coordinate to the corresponding chunk-section
-/// coordinate.
+/// Converts a world coordinate to the corresponding chunk-section coordinate.
 ///
 /// This function is equivalent to `section_coord(coord.floor() as i32)`.
-/// See [`section_coord`].
+/// See [`coord_section_from_block`].
 #[inline]
-pub fn section_coord_f64(coord: f64) -> i32 {
-    section_coord(coord.floor() as i32)
+pub fn coord_section_from_block_f64(coord: f64) -> i32 {
+    coord_section_from_block(coord.floor() as i32)
+}
+
+/// Converts the given chunk section coordinate to the world coordinate system.
+/// The returned coordinate will always be at the origin of the chunk section in world space.
+///
+/// This function is equivalent to `section_coord << 4`.
+#[inline]
+#[doc(alias = "block_coord")]
+pub const fn coord_block_from_section(section_coord: i32) -> i32 {
+    section_coord << 4
 }

@@ -163,16 +163,15 @@ pub struct States<'a, T> {
     props: BTreeMap<&'a str, ErasedProperty<'a>>,
 }
 
-impl<'a, T> States<'a, T>
-where
-    T: Clone,
-{
-    fn new<I>(props: I, data: T) -> Self
+impl<'a, T> States<'a, T> {
+    fn new<I, F>(props: I, mut f: F) -> Self
     where
         I: IntoIterator<Item = ErasedProperty<'a>>,
+        F: FnMut(&State<'a, ()>) -> T,
     {
         let props: BTreeMap<_, _> = props.into_iter().map(|prop| (prop.name, prop)).collect();
         let mut iter: Vec<Vec<(ErasedProperty<'a>, isize)>> = vec![Vec::new()];
+
         for prop in props.values() {
             iter = iter
                 .into_iter()
@@ -188,14 +187,29 @@ where
                 })
                 .collect();
         }
+
+        let mut unit_lock_reuse = Some(OnceLock::new());
         let list = iter
             .into_iter()
             .map(|vec| vec.into_iter().collect::<AHashMap<_, _>>())
             .map(|entries| {
+                let state = State {
+                    entries,
+                    table: unit_lock_reuse.take().unwrap(),
+                    data: (),
+                };
+                let data = f(&state);
+                let State {
+                    entries,
+                    table,
+                    data: _,
+                } = state;
+                unit_lock_reuse = Some(table);
+
                 NonNull::new(Box::into_raw(Box::new(State {
                     entries,
                     table: OnceLock::new(),
-                    data: data.clone(),
+                    data,
                 })))
                 .expect("failed to allocate state")
             })
@@ -274,21 +288,12 @@ impl<T> Drop for States<'_, T> {
 
 /// Mutable instance of [`States`].
 #[derive(Debug)]
-pub struct StatesMut<'a, T> {
+pub struct StatesMut<'a, F> {
     props: Vec<ErasedProperty<'a>>,
-    data: T,
+    f: F,
 }
 
-impl<'a, T> StatesMut<'a, T> {
-    /// Creates a new states with given data.
-    #[inline]
-    pub const fn new(data: T) -> Self {
-        Self {
-            props: Vec::new(),
-            data,
-        }
-    }
-
+impl<'a, F> StatesMut<'a, F> {
     /// Adds a property to the states.
     ///
     /// # Errors
@@ -331,23 +336,33 @@ impl<'a, T> StatesMut<'a, T> {
     }
 }
 
-impl<'a, T> StatesMut<'a, T>
+impl<'a, F, T> StatesMut<'a, F>
 where
-    T: Clone,
+    F: FnMut(&State<'a, ()>) -> T,
 {
+    /// Creates a new states with given data factory.
+    #[inline]
+    pub const fn new(f: F) -> Self {
+        Self {
+            props: Vec::new(),
+            f,
+        }
+    }
+
     /// Freezes the state.
     #[inline]
+    #[doc(alias = "build")]
     pub fn freeze(self) -> States<'a, T> {
-        States::new(self.props, self.data)
+        States::new(self.props, self.f)
     }
 }
 
-impl<'a, T> From<StatesMut<'a, T>> for States<'a, T>
+impl<'a, F, T> From<StatesMut<'a, F>> for States<'a, T>
 where
-    T: Clone,
+    F: FnMut(&State<'a, ()>) -> T,
 {
     #[inline]
-    fn from(value: StatesMut<'a, T>) -> Self {
+    fn from(value: StatesMut<'a, F>) -> Self {
         value.freeze()
     }
 }

@@ -38,6 +38,12 @@ pub fn full_cube() -> &'static Arc<Slice<'static>> {
     })
 }
 
+/// An unbounded shape.
+pub fn unbounded() -> &'static Arc<Slice<'static>> {
+    static UNBOUNDED: OnceLock<Arc<Slice<'static>>> = OnceLock::new();
+    UNBOUNDED.get_or_init(|| cuboid(BBox::from_raw(DVec3::NEG_INFINITY, DVec3::INFINITY)))
+}
+
 /// Builds a cuboid shape within given bounding box which use coordinates from 0 to 1 in each axis.
 ///
 /// # Voxel Representation
@@ -157,24 +163,24 @@ where
         return if lhs_tol { lhs } else { empty() }.clone();
     }
 
-    let pair_x = list_pair(
+    let pair_x = fast_list_pair(
         1,
-        lhs.0.__point_pos_list_arc(Axis::X),
-        rhs.0.__point_pos_list_arc(Axis::X),
+        ListDeref(lhs.0.__point_pos_list_arc(Axis::X)),
+        ListDeref(rhs.0.__point_pos_list_arc(Axis::X)),
         lhs_tol,
         rhs_tol,
     );
-    let pair_y = list_pair(
+    let pair_y = fast_list_pair(
         pair_x.__erased_len(),
-        lhs.0.__point_pos_list_arc(Axis::Y),
-        rhs.0.__point_pos_list_arc(Axis::Y),
+        ListDeref(lhs.0.__point_pos_list_arc(Axis::Y)),
+        ListDeref(rhs.0.__point_pos_list_arc(Axis::Y)),
         lhs_tol,
         rhs_tol,
     );
-    let pair_z = list_pair(
+    let pair_z = fast_list_pair(
         (pair_x.__erased_len() - 1) * (pair_y.__erased_len() - 1),
-        lhs.0.__point_pos_list_arc(Axis::Z),
-        rhs.0.__point_pos_list_arc(Axis::Z),
+        ListDeref(lhs.0.__point_pos_list_arc(Axis::Z)),
+        ListDeref(rhs.0.__point_pos_list_arc(Axis::Z)),
         lhs_tol,
         rhs_tol,
     );
@@ -182,7 +188,7 @@ where
     let set = VoxelSet::combine_with(
         &lhs.0.__as_raw().voxels,
         &rhs.0.__as_raw().voxels,
-        [&*pair_x, &*pair_y, &*pair_z],
+        [&pair_x, &pair_y, &pair_z],
         f,
     );
     let raw = RawVoxelShape::from_arc(set.into_boxed_slice().into());
@@ -193,29 +199,141 @@ where
     {
         Simple(raw).into_boxed_slice()
     } else {
-        #[inline]
-        fn conv(x: Box<dyn PairErasedList<f64>>) -> Box<dyn ErasedList<f64>> {
-            x
-        }
-
         Array {
             raw,
-            xp: conv(pair_x).into(),
-            yp: conv(pair_y).into(),
-            zp: conv(pair_z).into(),
+            xp: pair_x.into_boxed_list().into(),
+            yp: pair_y.into_boxed_list().into(),
+            zp: pair_z.into_boxed_list().into(),
         }
         .into_boxed_slice()
     }
     .into()
 }
 
-fn list_pair(
+/// Tests if the two slices match **anywhere** using the given function.
+///
+/// # Panics
+///
+/// Panics if the given function returns `true` for two `false` voxel inputs.
+pub fn matches_anywhere<'a, F>(lhs: &Arc<Slice<'a>>, rhs: &Arc<Slice<'a>>, f: F) -> bool
+where
+    F: Fn(bool, bool) -> bool,
+{
+    assert!(
+        !f(false, false),
+        "matching function should not return true for all false inputs"
+    );
+
+    let l_empty = lhs.is_empty();
+    let r_empty = rhs.is_empty();
+
+    // (singular)empty cases
+    if l_empty || r_empty {
+        return f(!l_empty, !r_empty);
+    }
+
+    // identical slices
+    if Arc::ptr_eq(lhs, rhs) {
+        return f(true, true);
+    }
+
+    let ltrf = f(true, false);
+    let lfrt = f(false, true);
+
+    if lhs
+        .0
+        .__max_vectorized()
+        .cmplt(rhs.0.__min_vectorized() - DVec3::splat(F64_TOLERANCE))
+        .any()
+        || rhs
+            .0
+            .__max_vectorized()
+            .cmplt(lhs.0.__min_vectorized() - DVec3::splat(F64_TOLERANCE))
+            .any()
+    {
+        return ltrf || lfrt;
+    }
+
+    let p1 = fast_list_pair(
+        1,
+        ListDeref(lhs.0.__point_pos_list_arc(Axis::X)),
+        ListDeref(rhs.0.__point_pos_list_arc(Axis::X)),
+        ltrf,
+        lfrt,
+    );
+
+    let p2 = fast_list_pair(
+        p1.__erased_len() - 1,
+        ListDeref(lhs.0.__point_pos_list_arc(Axis::Y)),
+        ListDeref(rhs.0.__point_pos_list_arc(Axis::Y)),
+        ltrf,
+        lfrt,
+    );
+
+    let p3 = fast_list_pair(
+        (p1.__erased_len() - 1) * (p2.__erased_len() - 1),
+        ListDeref(lhs.0.__point_pos_list_arc(Axis::Z)),
+        ListDeref(rhs.0.__point_pos_list_arc(Axis::Z)),
+        ltrf,
+        lfrt,
+    );
+
+    let l_voxels = &lhs.0.__as_raw().voxels;
+    let r_voxels = &rhs.0.__as_raw().voxels;
+
+    let mut result = false;
+    p1.__peek_pair_erased_iter(&mut |iter| {
+        for item1 in iter {
+            p2.__peek_pair_erased_iter(&mut |iter| {
+                for item2 in iter {
+                    p3.__peek_pair_erased_iter(&mut |iter| {
+                        for item3 in iter {
+                            if f(
+                                l_voxels.in_bounds_and_contains(item1.x, item2.x, item3.x),
+                                r_voxels.in_bounds_and_contains(item1.y, item2.y, item3.y),
+                            ) {
+                                result = true;
+                                break;
+                            }
+                        }
+                    });
+                    if result {
+                        break;
+                    }
+                }
+            });
+            if result {
+                break;
+            }
+        }
+    });
+
+    result
+}
+
+/// Returns true if the union of the two shapes covers the entire cube.
+///
+/// _The internal implementation is costly._
+pub fn union_covers_full_cube<'a>(lhs: &Arc<Slice<'a>>, rhs: &Arc<Slice<'a>>) -> bool {
+    if Arc::ptr_eq(lhs, full_cube()) || Arc::ptr_eq(rhs, full_cube()) {
+        true
+    } else if lhs.is_empty() && rhs.is_empty() {
+        false
+    } else {
+        !matches_anywhere(full_cube(), &combine(lhs, rhs), |a, _| a)
+    }
+}
+
+fn fast_list_pair<T>(
     len: usize,
-    lhs: Arc<dyn ErasedList<f64>>,
-    rhs: Arc<dyn ErasedList<f64>>,
+    lhs: T,
+    rhs: T,
     lhs_tol: bool,
     rhs_tol: bool,
-) -> Box<dyn PairErasedList<f64>> {
+) -> FastDoublePairList<T>
+where
+    T: ErasedList<f64>,
+{
     let lhs_lr = lhs.__erased_len() - 1;
     let rhs_lr = rhs.__erased_len() - 1;
 
@@ -223,24 +341,24 @@ fn list_pair(
         && rhs.__downcast_fractional_double_list().is_some()
         && len as u64 * math::int::lcm(lhs_lr as u64, rhs_lr as u64) < 256
     {
-        return Box::new(FractionalPairDoubleList::new(lhs_lr, rhs_lr));
+        return FastDoublePairList::Fractional(FractionalPairDoubleList::new(lhs_lr, rhs_lr));
     }
 
     if lhs.__erased_index(lhs_lr) < rhs.__erased_index(0) - F64_TOLERANCE {
-        Box::new(ChainedPairList {
-            left: ListDeref(lhs),
-            right: ListDeref(rhs),
+        FastDoublePairList::Chained(ChainedPairList {
+            left: lhs,
+            right: rhs,
             inverted: false,
         })
     } else if rhs.__erased_index(rhs_lr) < lhs.__erased_index(0) - F64_TOLERANCE {
-        Box::new(ChainedPairList {
-            left: ListDeref(rhs),
-            right: ListDeref(lhs),
+        FastDoublePairList::Chained(ChainedPairList {
+            left: rhs,
+            right: lhs,
             inverted: true,
         })
-    } else if Arc::ptr_eq(&lhs, &rhs) {
-        Box::new(IdentityPairList(ListDeref(lhs)))
+    } else if lhs.__is_identical(&rhs) {
+        FastDoublePairList::Identity(IdentityPairList(lhs))
     } else {
-        Box::new(SimplePairDoubleList::new(&*lhs, &*rhs, lhs_tol, rhs_tol))
+        FastDoublePairList::Simple(SimplePairDoubleList::new(&lhs, &rhs, lhs_tol, rhs_tol))
     }
 }

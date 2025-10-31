@@ -3,7 +3,10 @@
 use std::{
     any::TypeId,
     fmt::Debug,
-    sync::{Arc, atomic::AtomicU32},
+    sync::{
+        Arc,
+        atomic::{self, AtomicU32},
+    },
 };
 
 use block::{BlockState, ProvideBlockStateExtTy};
@@ -14,7 +17,7 @@ use global_cx::{
     GlobalContext, ProvideIdTy, ProvideNbtTy,
     rand::{LockedRng as _, ProvideRng, Rng as _},
 };
-use local_cx::ProvideLocalCxTy;
+use local_cx::{PeekLocalContext, ProvideLocalCxTy};
 use parking_lot::Mutex;
 use registry::Reg;
 use serde::Serialize;
@@ -26,10 +29,9 @@ use crate::data::{DataTracked, DataTracker, DataTrackerBuilder, EntityDataCx, Se
 
 mod _serde;
 pub mod data;
+mod filter;
 
-const POS_XZ_BOUND: f64 = 3.0000512e7;
-const POS_Y_BOUND: f64 = 2.0e7;
-const VELOCITY_BOUND: f64 = 10.0;
+pub use filter::{SafeTypeFilter, TypeFilter};
 
 /// Global context types satisfying use of entities.
 pub trait EntityCx<'a>:
@@ -40,16 +42,15 @@ pub trait EntityCx<'a>:
     + ProvideLocalCxTy
     + EntityDataCx<'a>
 {
-}
+    /// The data type of a player entity, can either be a concrete type or a supertype.
+    type PlayerEntityData: ?Sized + 'a;
 
-impl<'a, T> EntityCx<'a> for T where
-    T: ProvideIdTy
-        + ProvideNbtTy
-        + ProvideEntityExtTy
-        + ProvideBlockStateExtTy
-        + ProvideLocalCxTy
-        + EntityDataCx<'a>
-{
+    /// The maximum position of an entity in X and Z axis.
+    const POS_XZ_BOUND: f64 = 3.0000512e7;
+    /// The maximum position of an entity in Y axis.
+    const POS_Y_BOUND: f64 = 2.0e7;
+    /// The maximum velocity of an entity.
+    const VELOCITY_BOUND: f64 = 10.0;
 }
 
 /// Global context types providing an extension types to entities.
@@ -108,7 +109,8 @@ impl ChangeListener {
 }
 
 /// Boxed entity cell with internal mutability and reference-counting.
-pub type EntityCell<'w, Cx> = Arc<Mutex<Box<Entity<'w, Cx>>>>;
+pub type EntityCell<'w, Cx, T = dyn ErasedData<'w, Cx> + 'w> =
+    Arc<Mutex<Box<RawEntity<'w, T, Cx>>>>;
 
 /// A type of [`Entity`].
 pub trait RawEntityType<'a, Cx>: HoldDescriptors<'static, 'a>
@@ -384,20 +386,27 @@ where
     }
 }
 
+/// Counter of entity networking ID which should be provided by the local context.
+#[derive(Debug)]
+pub struct IdCounter {
+    inner: AtomicU32,
+}
+
 impl<'w, T, Cx> RawEntity<'w, T, Cx>
 where
     Cx: EntityCx<'w, EntityExt<'w>: Default> + ProvideRng,
     T: Data<'w, Cx>,
 {
     /// Creates a new entity.
-    pub fn new(ty: EntityType<'w, Cx>, data: T) -> Self {
+    pub fn new<L>(ty: EntityType<'w, Cx>, data: T, cx: L) -> Self
+    where
+        L: PeekLocalContext<IdCounter>,
+    {
         let mut tracker_builder = DataTrackerBuilder::new(ty);
         T::init_data_tracker(&mut tracker_builder);
 
-        static ID_COUNTER: AtomicU32 = AtomicU32::new(0);
-
         Self {
-            net_id: ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            net_id: cx.peek_acquire(|c| c.inner.fetch_add(1, atomic::Ordering::Relaxed)),
             ty,
             uuid: {
                 let mut bytes = [0u8; 16];

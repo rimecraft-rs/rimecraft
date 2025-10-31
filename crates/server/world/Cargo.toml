@@ -1,0 +1,45 @@
+[package]
+name = "rimecraft-server-world"
+version = "0.1.0"
+edition = "2024"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "Minecraft server world implementation"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+# Rimecraft crates
+world = { path = "../../core/world", package = "rimecraft-world" }
+global-cx = { path = "../../core/global-cx", package = "rimecraft-global-cx" }
+registry = { path = "../../core/registry", features = [
+    "serde",
+], package = "rimecraft-registry" }
+state = { path = "../../core/state", package = "rimecraft-state" }
+block = { path = "../../core/block", package = "rimecraft-block" }
+fluid = { path = "../../core/fluid", package = "rimecraft-fluid" }
+block-entity = { path = "../../core/block-entity", package = "rimecraft-block-entity" }
+local-cx = { path = "../../core/local-cx", package = "rimecraft-local-cx", features = [
+    "dsyn",
+] }
+maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
+dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
+rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }
+voxel-math = { path = "../../util/voxel-math", package = "rimecraft-voxel-math" }
+ident-hash = { path = "../../util/ident-hash", package = "rimecraft-ident-hash" }
+entity = { path = "../../core/entity", package = "rimecraft-entity" }
+edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2" }
+# External utils
+serde = "1.0"
+serde-private = "1.0"
+erased-serde = "0.4"
+bitflags = "2.9"
+parking_lot = "0.12"
+
+[features]
+
+[lints]
+workspace = true

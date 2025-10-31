@@ -19,10 +19,41 @@ pub use ::dsyn as __dsyn;
 /// A base local context.
 pub trait BaseLocalContext: Sized + Copy {}
 
+/// A trait for types that can hold a local context inside.
+pub trait HoldLocalContext {
+    /// The local context type.
+    type LocalCx: BaseLocalContext;
+
+    /// Returns the local context.
+    fn local_context(&self) -> Self::LocalCx;
+}
+
 /// A local context provides data to the global context.
 pub trait LocalContext<T>: BaseLocalContext {
     /// Acquire the data from the local context.
+    #[must_use]
     fn acquire(self) -> T;
+}
+
+/// A local context that can be peeked.
+pub trait PeekLocalContext<T>: BaseLocalContext {
+    /// Peek the data from the local context.
+    fn peek_acquire<F, U>(self, f: F) -> U
+    where
+        F: FnOnce(&T) -> U;
+}
+
+impl<'a, L, T: 'a> PeekLocalContext<T> for L
+where
+    L: LocalContext<&'a T>,
+{
+    #[inline]
+    fn peek_acquire<F, U>(self, f: F) -> U
+    where
+        F: FnOnce(&T) -> U,
+    {
+        f(self.acquire())
+    }
 }
 
 /// A general type that provides explicit local context type.
@@ -73,6 +104,7 @@ where
 pub trait LocalContextExt {
     /// Create a [`WithLocalCx`] with the given inner data.
     #[inline]
+    #[must_use]
     fn with<T>(self, inner: T) -> WithLocalCx<T, Self>
     where
         Self: Sized,
@@ -82,9 +114,38 @@ pub trait LocalContextExt {
             local_cx: self,
         }
     }
+
+    /// Acquire the inner data within the local context.
+    ///
+    /// This is a shorthand for [`LocalContext::acquire`] but with better generic bounding experience.
+    #[inline]
+    #[must_use]
+    fn acquire_within<T>(self) -> T
+    where
+        Self: LocalContext<T>,
+    {
+        self.acquire()
+    }
 }
 
 impl<Cx> LocalContextExt for Cx where Cx: BaseLocalContext {}
+
+/// Extension trait for peekable local context.
+pub trait PeekLocalContextExt {
+    /// Peek the inner data within the local context.
+    ///
+    /// This is a shorthand for [`PeekLocalContext::peek_acquire`] but with better generic bounding experience.
+    #[inline]
+    fn peek_within<T, F, U>(self, f: F) -> U
+    where
+        F: FnOnce(&T) -> U,
+        Self: PeekLocalContext<T>,
+    {
+        self.peek_acquire(f)
+    }
+}
+
+impl<Cx> PeekLocalContextExt for Cx where Cx: BaseLocalContext {}
 
 /// A type that can be transformed into a [`WithLocalCx`] by taking ownership of it.
 pub trait ForwardToWithLocalCx {
@@ -162,6 +223,24 @@ where
     #[inline]
     fn forward(self) -> WithLocalCx<Self::Forwarded, Self::LocalCx> {
         (*self).forward()
+    }
+}
+
+impl<T: HoldLocalContext + ?Sized> HoldLocalContext for &T {
+    type LocalCx = T::LocalCx;
+
+    #[inline]
+    fn local_context(&self) -> Self::LocalCx {
+        (**self).local_context()
+    }
+}
+
+impl<T: HoldLocalContext + ?Sized> HoldLocalContext for &mut T {
+    type LocalCx = T::LocalCx;
+
+    #[inline]
+    fn local_context(&self) -> Self::LocalCx {
+        (**self).local_context()
     }
 }
 

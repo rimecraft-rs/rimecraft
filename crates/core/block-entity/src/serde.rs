@@ -311,7 +311,7 @@ where
 
 impl<'a, Cx, L> Debug for Seed<'a, Cx, L>
 where
-    Cx: BlockEntityCx<'a, Id: Debug, BlockStateExt: Debug> + Debug,
+    Cx: BlockEntityCx<'a, Id: Debug, BlockStateExt<'a>: Debug> + Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DeserializeSeed")

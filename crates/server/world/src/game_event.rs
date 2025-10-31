@@ -4,18 +4,21 @@
 
 //TODO: funtion of dispatch manager, which requires interacting with a world instance.
 
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
+use block::BlockState;
+use entity::{Entity, EntityCell};
 use glam::DVec3;
+use global_cx::ProvideIdTy;
 use ident_hash::{HashTableExt as _, IHashSet};
 use local_cx::dyn_codecs::{Any, EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
 use maybe::Maybe;
 use parking_lot::Mutex;
-use rimecraft_block::BlockState;
-use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::Reg;
+use registry::Reg;
+use voxel_math::glam;
+use world::WorldCx;
 
-use crate::{Entity, ServerWorld, World, chunk::ChunkCx};
+use crate::ServerWorld;
 
 /// Raw type of a [`GameEvent`], consisting of its notification radius.
 #[derive(Debug)]
@@ -54,16 +57,20 @@ pub type GameEvent<'w, Cx> = Reg<'w, <Cx as ProvideIdTy>::Id, RawGameEvent>;
 /// A game event listener listens to [`GameEvent`]s from dispatchers.
 ///
 /// See [`ErasedListener`] for type-erasure.
+///
+/// _Implementation Note: Listeners should validate that the passed block entity is the
+/// block entity for the block as there could be cases here where the block entity is not
+/// the block entity for the listener._
 pub trait Listener<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Type of this listener's [`PositionSource`].
     type PositionSource: PositionSource<'w, Cx>;
 
     /// Listens to an incoming game event.
     fn listen(
-        &mut self,
+        &self,
         world: &ServerWorld<'w, Cx>,
         event: GameEvent<'w, Cx>,
         emitter: Emitter<'_, 'w, Cx>,
@@ -87,7 +94,7 @@ where
 #[allow(missing_docs)]
 pub trait ErasedListener<'w, Cx>: sealed::Sealed<Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     fn _erased_listen(
         &mut self,
@@ -101,21 +108,21 @@ where
     fn _erased_trigger_order(&self) -> TriggerOrder;
 
     // Flatten position source
-    fn _erased_ps_pos(&self, world: &World<'w, Cx>) -> Option<DVec3>;
+    fn _erased_ps_pos(&self, world: &ServerWorld<'w, Cx>) -> Option<DVec3>;
     fn _erased_ps_ty(&self) -> PositionSourceType<'w, Cx>;
 }
 
 impl<'w, T, Cx> sealed::Sealed<Cx> for T
 where
     T: Listener<'w, Cx>,
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
 }
 
 impl<'w, T, Cx> ErasedListener<'w, Cx> for T
 where
     T: Listener<'w, Cx>,
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     fn _erased_listen(
         &mut self,
@@ -135,7 +142,7 @@ where
     fn _erased_trigger_order(&self) -> TriggerOrder {
         self.trigger_order()
     }
-    fn _erased_ps_pos(&self, world: &World<'w, Cx>) -> Option<DVec3> {
+    fn _erased_ps_pos(&self, world: &ServerWorld<'w, Cx>) -> Option<DVec3> {
         self.position_source().pos(world)
     }
     fn _erased_ps_ty(&self) -> PositionSourceType<'w, Cx> {
@@ -175,19 +182,19 @@ pub enum TriggerOrder {
 /// Emitter of a game event.
 pub struct Emitter<'event, 'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
-    src: Option<Maybe<'event, Entity<'w, Cx>>>,
+    src: Option<Maybe<'event, EntityCell<'w, Cx>>>,
     dst: Option<BlockState<'w, Cx>>,
 }
 
 impl<'event, 'w, Cx> Emitter<'event, 'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Creates a new emitter from source entity and affected state.
     #[inline]
-    pub fn new(src: Option<&'event Entity<'w, Cx>>, dst: Option<BlockState<'w, Cx>>) -> Self {
+    pub fn new(src: Option<&'event EntityCell<'w, Cx>>, dst: Option<BlockState<'w, Cx>>) -> Self {
         Self {
             src: src.map(Maybe::Borrowed),
             dst,
@@ -196,7 +203,7 @@ where
 
     /// Creates a new emitter from owned source entity and affected state.
     #[inline]
-    pub fn from_owned(src: Option<Entity<'w, Cx>>, dst: Option<BlockState<'w, Cx>>) -> Self {
+    pub fn from_owned(src: Option<EntityCell<'w, Cx>>, dst: Option<BlockState<'w, Cx>>) -> Self {
         Self {
             src: src.map(|e| Maybe::Owned(maybe::SimpleOwned(e))),
             dst,
@@ -205,7 +212,7 @@ where
 
     /// Gets the source entity of this game event emitter.
     #[inline]
-    pub fn source_entity(&self) -> Option<&Entity<'w, Cx>> {
+    pub fn source_entity(&self) -> Option<&EntityCell<'w, Cx>> {
         self.src.as_deref()
     }
 
@@ -235,7 +242,7 @@ where
 
 impl<'w, Cx> Debug for Emitter<'_, 'w, Cx>
 where
-    Cx: ChunkCx<'w, Id: Debug, BlockStateExt: Debug> + Debug,
+    Cx: WorldCx<'w, Id: Debug, BlockStateExt<'w>: Debug> + Debug,
     Entity<'w, Cx>: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -246,7 +253,8 @@ where
     }
 }
 
-type BoxedListener<'w, Cx> = Box<dyn ErasedListener<'w, Cx> + Send + Sync + 'w>;
+/// Type-erased event listener type.
+pub type DynListener<'w, Cx> = dyn ErasedListener<'w, Cx> + Send + Sync + 'w;
 
 /// Dispatcher of game events and their listeners.
 ///
@@ -254,15 +262,23 @@ type BoxedListener<'w, Cx> = Box<dyn ErasedListener<'w, Cx> + Send + Sync + 'w>;
 /// as like the one in vanilla Minecraft.
 pub struct Dispatcher<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
-    listeners: Mutex<Vec<BoxedListener<'w, Cx>>>,
+    listeners: Mutex<Vec<Arc<DynListener<'w, Cx>>>>,
     buf: Mutex<DispatcherBuf<'w, Cx>>,
 }
 
 /// Key of a dispatched listener.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct ListenerKey(*const ());
+
+impl ListenerKey {
+    /// Creates a new listener key from a reference-counted pointer.
+    #[inline]
+    pub fn from_arc<'w, Cx: WorldCx<'w>>(arc: &Arc<DynListener<'w, Cx>>) -> Self {
+        Self(Arc::as_ptr(arc).cast())
+    }
+}
 
 unsafe impl Send for ListenerKey {}
 unsafe impl Sync for ListenerKey {}
@@ -276,15 +292,15 @@ impl Hash for ListenerKey {
 
 struct DispatcherBuf<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
-    push: Vec<BoxedListener<'w, Cx>>,
+    push: Vec<Arc<DynListener<'w, Cx>>>,
     pop: IHashSet<ListenerKey>,
 }
 
 impl<'w, Cx> Dispatcher<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Creates a new dispatcher.
     pub fn new() -> Self {
@@ -302,19 +318,24 @@ where
         self.listeners.lock().is_empty()
     }
 
+    /// Pushes an erased listener to this dispatcher.
+    pub fn push_erased(&self, listener: Arc<DynListener<'w, Cx>>) -> ListenerKey {
+        let ptr = std::ptr::from_ref(&*listener) as *const ();
+        if let Some(mut guard) = self.listeners.try_lock() {
+            guard.push(listener);
+        } else {
+            self.buf.lock().push.push(listener);
+        }
+        ListenerKey(ptr)
+    }
+
     /// Pushes a listener to this dispatcher.
-    pub fn push<T>(&self, listener: T) -> ListenerKey
+    #[inline]
+    pub fn push<T>(&self, listener: Arc<T>) -> ListenerKey
     where
         T: Listener<'w, Cx> + Send + Sync + 'w,
     {
-        let boxed = Box::new(listener);
-        let ptr = std::ptr::from_ref::<T>(&*boxed) as *const ();
-        if let Some(mut guard) = self.listeners.try_lock() {
-            guard.push(boxed);
-        } else {
-            self.buf.lock().push.push(boxed);
-        }
-        ListenerKey(ptr)
+        self.push_erased(listener)
     }
 
     /// Removes a listener from this dispatcher if present.
@@ -340,16 +361,16 @@ where
     /// Returns whether the callback was triggered.
     pub fn dispatch<F>(&self, world: &ServerWorld<'w, Cx>, pos: DVec3, mut callback: F) -> bool
     where
-        F: for<'env> FnMut(&'env mut dyn ErasedListener<'w, Cx>, DVec3),
+        F: for<'env> FnMut(&'env dyn ErasedListener<'w, Cx>, DVec3),
     {
         let mut vg = self.listeners.lock();
         let mut visited = false;
-        for listener in &mut *vg {
-            if let Some(sp) = listener._erased_ps_pos(world.as_ref()) {
+        for listener in &*vg {
+            if let Some(sp) = listener._erased_ps_pos(world) {
                 let d = sp.floor().distance_squared(pos.floor());
                 let i = listener._erased_range().pow(2) as f64;
                 if d <= i {
-                    callback(&mut **listener, sp);
+                    callback(&**listener, sp);
                     visited = true;
                 }
             }
@@ -369,7 +390,7 @@ where
 
 impl<'w, Cx> Default for Dispatcher<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     #[inline]
     fn default() -> Self {
@@ -379,7 +400,7 @@ where
 
 impl<'w, Cx> Debug for Dispatcher<'w, Cx>
 where
-    Cx: ChunkCx<'w, Id: Debug>,
+    Cx: WorldCx<'w, Id: Debug>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Dispatcher")
@@ -399,10 +420,10 @@ where
 /// A property of a game event listener which provides position of an in-game object.
 pub trait PositionSource<'w, Cx>: Any
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Gets position of this source.
-    fn pos(&self, world: &World<'w, Cx>) -> Option<DVec3>;
+    fn pos(&self, world: &ServerWorld<'w, Cx>) -> Option<DVec3>;
 
     /// Gets the type of this position source.
     fn ty(&self) -> PositionSourceType<'w, Cx>;
@@ -412,7 +433,7 @@ where
 #[derive(Debug)]
 pub struct RawPositionSourceType<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     serde: UnsafeSerdeCodec<
         Cx::LocalContext<'w>,
@@ -432,7 +453,7 @@ pub type PositionSourceType<'a, Cx> =
 
 impl<'a, Cx> RawPositionSourceType<'a, Cx>
 where
-    Cx: ChunkCx<'a>,
+    Cx: WorldCx<'a>,
 {
     /// Creates a new position source type from codecs.
     #[inline]
@@ -464,18 +485,16 @@ mod sealed {
 
 mod _edcode {
     use edcode2::{Buf, BufMut, Decode, Encode};
-    use local_cx::{
-        ForwardToWithLocalCx, LocalContext, LocalContextExt as _, WithLocalCx, dyn_cx::AsDynamicContext,
-    };
-    use rimecraft_registry::Registry;
+    use local_cx::{ForwardToWithLocalCx, LocalContext, LocalContextExt as _, WithLocalCx};
+    use registry::Registry;
 
-    use crate::chunk::ChunkCx;
+    use world::WorldCx;
 
     use super::{PositionSource, PositionSourceType, RawPositionSourceType};
 
     impl<'w, Cx, Fw> Encode<Fw> for dyn PositionSource<'w, Cx> + 'w
     where
-        Cx: ChunkCx<'w>,
+        Cx: WorldCx<'w>,
         Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx = Cx::LocalContext<'w>>,
     {
         fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
@@ -491,10 +510,9 @@ mod _edcode {
 
     impl<'de, 'w, Cx, Fw> Decode<'de, Fw> for Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>
     where
-        Cx: ChunkCx<'w>,
+        Cx: WorldCx<'w>,
         Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'w>>,
-        Cx::LocalContext<'w>:
-            LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>> + AsDynamicContext,
+        Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>>,
     {
         fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
             let WithLocalCx {
@@ -514,17 +532,19 @@ mod _serde {
         LocalContext, LocalContextExt as _, WithLocalCx,
         serde::{DeserializeWithCx, SerializeWithCx, TYPE_KEY},
     };
-    use rimecraft_registry::Registry;
+    use registry::Registry;
     use serde::{Deserialize, Serialize, ser::SerializeMap as _};
     use serde_private::de::ContentVisitor;
 
-    use crate::{chunk::ChunkCx, event::game_event::PositionSourceType};
+    use world::WorldCx;
+
+    use crate::game_event::PositionSourceType;
 
     use super::{PositionSource, RawPositionSourceType};
 
     impl<'w, Cx> SerializeWithCx<Cx::LocalContext<'w>> for dyn PositionSource<'w, Cx> + 'w
     where
-        Cx: ChunkCx<'w, Id: Serialize>,
+        Cx: WorldCx<'w, Id: Serialize>,
     {
         fn serialize_with_cx<S>(
             &self,
@@ -550,7 +570,7 @@ mod _serde {
     impl<'de, 'w, Cx> serde::de::Visitor<'de> for Visitor<'w, Cx::LocalContext<'w>, Cx>
     where
         Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>>,
-        Cx: ChunkCx<'w, Id: Deserialize<'de>>,
+        Cx: WorldCx<'w, Id: Deserialize<'de>>,
     {
         type Value = Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>;
 
@@ -600,7 +620,7 @@ mod _serde {
         for Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>
     where
         Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>>,
-        Cx: ChunkCx<'w, Id: Deserialize<'de>>,
+        Cx: WorldCx<'w, Id: Deserialize<'de>>,
     {
         fn deserialize_with_cx<D>(
             deserializer: WithLocalCx<D, Cx::LocalContext<'w>>,

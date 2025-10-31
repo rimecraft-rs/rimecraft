@@ -205,6 +205,12 @@ impl Direction {
     pub fn axis_dir(self) -> AxisDirection {
         self.into()
     }
+
+    /// Gets the offset vector of the direction.
+    #[inline]
+    pub fn offset(self) -> IVec3 {
+        self.into()
+    }
 }
 
 impl From<(AxisDirection, Axis)> for Direction {

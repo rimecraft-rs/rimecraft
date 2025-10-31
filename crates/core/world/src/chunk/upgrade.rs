@@ -13,12 +13,12 @@ use serde::{
 
 use crate::view::HeightLimit;
 
-use super::ChunkCx;
+use super::WorldCx;
 
 /// Upgrade data for a chunk.
 pub struct UpgradeData<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     sides_to_upgrade: Vec<EightWayDirection>,
     center_indices_upgrade: Box<[Box<[i32]>]>,
@@ -36,7 +36,38 @@ struct TickedReg<'r, T, K>(Reg<'r, K, T>);
 
 impl<'w, Cx> UpgradeData<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
+{
+    /// Creates an empty upgrade data.
+    #[must_use]
+    pub fn empty() -> Self {
+        const VERTICAL_SECTIONS_EMPTY: usize = HeightLimit::new(0, 0).count_vertical_sections();
+        const __CHECK_SECTIONS_COUNT_IS_ZERO: () =
+            assert!(VERTICAL_SECTIONS_EMPTY == 0, "invalid empty sections count");
+        let _: () = __CHECK_SECTIONS_COUNT_IS_ZERO;
+
+        Self {
+            sides_to_upgrade: vec![],
+            center_indices_upgrade: Box::new([]),
+            block_ticks: vec![],
+            fluid_ticks: vec![],
+        }
+    }
+}
+
+impl<'w, Cx> Default for UpgradeData<'w, Cx>
+where
+    Cx: WorldCx<'w>,
+{
+    #[inline]
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+impl<'w, Cx> UpgradeData<'w, Cx>
+where
+    Cx: WorldCx<'w>,
     Cx::Id: Hash + Eq,
 {
     /// Creates a new upgrade data from given *serialized NBT data* and the height limit.
@@ -58,7 +89,7 @@ where
         Local: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
             + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
     {
-        let indices_len = height_limit.count_vertical_sections() as usize;
+        let indices_len = height_limit.count_vertical_sections();
 
         thread_local! {
             static LENGTH: Cell<usize> = const { Cell::new(0) };
@@ -68,14 +99,14 @@ where
 
         struct Serialized<'w, Cx>
         where
-            Cx: ChunkCx<'w>,
+            Cx: WorldCx<'w>,
         {
             data: UpgradeData<'w, Cx>,
         }
 
         impl<'w, 'de, Cx, L> DeserializeWithCx<'de, L> for Serialized<'w, Cx>
         where
-            Cx: ChunkCx<'w, IntArray: DeserializeOwned, Id: Deserialize<'de>>,
+            Cx: WorldCx<'w, IntArray: DeserializeOwned, Id: Deserialize<'de>>,
             L: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
                 + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
         {
@@ -135,7 +166,7 @@ where
 
                 impl<'w, 'de, L, Cx> serde::de::Visitor<'de> for Visitor<'w, L, Cx>
                 where
-                    Cx: ChunkCx<'w, IntArray: DeserializeOwned, Id: Deserialize<'de>>,
+                    Cx: WorldCx<'w, IntArray: DeserializeOwned, Id: Deserialize<'de>>,
                     L: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
                         + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
                 {
@@ -306,11 +337,11 @@ where
 
                 struct TicksSeed<'a, 'w, Cx, T, L>(&'a mut Vec<TickedReg<'w, T, Cx::Id>>, L)
                 where
-                    Cx: ChunkCx<'w>;
+                    Cx: WorldCx<'w>;
 
                 impl<'de, 'w, Cx, T, L> serde::de::Visitor<'de> for TicksSeed<'_, 'w, Cx, T, L>
                 where
-                    Cx: ChunkCx<'w, Id: Deserialize<'de>>,
+                    Cx: WorldCx<'w, Id: Deserialize<'de>>,
                     L: LocalContext<&'w Registry<Cx::Id, T>>,
                 {
                     type Value = ();
@@ -340,7 +371,7 @@ where
 
                 impl<'de, 'w, Cx, T, L> DeserializeSeed<'de> for TicksSeed<'_, 'w, Cx, T, L>
                 where
-                    Cx: ChunkCx<'w, Id: Deserialize<'de>>,
+                    Cx: WorldCx<'w, Id: Deserialize<'de>>,
                     L: LocalContext<&'w Registry<Cx::Id, T>>,
                 {
                     type Value = ();
@@ -367,9 +398,9 @@ where
 
 impl<'w, Cx> Debug for UpgradeData<'w, Cx>
 where
-    Cx: ChunkCx<'w> + Debug,
+    Cx: WorldCx<'w> + Debug,
     Cx::Id: Debug,
-    Cx::BlockStateExt: Debug,
+    Cx::BlockStateExt<'w>: Debug,
     Cx::BlockStateList: Debug,
     Cx::FluidStateExt: Debug,
 {

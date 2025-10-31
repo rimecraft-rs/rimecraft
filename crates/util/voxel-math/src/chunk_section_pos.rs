@@ -1,5 +1,7 @@
 use glam::IVec3;
 
+use crate::{BlockPos, ChunkPos, coord_block_from_section};
+
 /// Position of a chunk section.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct ChunkSectionPos(pub IVec3);
@@ -28,6 +30,16 @@ impl ChunkSectionPos {
     pub const fn z(&self) -> i32 {
         self.0.z
     }
+
+    /// Returns the minimum block position of the chunk section.
+    #[inline]
+    pub const fn min_pos(self) -> BlockPos {
+        BlockPos(IVec3 {
+            x: coord_block_from_section(self.x()),
+            y: coord_block_from_section(self.y()),
+            z: coord_block_from_section(self.z()),
+        })
+    }
 }
 
 impl From<IVec3> for ChunkSectionPos {
@@ -55,6 +67,13 @@ impl From<ChunkSectionPos> for (i32, i32, i32) {
     #[inline]
     fn from(pos: ChunkSectionPos) -> (i32, i32, i32) {
         (pos.x(), pos.y(), pos.z())
+    }
+}
+
+impl From<(ChunkPos, i32)> for ChunkSectionPos {
+    #[inline]
+    fn from(value: (ChunkPos, i32)) -> Self {
+        Self::new(value.0.x, value.1, value.0.z)
     }
 }
 
