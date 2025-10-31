@@ -347,14 +347,12 @@ fn tt_allow_lint(lint: &str, span: Span) -> [TokenTree; 2] {
 
 const CFG_KEY_NAME: &str = "rc_mapping";
 
-fn tt_cfg<I>(span: Span, iter: I) -> [TokenTree; 4]
+fn tt_cfg<I>(span: Span, iter: I) -> [TokenTree; 2]
 where
     I: IntoIterator<Item = Ident>,
 {
-    let [a0, a1] = tt_allow_lint("unexpected_cfgs", span);
+    // let [a0, a1] = tt_allow_lint("unexpected_cfgs", span);
     [
-        a0,
-        a1,
         TokenTree::Punct(Punct::new('#', Spacing::Joint)),
         TokenTree::Group(Group::new(
             Delimiter::Bracket,
@@ -371,6 +369,7 @@ where
                                     TokenTree::Ident(Ident::new(CFG_KEY_NAME, ident.span())),
                                     TokenTree::Punct(Punct::new('=', Spacing::Alone)),
                                     TokenTree::Literal(Literal::string(&ident.to_smolstr())),
+                                    TokenTree::Punct(Punct::new(',', Spacing::Alone)),
                                 ]
                             })),
                         )),
