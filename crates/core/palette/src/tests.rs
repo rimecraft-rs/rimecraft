@@ -200,6 +200,7 @@ mod container {
                     (Strategy::$pascal, 0)
                 }
             }
+            static_assertions::assert_impl_all!(PalettedContainer<List<0>, u8, Cx>: Send, Sync, Unpin);
         };
     }
 
