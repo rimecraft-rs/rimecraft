@@ -271,6 +271,26 @@ where
     }
 }
 
+impl<'a, Ext> Add<&'a Self> for Style<Ext>
+where
+    Ext: Add<&'a Ext, Output = Ext>,
+{
+    type Output = Self;
+
+    fn add(self, rhs: &'a Self) -> Self::Output {
+        Self {
+            color: rhs.color.or(self.color),
+            shadow_color: rhs.shadow_color.or(self.shadow_color),
+            bold: rhs.bold.or(self.bold),
+            italic: rhs.italic.or(self.italic),
+            underlined: rhs.underlined.or(self.underlined),
+            strikethrough: rhs.strikethrough.or(self.strikethrough),
+            obfuscated: rhs.obfuscated.or(self.obfuscated),
+            ext: self.ext + &rhs.ext,
+        }
+    }
+}
+
 impl<Ext> AddAssign for Style<Ext>
 where
     Ext: AddAssign,

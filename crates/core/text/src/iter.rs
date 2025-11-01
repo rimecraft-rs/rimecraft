@@ -1,60 +1,90 @@
 //! Iterator types for text processing.
 
-use std::{fmt::Debug, ops::Add};
+use std::{fmt::Debug, iter::FusedIterator, ops::Add};
 
-use crate::style::Style;
+use crate::{RawText, style::Style};
 
 /// An iterator over the content and style of a text.
 pub struct StyledIter<'a, T, StyleExt> {
     pub(crate) style: &'a Style<StyleExt>,
-    pub(crate) inner: Box<dyn Iterator<Item = (&'a T, Style<StyleExt>)> + 'a>,
+    pub(crate) content: Option<&'a T>,
+    pub(crate) sibs: std::slice::Iter<'a, RawText<T, StyleExt>>,
+    pub(crate) sib_iter: Option<Box<Self>>,
+}
+
+impl<'a, T, StyleExt> FusedIterator for StyledIter<'a, T, StyleExt> where
+    StyleExt: Add<&'a StyleExt, Output = StyleExt> + Default
+{
 }
 
 impl<'a, T, StyleExt> Iterator for StyledIter<'a, T, StyleExt>
 where
-    StyleExt: Add<Output = StyleExt> + Clone,
+    StyleExt: Add<&'a StyleExt, Output = StyleExt> + Default,
 {
     type Item = (&'a T, Style<StyleExt>);
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let (content, style) = self.inner.next()?;
-        Some((content, self.style.clone() + style))
+        self.content
+            .take()
+            .map(|c| (c, Default::default()))
+            .or_else(|| self.sib_iter.as_deref_mut().and_then(Iterator::next))
+            .or_else(|| {
+                let mut sib_iter = self.sibs.next()?.styled_iter();
+                let item = sib_iter.next();
+                self.sib_iter = Some(Box::new(sib_iter));
+                item
+            })
+            .map(|(c, s)| (c, s + self.style))
     }
 
-    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
+        let floor = (self.content.is_some() as usize)
+            + self.sibs.size_hint().0
+            + self.sib_iter.as_deref().map_or(0, |i| i.size_hint().0);
+        (floor, None)
     }
 }
 
 impl<T, StyleExt> Debug for StyledIter<'_, T, StyleExt> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("StyledIter").finish()
+        f.debug_struct("StyledIter").finish_non_exhaustive()
     }
 }
 
 /// An iterator over the content of a text.
-pub struct Iter<'a, T> {
-    pub(crate) inner: Box<dyn Iterator<Item = &'a T> + 'a>,
+pub struct Iter<'a, T, StyleExt> {
+    pub(crate) content: Option<&'a T>,
+    pub(crate) sibs: std::slice::Iter<'a, RawText<T, StyleExt>>,
+    pub(crate) sib_iter: Option<Box<Self>>,
 }
 
-impl<'a, T> Iterator for Iter<'a, T> {
+impl<T, StyleExt> FusedIterator for Iter<'_, T, StyleExt> {}
+
+impl<'a, T, StyleExt> Iterator for Iter<'a, T, StyleExt> {
     type Item = &'a T;
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
+        self.content
+            .take()
+            .or_else(|| self.sib_iter.as_deref_mut().and_then(Iterator::next))
+            .or_else(|| {
+                let mut sib_iter = self.sibs.next()?.iter();
+                let item = sib_iter.next();
+                self.sib_iter = Some(Box::new(sib_iter));
+                item
+            })
     }
 
-    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
+        let floor = (self.content.is_some() as usize)
+            + self.sibs.size_hint().0
+            + self.sib_iter.as_deref().map_or(0, |i| i.size_hint().0);
+        (floor, None)
     }
 }
 
-impl<T> Debug for Iter<'_, T> {
+impl<T, StyleExt> Debug for Iter<'_, T, StyleExt> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Iter").finish()
+        f.debug_struct("Iter").finish_non_exhaustive()
     }
 }
