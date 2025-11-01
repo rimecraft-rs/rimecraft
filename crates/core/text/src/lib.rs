@@ -164,6 +164,46 @@ where
     }
 }
 
+impl<T, StyleExt> RawText<T, StyleExt>
+where
+    T: Display,
+{
+    /// Visits the string literals of this text.
+    #[remap_method(yarn = "visit", mojmaps = "visit")]
+    #[deprecated = "use `Self::iter` instead"]
+    pub fn visit<V, U>(&self, mut visitor: V) -> Option<U>
+    where
+        V: FnMut(&str) -> Option<U>,
+    {
+        for content in self.iter() {
+            if let Some(result) = visitor(&content.to_string()) {
+                return Some(result);
+            }
+        }
+        None
+    }
+}
+
+impl<T, StyleExt> RawText<T, StyleExt>
+where
+    T: Display,
+    StyleExt: Add<Output = StyleExt> + Clone,
+{
+    /// Visits the string literals of this text with style.
+    #[deprecated = "use `Self::styled_iter` instead"]
+    pub fn styled_visit<V, U>(&self, mut visitor: V) -> Option<U>
+    where
+        V: FnMut(Style<StyleExt>, &str) -> Option<U>,
+    {
+        for (content, style) in self.styled_iter() {
+            if let Some(result) = visitor(style, &content.to_string()) {
+                return Some(result);
+            }
+        }
+        None
+    }
+}
+
 impl<'a, T, StyleExt> IntoIterator for &'a RawText<T, StyleExt> {
     type Item = &'a T;
     type IntoIter = Iter<'a, T>;
