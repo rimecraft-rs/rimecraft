@@ -20,6 +20,9 @@ typeid = "1.0"
 local-cx = { path = "../local-cx", package = "rimecraft-local-cx" }
 marking = { path = "../../util/marking", package = "rimecraft-marking", optional = true }
 
+[dev-dependencies]
+static_assertions = "1.1"
+
 [features]
 serde = ["dep:serde", "local-cx/serde"]
 edcode = ["dep:edcode2", "local-cx/edcode"]

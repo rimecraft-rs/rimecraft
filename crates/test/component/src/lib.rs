@@ -505,3 +505,5 @@ fn changes_edcode() {
         1919
     );
 }
+
+static_assertions::assert_impl_all!(ComponentMap<'static, TestContext>: Send, Sync, Unpin);

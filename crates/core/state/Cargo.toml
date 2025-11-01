@@ -21,6 +21,9 @@ ahash = "0.8"
 typeid = "1.0"
 ident-hash = { path = "../../util/ident-hash", package = "rimecraft-ident-hash" }
 
+[dev-dependencies]
+static_assertions = "1.1"
+
 [features]
 default = ["serde"]
 serde = ["dep:serde", "dep:rimecraft-serde-update"]
