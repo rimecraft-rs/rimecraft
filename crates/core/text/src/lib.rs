@@ -32,7 +32,6 @@ pub use rimecraft_text_derive::Localize;
 mod error;
 mod iter;
 pub mod ordered;
-pub mod ordered_text;
 pub mod style;
 
 #[cfg(feature = "serde")]
