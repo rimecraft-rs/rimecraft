@@ -1,5 +1,7 @@
 //! Iterators over text items with associated [`Style`]s.
 
+#![deprecated = "use `ordered` module instead"]
+
 use std::fmt::Debug;
 
 use remap::remap;
@@ -7,21 +9,7 @@ use rimecraft_fmt::Formatting;
 
 use crate::{ProvideTextTy, Style, style::Formattable as _};
 
-/// An item in an iterator over text items with associated [`Style`]s.
-///
-/// See: [`OrderedText`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OrderedTextItem<Cx>
-where
-    Cx: ProvideTextTy,
-{
-    /// The index of the character in the original string.
-    pub index: usize,
-    /// The character.
-    pub c: char,
-    /// The [`Style`] associated with the character.
-    pub style: Style<Cx::StyleExt>,
-}
+pub use crate::ordered::OrderedTextItem;
 
 /// An iterator over indexed [`char`]s with associated [`Style`]s.
 #[remap(yarn = "OrderedText", mojmaps = "FormattedCharSequence")]
