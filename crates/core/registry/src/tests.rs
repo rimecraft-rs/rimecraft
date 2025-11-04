@@ -50,3 +50,7 @@ fn freeze() {
     assert_eq!(registry.get(&"two").unwrap(), 2);
     assert!(registry.get(&"three").is_none());
 }
+
+static_assertions::assert_impl_all!(Registry<&'static str, i32>: Send, Sync, Unpin);
+static_assertions::assert_impl_all!(RegistryMut<&'static str, i32>: Send, Sync, Unpin);
+static_assertions::assert_impl_all!(Reg<'static, &'static str, i32>: Send, Sync, Unpin);

@@ -20,6 +20,7 @@ fastnbt = "2.6"
 serde = { version = "1.0", features = ["derive"] }
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2" }
 registry = { path = "../../core/registry", package = "rimecraft-registry" }
+static_assertions = "1.1"
 
 [features]
 

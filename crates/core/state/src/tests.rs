@@ -1,5 +1,5 @@
 use crate::{
-    StatesMut,
+    States, StatesMut,
     property::{
         BoolProperty, IntProperty,
         data::{BoolData, IntData},
@@ -37,3 +37,6 @@ fn with_cycle() {
     let state = state.cycle(&BOOL_PROPERTY).unwrap();
     assert_eq!(state.get(&BOOL_PROPERTY), Some(false));
 }
+
+static_assertions::assert_impl_all!(States<'static, fn(i32)>: Send, Sync, Unpin);
+static_assertions::assert_impl_all!(StatesMut<'static, fn(i32)>: Send, Sync, Unpin);
