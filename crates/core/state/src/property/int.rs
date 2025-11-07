@@ -31,7 +31,7 @@ where
     type IntoIter = <<T as ToOwned>::Owned as IntoIterator>::IntoIter;
 
     #[inline]
-    #[allow(clippy::unnecessary_to_owned)]
+    #[allow(clippy::unnecessary_to_owned)] // wrong clippy diagnosis
     fn into_iter(self) -> Self::IntoIter {
         self.0.to_owned().into_iter()
     }

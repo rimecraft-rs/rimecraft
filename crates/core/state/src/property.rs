@@ -9,6 +9,8 @@ use std::{
     ops::RangeInclusive,
 };
 
+use smallbox::{SmallBox, smallbox};
+
 #[derive(Clone)]
 pub(crate) struct ErasedProperty<'a> {
     pub name: &'a str,
@@ -111,7 +113,7 @@ pub(crate) trait ErasedWrap {
     #[allow(dead_code)]
     fn erased_parse_name(&self, name: &str) -> Option<isize>;
     fn erased_to_name(&self, index: isize) -> Option<Cow<'_, str>>;
-    fn erased_iter(&self) -> Box<dyn Iterator<Item = isize> + '_>;
+    fn erased_iter(&self) -> SmallBox<dyn Iterator<Item = isize> + '_, smallbox::space::S8>;
 }
 
 pub(crate) trait UnObjSafeErasedWrap {
@@ -175,8 +177,8 @@ where
     }
 
     #[inline]
-    fn erased_iter(&self) -> Box<dyn Iterator<Item = isize> + '_> {
-        Box::new(self.erased_iter_typed())
+    fn erased_iter(&self) -> SmallBox<dyn Iterator<Item = isize> + '_, smallbox::space::S8> {
+        smallbox!(self.erased_iter_typed())
     }
 }
 

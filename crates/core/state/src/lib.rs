@@ -176,8 +176,7 @@ impl<'a, T> States<'a, T> {
             iter = iter
                 .into_iter()
                 .flat_map(|lx| {
-                    prop.wrap
-                        .erased_iter()
+                    (&mut *prop.wrap.erased_iter())
                         .map(|val| {
                             let mut lx = lx.clone();
                             lx.push((prop.clone(), val));
@@ -221,8 +220,8 @@ impl<'a, T> States<'a, T> {
             let mut table: Table<'a, State<'a, T>> = Table::new();
             for (prop, s_val) in state.entries.iter() {
                 let mut row = IHashMap::new();
-                for val in prop.wrap.erased_iter().filter(|v| v != s_val) {
-                    let Some(s) = list.iter().find(|s| {
+                for val in (&mut *prop.wrap.erased_iter()).filter(|v| v != s_val) {
+                    let Some(s) = list.iter().find(|&s| {
                         let s = unsafe { s.as_ref() };
                         s.entries.iter().all(|(p, v)| {
                             if p == prop {
