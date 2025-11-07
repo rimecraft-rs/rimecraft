@@ -2,7 +2,9 @@
 
 use std::marker::PhantomData;
 
+#[doc(no_inline)]
 pub use bytes::{Buf, BufMut};
+
 pub use codecs::Variable;
 
 pub mod codecs;
