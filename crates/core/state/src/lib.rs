@@ -5,6 +5,7 @@
 use std::{
     collections::BTreeMap,
     fmt::{Debug, Display},
+    mem::MaybeUninit,
     ptr::NonNull,
     sync::OnceLock,
 };
@@ -28,11 +29,18 @@ type Table<'a, T> = AHashMap<ErasedProperty<'a>, IHashMap<isize, NonNull<T>>>;
 /// State of an object.
 pub struct State<'a, T> {
     pub(crate) entries: AHashMap<ErasedProperty<'a>, isize>,
-    table: OnceLock<Table<'a, Self>>,
+    table: MaybeUninit<Table<'a, Self>>,
+    init: bool,
     data: T,
 }
 
-impl<T> State<'_, T> {
+impl<'a, T> State<'a, T> {
+    fn table(&self) -> &Table<'a, Self> {
+        assert!(self.init);
+        // SAFETY: we assume the state is correctly initialized
+        unsafe { self.table.assume_init_ref() }
+    }
+
     /// Gets the current value of given property in this state.
     #[inline]
     pub fn get<V, W>(&self, prop: &Property<'_, W>) -> Option<V>
@@ -74,9 +82,7 @@ impl<T> State<'_, T> {
         if next == index {
             Ok(self)
         } else {
-            self.table
-                .get()
-                .expect("state not initialized")
+            self.table()
                 .get(prop.name())
                 .ok_or_else(|| Error::PropertyNotFound(prop.name().to_owned()))
                 .and_then(|map| map.get(&next).ok_or(Error::ValueNotFound(index)))
@@ -107,9 +113,7 @@ impl<T> State<'_, T> {
         if value == index {
             Ok(self)
         } else {
-            self.table
-                .get()
-                .expect("state not initialized")
+            self.table()
                 .get(prop.name())
                 .ok_or_else(|| Error::PropertyNotFound(prop.name().to_owned()))
                 .and_then(|map| map.get(&value).ok_or(Error::ValueNotFound(index)))
@@ -187,27 +191,25 @@ impl<'a, T> States<'a, T> {
                 .collect();
         }
 
-        let mut unit_lock_reuse = Some(OnceLock::new());
-        let list = iter
+        let mut list = iter
             .into_iter()
             .map(|vec| vec.into_iter().collect::<AHashMap<_, _>>())
             .map(|entries| {
                 let state = State {
                     entries,
-                    table: unit_lock_reuse.take().unwrap(),
+                    table: MaybeUninit::uninit(),
+                    init: false,
                     data: (),
                 };
                 let data = f(&state);
                 let State {
-                    entries,
-                    table,
-                    data: _,
+                    entries, data: _, ..
                 } = state;
-                unit_lock_reuse = Some(table);
 
                 NonNull::new(Box::into_raw(Box::new(State {
                     entries,
-                    table: OnceLock::new(),
+                    table: MaybeUninit::uninit(),
+                    init: false,
                     data,
                 })))
                 .expect("failed to allocate state")
@@ -215,8 +217,8 @@ impl<'a, T> States<'a, T> {
             .collect::<Vec<_>>();
 
         // Initialize tables
-        for state in list.iter() {
-            let state = unsafe { state.as_ref() };
+        for i in 0..list.len() {
+            let state = unsafe { list[i].as_ref() };
             let mut table: Table<'a, State<'a, T>> = Table::new();
             for (prop, s_val) in state.entries.iter() {
                 let mut row = IHashMap::new();
@@ -237,7 +239,9 @@ impl<'a, T> States<'a, T> {
                 }
                 table.insert(prop.clone(), row);
             }
-            state.table.set(table).expect("state already initialized");
+            let state = unsafe { list[i].as_mut() };
+            state.table.write(table);
+            state.init = true;
         }
 
         Self {
@@ -467,9 +471,7 @@ mod _serde {
                 {
                     while let Some((prop, val)) = map.next_entry::<String, isize>()? {
                         self.0 = unsafe { &*self.0 }
-                            .table
-                            .get()
-                            .expect("state not initialized")
+                            .table()
                             .get(prop.as_str())
                             .ok_or_else(|| {
                                 serde::de::Error::custom(format!("property {prop} not found"))
