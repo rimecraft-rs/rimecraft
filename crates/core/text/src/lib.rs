@@ -26,6 +26,7 @@ pub mod __priv_macro_use {
 }
 
 use remap::{remap, remap_method};
+
 #[cfg(feature = "macros")]
 pub use rimecraft_text_derive::Localize;
 
@@ -39,12 +40,14 @@ mod _serde;
 
 use std::{borrow::Cow, fmt::Display, ops::Add};
 
-pub use error::Error;
-pub use iter::{Iter, StyledIter};
 use rimecraft_global_cx::GlobalContext;
-pub use style::Style;
 
 use crate::style::Formattable;
+
+pub use error::Error;
+pub use iter::{Iter, StyledIter};
+pub use ordered::{ErasedOrderedText, OrderedText};
+pub use style::Style;
 
 /// A raw text component.
 ///
