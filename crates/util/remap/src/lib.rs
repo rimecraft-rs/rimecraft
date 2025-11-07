@@ -10,6 +10,10 @@ use smol_str::ToSmolStr as _;
 /// This isn't any restriction but only a hint for allocation.
 const HINT_NAMES_COUNT: usize = 2;
 
+const KEYWORDS: &[&str] = &[
+    "pub", "mod", "fn", "type", "struct", "enum", "union", "const", "static", "char", "bool",
+];
+
 fn rewrite_ident_in_rust(literal: Literal) -> Ident {
     let input = literal.to_smolstr();
     // reserve more capacity for de-camelizing and reduce allocations
@@ -45,6 +49,7 @@ fn rewrite_ident_in_rust(literal: Literal) -> Ident {
     let output_slice = if let Some(body) = output.strip_prefix("get_")
         && !body.starts_with("mut")
         && !body.starts_with("ref")
+        && !KEYWORDS.contains(&body)
     {
         body
     } else {

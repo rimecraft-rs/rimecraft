@@ -1,5 +1,7 @@
 use std::{fmt::Debug, iter::FusedIterator, pin::Pin, sync::Arc};
 
+use remap::remap;
+
 use crate::{ProvideTextTy, Style, ordered::OrderedTextItem};
 
 /// Iterator type returned by [`iter_forwards`].
@@ -17,6 +19,7 @@ where
 ///
 /// See [`iter_forwards_owned`] for an owned version.
 #[inline]
+#[remap(yarn = "visitForwards", mojmaps = "iterate")]
 pub fn iter_forwards<Cx>(text: &str, style: Style<Cx::StyleExt>) -> IterForwards<'_, Cx>
 where
     Cx: ProvideTextTy,
@@ -39,6 +42,7 @@ where
 ///
 /// This is a shorthand for `iter_forwards(text, style).rev()`.
 #[inline]
+#[remap(yarn = "visitBackwards", mojmaps = "iterateBackwards")]
 pub fn iter_backwards<Cx>(text: &str, style: Style<Cx::StyleExt>) -> IterBackwards<'_, Cx>
 where
     Cx: ProvideTextTy,
@@ -63,6 +67,7 @@ where
 /// Creates an iterator over the characters of an owned string with given [`Style`]s attached.
 ///
 /// The returned iterator is a [`DoubleEndedIterator`] which means you can make it go backwards.
+#[remap(yarn = "visitForwardsOwned", mojmaps = "iterateOwned")]
 pub fn iter_forwards_owned<Cx>(text: String, style: Style<Cx::StyleExt>) -> IterForwardsOwned<Cx>
 where
     Cx: ProvideTextTy,
@@ -87,6 +92,7 @@ where
 ///
 /// This is a shorthand for `iter_forwards_owned(text, style).rev()`.
 #[inline]
+#[remap(yarn = "visitBackwardsOwned", mojmaps = "iterateBackwardsOwned")]
 pub fn iter_backwards_owned<Cx>(text: String, style: Style<Cx::StyleExt>) -> IterBackwardsOwned<Cx>
 where
     Cx: ProvideTextTy,
