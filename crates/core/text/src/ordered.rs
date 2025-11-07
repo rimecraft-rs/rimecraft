@@ -120,7 +120,7 @@ where
 {
 }
 
-/// The iterator type for [`Erased`].
+/// The iterator type for [`ErasedOrderedText`].
 pub struct ErasedIter<'a, Cx>(
     SmallBox<dyn FusedIterator<Item = OrderedTextItem<Cx>> + 'a, smallbox::space::S4>,
 )

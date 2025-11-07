@@ -63,7 +63,10 @@ macro_rules! formattings {
         #[non_exhaustive]
         #[remap(yarn = "Formatting", mojmaps = "ChatFormatting")]
         pub enum Formatting {
-            $(#[doc = "The formatting."] $i),*
+            $(
+            #[doc = concat!("The formatting ", $n, ", `§", $c, "`.")]
+            $i
+            ),*
         }
 
         impl Formatting {

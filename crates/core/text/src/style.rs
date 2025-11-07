@@ -165,22 +165,21 @@ impl From<ShadowColor> for u32 {
 ///
 /// All formatting operations take ownership of `self` and return a new instance with the formatting applied.
 pub trait Formattable: Sized {
-    /// Returns a new instance with the formatting applied.
+    /// Returns a new instance with the formatting applied, conserving **all** other attributes of this value.
     #[remap_method(yarn = "withFormatting", mojmaps = "applyFormat")]
-    fn with_formatting(self, formatting: Formatting) -> Self {
-        let _ = formatting;
-        self
-    }
+    fn with_formatting(self, formatting: Formatting) -> Self;
 
-    /// Returns a new instance with the formatting applied exclusively.
+    /// Returns a new instance with the formatting applied, conserving **some applicable**
+    /// attributes of this value.
     #[remap_method(yarn = "withExclusiveFormatting", mojmaps = "applyLegacyFormat")]
-    fn with_exclusive_formatting(self, formatting: Formatting) -> Self {
-        let _ = formatting;
-        self
-    }
+    fn with_exclusive_formatting(self, formatting: Formatting) -> Self;
 }
 
 /// Style of a text, representing cosmetic attributes.
+///
+/// # Note to extension type implementors
+///
+/// This type is supposed to be cheaply-cloned, so as well as the `Ext` type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 #[cfg_attr(
     feature = "serde",
@@ -328,7 +327,6 @@ impl<Ext> Formattable for Style<Ext>
 where
     Ext: Formattable,
 {
-    /// Returns a new [`Style`] with the formatting provided and all other attributes of this style.
     fn with_formatting(self, formatting: Formatting) -> Self {
         let mut style = self;
         style.ext = style.ext.with_formatting(formatting);
@@ -348,9 +346,8 @@ where
         }
         style
     }
-
-    /// Returns a new [`Style`] with the formatting provided and some applicable attributes of this style.
-    /// When a color formatting is passed for formatting, the other formattings, including bold, italic, strikethrough, underlined, and obfuscated, are all removed.
+    /// When a color formatting is passed for formatting, the other formattings,
+    /// including bold, italic, strikethrough, underlined, and obfuscated, are all removed.
     fn with_exclusive_formatting(self, formatting: Formatting) -> Self {
         if formatting.is_color() {
             // Color formatting clears all modifiers
