@@ -10,6 +10,7 @@ impl ProvideKeyBindTy for TestContext {
     type KeyBindExt = EmptyKeyBindExt;
 }
 
+/// A blank key bind extension for [`TestContext`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EmptyKeyBindExt;
 

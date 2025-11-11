@@ -1,15 +1,12 @@
 //! Window management for Rimecraft.
 
 use rimecraft_global_cx::GlobalContext;
+use rimecraft_local_cx::ProvideLocalCxTy;
 
-pub trait ProvideWindowCx: GlobalContext {
+/// Context for window management.
+pub trait ProvideWindowTy: GlobalContext + ProvideLocalCxTy {
+    /// The window type.
     type Window: Window;
-}
-
-pub trait WindowCx: GlobalContext + ProvideWindowCx {
-    fn window(&self) -> &Self::Window;
-
-    fn window_mut(&mut self) -> &mut Self::Window;
 }
 
 /// The position of the window on the screen, in pixels.

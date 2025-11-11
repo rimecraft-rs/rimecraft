@@ -6,12 +6,17 @@ use mouse::{ProvideMouseTy, button::MouseButton};
 
 use crate::TestContext;
 
+/// Mouse buttons.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TestButton {
+    /// Left mouse button.
     Left,
+    /// Right mouse button.
     Right,
+    /// Middle mouse button.
     Middle,
+    /// Other mouse button.
     Other(u8),
 }
 

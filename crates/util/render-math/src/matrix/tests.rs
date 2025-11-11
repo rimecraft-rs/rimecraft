@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn test_raii_auto_pop() {
+fn raii_auto_pop() {
     let mut stack = MatrixStack::new(0);
 
     let mut handle = stack.push();
@@ -12,7 +12,7 @@ fn test_raii_auto_pop() {
 }
 
 #[test]
-fn test_push_always_copies_top() {
+fn push_always_copies_top() {
     let mut stack = MatrixStack::new(5);
 
     let mut h1 = stack.push();
@@ -26,7 +26,7 @@ fn test_push_always_copies_top() {
 }
 
 #[test]
-fn test_nested_transformations() {
+fn nested_transformations() {
     let mut stack = MatrixStack::new(1);
 
     let mut h1 = stack.push();
@@ -46,7 +46,7 @@ fn test_nested_transformations() {
 }
 
 #[test]
-fn test_complex_types() {
+fn complex_types() {
     let mut stack = MatrixStack::new(vec![1, 2, 3]);
 
     let mut h1 = stack.push();
@@ -61,7 +61,7 @@ fn test_complex_types() {
 }
 
 #[test]
-fn test_clear_resets_depth() {
+fn clear_resets_depth() {
     let mut stack = MatrixStack::new(100);
     stack.push();
     stack.clear();
@@ -70,13 +70,13 @@ fn test_clear_resets_depth() {
 }
 
 #[test]
-fn test_preallocated_capacity() {
+fn preallocated_capacity() {
     let stack = MatrixStack::<i32>::with_capacity(0, 10);
     assert!(stack.stack.capacity() >= 10);
 }
 
 #[test]
-fn test_nested_blocks() {
+fn nested_blocks() {
     let mut stack = MatrixStack::new(1);
 
     {
@@ -95,7 +95,7 @@ fn test_nested_blocks() {
 }
 
 #[test]
-fn test_chain_invocations() {
+fn chain_invocations() {
     let mut stack = MatrixStack::new(1);
 
     fn render_inner(stack: &mut MatrixStack<i32>) -> i32 {

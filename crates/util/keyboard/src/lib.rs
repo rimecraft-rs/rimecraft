@@ -45,7 +45,7 @@ impl KeyState {
 
     /// Returns `true` if the key is currently repeating.
     pub fn is_repeating(&self) -> bool {
-        matches!(self, KeyState::Repeating)
+        matches!(self, Self::Repeating)
     }
 }
 

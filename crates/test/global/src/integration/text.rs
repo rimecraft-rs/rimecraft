@@ -63,6 +63,7 @@ impl Display for TextContent {
     }
 }
 
+/// A blank style extension for [`TestContext`].
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct EmptyStyleExt;
 

@@ -76,7 +76,7 @@ impl From<glam::Vec2> for MousePos {
 
 impl From<MousePos> for glam::Vec2 {
     fn from(pos: MousePos) -> Self {
-        glam::Vec2::new(pos.x, pos.y)
+        Self::new(pos.x, pos.y)
     }
 }
 
@@ -120,6 +120,6 @@ impl From<glam::Vec2> for MouseScroll {
 
 impl From<MouseScroll> for glam::Vec2 {
     fn from(scroll: MouseScroll) -> Self {
-        glam::Vec2::new(scroll.delta_x, scroll.delta_y)
+        Self::new(scroll.delta_x, scroll.delta_y)
     }
 }

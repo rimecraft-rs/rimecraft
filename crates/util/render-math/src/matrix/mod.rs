@@ -26,7 +26,7 @@ pub struct MatrixStack<Entry> {
 #[derive(Debug)]
 pub struct MatrixStackGuard<'a, Entry>(&'a mut MatrixStack<Entry>);
 
-impl<'a, Entry> Drop for MatrixStackGuard<'a, Entry> {
+impl<Entry> Drop for MatrixStackGuard<'_, Entry> {
     #[inline]
     fn drop(&mut self) {
         self.0.pop();

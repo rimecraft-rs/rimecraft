@@ -16,13 +16,18 @@ pub mod item;
 pub mod layout;
 pub mod nav;
 
+/// Provides typesm and constants for the UI framework.
 pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
+    /// The extension type for [`UiEvent`].
     type UiEventExt;
+    /// The extension type for [`SizeConstraints`].
     type SizeConstraintsExt;
+    /// The iterator type to iterate over child elements.
     type ElementIter<'a>: IntoIterator<Item = &'a dyn Element<Self>>
     where
         Self: 'a;
 
+    /// The maximum interval between two clicks to be considered a double-click.
     const MAX_DOUBLE_CLICK_INTERVAL: Duration = Duration::from_millis(250);
 }
 
