@@ -3,6 +3,7 @@ use rimecraft_render_math::screen::ScreenSize;
 use crate::layout::{LayoutPack, LayoutValue};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub enum SizeConstraint {
     #[default]
     Free,

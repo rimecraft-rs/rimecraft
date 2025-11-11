@@ -30,29 +30,29 @@ pub enum NavAxis {
 impl NavAxis {
     /// Returns `true` if the axis is horizontal.
     pub fn is_horizontal(&self) -> bool {
-        matches!(self, NavAxis::Horizontal)
+        matches!(self, Self::Horizontal)
     }
 
     /// Returns `true` if the axis is vertical.
     pub fn is_vertical(&self) -> bool {
-        matches!(self, NavAxis::Vertical)
+        matches!(self, Self::Vertical)
     }
 
     /// Flips the axis to its opposite.
     pub fn flip(&self) -> Self {
         match self {
-            NavAxis::Horizontal => NavAxis::Vertical,
-            NavAxis::Vertical => NavAxis::Horizontal,
+            Self::Horizontal => Self::Vertical,
+            Self::Vertical => Self::Horizontal,
         }
     }
 
     /// Returns the [`NavDirection`] for the given [`Sign`] on this axis.
     pub fn direction(&self, sign: Sign) -> NavDirection {
         match (self, sign) {
-            (NavAxis::Horizontal, Sign::Positive) => NavDirection::Right,
-            (NavAxis::Horizontal, Sign::Negative) => NavDirection::Left,
-            (NavAxis::Vertical, Sign::Positive) => NavDirection::Down,
-            (NavAxis::Vertical, Sign::Negative) => NavDirection::Up,
+            (Self::Horizontal, Sign::Positive) => NavDirection::Right,
+            (Self::Horizontal, Sign::Negative) => NavDirection::Left,
+            (Self::Vertical, Sign::Positive) => NavDirection::Down,
+            (Self::Vertical, Sign::Negative) => NavDirection::Up,
         }
     }
 }
@@ -84,26 +84,26 @@ impl NavDirection {
     /// The [`NavAxis`] of this direction.
     pub fn axis(&self) -> NavAxis {
         match self {
-            NavDirection::Up | NavDirection::Down => NavAxis::Vertical,
-            NavDirection::Left | NavDirection::Right => NavAxis::Horizontal,
+            Self::Up | Self::Down => NavAxis::Vertical,
+            Self::Left | Self::Right => NavAxis::Horizontal,
         }
     }
 
     /// Flips the direction to its opposite.
     pub fn flip(&self) -> Self {
         match self {
-            NavDirection::Up => NavDirection::Down,
-            NavDirection::Down => NavDirection::Up,
-            NavDirection::Left => NavDirection::Right,
-            NavDirection::Right => NavDirection::Left,
+            Self::Up => Self::Down,
+            Self::Down => Self::Up,
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
         }
     }
 
     /// The [`Sign`] of this direction.
     pub fn sign(&self) -> Sign {
         match self {
-            NavDirection::Up | NavDirection::Left => Sign::Negative,
-            NavDirection::Down | NavDirection::Right => Sign::Positive,
+            Self::Up | Self::Left => Sign::Negative,
+            Self::Down | Self::Right => Sign::Positive,
         }
     }
 }

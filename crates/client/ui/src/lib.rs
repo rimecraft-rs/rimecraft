@@ -1,10 +1,16 @@
 //! Minecraft client UI framework.
 
+use std::time::Duration;
+
 use rimecraft_client_narration::Narratable;
 use rimecraft_keyboard::{KeyState, ProvideKeyboardTy};
 use rimecraft_mouse::{ButtonState, MousePos, MouseScroll, ProvideMouseTy};
+use rimecraft_render_math::screen::ScreenSize;
 
-use crate::nav::WithNavIndex;
+use crate::{
+    layout::{LayoutMeasurements, position::PositionConstraints, size::SizeConstraints},
+    nav::WithNavIndex,
+};
 
 pub mod item;
 pub mod layout;
@@ -13,6 +19,11 @@ pub mod nav;
 pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
     type UiEventExt;
     type SizeConstraintsExt;
+    type ElementIter<'a>: IntoIterator<Item = &'a dyn Element<Self>>
+    where
+        Self: 'a;
+
+    const MAX_DOUBLE_CLICK_INTERVAL: Duration = Duration::from_millis(250);
 }
 
 /// The selection state of a UI component.
@@ -29,7 +40,7 @@ pub enum SelectionState {
 impl SelectionState {
     /// Whether the selection state is `Focused`.
     pub fn is_focused(&self) -> bool {
-        matches!(self, SelectionState::Focused)
+        matches!(self, Self::Focused)
     }
 }
 
@@ -58,17 +69,23 @@ pub enum EventPropagation {
 impl EventPropagation {
     /// Whether the event should stop propagating.
     pub fn should_stop(&self) -> bool {
-        matches!(self, EventPropagation::Handled)
+        matches!(self, Self::Handled)
     }
 }
 
-pub trait Focusable {
+/// A component that can be focused.
+pub trait Focusable<Cx>
+where
+    Cx: ProvideUiTy,
+{
     /// Whether this component is currently focused.
     fn is_focused(&self) -> bool;
 
-    fn set_focused(&mut self, focused: bool);
+    /// Sets the focus state of this component.
+    fn set_focused(&self, focused: bool);
 
-    fn focus(&mut self) {
+    /// Focuses this component.
+    fn focus(&self) {
         self.set_focused(true);
     }
 }
@@ -130,8 +147,86 @@ where
     },
 }
 
-pub trait Element<Cx>
+/// An UI element.
+pub trait Element<Cx>: Focusable<Cx>
 where
     Cx: ProvideUiTy,
 {
+    /// Handles the propagation of an [`UiEvent`].
+    fn handle_ui_event<'a>(&'a self, event: &UiEvent<'a, Cx>) -> EventPropagation {
+        let _ = event;
+        EventPropagation::NotHandled
+    }
+}
+
+/// An UI element that works as a container for some children elements.
+pub trait ContainerElement<Cx>: Element<Cx>
+where
+    Cx: ProvideUiTy,
+{
+    /// The children elements.
+    fn children(&self) -> Cx::ElementIter<'_>;
+
+    /// Whether this element contains a child that matches the given pointer.
+    fn contains_child(&self, child: &dyn Element<Cx>) -> bool {
+        self.children().into_iter().any(|c| std::ptr::eq(c, child))
+    }
+
+    /// Whether this element has any focused children.
+    fn has_focused_child(&self) -> bool {
+        self.children().into_iter().any(|child| child.is_focused())
+    }
+
+    /// Sets the focused child to match the given pointer. If [`None`] is given, every child will be blurred. If the given pointer points to an element elsewhere, no operations will be performed.
+    fn set_focused_child(&self, child: Option<&dyn Element<Cx>>) {
+        if let Some(child) = child {
+            if self.contains_child(child) {
+                for c in self.children() {
+                    c.set_focused(std::ptr::eq(c, child));
+                }
+            }
+        } else {
+            self.children()
+                .into_iter()
+                .for_each(|c| c.set_focused(false));
+        }
+    }
+}
+
+impl<E, Cx> Element<Cx> for E
+where
+    E: ContainerElement<Cx>,
+    Cx: ProvideUiTy,
+{
+    fn handle_ui_event<'a>(&'a self, event: &UiEvent<'a, Cx>) -> EventPropagation {
+        for child in self.children() {
+            if child.handle_ui_event(event).should_stop() {
+                return EventPropagation::Handled;
+            }
+        }
+        EventPropagation::NotHandled
+    }
+}
+
+/// An UI element that responds to layout.
+pub trait LayoutElement<Cx>: Element<Cx>
+where
+    Cx: ProvideUiTy,
+{
+    /// The layout should be updated.
+    fn update_layout(
+        &self,
+        screen_size: ScreenSize,
+        parent_size: ScreenSize,
+        optimal_size: ScreenSize,
+    );
+
+    /// The [`LayoutMeasurements`] of this element.
+    fn measurements(&self) -> LayoutMeasurements<ScreenSize>;
+
+    /// The [`SizeConstraints`] of this element.
+    fn size_constraints(&self) -> SizeConstraints<Cx::SizeConstraintsExt>;
+
+    /// The [`PositionConstraints`] of this element.
+    fn position_constraints(&self) -> PositionConstraints;
 }

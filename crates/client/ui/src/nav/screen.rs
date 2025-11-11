@@ -158,12 +158,12 @@ impl ScreenRectExt for ScreenRect {
         }
     }
 
-    fn border(&self, direction: NavDirection) -> ScreenRect {
+    fn border(&self, direction: NavDirection) -> Self {
         let opposite_axis = direction.axis().flip();
         let coord_start = self.coord(direction);
         let coord_end = self.coord(opposite_axis.direction(Sign::Negative));
         let length = self.length(opposite_axis);
-        ScreenRect::from_axis(direction.axis(), coord_start, coord_end, 1.0, length) + direction
+        Self::from_axis(direction.axis(), coord_start, coord_end, 1.0, length) + direction
     }
 
     fn overlaps_axis(&self, other: &Self, axis: NavAxis) -> bool {
@@ -182,7 +182,7 @@ impl ScreenRectExt for ScreenRect {
     fn center_axis(&self, axis: NavAxis) -> f32 {
         let start = self.coord(axis.direction(Sign::Negative));
         let end = self.coord(axis.direction(Sign::Positive));
-        (start + end) / 2.0
+        f32::midpoint(start, end)
     }
 
     fn center(&self) -> ScreenPos {
@@ -218,7 +218,7 @@ impl ScreenRectExt for ScreenRect {
         let x2 = self.coord_right().min(other.coord_right());
         let y2 = self.coord_bottom().min(other.coord_bottom());
 
-        (x2 >= x1 && y2 >= y1).then(|| ScreenRect::from_xywh(x1, y1, x2 - x1, y2 - y1))
+        (x2 >= x1 && y2 >= y1).then(|| Self::from_xywh(x1, y1, x2 - x1, y2 - y1))
     }
 
     fn intersects(&self, other: &Self) -> bool {
@@ -238,7 +238,7 @@ impl ScreenRectExt for ScreenRect {
         let x2 = self.coord_right().max(other.coord_right());
         let y2 = self.coord_bottom().max(other.coord_bottom());
 
-        ScreenRect::from_xywh(x1, y1, x2 - x1, y2 - y1)
+        Self::from_xywh(x1, y1, x2 - x1, y2 - y1)
     }
 
     fn contains(&self, other: &Self) -> bool {
@@ -262,7 +262,7 @@ impl ScreenRectExt for ScreenRect {
             transformation.transform_point2(glam::Vec2::new(self.coord_left(), self.coord_top()));
         let bottom_right = transformation
             .transform_point2(glam::Vec2::new(self.coord_right(), self.coord_bottom()));
-        ScreenRect::from_xywh(
+        Self::from_xywh(
             top_left.x,
             top_left.y,
             bottom_right.x - top_left.x,
@@ -270,7 +270,7 @@ impl ScreenRectExt for ScreenRect {
         )
     }
 
-    fn transform_vertices(&self, transformation: glam::Affine2) -> ScreenRect {
+    fn transform_vertices(&self, transformation: glam::Affine2) -> Self {
         let top_left =
             transformation.transform_point2(glam::Vec2::new(self.coord_left(), self.coord_top()));
         let top_right =
@@ -301,7 +301,7 @@ impl ScreenRectExt for ScreenRect {
             .max(bottom_left.y)
             .max(bottom_right.y);
 
-        ScreenRect::from_xywh(min_x, min_y, max_x - min_x, max_y - min_y)
+        Self::from_xywh(min_x, min_y, max_x - min_x, max_y - min_y)
     }
 }
 

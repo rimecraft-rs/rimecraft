@@ -16,8 +16,8 @@ impl LayoutValue {
     /// Converts the layout value to pixels based on the given reference size.
     pub fn to_pixels(&self, reference: f32) -> f32 {
         match self {
-            LayoutValue::Px(px) => *px,
-            LayoutValue::Percent(percent) => reference * (*percent / 100.0),
+            Self::Px(px) => *px,
+            Self::Percent(percent) => reference * (*percent / 100.0),
         }
     }
 }
@@ -28,15 +28,44 @@ pub enum LayoutReference {
     Parent,
     Child,
     #[default]
-    Available,
+    Optimal,
 }
 
-impl LayoutReference {
-    pub fn solve(&self, parent: f32, child: f32, available: f32) -> f32 {
-        match self {
-            LayoutReference::Parent => parent,
-            LayoutReference::Child => child,
-            LayoutReference::Available => available,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LayoutMeasurements<V>
+where
+    V: Copy,
+{
+    pub parent: Option<V>,
+    pub child: V,
+    pub optimal: V,
+}
+
+impl<V> LayoutMeasurements<V>
+where
+    V: Copy,
+{
+    pub fn new_prefer_parent(parent: Option<V>, child: V) -> Self {
+        Self {
+            parent,
+            child,
+            optimal: parent.unwrap_or(child),
+        }
+    }
+
+    pub fn new_prefer_child(parent: Option<V>, child: V) -> Self {
+        Self {
+            parent,
+            child,
+            optimal: child,
+        }
+    }
+
+    pub fn resolve_in(&self, reference: LayoutReference) -> V {
+        match reference {
+            LayoutReference::Parent => self.parent.unwrap_or(self.optimal),
+            LayoutReference::Child => self.child,
+            LayoutReference::Optimal => self.optimal,
         }
     }
 }
@@ -52,8 +81,8 @@ impl LayoutAxis {
     /// Returns the orthogonal layout axis.
     pub fn orthogonal(&self) -> Self {
         match self {
-            LayoutAxis::Horizontal => LayoutAxis::Vertical,
-            LayoutAxis::Vertical => LayoutAxis::Horizontal,
+            Self::Horizontal => Self::Vertical,
+            Self::Vertical => Self::Horizontal,
         }
     }
 }
@@ -78,8 +107,8 @@ impl LayoutDirection {
     /// Returns the opposite layout direction.
     pub fn opposite(&self) -> Self {
         match self {
-            LayoutDirection::Start => LayoutDirection::End,
-            LayoutDirection::End => LayoutDirection::Start,
+            Self::Start => Self::End,
+            Self::End => Self::Start,
         }
     }
 }
