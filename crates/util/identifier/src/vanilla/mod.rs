@@ -344,8 +344,8 @@ impl std::fmt::Display for Error {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::InvalidNamespace(s) => write!(f, "invalid namespace: {s}"),
-            Error::InvalidPath(s) => write!(f, "invalid path: {s}"),
+            Self::InvalidNamespace(s) => write!(f, "invalid namespace: {s}"),
+            Self::InvalidPath(s) => write!(f, "invalid path: {s}"),
         }
     }
 }

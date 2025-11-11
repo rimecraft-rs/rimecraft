@@ -20,6 +20,7 @@ maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
 glam = "0.30"
 approx = "0.5"
 math = { path = "../math", package = "rimecraft-math" }
+typeid = "1.0"
 
 [features]
 default = ["serde", "edcode"]

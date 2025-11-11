@@ -96,8 +96,8 @@ where
     fn i32_validate(&self, value: i32) -> Option<i32> {
         value
             .clamp(
-                <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::min_inclusive(self),
-                <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::max_inclusive(self),
+                <Self as IntSliderCallbacks<Cx>>::min_inclusive(self),
+                <Self as IntSliderCallbacks<Cx>>::max_inclusive(self),
             )
             .into()
     }
@@ -108,11 +108,11 @@ where
     Cx: ProvideTextTy,
 {
     fn to_slider_progress(&self, value: i32) -> f32 {
-        <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::to_slider_progress(self, value)
+        <Self as IntSliderCallbacks<Cx>>::to_slider_progress(self, value)
     }
 
     fn to_value(&self, slider_progress: f32) -> i32 {
-        <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::to_value(self, slider_progress)
+        <Self as IntSliderCallbacks<Cx>>::to_value(self, slider_progress)
     }
 }
 
@@ -121,6 +121,6 @@ where
     Cx: ProvideTextTy,
 {
     fn validate(&self, value: i32) -> Option<i32> {
-        <SuppliableIntCallbacks as IntSliderCallbacks<Cx>>::i32_validate(self, value)
+        <Self as IntSliderCallbacks<Cx>>::i32_validate(self, value)
     }
 }

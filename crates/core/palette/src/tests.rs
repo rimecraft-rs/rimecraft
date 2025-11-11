@@ -164,7 +164,7 @@ fn direct() {
 mod edcode {
     use super::List;
     use crate::{Palette, Strategy};
-    use edcode2::{Decode, Encode};
+    use edcode2::{Decode as _, Encode as _};
     use rimecraft_maybe::Maybe;
 
     macro_rules! helper {
@@ -200,6 +200,7 @@ mod container {
                     (Strategy::$pascal, 0)
                 }
             }
+            static_assertions::assert_impl_all!(PalettedContainer<List<0>, u8, Cx>: Send, Sync, Unpin);
         };
     }
 
@@ -210,7 +211,7 @@ mod container {
             container::{PalettedContainer, ProvidePalette, Storage},
             tests::List,
         };
-        use edcode2::{Decode, Encode};
+        use edcode2::{Decode as _, Encode as _};
 
         macro_rules! helper_base {
             ($pascal:ident, $snake:ident, $expect:expr) => {
@@ -259,7 +260,7 @@ mod container {
     #[cfg(feature = "serde")]
     mod serde {
         use fastnbt::{DeOpts, SerOpts, de::Deserializer};
-        use rimecraft_serde_update::Update;
+        use rimecraft_serde_update::Update as _;
 
         use crate::{
             Strategy,

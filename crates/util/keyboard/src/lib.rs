@@ -35,12 +35,12 @@ pub enum KeyState {
 impl KeyState {
     /// Returns `true` if the key is currently idle.
     pub fn is_idle(&self) -> bool {
-        matches!(self, KeyState::Idle)
+        matches!(self, Self::Idle)
     }
 
     /// Returns `true` if the key is currently pressed.
     pub fn is_pressed(&self) -> bool {
-        matches!(self, KeyState::Pressed)
+        matches!(self, Self::Pressed)
     }
 
     /// Returns `true` if the key is currently repeating.

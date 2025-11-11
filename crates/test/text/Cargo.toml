@@ -20,6 +20,7 @@ serde = "1.0"
 text = { path = "../../core/text", package = "rimecraft-text", features = [
     "serde",
 ] }
+static_assertions = "1.1"
 
 [lints]
 workspace = true

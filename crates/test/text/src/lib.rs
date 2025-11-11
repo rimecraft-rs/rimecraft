@@ -46,3 +46,5 @@ fn display() {
         "Hello, world! Genshin Impact, a game by miHoYo, boot! opssw"
     );
 }
+
+static_assertions::assert_impl_all!(Text<TestContext>: Send, Sync, Unpin);

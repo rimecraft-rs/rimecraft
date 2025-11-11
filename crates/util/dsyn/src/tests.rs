@@ -85,3 +85,6 @@ fn parenting_overrides_flat() {
     );
     assert_eq!(set2.get(ty).expect("get failed")(), 14u8, "wrong function")
 }
+
+static_assertions::assert_impl_all!(Type::<fn()>: Send, Sync, Unpin);
+static_assertions::assert_impl_all!(SimpleRegistry::<Id>: Send, Sync, Unpin);

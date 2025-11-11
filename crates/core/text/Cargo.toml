@@ -18,6 +18,8 @@ rimecraft-fmt = { path = "../../util/fmt" }
 serde = { version = "1.0", features = ["derive"], optional = true }
 edcode2 = { path = "../../util/edcode2", optional = true, package = "rimecraft-edcode2" }
 rimecraft-text-derive = { path = "../../util/text-derive", optional = true }
+remap = { path = "../../util/remap", package = "rimecraft-remap" }
+smallbox = "0.8"
 
 [features]
 default = ["macros", "rgb/argb", "unit-ext"]

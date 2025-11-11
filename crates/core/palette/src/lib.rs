@@ -122,7 +122,13 @@ where
                     forward.len(),
                     entries.len()
                 );
-                reverse.extend(entries.iter().cloned().enumerate().map(|(i, v)| (v, i)));
+                reverse.extend(
+                    entries
+                        .into_iter_ref()
+                        .cloned()
+                        .enumerate()
+                        .map(|(i, v)| (v, i)),
+                );
                 forward.extend(entries);
 
                 Self {
@@ -149,7 +155,7 @@ where
     pub fn index(&self, object: &T) -> Option<usize> {
         match &self.internal {
             PaletteImpl::Singular(value) => (value.as_ref() == Some(object)).then_some(0),
-            PaletteImpl::Array(array) => array.iter().position(|val| val == object),
+            PaletteImpl::Array(array) => array.into_iter_ref().position(|val| val == object),
             PaletteImpl::BiMap { reverse, .. } => reverse.get(object).copied(),
             PaletteImpl::Direct => Some(self.list.raw_id(object).unwrap_or(0)),
         }
@@ -182,7 +188,7 @@ where
                 Ok(0)
             }
             PaletteImpl::Array(array) => {
-                if let Some(index) = array.iter().position(|val| val == &object) {
+                if let Some(index) = array.into_iter_ref().position(|val| val == &object) {
                     Ok(index)
                 } else if array.capacity() > array.len() {
                     let index = array.len();
@@ -233,28 +239,28 @@ impl<L, T> Palette<L, T> {
     #[allow(clippy::len_without_is_empty)] // A palette is never empty.
     pub fn len<'a>(&'a self) -> usize
     where
-        &'a L: IntoIterator,
-        <&'a L as IntoIterator>::IntoIter: ExactSizeIterator,
+        L: IntoIteratorRef<'a>,
+        <L as IntoIteratorRef<'a>>::IntoIter: ExactSizeIterator,
     {
         match &self.internal {
             PaletteImpl::Singular(value) => value.is_some() as usize,
             PaletteImpl::Array(forward) | PaletteImpl::BiMap { forward, .. } => forward.len(),
-            PaletteImpl::Direct => (&self.list).into_iter().len(),
+            PaletteImpl::Direct => self.list.into_iter_ref().len(),
         }
     }
 
     /// Returns an iterator over the palette.
-    pub fn iter<'a, I>(&'a self) -> Iter<'a, I, T>
+    pub fn iter<'a>(&'a self) -> Iter<'a, <L as IntoIteratorRef<'a>>::IntoIter, T>
     where
-        &'a L: IntoIterator<Item = &'a T, IntoIter = I>,
+        L: IntoIteratorRef<'a, Item = &'a T>,
     {
         Iter {
             internal: match &self.internal {
                 PaletteImpl::Singular(value) => IterImpl::MaybeNone(value.iter()),
                 PaletteImpl::Array(forward) | PaletteImpl::BiMap { forward, .. } => {
-                    IterImpl::Vector(forward.iter())
+                    IterImpl::Vector(forward.into_iter_ref())
                 }
-                PaletteImpl::Direct => IterImpl::IntoIter((&self.list).into_iter()),
+                PaletteImpl::Direct => IterImpl::IntoIter(self.list.into_iter_ref()),
             },
         }
     }
@@ -274,12 +280,30 @@ impl<L, T> Palette<L, T> {
     }
 }
 
+impl<L, T> Palette<L, T>
+where
+    T: Hash + Eq,
+{
+    /// Returns whether the given object is (or may) in the palette.
+    pub fn contains(&self, object: &T) -> bool {
+        match &self.internal {
+            PaletteImpl::Singular(value) => value.as_ref() == Some(object),
+            PaletteImpl::Direct => true,
+            PaletteImpl::Array(items) => items.contains(object),
+            PaletteImpl::BiMap {
+                forward: _,
+                reverse,
+            } => reverse.contains_key(object),
+        }
+    }
+}
+
 impl<'a, L, T> IntoIterator for &'a Palette<L, T>
 where
-    &'a L: IntoIterator<Item = &'a T>,
+    L: IntoIteratorRef<'a, Item = &'a T>,
 {
     type Item = &'a T;
-    type IntoIter = Iter<'a, <&'a L as IntoIterator>::IntoIter, T>;
+    type IntoIter = Iter<'a, <L as IntoIteratorRef<'a>>::IntoIter, T>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -291,7 +315,7 @@ where
 mod _edcode {
     use std::io::{self, ErrorKind};
 
-    use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
+    use edcode2::{Buf, BufExt as _, BufMut, BufMutExt as _, Decode, Encode};
 
     use super::*;
 
@@ -405,11 +429,38 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Uninitialized => write!(f, "use of an uninitialized palette"),
-            Error::UnknownEntry => write!(f, "unknown entry"),
-            Error::UnknownId(id) => write!(f, "unknown id: {id}"),
+            Self::Uninitialized => write!(f, "use of an uninitialized palette"),
+            Self::UnknownEntry => write!(f, "unknown entry"),
+            Self::UnknownId(id) => write!(f, "unknown id: {id}"),
         }
     }
 }
 
 impl std::error::Error for Error {}
+
+/// Equivalent to `&'a T: IntoIterator` but can be constrained in a set of trait bounds.
+pub trait IntoIteratorRef<'a> {
+    /// The type of the items.
+    type Item;
+
+    /// The iterator type.
+    type IntoIter: Iterator<Item = Self::Item>;
+
+    /// Returns an iterator over the items.
+    #[allow(clippy::wrong_self_convention)]
+    fn into_iter_ref(&'a self) -> Self::IntoIter;
+}
+
+impl<'a, T: 'a> IntoIteratorRef<'a> for T
+where
+    &'a T: IntoIterator,
+{
+    type Item = <&'a T as IntoIterator>::Item;
+
+    type IntoIter = <&'a T as IntoIterator>::IntoIter;
+
+    #[inline]
+    fn into_iter_ref(&'a self) -> Self::IntoIter {
+        self.into_iter()
+    }
+}

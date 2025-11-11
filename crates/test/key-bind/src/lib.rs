@@ -10,7 +10,7 @@ use test_global::integration::keyboard::TestKey;
 use test_global::integration::mouse::TestButton;
 
 #[test]
-fn test_key_bind_handle_release() {
+fn key_bind_handle_release() {
     let mode = Rc::new(RefCell::new(KeyBindMode::Hold));
     let mode_for_getter = mode.clone();
 
@@ -54,24 +54,30 @@ fn test_key_bind_handle_release() {
 }
 
 #[test]
-fn test_key_bind_default_key() {
-    let key_bind = KeyBind::<TestContext>::new(
-        Box::new(|| KeyBindMode::Hold),
-        Key::KeyboardKey(TestKey::A),
-        (),
-    );
+fn key_bind_default_key() {
+    let key_bind = KeyBind::<TestContext, ()> {
+        mode_getter: Box::new(|| KeyBindMode::Hold),
+        default_key: Key::KeyboardKey(TestKey::A),
+        bound_key: None,
+        state: KeyState::Idle,
+        press_count: 0,
+        ext: (),
+    };
 
     assert_eq!(key_bind.default_key(), &Key::KeyboardKey(TestKey::A));
     assert!(key_bind.bound_key().is_none());
 }
 
 #[test]
-fn test_key_bind_binding() {
-    let mut key_bind = KeyBind::<TestContext>::new(
-        Box::new(|| KeyBindMode::Hold),
-        Key::KeyboardKey(TestKey::A),
-        (),
-    );
+fn key_bind_binding() {
+    let mut key_bind = KeyBind::<TestContext, ()> {
+        mode_getter: Box::new(|| KeyBindMode::Hold),
+        default_key: Key::KeyboardKey(TestKey::A),
+        bound_key: None,
+        state: KeyState::Idle,
+        press_count: 0,
+        ext: (),
+    };
 
     assert_eq!(key_bind.bound_key(), None);
     assert_eq!(key_bind.effective_key(), &Key::KeyboardKey(TestKey::A));

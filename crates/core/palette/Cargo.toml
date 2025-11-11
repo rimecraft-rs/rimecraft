@@ -21,6 +21,7 @@ ahash = "0.8"
 
 [dev-dependencies]
 fastnbt = "2.6"
+static_assertions = "1.1"
 
 [features]
 edcode = ["dep:edcode2"]

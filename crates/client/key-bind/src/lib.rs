@@ -217,7 +217,7 @@ where
     /// # `Toggle` Mode
     ///
     /// Toggles the key state between pressed and idle, returning a [`KeyBindHandle`] that will do nothing when dropped.
-    pub fn press<'a>(&'a mut self) -> KeyBindHandle<'a, Cx> {
+    pub fn press(&mut self) -> KeyBindHandle<'_, Cx, Ext> {
         let mode = (self.mode_getter)();
         self.press_count += 1;
 

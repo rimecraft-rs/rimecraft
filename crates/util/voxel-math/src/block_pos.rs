@@ -4,6 +4,8 @@ use std::fmt::Display;
 
 use glam::{DVec3, IVec3};
 
+use crate::direction::Direction;
+
 /// A position of a block in a three-dimensional volume.
 ///
 /// The position is integer-valued.
@@ -36,6 +38,13 @@ impl BlockPos {
     #[inline]
     pub const fn z(&self) -> i32 {
         self.0.z
+    }
+
+    /// Moves this block position by the given offset.
+    #[inline]
+    #[doc(alias = "move")]
+    pub fn mv(self, direction: Direction, distance: i32) -> Self {
+        self + direction.offset() * IVec3::splat(distance)
     }
 }
 
@@ -74,35 +83,47 @@ impl From<BlockPos> for (i32, i32, i32) {
     }
 }
 
-impl std::ops::Add<IVec3> for BlockPos {
-    type Output = BlockPos;
+impl<T> std::ops::Add<T> for BlockPos
+where
+    T: Into<IVec3>,
+{
+    type Output = Self;
 
     #[inline]
-    fn add(self, rhs: IVec3) -> BlockPos {
-        BlockPos(self.0 + rhs)
+    fn add(self, rhs: T) -> Self {
+        Self(self.0 + rhs.into())
     }
 }
 
-impl std::ops::AddAssign<IVec3> for BlockPos {
+impl<T> std::ops::AddAssign<T> for BlockPos
+where
+    T: Into<IVec3>,
+{
     #[inline]
-    fn add_assign(&mut self, rhs: IVec3) {
-        self.0 += rhs;
+    fn add_assign(&mut self, rhs: T) {
+        self.0 += rhs.into();
     }
 }
 
-impl std::ops::Sub<IVec3> for BlockPos {
-    type Output = BlockPos;
+impl<T> std::ops::Sub<T> for BlockPos
+where
+    T: Into<IVec3>,
+{
+    type Output = Self;
 
     #[inline]
-    fn sub(self, rhs: IVec3) -> BlockPos {
-        BlockPos(self.0 - rhs)
+    fn sub(self, rhs: T) -> Self {
+        Self(self.0 - rhs.into())
     }
 }
 
-impl std::ops::SubAssign<IVec3> for BlockPos {
+impl<T> std::ops::SubAssign<T> for BlockPos
+where
+    T: Into<IVec3>,
+{
     #[inline]
-    fn sub_assign(&mut self, rhs: IVec3) {
-        self.0 -= rhs;
+    fn sub_assign(&mut self, rhs: T) {
+        self.0 -= rhs.into();
     }
 }
 
@@ -118,17 +139,17 @@ const BIT_SHIFT_Z: i32 = LEN_BITS_Y;
 
 impl From<BlockPos> for i64 {
     #[inline]
-    fn from(BlockPos(IVec3 { x, y, z }): BlockPos) -> i64 {
+    fn from(BlockPos(IVec3 { x, y, z }): BlockPos) -> Self {
         let mut l = 0i64;
-        l |= (x as i64 & BITS_X) << BIT_SHIFT_X;
-        l |= y as i64 & BITS_Y;
-        l | ((z as i64 & BITS_Z) << BIT_SHIFT_Z)
+        l |= (x as Self & BITS_X) << BIT_SHIFT_X;
+        l |= y as Self & BITS_Y;
+        l | ((z as Self & BITS_Z) << BIT_SHIFT_Z)
     }
 }
 
 impl From<i64> for BlockPos {
     #[inline]
-    fn from(l: i64) -> BlockPos {
+    fn from(l: i64) -> Self {
         Self(IVec3 {
             x: (l << (64 - BIT_SHIFT_X - LEN_BITS_XZ) >> (64 - LEN_BITS_XZ)) as i32,
             y: (l << (64 - LEN_BITS_Y) >> (64 - LEN_BITS_Y)) as i32,

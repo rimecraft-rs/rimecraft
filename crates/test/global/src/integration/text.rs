@@ -54,11 +54,31 @@ impl From<&str> for TextContent {
 impl Display for TextContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TextContent::Plain { text } => write!(f, "{text}"),
-            TextContent::Translated {
+            Self::Plain { text } => write!(f, "{text}"),
+            Self::Translated {
                 translate,
                 fallback,
             } => write!(f, "{}", fallback.as_ref().unwrap_or(translate)),
+        }
+    }
+}
+
+mod sealed {
+    use serde::{Deserialize, Serialize};
+    use text::style::Formattable;
+
+    #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+    pub struct EmptyStyleExt {}
+
+    impl Formattable for EmptyStyleExt {
+        #[inline]
+        fn with_formatting(self, _: text::style::Formatting) -> Self {
+            self
+        }
+
+        #[inline]
+        fn with_exclusive_formatting(self, _: text::style::Formatting) -> Self {
+            self
         }
     }
 }

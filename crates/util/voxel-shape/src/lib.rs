@@ -17,8 +17,8 @@ use maybe::Maybe;
 
 pub use func::*;
 pub use set::VoxelSet;
-
 pub use voxel_math;
+
 use voxel_math::{
     BBox,
     direction::{Axis, AxisDirection, Direction},
@@ -265,6 +265,7 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
 #[derive(Debug)]
 #[doc(alias = "VoxelShapeSlice")]
 pub struct Slice<'a>(dyn Abstract + 'a);
+
 fn slice_set_bounds(set: &set::Slice<'_>, axis: Axis, width: u32) -> set::Bounds {
     let (sx, sy, sz) = set.0.__len_vectorized().into();
     set::Bounds {

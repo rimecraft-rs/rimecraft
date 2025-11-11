@@ -3,15 +3,13 @@ use std::{borrow::Cow, marker::PhantomData};
 use glam::{DVec3, Vec2};
 use serde::{
     Deserialize, Serialize,
-    ser::{SerializeMap, SerializeSeq},
+    ser::{SerializeMap as _, SerializeSeq as _},
 };
 use serde_private::de::ContentVisitor;
 use serde_update::Update as _;
 use uuid::Uuid;
 
-use crate::{
-    EntityCell, EntityCx, ErasedData, POS_XZ_BOUND, POS_Y_BOUND, RawEntity, VELOCITY_BOUND,
-};
+use crate::{EntityCell, EntityCx, ErasedData, RawEntity};
 
 const KEY_POS: &str = "Pos";
 const KEY_VELOCITY: &str = "Motion";
@@ -196,6 +194,17 @@ where
     {
         struct Visitor<'borrow, T: ?Sized>(&'borrow mut T);
 
+        impl<'a, T: ?Sized, Cx> Visitor<'_, RawEntity<'a, T, Cx>>
+        where
+            Cx: EntityCx<'a>,
+        {
+            const POS_UPPER_BOUND: DVec3 =
+                DVec3::new(Cx::POS_XZ_BOUND, Cx::POS_Y_BOUND, Cx::POS_XZ_BOUND);
+
+            const VELOCITY_UPPER_BOUND: DVec3 =
+                DVec3::new(Cx::VELOCITY_BOUND, Cx::VELOCITY_BOUND, Cx::VELOCITY_BOUND);
+        }
+
         impl<'a, 'de, T: ?Sized, Cx> serde::de::Visitor<'de> for Visitor<'_, RawEntity<'a, T, Cx>>
         where
             Cx: EntityCx<'a, Compound: Deserialize<'de>>,
@@ -220,17 +229,15 @@ where
                     match field {
                         Field::Pos => {
                             let pos = map.next_value::<DVec3>()?;
-                            const UPPER_BOUND: DVec3 =
-                                DVec3::new(POS_XZ_BOUND, POS_Y_BOUND, POS_XZ_BOUND);
-                            this.set_pos(pos.clamp(-UPPER_BOUND, UPPER_BOUND));
+                            this.set_pos(pos.clamp(-Self::POS_UPPER_BOUND, Self::POS_UPPER_BOUND));
                             this.update_last_pos();
                         }
                         Field::Velocity => {
                             let velocity = map.next_value::<DVec3>()?;
-                            const UPPER_BOUND: DVec3 =
-                                DVec3::new(VELOCITY_BOUND, VELOCITY_BOUND, VELOCITY_BOUND);
+
                             this.set_velocity(DVec3::select(
-                                velocity.cmpgt(UPPER_BOUND) | velocity.cmplt(-UPPER_BOUND),
+                                velocity.cmpgt(Self::VELOCITY_UPPER_BOUND)
+                                    | velocity.cmplt(-Self::VELOCITY_UPPER_BOUND),
                                 DVec3::ZERO,
                                 velocity,
                             ));

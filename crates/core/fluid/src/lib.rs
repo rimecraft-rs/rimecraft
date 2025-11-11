@@ -85,7 +85,7 @@ where
     Cx::FluidStateExt: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("IFluidState")
+        f.debug_struct("FluidState")
             .field("fluid", &self.fluid)
             .field("state", &self.state)
             .finish()
@@ -137,7 +137,7 @@ where
     fn block_to_fluid_state(bs: BlockState<'w, Self>) -> FluidState<'w, Self>;
 }
 
-/// Extenstions to the `Maybe<'_, IBlockState<'_, _>>`.
+/// Extenstions to the `Maybe<'_, BlockState<'_, _>>`.
 pub trait BlockStateExt<'w, Cx>
 where
     Cx: ProvideFluidStateExtTy,

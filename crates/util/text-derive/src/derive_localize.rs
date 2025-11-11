@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::parse::Parser;
-use syn::spanned::Spanned;
+use syn::parse::Parser as _;
+use syn::spanned::Spanned as _;
 use syn::{
     Attribute, Data, DeriveInput, Expr, Fields, Lit, Meta, MetaNameValue, Path, parse_macro_input,
 };
@@ -297,7 +297,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_to_snake_case_ident() {
+    fn to_snake_case_ident_works() {
         assert_eq!(to_snake_case_ident("MyCase"), "my_case");
         assert_eq!(to_snake_case_ident("HTTPServer"), "http_server");
         assert_eq!(to_snake_case_ident("someValue"), "some_value");
