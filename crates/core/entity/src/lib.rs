@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use block::{BlockState, ProvideBlockStateTy};
+use block::{BlockState, ProvideBlockStateExtTy};
 use dsyn::HoldDescriptors;
 use erased_serde::Serialize as ErasedSerialize;
 use glam::DVec3;
@@ -38,7 +38,7 @@ pub trait EntityCx<'a>:
     ProvideIdTy
     + ProvideNbtTy
     + ProvideEntityExtTy
-    + ProvideBlockStateTy
+    + ProvideBlockStateExtTy
     + ProvideLocalCxTy
     + EntityDataCx<'a>
 {

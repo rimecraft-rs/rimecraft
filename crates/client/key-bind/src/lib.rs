@@ -217,7 +217,7 @@ where
     /// # `Toggle` Mode
     ///
     /// Toggles the key state between pressed and idle, returning a [`KeyBindHandle`] that will do nothing when dropped.
-    pub fn press(&mut self) -> KeyBindHandle<'_, Cx, Ext> {
+    pub fn press(&mut self) -> KeyBindHandle<'_, Cx> {
         let mode = (self.mode_getter)();
         self.press_count += 1;
 
@@ -396,6 +396,3 @@ where
         self.0.unbind();
     }
 }
-
-#[cfg(feature = "unit-ext")]
-impl<Cx> KeyBindHook<Cx> for () where Cx: ProvideKeyBindTy {}

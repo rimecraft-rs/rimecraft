@@ -23,9 +23,6 @@ rimecraft-test-global = { path = "../../test/global", package = "rimecraft-test-
     "key-bind",
 ] }
 
-[features]
-default = ["unit-ext"]
-unit-ext = []
 
 [lints]
 workspace = true

@@ -5,7 +5,7 @@
 
 use bitflags::bitflags;
 use local_cx::ProvideLocalCxTy;
-use rimecraft_block::{BlockState, ProvideBlockStateTy};
+use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_block_entity::{BlockEntity, BlockEntityCell};
 use rimecraft_fluid::{FluidState, ProvideFluidStateExtTy};
 use rimecraft_voxel_math::BlockPos;
@@ -13,7 +13,7 @@ use rimecraft_voxel_math::BlockPos;
 /// A scoped, immutable view of [`BlockState`]s and [`FluidState`]s.
 pub trait BlockView<'w, Cx>
 where
-    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
     /// Returns the [`BlockState`] at the given position.
     fn block_state(&self, pos: BlockPos) -> Option<BlockState<'w, Cx>>;
@@ -40,7 +40,7 @@ where
 /// This is an affiliation of [`BlockView`].
 pub trait BlockEntityView<'w, Cx>: BlockView<'w, Cx>
 where
-    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
     /// Peeks the [`BlockEntity`] at the given position.
     fn peek_block_entity<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
@@ -52,7 +52,7 @@ where
 /// and lock-free access, where the latter one requires mutability.
 pub trait MutBlockEntityView<'w, Cx>: MutBlockView<'w, Cx>
 where
-    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
     /// Peeks the [`BlockEntity`] at the given position.
     fn peek_block_entity<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
@@ -95,7 +95,7 @@ bitflags! {
 /// Mutable variant of [`BlockView`].
 pub trait BlockViewMut<'w, Cx>: MutBlockView<'w, Cx>
 where
-    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy,
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
     /// Sets the block state at the given position.
     ///
@@ -127,7 +127,7 @@ where
 /// Mutable variant of [`BlockEntityView`], without internal mutability.
 pub trait BlockEntityViewMut<'w, Cx>: MutBlockEntityView<'w, Cx> + BlockViewMut<'w, Cx>
 where
-    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
 {
     /// Adds a [`BlockEntity`] to this view.
     fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>);
@@ -139,7 +139,7 @@ where
 /// [`BlockEntityViewMut`] with internal mutability.
 pub trait ConstBlockEntityViewMut<'w, Cx>: ConstBlockViewMut<'w, Cx>
 where
-    Cx: ProvideBlockStateTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
 {
     /// Adds a [`BlockEntity`] to this view.
     fn set_block_entity(&self, block_entity: Box<BlockEntity<'w, Cx>>);

@@ -15,7 +15,7 @@ pub use rimecraft_state as state;
 #[derive(Debug)]
 pub struct RawBlock<'a, Cx>
 where
-    Cx: ProvideBlockStateTy,
+    Cx: ProvideBlockStateExtTy,
 {
     settings: Settings<'a, Cx>,
     states: States<'a, Cx::BlockStateExt<'a>>,
@@ -25,7 +25,7 @@ where
 
 impl<'a, Cx> RawBlock<'a, Cx>
 where
-    Cx: ProvideBlockStateTy,
+    Cx: ProvideBlockStateExtTy,
 {
     /// Creates a new block with the given settings.
     ///
@@ -67,7 +67,7 @@ where
 
 impl<'a, Cx> HoldDescriptors<'static, 'a> for RawBlock<'a, Cx>
 where
-    Cx: ProvideBlockStateTy,
+    Cx: ProvideBlockStateExtTy,
 {
     #[inline]
     fn descriptors(&self) -> &DescriptorSet<'static, 'a> {
@@ -183,7 +183,7 @@ pub trait BlockStateExt<'a, Cx> {
 /// This contains the block registration and the [`State`].
 pub struct BlockState<'w, Cx>
 where
-    Cx: ProvideBlockStateTy,
+    Cx: ProvideBlockStateExtTy,
 {
     /// The block.
     pub block: Block<'w, Cx>,
@@ -232,7 +232,7 @@ where
 
 impl<'a, Cx> Debug for BlockState<'a, Cx>
 where
-    Cx: ProvideBlockStateTy + Debug,
+    Cx: ProvideBlockStateExtTy + Debug,
     Cx::Id: Debug,
     Cx::BlockStateExt<'a>: Debug,
 {
@@ -244,11 +244,11 @@ where
     }
 }
 
-impl<Cx> Copy for BlockState<'_, Cx> where Cx: ProvideBlockStateTy {}
+impl<Cx> Copy for BlockState<'_, Cx> where Cx: ProvideBlockStateExtTy {}
 
 impl<Cx> Clone for BlockState<'_, Cx>
 where
-    Cx: ProvideBlockStateTy,
+    Cx: ProvideBlockStateExtTy,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -258,7 +258,7 @@ where
 
 impl<Cx> PartialEq for BlockState<'_, Cx>
 where
-    Cx: ProvideBlockStateTy,
+    Cx: ProvideBlockStateExtTy,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -266,11 +266,11 @@ where
     }
 }
 
-impl<Cx> Eq for BlockState<'_, Cx> where Cx: ProvideBlockStateTy {}
+impl<Cx> Eq for BlockState<'_, Cx> where Cx: ProvideBlockStateExtTy {}
 
 impl<Cx> Hash for BlockState<'_, Cx>
 where
-    Cx: ProvideBlockStateTy,
+    Cx: ProvideBlockStateExtTy,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.block.hash(state);

@@ -22,11 +22,10 @@ remap = { path = "../../util/remap", package = "rimecraft-remap" }
 smallbox = "0.8"
 
 [features]
-default = ["macros", "rgb/argb", "unit-ext"]
+default = ["macros", "rgb/argb"]
 serde = ["dep:serde"]
 macros = ["dep:rimecraft-text-derive"]
 edcode = ["dep:edcode2", "rimecraft-global-cx/edcode", "serde"]
-unit-ext = []
 
 [lints]
 workspace = true

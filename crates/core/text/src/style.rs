@@ -454,6 +454,3 @@ mod _serde {
         }
     }
 }
-
-#[cfg(feature = "unit-ext")]
-impl Formattable for () {}

@@ -5,7 +5,7 @@ use std::{fmt::Debug, marker::PhantomData};
 use bitflags::bitflags;
 use component::{RawErasedComponentType, map::ComponentMap};
 use local_cx::{LocalContext, LocalContextExt as _, WithLocalCx, serde::SerializeWithCx};
-use rimecraft_block::{BlockState, ProvideBlockStateTy};
+use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_registry::Registry;
 use rimecraft_voxel_math::BlockPos;
 use serde::{Deserialize, Serialize, de::DeserializeSeed};
@@ -201,7 +201,7 @@ where
 /// Seed for deserializing a block state.
 pub struct Seed<'a, Cx, Local>
 where
-    Cx: ProvideBlockStateTy,
+    Cx: ProvideBlockStateExtTy,
 {
     /// Position of the block state.
     pub pos: BlockPos,
@@ -226,7 +226,7 @@ where
     {
         struct Visitor<'a, Cx, L>(BlockPos, BlockState<'a, Cx>, L)
         where
-            Cx: ProvideBlockStateTy;
+            Cx: ProvideBlockStateExtTy;
 
         impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx, Cx::LocalContext<'a>>
         where
