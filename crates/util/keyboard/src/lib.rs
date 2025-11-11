@@ -13,10 +13,10 @@ pub trait ProvideKeyboardTy: GlobalContext {
     /// The key type used for keyboard input.
     ///
     /// See: [`key` module](crate::key) for predefined key traits.
-    type Key;
+    type Key: Copy + Eq;
 
     /// The modifier type used for keyboard input.
-    type Modifier: KeyModifier;
+    type Modifier: KeyModifier + Copy + Eq;
 }
 
 /// Represents the state of a key, useful for querying key states.

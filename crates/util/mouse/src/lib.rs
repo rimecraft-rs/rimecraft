@@ -9,7 +9,7 @@ pub trait ProvideMouseTy: GlobalContext {
     /// The button type used for mouse input.
     ///
     /// See: [`button` module](crate::button) for predefined button traits.
-    type Button;
+    type Button: Copy + Eq;
 }
 
 /// Represents the state of a button, useful for querying button states.

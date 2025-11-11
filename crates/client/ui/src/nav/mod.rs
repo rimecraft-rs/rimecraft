@@ -16,6 +16,18 @@ pub enum Sign {
     Negative,
 }
 
+/// Navigation types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum NavType {
+    /// Navigation via mouse input.
+    Mouse,
+    /// Navigation via keyboard arrow keys.
+    KeyboardArrow,
+    /// Navigation via keyboard tab key.
+    KeyboardTab,
+}
+
 /// Navigation axes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -139,5 +151,7 @@ impl Not for NavDirection {
 /// A component that has a navigation index.
 pub trait WithNavIndex {
     /// Returns the navigation index of this component.
-    fn nav_index(&self) -> Option<usize>;
+    fn nav_index(&self) -> Option<usize> {
+        None
+    }
 }

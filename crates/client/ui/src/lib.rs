@@ -5,18 +5,22 @@ use std::time::Duration;
 use rimecraft_client_narration::Narratable;
 use rimecraft_keyboard::{KeyState, ProvideKeyboardTy};
 use rimecraft_mouse::{ButtonState, MousePos, MouseScroll, ProvideMouseTy};
-use rimecraft_render_math::screen::ScreenSize;
+use rimecraft_render_math::screen::{ScreenRect, ScreenSize};
 
 use crate::{
     layout::{LayoutMeasurements, position::PositionConstraints, size::SizeConstraints},
-    nav::WithNavIndex,
+    nav::{
+        NavDirection, WithNavIndex,
+        gui::{GuiNavigation, GuiNavigationPath},
+        screen::ScreenRectExt as _,
+    },
 };
 
 pub mod item;
 pub mod layout;
 pub mod nav;
 
-/// Provides typesm and constants for the UI framework.
+/// Provides types and constants for the UI framework.
 pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
     /// The extension type for [`UiEvent`].
     type UiEventExt;
@@ -92,6 +96,37 @@ where
     /// Focuses this component.
     fn focus(&self) {
         self.set_focused(true);
+    }
+}
+
+/// A component that can be dragged.
+pub trait Draggable<Cx>
+where
+    Cx: ProvideUiTy,
+{
+    /// The buttons that are currently dragging this component.
+    fn dragging_buttons(&self) -> &[Cx::Button];
+
+    /// Mutable access to the buttons that are currently dragging this component.
+    fn dragging_buttons_mut(&mut self) -> &mut Vec<Cx::Button>;
+
+    /// Whether this component is being dragged with the given button. If [`None`] is given, checks if the component is being dragged with any button.
+    fn is_dragging(&self, button: Option<Cx::Button>) -> bool {
+        match button {
+            Some(btn) => self.dragging_buttons().contains(&btn),
+            None => !self.dragging_buttons().is_empty(),
+        }
+    }
+
+    /// Sets the dragging state for the given button.
+    fn set_dragging(&mut self, button: Cx::Button, dragging: bool) {
+        if dragging {
+            if !self.is_dragging(Some(button)) {
+                self.dragging_buttons_mut().push(button);
+            }
+        } else {
+            self.dragging_buttons_mut().retain(|&b| b != button);
+        }
     }
 }
 
@@ -234,4 +269,37 @@ where
 
     /// The [`PositionConstraints`] of this element.
     fn position_constraints(&self) -> PositionConstraints;
+}
+
+/// An UI element that supports navigation.
+pub trait NavElement<Cx>: Element<Cx> + WithNavIndex
+where
+    Cx: ProvideUiTy,
+{
+    /// Returns a [`GuiNavigationPath`] starting from this element according to the given [`GuiNavigation`].
+    fn nav_path<N>(&self, nav: N) -> Option<GuiNavigationPath<'_, Cx>>
+    where
+        N: GuiNavigation,
+    {
+        drop(nav);
+        None
+    }
+
+    /// Returns the focused [`GuiNavigationPath`] starting from this element.
+    fn focused_path(&self) -> Option<GuiNavigationPath<'_, Cx>>
+    where
+        Self: Sized,
+    {
+        self.is_focused().then(|| GuiNavigationPath::new_leaf(self))
+    }
+
+    /// The focus rectangle of this element, if any.
+    fn focus_rect(&self) -> Option<ScreenRect> {
+        None
+    }
+
+    /// The focus border of this element in the given direction, if any.
+    fn focus_border(&self, direction: NavDirection) -> Option<ScreenRect> {
+        self.focus_rect().map(|r| r.border(direction))
+    }
 }
