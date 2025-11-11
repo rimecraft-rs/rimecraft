@@ -2,21 +2,11 @@
 
 #![cfg(feature = "ui")]
 
-use std::vec::IntoIter;
-
 use ui::ProvideUiTy;
 
-use crate::{
-    TestContext,
-    integration::ui::framework::{TestElementMeta, TestKey},
-};
-
-pub mod framework;
+use crate::TestContext;
 
 impl ProvideUiTy for TestContext {
     type UiEventExt = ();
     type SizeConstraintsExt = ();
-    type StoreKey = TestKey<u32>;
-    type ElementMeta = TestElementMeta<TestKey<u32>>;
-    type ChildrenIter = IntoIter<TestKey<u32>>;
 }

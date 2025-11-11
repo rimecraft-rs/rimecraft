@@ -1,19 +1,11 @@
 //! Minecraft client UI framework.
 
-use std::any::Any;
-
 use rimecraft_client_narration::Narratable;
 use rimecraft_keyboard::{KeyState, ProvideKeyboardTy};
 use rimecraft_mouse::{ButtonState, MousePos, MouseScroll, ProvideMouseTy};
-use rimecraft_render_math::screen::ScreenSize;
 
-use crate::{
-    framework::{Command, UiStoreRead},
-    layout::{LayoutPack, LayoutValue, position::PositionConstraints, size::SizeConstraints},
-    nav::WithNavIndex,
-};
+use crate::nav::WithNavIndex;
 
-pub mod framework;
 pub mod item;
 pub mod layout;
 pub mod nav;
@@ -21,9 +13,6 @@ pub mod nav;
 pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
     type UiEventExt;
     type SizeConstraintsExt;
-    type StoreKey: Copy + Eq;
-    type ElementMeta: ElementMeta;
-    type ChildrenIter: IntoIterator<Item = Self::StoreKey>;
 }
 
 /// The selection state of a UI component.
@@ -141,79 +130,8 @@ where
     },
 }
 
-pub trait ElementMeta: Clone + Sized {}
-
 pub trait Element<Cx>
 where
     Cx: ProvideUiTy,
 {
-}
-
-/// Read-only, pure-decision event handler for element implementations.
-///
-/// Implementors should not perform mutations on the store in this method.
-/// Instead they return zero-or-more `Command<K>` values which will be
-/// collected by the coordinator and applied in a single `apply_batch` call.
-pub trait InteractiveElement<Cx>: Element<Cx>
-where
-    Cx: ProvideUiTy,
-{
-    /// Decides how to react to `ev` using only the read-only `store` view.
-    /// Returns a propagation decision and a list of commands to apply.
-    fn handle_event_read(
-        &self,
-        ev: &dyn Any,
-        store: &dyn UiStoreRead<Cx>,
-    ) -> (EventPropagation, Vec<Box<dyn Command<Cx>>>) {
-        if let Some(ui_ev) = ev.downcast_ref::<UiEvent<'_, Cx>>() {
-            self.handle_ui_event_read(ui_ev, store)
-        } else {
-            (EventPropagation::NotHandled, Vec::new())
-        }
-    }
-
-    /// Decides how to react to a typed UI event using only the read-only `store` view.
-    /// Returns a propagation decision and a list of commands to apply.
-    ///
-    /// This function should never be called directly; instead, use [`InteractiveElement::handle_event_read`].
-    fn handle_ui_event_read(
-        &self,
-        ev: &UiEvent<'_, Cx>,
-        store: &dyn UiStoreRead<Cx>,
-    ) -> (EventPropagation, Vec<Box<dyn Command<Cx>>>) {
-        let _ = (ev, store);
-        (EventPropagation::NotHandled, Vec::new())
-    }
-}
-
-/// Helper for container implementations: iterate children and invoke a
-/// per-child read-time handler. Collects commands returned by children and
-/// respects propagation (stops if a child returns `Handled`).
-pub fn container_handle_event_read<Cx, F>(
-    children: Cx::ChildrenIter,
-    ev: &dyn Any,
-    store: &dyn UiStoreRead<Cx>,
-    mut call_child: F,
-) -> (EventPropagation, Vec<Box<dyn Command<Cx>>>)
-where
-    Cx: ProvideUiTy,
-    F: FnMut(
-        Cx::StoreKey,
-        &dyn Any,
-        &dyn UiStoreRead<Cx>,
-    ) -> (EventPropagation, Vec<Box<dyn Command<Cx>>>),
-{
-    let mut out_cmds: Vec<Box<dyn Command<Cx>>> = Vec::new();
-    for child in children {
-        if !store.exists(child) {
-            continue;
-        }
-
-        let (prop, mut cmds) = store;
-        out_cmds.append(&mut cmds);
-        if prop.should_stop() {
-            return (EventPropagation::Handled, out_cmds);
-        }
-    }
-    (EventPropagation::NotHandled, out_cmds)
 }
