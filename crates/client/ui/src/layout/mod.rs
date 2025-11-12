@@ -21,29 +21,41 @@ pub enum LayoutReference {
 
 /// Measurements used during layout calculations.
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct LayoutMeasurements {
+pub struct LayoutMeasurements<Ext> {
     /// The measured value of the root component.
     pub root: f32,
     /// The measured value of the upstream component.
     pub upstream: f32,
     /// The measured value of the current component, if known.
     pub this: Option<f32>,
+    /// The extension data.
+    pub ext: Ext,
 }
 
-impl LayoutMeasurements {
+impl<Ext> LayoutMeasurements<Ext> {
     /// Creates a new [`LayoutMeasurements`].
-    pub fn new(root: f32, upstream: f32, this: Option<f32>) -> Self {
+    pub fn new(root: f32, upstream: f32, this: Option<f32>, ext: Ext) -> Self {
         Self {
             root,
             upstream,
             this,
+            ext,
         }
     }
 }
 
-impl From<(f32, f32, Option<f32>)> for LayoutMeasurements {
+impl<Ext> From<(f32, f32, Option<f32>, Ext)> for LayoutMeasurements<Ext> {
+    fn from((root, upstream, this, ext): (f32, f32, Option<f32>, Ext)) -> Self {
+        Self::new(root, upstream, this, ext)
+    }
+}
+
+impl<Ext> From<(f32, f32, Option<f32>)> for LayoutMeasurements<Ext>
+where
+    Ext: Default,
+{
     fn from((root, upstream, this): (f32, f32, Option<f32>)) -> Self {
-        Self::new(root, upstream, this)
+        Self::new(root, upstream, this, Ext::default())
     }
 }
 
@@ -69,7 +81,7 @@ impl LayoutValue {
     }
 
     /// Resolves the [`LayoutValue`] to an absolute pixel value based on the given reference size.
-    pub fn resolve(&self, measurements: LayoutMeasurements) -> f32 {
+    pub fn resolve<Ext>(&self, measurements: LayoutMeasurements<Ext>) -> f32 {
         match self {
             Self::Px(value) => *value,
             Self::Percent(value, reference) => match reference {

@@ -51,6 +51,7 @@ where
 pub struct DefaultLayoutEngine<Cx>
 where
     Cx: ProvideUiTy,
+    Cx::LayoutMeasurementsExt: Default,
 {
     _marker: std::marker::PhantomData<Cx>,
 }
@@ -69,11 +70,15 @@ where
     {
         let screen_size = Self::screen_size(cx);
 
-        fn resolve(constraint: &SizeConstraint, upstream: f32, screen: f32) -> f32 {
+        fn resolve<Ext>(constraint: &SizeConstraint, upstream: f32, screen: f32) -> f32
+        where
+            Ext: Default + Copy,
+        {
             let measurements = LayoutMeasurements {
                 root: screen,
                 upstream,
                 this: None,
+                ext: Ext::default(),
             };
             match constraint {
                 SizeConstraint::Free => upstream,
@@ -97,12 +102,12 @@ where
             }
         }
 
-        let horizontal = resolve(
+        let horizontal = resolve::<Cx::LayoutMeasurementsExt>(
             &constraints.horizontal,
             upstream_size.horizontal,
             screen_size.horizontal,
         );
-        let vertical = resolve(
+        let vertical = resolve::<Cx::LayoutMeasurementsExt>(
             &constraints.vertical,
             upstream_size.vertical,
             screen_size.vertical,
@@ -122,7 +127,7 @@ where
     {
         let screen_size = Self::screen_size(cx);
 
-        fn resolve(
+        fn resolve<Ext>(
             constraint: &PositionConstraint,
             this_edge: LayoutWithCenter<LayoutGenericEdge>,
             target_edge: LayoutWithCenter<LayoutGenericEdge>,
@@ -130,11 +135,15 @@ where
             upstream_size: f32,
             element_size: f32,
             screen_size: f32,
-        ) -> f32 {
+        ) -> f32
+        where
+            Ext: Default + Copy,
+        {
             let measurements = LayoutMeasurements {
                 root: screen_size,
                 upstream: upstream_size,
                 this: Some(element_size),
+                ext: Ext::default(),
             };
             let pixels = constraint.0.resolve(measurements);
             let baseline = match constraint.1 {
@@ -160,7 +169,7 @@ where
             baseline + pixels - this_offset
         }
 
-        let horizontal = resolve(
+        let horizontal = resolve::<Cx::LayoutMeasurementsExt>(
             &constraints.offset.horizontal,
             constraints.this_anchor.horizontal.map(|e| (*e).into()),
             constraints.target_anchor.horizontal.map(|e| (*e).into()),
@@ -169,7 +178,7 @@ where
             element_size.horizontal,
             screen_size.horizontal,
         );
-        let vertical = resolve(
+        let vertical = resolve::<Cx::LayoutMeasurementsExt>(
             &constraints.offset.vertical,
             constraints.this_anchor.vertical.map(|e| (*e).into()),
             constraints.target_anchor.vertical.map(|e| (*e).into()),

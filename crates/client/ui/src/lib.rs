@@ -8,7 +8,10 @@ use rimecraft_mouse::{ButtonState, MousePos, MouseScroll, ProvideMouseTy};
 use rimecraft_render_math::screen::ScreenRect;
 
 use crate::{
-    layout::{engine::LayoutEngine, position::PositionConstraints, size::SizeConstraints},
+    layout::{
+        LayoutMeasurements, engine::LayoutEngine, position::PositionConstraints,
+        size::SizeConstraints,
+    },
     nav::{
         NavDirection, WithNavIndex,
         gui::{GuiNavigation, GuiNavigationPath},
@@ -29,6 +32,8 @@ pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
     type SizeConstraintsExt;
     /// The extension type for [`PositionConstraints`].
     type PositionConstraintsExt;
+    /// The extension type for [`LayoutMeasurements`].
+    type LayoutMeasurementsExt: Default + Copy;
     /// The iterator type to iterate over child elements.
     type ElementIter<'a>: IntoIterator<Item = &'a dyn Element<Self>>
     where
@@ -263,6 +268,9 @@ where
 
     /// The [`PositionConstraints`] of this element.
     fn position_constraints(&self) -> PositionConstraints<Cx::PositionConstraintsExt>;
+
+    /// Lays out this element.
+    fn layout(&self, measurements: LayoutMeasurements<Cx::LayoutMeasurementsExt>);
 }
 
 /// An UI element that supports navigation.
