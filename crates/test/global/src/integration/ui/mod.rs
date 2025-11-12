@@ -7,10 +7,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use ui::{
-    Draggable, Element, Focusable, ProvideUiTy, layout::engine::DefaultLayoutEngine,
-    widget::InteractableWidget,
-};
+use ui::{Draggable, Element, Focusable, ProvideUiTy, layout::engine::DefaultLayoutEngine};
 
 use crate::{TestContext, integration::mouse::TestButton};
 
@@ -22,10 +19,6 @@ impl ProvideUiTy for TestContext {
 
     type ElementIter<'a>
         = Vec<&'a dyn Element<Self>>
-    where
-        Self: 'a;
-    type InteractableWidgetIter<'a>
-        = Vec<&'a dyn InteractableWidget<'a, Self>>
     where
         Self: 'a;
 

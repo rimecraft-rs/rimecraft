@@ -12,9 +12,9 @@ categories = []
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+rimecraft-global-cx = { path = "../../core/global-cx" }
 rimecraft-client-narration = { path = "../narration" }
 rimecraft-text = { path = "../../core/text" }
-rimecraft-global-cx = { path = "../../core/global-cx" }
 
 [lints]
 workspace = true

@@ -16,13 +16,11 @@ use crate::{
         gui::{GuiNavigation, GuiNavigationPath},
         screen::ScreenRectExt as _,
     },
-    widget::InteractableWidget,
 };
 
 pub mod item;
 pub mod layout;
 pub mod nav;
-pub mod widget;
 
 /// Provides types and constants for the UI framework.
 pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
@@ -37,10 +35,6 @@ pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
 
     /// The iterator type to iterate over child elements.
     type ElementIter<'a>: IntoIterator<Item = &'a dyn Element<Self>>
-    where
-        Self: 'a;
-    /// The iterator type to iterate over child widgets.
-    type InteractableWidgetIter<'a>: IntoIterator<Item = &'a dyn InteractableWidget<'a, Self>>
     where
         Self: 'a;
 
@@ -126,16 +120,6 @@ where
     /// Sets the buttons that are currently dragging this component.
     fn set_dragging_buttons(&self, buttons: Vec<Cx::Button>);
 
-    /// Modifies the buttons that are currently dragging this component.
-    fn modify_dragging_buttons<F>(&self, f: F)
-    where
-        F: FnOnce(&mut Vec<Cx::Button>),
-    {
-        let mut buttons = self.dragging_buttons();
-        f(&mut buttons);
-        self.set_dragging_buttons(buttons);
-    }
-
     /// Whether this component is being dragged with the given button. If [`None`] is given, checks if the component is being dragged with any button.
     fn is_dragging(&self, button: Option<Cx::Button>) -> bool {
         match button {
@@ -148,10 +132,14 @@ where
     fn set_dragging(&mut self, button: Cx::Button, dragging: bool) {
         if dragging {
             if !self.is_dragging(Some(button)) {
-                self.modify_dragging_buttons(|b| b.push(button));
+                let mut buttons = self.dragging_buttons();
+                buttons.push(button);
+                self.set_dragging_buttons(buttons);
             }
         } else {
-            self.modify_dragging_buttons(|b| b.retain(|x| *x != button));
+            let mut buttons = self.dragging_buttons();
+            buttons.retain(|x| *x != button);
+            self.set_dragging_buttons(buttons);
         }
     }
 }
