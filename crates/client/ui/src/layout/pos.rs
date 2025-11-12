@@ -5,16 +5,16 @@ use crate::layout::{LayoutAnchor, LayoutPack, LayoutReference, LayoutValue};
 /// The position constraint on a single axis.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(clippy::exhaustive_enums)]
-pub struct PositionConstraint(pub LayoutValue, pub LayoutReference);
+pub struct PosConstraint(pub LayoutValue, pub LayoutReference);
 
-impl PositionConstraint {
-    /// Creates a new [`PositionConstraint`].
+impl PosConstraint {
+    /// Creates a new [`PosConstraint`].
     pub fn new(value: LayoutValue, reference: LayoutReference) -> Self {
         Self(value, reference)
     }
 }
 
-impl From<(LayoutValue, LayoutReference)> for PositionConstraint {
+impl From<(LayoutValue, LayoutReference)> for PosConstraint {
     fn from((value, reference): (LayoutValue, LayoutReference)) -> Self {
         Self::new(value, reference)
     }
@@ -22,23 +22,23 @@ impl From<(LayoutValue, LayoutReference)> for PositionConstraint {
 
 /// Position constraints on both horizontal and vertical axes, with layout pivots.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PositionConstraints<Ext> {
+pub struct PosConstraints<Ext> {
     /// The anchor point on this component.
     pub this_anchor: LayoutAnchor,
     /// The anchor point on the target component, often the parent element.
     pub target_anchor: LayoutAnchor,
     /// The offset from `target_anchor` to `this_anchor`.
-    pub offset: LayoutPack<PositionConstraint>,
+    pub offset: LayoutPack<PosConstraint>,
     /// The extension data.
     pub ext: Ext,
 }
 
-impl<Ext> PositionConstraints<Ext> {
-    /// Creates a new [`PositionConstraints`].
+impl<Ext> PosConstraints<Ext> {
+    /// Creates a new [`PosConstraints`].
     pub fn new(
         this_anchor: LayoutAnchor,
         target_anchor: LayoutAnchor,
-        offset: LayoutPack<PositionConstraint>,
+        offset: LayoutPack<PosConstraint>,
         ext: Ext,
     ) -> Self {
         Self {
@@ -49,8 +49,8 @@ impl<Ext> PositionConstraints<Ext> {
         }
     }
 
-    /// Creates a new [`PositionConstraints`] with both anchors at the origin (top-left).
-    pub fn origin_aligned(offset: LayoutPack<PositionConstraint>, ext: Ext) -> Self {
+    /// Creates a new [`PosConstraints`] with both anchors at the origin (top-left).
+    pub fn origin_aligned(offset: LayoutPack<PosConstraint>, ext: Ext) -> Self {
         Self {
             target_anchor: LayoutAnchor::origin(),
             this_anchor: LayoutAnchor::origin(),
@@ -59,8 +59,8 @@ impl<Ext> PositionConstraints<Ext> {
         }
     }
 
-    /// Creates a new [`PositionConstraints`] with both anchors at the center.
-    pub fn center_aligned(offset: LayoutPack<PositionConstraint>, ext: Ext) -> Self {
+    /// Creates a new [`PosConstraints`] with both anchors at the center.
+    pub fn center_aligned(offset: LayoutPack<PosConstraint>, ext: Ext) -> Self {
         Self {
             target_anchor: LayoutAnchor::center(),
             this_anchor: LayoutAnchor::center(),

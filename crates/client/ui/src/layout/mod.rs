@@ -3,7 +3,7 @@
 use std::{fmt::Debug, ops::Not};
 
 pub mod engine;
-pub mod position;
+pub mod pos;
 pub mod size;
 
 /// The component to refer to for layout calculations. [`LayoutReference::Upstream`] should refer to the nearest parent element that can provide layout context, while [`LayoutReference::Root`] should refer to the screen in most cases.

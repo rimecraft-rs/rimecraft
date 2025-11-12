@@ -13,6 +13,7 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 rimecraft-global-cx = { path = "../global-cx" }
+rimecraft-local-cx = { path = "../local-cx" }
 rimecraft-render-math = { path = "../../util/render-math" }
 glam = "0.30"
 

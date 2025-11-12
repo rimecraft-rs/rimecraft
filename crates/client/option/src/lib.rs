@@ -1,8 +1,5 @@
 //! Minecraft client game options.
 
-#[cfg(test)]
-mod tests;
-
 pub mod callbacks;
 
 use rimecraft_client_tooltip::{Tooltip, TooltipCx};
@@ -265,3 +262,6 @@ where
         change_callback,
     )
 }
+
+#[cfg(test)]
+mod tests;

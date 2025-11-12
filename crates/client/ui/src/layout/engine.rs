@@ -7,7 +7,7 @@ use crate::{
     ProvideUiTy,
     layout::{
         LayoutGenericEdge, LayoutMeasurements, LayoutReference, LayoutWithCenter,
-        position::{PositionConstraint, PositionConstraints},
+        pos::{PosConstraint, PosConstraints},
         size::{SizeConstraint, SizeConstraints},
     },
 };
@@ -17,16 +17,9 @@ pub trait LayoutEngine<Cx>
 where
     Cx: ProvideUiTy,
 {
-    /// Retrieves the current screen size from the local context.
-    fn screen_size<Local>(cx: Local) -> ScreenSize
-    where
-        Local: LocalContext<ScreenSize>,
-    {
-        LocalContext::<ScreenSize>::acquire(cx)
-    }
-
     /// Resolves size constraints into actual sizes, relative to the screen coordinate system.
     fn resolve_size_constraints<Local>(
+        &self,
         cx: Local,
         upstream_size: ScreenSize,
         constraints: &SizeConstraints<Cx::SizeConstraintsExt>,
@@ -36,11 +29,12 @@ where
 
     /// Resolves position constraints into actual positions, relative to the screen coordinate system.
     fn resolve_position_constraints<Local>(
+        &self,
         cx: Local,
         upstream_pos: ScreenPos,
         upstream_size: ScreenSize,
         element_size: ScreenSize,
-        constraints: &PositionConstraints<Cx::PositionConstraintsExt>,
+        constraints: &PosConstraints<Cx::PosConstraintsExt>,
     ) -> ScreenPos
     where
         Local: LocalContext<ScreenSize>;
@@ -61,6 +55,7 @@ where
     Cx: ProvideUiTy,
 {
     fn resolve_size_constraints<Local>(
+        &self,
         cx: Local,
         upstream_size: ScreenSize,
         constraints: &SizeConstraints<Cx::SizeConstraintsExt>,
@@ -68,7 +63,7 @@ where
     where
         Local: LocalContext<ScreenSize>,
     {
-        let screen_size = Self::screen_size(cx);
+        let screen_size = LocalContext::<ScreenSize>::acquire(cx);
 
         fn resolve<Ext>(constraint: &SizeConstraint, upstream: f32, screen: f32) -> f32
         where
@@ -116,19 +111,20 @@ where
     }
 
     fn resolve_position_constraints<Local>(
+        &self,
         cx: Local,
         upstream_pos: ScreenPos,
         upstream_size: ScreenSize,
         element_size: ScreenSize,
-        constraints: &PositionConstraints<Cx::PositionConstraintsExt>,
+        constraints: &PosConstraints<Cx::PosConstraintsExt>,
     ) -> ScreenPos
     where
         Local: LocalContext<ScreenSize>,
     {
-        let screen_size = Self::screen_size(cx);
+        let screen_size = LocalContext::<ScreenSize>::acquire(cx);
 
         fn resolve<Ext>(
-            constraint: &PositionConstraint,
+            constraint: &PosConstraint,
             this_edge: LayoutWithCenter<LayoutGenericEdge>,
             target_edge: LayoutWithCenter<LayoutGenericEdge>,
             upstream_pos: f32,

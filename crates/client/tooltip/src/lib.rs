@@ -5,7 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use rimecraft_client_narration::{Narratable, NarrationPart};
+use rimecraft_client_narration::{Narratable, Narration, NarrationPart};
 use rimecraft_global_cx::GlobalContext;
 use rimecraft_text::{
     ProvideTextTy, Text,
@@ -102,12 +102,14 @@ where
     Cx: TooltipCx + ProvideTextTy,
     <Cx as ProvideTextTy>::Content: Display,
 {
-    fn append_narrations<B>(&self, builder: &mut B)
-    where
-        B: rimecraft_client_narration::NarrationMessageBuilder,
-    {
+    fn narrations(&self) -> Vec<(NarrationPart, rimecraft_client_narration::ErasedNarration)> {
+        let mut narrations = Vec::new();
         if let Some(narration) = &self.narration {
-            builder.put_text::<Cx>(NarrationPart::Hint, narration);
+            narrations.push((
+                NarrationPart::Hint,
+                Narration::text::<Cx>(narration).erase(),
+            ));
         }
+        narrations
     }
 }

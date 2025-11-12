@@ -1,13 +1,14 @@
 //! Drawing utilities for the rendering system.
 
 use rimecraft_global_cx::GlobalContext;
+use rimecraft_local_cx::{LocalContext, ProvideLocalCxTy};
 use rimecraft_render_math::{
     matrix::MatrixStack,
     screen::{ScreenPos, ScreenRect},
 };
 
 /// Provides type information for drawing.
-pub trait ProvideDrawTy: GlobalContext {
+pub trait ProvideDrawTy: GlobalContext + ProvideLocalCxTy {
     /// The drawing context.
     type Context: DrawContext;
 }
@@ -47,9 +48,11 @@ pub trait DrawContext: Send + Sync {
     fn scissors_mut(&self) -> Self::ScissorsWriteGuard<'_>;
 }
 
-pub trait Drawable<Cx>
+pub trait Drawable<'a, Cx>
 where
     Cx: ProvideDrawTy,
 {
-    fn draw(&self, context: &Cx::Context, mouse_pos: impl Into<ScreenPos>, delta: f32);
+    fn draw(&'a self, cx: Cx::LocalContext<'a>, mouse_pos: ScreenPos, delta: f32)
+    where
+        Cx::LocalContext<'a>: LocalContext<&'a Cx::Context>;
 }

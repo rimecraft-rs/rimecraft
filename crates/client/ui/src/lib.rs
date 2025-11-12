@@ -9,14 +9,14 @@ use rimecraft_render_math::screen::ScreenRect;
 
 use crate::{
     layout::{
-        LayoutMeasurements, engine::LayoutEngine, position::PositionConstraints,
-        size::SizeConstraints,
+        LayoutMeasurements, engine::LayoutEngine, pos::PosConstraints, size::SizeConstraints,
     },
     nav::{
         NavDirection, WithNavIndex,
         gui::{GuiNavigation, GuiNavigationPath},
         screen::ScreenRectExt as _,
     },
+    widget::InteractableWidget,
 };
 
 pub mod item;
@@ -30,14 +30,20 @@ pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
     type UiEventExt;
     /// The extension type for [`SizeConstraints`].
     type SizeConstraintsExt;
-    /// The extension type for [`PositionConstraints`].
-    type PositionConstraintsExt;
+    /// The extension type for [`PosConstraints`].
+    type PosConstraintsExt;
     /// The extension type for [`LayoutMeasurements`].
     type LayoutMeasurementsExt: Default + Copy;
+
     /// The iterator type to iterate over child elements.
     type ElementIter<'a>: IntoIterator<Item = &'a dyn Element<Self>>
     where
         Self: 'a;
+    /// The iterator type to iterate over child widgets.
+    type InteractableWidgetIter<'a>: IntoIterator<Item = &'a dyn InteractableWidget<'a, Self>>
+    where
+        Self: 'a;
+
     /// The layout engine type.
     type LayoutEngine: LayoutEngine<Self>;
 
@@ -115,10 +121,20 @@ where
     Cx: ProvideUiTy,
 {
     /// The buttons that are currently dragging this component.
-    fn dragging_buttons(&self) -> &[Cx::Button];
+    fn dragging_buttons(&self) -> Vec<Cx::Button>;
 
-    /// Mutable access to the buttons that are currently dragging this component.
-    fn dragging_buttons_mut(&mut self) -> &mut Vec<Cx::Button>;
+    /// Sets the buttons that are currently dragging this component.
+    fn set_dragging_buttons(&self, buttons: Vec<Cx::Button>);
+
+    /// Modifies the buttons that are currently dragging this component.
+    fn modify_dragging_buttons<F>(&self, f: F)
+    where
+        F: FnOnce(&mut Vec<Cx::Button>),
+    {
+        let mut buttons = self.dragging_buttons();
+        f(&mut buttons);
+        self.set_dragging_buttons(buttons);
+    }
 
     /// Whether this component is being dragged with the given button. If [`None`] is given, checks if the component is being dragged with any button.
     fn is_dragging(&self, button: Option<Cx::Button>) -> bool {
@@ -132,10 +148,10 @@ where
     fn set_dragging(&mut self, button: Cx::Button, dragging: bool) {
         if dragging {
             if !self.is_dragging(Some(button)) {
-                self.dragging_buttons_mut().push(button);
+                self.modify_dragging_buttons(|b| b.push(button));
             }
         } else {
-            self.dragging_buttons_mut().retain(|&b| b != button);
+            self.modify_dragging_buttons(|b| b.retain(|x| *x != button));
         }
     }
 }
@@ -266,10 +282,10 @@ where
     /// The [`SizeConstraints`] of this element.
     fn size_constraints(&self) -> SizeConstraints<Cx::SizeConstraintsExt>;
 
-    /// The [`PositionConstraints`] of this element.
-    fn position_constraints(&self) -> PositionConstraints<Cx::PositionConstraintsExt>;
+    /// The [`PosConstraints`] of this element.
+    fn pos_constraints(&self) -> PosConstraints<Cx::PosConstraintsExt>;
 
-    /// Lays out this element.
+    /// Lays out this element. The [`LayoutMeasurements::this`] is often [`None`] during this call. However, callers can propose a size by filling in this field.
     fn layout(&self, measurements: LayoutMeasurements<Cx::LayoutMeasurementsExt>);
 }
 
