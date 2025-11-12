@@ -34,7 +34,7 @@ pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
     where
         Self: 'a;
     /// The layout engine type.
-    type LayoutEngine: LayoutEngine;
+    type LayoutEngine: LayoutEngine<Self>;
 
     /// The maximum interval between two clicks to be considered a double-click.
     const MAX_DOUBLE_CLICK_INTERVAL: Duration = Duration::from_millis(250);

@@ -1,10 +1,9 @@
 //! Window management for Rimecraft.
 
 use rimecraft_global_cx::GlobalContext;
-use rimecraft_local_cx::ProvideLocalCxTy;
 
 /// Context for window management.
-pub trait ProvideWindowTy: GlobalContext + ProvideLocalCxTy {
+pub trait ProvideWindowTy: GlobalContext {
     /// The window type.
     type Window: Window;
 }
