@@ -25,20 +25,28 @@ impl ProvideUiTy for TestContext {
     type LayoutEngine = DefaultLayoutEngine<Self>;
 }
 
+/// An empty extension type for [`UiEvent`].
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EmptyUiEventExt;
 
+/// An empty extension type for [`SizeConstraints`].
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EmptySizeConstraintsExt;
 
+/// An empty extension type for [`PosConstraints`].
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EmptyPosConstraintsExt;
 
+/// An empty extension type for [`LayoutMeasurements`].
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EmptyLayoutMeasurementsExt;
 
+/// A test UI element.
+#[derive(Debug)]
 pub struct TestElement {
+    /// Whether the element is focused.
     pub is_focused: AtomicBool,
+    /// The buttons that are currently dragging this element.
     pub dragging_buttons: RefCell<Vec<TestButton>>,
 }
 

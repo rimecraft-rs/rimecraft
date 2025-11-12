@@ -48,10 +48,12 @@ pub trait DrawContext: Send + Sync {
     fn scissors_mut(&self) -> Self::ScissorsWriteGuard<'_>;
 }
 
+/// A component that can be drawn.
 pub trait Drawable<'a, Cx>
 where
     Cx: ProvideDrawTy,
 {
+    /// Draws the component with the [`DrawContext`] given by the provided local context.
     fn draw(&'a self, cx: Cx::LocalContext<'a>, mouse_pos: ScreenPos, delta: f32)
     where
         Cx::LocalContext<'a>: LocalContext<&'a Cx::Context>;

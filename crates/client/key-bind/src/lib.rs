@@ -106,12 +106,12 @@ where
 
     /// Binds the key bind to the specified key.
     fn bind(&mut self, key: Key<Cx>, default: Key<Cx>, current: Option<Key<Cx>>) {
-        drop((key, default, current));
+        let _ = (key, default, current);
     }
 
     /// Reverting the bound key to [`None`]. This makes the key bind use the default key.
     fn unbind(&mut self, key: Option<Key<Cx>>, default: Key<Cx>) {
-        drop((key, default));
+        let _ = (key, default);
     }
 
     /// Forcefully resets the key bind state to idle.
