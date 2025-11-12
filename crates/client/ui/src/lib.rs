@@ -5,10 +5,10 @@ use std::time::Duration;
 use rimecraft_client_narration::Narratable;
 use rimecraft_keyboard::{KeyState, ProvideKeyboardTy};
 use rimecraft_mouse::{ButtonState, MousePos, MouseScroll, ProvideMouseTy};
-use rimecraft_render_math::screen::{ScreenRect, ScreenSize};
+use rimecraft_render_math::screen::ScreenRect;
 
 use crate::{
-    layout::{LayoutMeasurements, position::PositionConstraints, size::SizeConstraints},
+    layout::{engine::LayoutEngine, position::PositionConstraints, size::SizeConstraints},
     nav::{
         NavDirection, WithNavIndex,
         gui::{GuiNavigation, GuiNavigationPath},
@@ -19,6 +19,7 @@ use crate::{
 pub mod item;
 pub mod layout;
 pub mod nav;
+pub mod widget;
 
 /// Provides types and constants for the UI framework.
 pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
@@ -26,10 +27,14 @@ pub trait ProvideUiTy: ProvideKeyboardTy + ProvideMouseTy {
     type UiEventExt;
     /// The extension type for [`SizeConstraints`].
     type SizeConstraintsExt;
+    /// The extension type for [`PositionConstraints`].
+    type PositionConstraintsExt;
     /// The iterator type to iterate over child elements.
     type ElementIter<'a>: IntoIterator<Item = &'a dyn Element<Self>>
     where
         Self: 'a;
+    /// The layout engine type.
+    type LayoutEngine: LayoutEngine;
 
     /// The maximum interval between two clicks to be considered a double-click.
     const MAX_DOUBLE_CLICK_INTERVAL: Duration = Duration::from_millis(250);
@@ -248,27 +253,16 @@ where
     }
 }
 
-/// An UI element that responds to layout.
-pub trait LayoutElement<Cx>: Element<Cx>
+/// An UI element that is measured and laid out.
+pub trait MeasurableElement<Cx>: Element<Cx>
 where
     Cx: ProvideUiTy,
 {
-    /// The layout should be updated.
-    fn update_layout(
-        &self,
-        screen_size: ScreenSize,
-        parent_size: ScreenSize,
-        optimal_size: ScreenSize,
-    );
-
-    /// The [`LayoutMeasurements`] of this element.
-    fn measurements(&self) -> LayoutMeasurements<ScreenSize>;
-
     /// The [`SizeConstraints`] of this element.
     fn size_constraints(&self) -> SizeConstraints<Cx::SizeConstraintsExt>;
 
     /// The [`PositionConstraints`] of this element.
-    fn position_constraints(&self) -> PositionConstraints;
+    fn position_constraints(&self) -> PositionConstraints<Cx::PositionConstraintsExt>;
 }
 
 /// An UI element that supports navigation.
