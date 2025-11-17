@@ -36,7 +36,7 @@ pub struct State<'a, T> {
 
 impl<'a, T> State<'a, T> {
     fn table(&self) -> &Table<'a, Self> {
-        assert!(self.init);
+        assert!(self.init, "state is not fully initialized");
         // SAFETY: we assume the state is correctly initialized
         unsafe { self.table.assume_init_ref() }
     }

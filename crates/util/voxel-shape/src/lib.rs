@@ -420,7 +420,6 @@ impl<'a> Slice<'a> {
 #[allow(clippy::type_complexity)]
 struct RawVoxelShape {
     voxels: Arc<set::Slice<'static>>,
-    //WIP
     face_cache: OnceLock<Box<[OnceLock<Option<Arc<Slice<'static>>>>; Direction::COUNT]>>,
 }
 

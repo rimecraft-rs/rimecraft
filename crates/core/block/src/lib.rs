@@ -7,8 +7,9 @@ use rimecraft_state::{State, States};
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
-pub mod behave;
+pub mod shape;
 
+#[doc(no_inline)]
 pub use rimecraft_state as state;
 
 /// Block containing settings and the state manager.
@@ -105,6 +106,8 @@ where
     pub opaque: bool,
     /// Whether this block is transparent.
     pub transparent: bool,
+    /// Whether this block has dynamic bounds.
+    pub dynamic_bounds: bool,
 
     /// Whether the block's transparency depends on the side of the block.
     ///
@@ -131,6 +134,7 @@ where
             empty: false,
             opaque: true,
             transparent: false,
+            dynamic_bounds: false,
 
             has_sided_transparency: |_| false,
             opacity: |state| {
@@ -212,21 +216,6 @@ where
     #[inline]
     pub fn settings(&self) -> &Settings<'w, Cx> {
         self.block.settings()
-    }
-}
-
-#[allow(deprecated)]
-impl<'a, Cx> BlockState<'a, Cx>
-where
-    Cx: ProvideBlockStateExtTy,
-    Cx::BlockStateExt<'a>: behave::ProvideLuminance,
-{
-    /// Returns the luminance level of this block state.
-    #[inline]
-    #[deprecated = "this function should be provided by the nested block state extension types"]
-    pub fn luminance(&self) -> u32 {
-        use behave::ProvideLuminance as _;
-        self.state.data().luminance(self.state)
     }
 }
 

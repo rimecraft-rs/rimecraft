@@ -16,13 +16,14 @@ pub mod tick;
 pub mod view;
 
 mod _impl;
+mod shape;
 
 pub use _impl::*;
 
 use entity::EntityCx;
 use local_cx::GlobalProvideLocalCxTy;
 use maybe::Maybe;
-use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
+use rimecraft_block::{Block, BlockState, ProvideBlockStateExtTy};
 use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, IntoIteratorRef,
 };
@@ -215,7 +216,10 @@ impl<'a> NestedBlockStateExt<'a> {
     }
 
     /// Initializes the cached shape and friends of this block state.
-    pub fn init_cache(&self) {
+    pub fn init_cache<Cx>(&self, block: Block<'a, Cx>)
+    where
+        Cx: ProvideBlockStateExtTy<BlockStateExt<'a> = Self>,
+    {
         todo!()
     }
 }
