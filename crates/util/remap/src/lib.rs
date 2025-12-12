@@ -1,6 +1,10 @@
 //! Proc-macro to append mappings on items for remapping.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Write as _,
+    iter::Peekable,
+};
 
 use proc_macro2::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 use smol_str::ToSmolStr as _;
@@ -9,6 +13,10 @@ use smol_str::ToSmolStr as _;
 ///
 /// This isn't any restriction but only a hint for allocation.
 const HINT_NAMES_COUNT: usize = 2;
+
+const KEYWORDS: &[&str] = &[
+    "pub", "mod", "fn", "type", "struct", "enum", "union", "const", "static", "char", "bool",
+];
 
 fn rewrite_ident_in_rust(literal: Literal) -> Ident {
     let input = literal.to_smolstr();
@@ -45,6 +53,7 @@ fn rewrite_ident_in_rust(literal: Literal) -> Ident {
     let output_slice = if let Some(body) = output.strip_prefix("get_")
         && !body.starts_with("mut")
         && !body.starts_with("ref")
+        && !KEYWORDS.contains(&body)
     {
         body
     } else {
@@ -144,7 +153,7 @@ pub fn remap(
     remap_inner(attr.into(), item.clone().into(), true).map_or(item, Into::into)
 }
 
-fn remap_inner(attr: TokenStream, mut item: TokenStream, cfg: bool) -> Option<TokenStream> {
+fn remap_inner(attr: TokenStream, item: TokenStream, cfg: bool) -> Option<TokenStream> {
     let names = parse_attr(attr);
     let mut iter = item.clone().into_iter().peekable();
     let mut vis = None;
@@ -177,6 +186,15 @@ fn remap_inner(attr: TokenStream, mut item: TokenStream, cfg: bool) -> Option<To
     let TokenTree::Ident(native_name) = iter.next()? else {
         return None;
     };
+
+    let mut item: TokenStream = AttachDocIter {
+        iter: item.into_iter().peekable(),
+        done: false,
+        maps: &names,
+        native_name: &native_name,
+        doc_buf: None,
+    }
+    .collect();
 
     for (name, keys) in names {
         if name == native_name {
@@ -224,7 +242,15 @@ fn remap_fn_inner(
     let Some(TokenTree::Ident(native_name)) = iter.next() else {
         return None;
     };
-    let mut result = item.clone();
+    let mut result: TokenStream = AttachDocIter {
+        iter: item.clone().into_iter().peekable(),
+        done: false,
+        maps: &names,
+        native_name: &native_name,
+        doc_buf: None,
+    }
+    .collect();
+
     for (name, keys) in names {
         if name == native_name {
             // do something..
@@ -398,7 +424,7 @@ enum ScanFnStatus {
 }
 
 struct RemapFnIter<'a, I: Iterator> {
-    iter: std::iter::Peekable<I>,
+    iter: Peekable<I>,
     replace_fn_name: Option<Ident>,
     params: Option<&'a mut Vec<Ident>>,
     generics: Option<&'a mut Vec<(Option<Punct>, Ident)>>,
@@ -548,5 +574,84 @@ impl<I: Iterator<Item = TokenTree>> Iterator for RemapFnIter<'_, I> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.iter.size_hint()
+    }
+}
+
+struct AttachDocIter<'a, I: Iterator> {
+    iter: Peekable<I>,
+    done: bool,
+    maps: &'a HashMap<Ident, Vec<Ident>>,
+    native_name: &'a Ident,
+
+    doc_buf: Option<String>,
+}
+
+impl<I: Iterator<Item = TokenTree>> Iterator for AttachDocIter<'_, I> {
+    type Item = TokenTree;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(doc) = self.doc_buf.take() {
+            return Some(TokenTree::Group(Group::new(
+                Delimiter::Bracket,
+                [
+                    TokenTree::Ident(Ident::new("doc", Span::call_site())),
+                    TokenTree::Punct(Punct::new('=', Spacing::Alone)),
+                    TokenTree::Literal(Literal::string(&doc)),
+                ]
+                .into_iter()
+                .collect(),
+            )));
+        }
+
+        if !self.done
+            && self.iter.peek().is_some_and(|t| {
+                (!if let TokenTree::Group(g) = t
+                    && g.delimiter() == Delimiter::Bracket
+                {
+                    true
+                } else {
+                    false
+                }) && (!if let TokenTree::Punct(p) = t
+                    && p.as_char() == '#'
+                {
+                    true
+                } else {
+                    false
+                })
+            })
+        {
+            self.done = true;
+            if self.maps.len() > 1 || !self.maps.contains_key(self.native_name) {
+                // have something meaningful
+                let mut doc = "\n\n_Mapped names: ".to_owned();
+                let mut first = true;
+                for (k, maps) in self.maps.iter().filter(|(k, _)| k != &self.native_name) {
+                    let maps_desc = maps.iter().fold(String::new(), |mut s, i| {
+                        if s.is_empty() {
+                            i.to_string()
+                        } else {
+                            write!(&mut s, ", {}", i).unwrap();
+                            s
+                        }
+                    });
+                    if first {
+                        write!(&mut doc, "`{}` ({})", k, maps_desc).unwrap();
+                    } else {
+                        write!(&mut doc, ", `{}` ({})", k, maps_desc).unwrap();
+                    }
+                    first = false;
+                }
+                doc.push_str("._"); // trailing italic mark
+
+                self.doc_buf = Some(doc);
+                return Some(TokenTree::Punct(Punct::new('#', Spacing::Joint)));
+            }
+        }
+        self.iter.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (floor, ceil) = self.iter.size_hint();
+        (floor, ceil.map(|len| len + 2))
     }
 }

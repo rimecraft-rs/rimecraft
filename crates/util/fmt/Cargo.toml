@@ -16,6 +16,7 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 rgb = "0.8"
 regex-lite = "0.1"
 regex = { version = "1.10", optional = true }
+remap = { path = "../remap", package = "rimecraft-remap" }
 
 [features]
 serde = ["dep:serde"]

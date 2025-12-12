@@ -26,12 +26,13 @@ pub mod __priv_macro_use {
 }
 
 use remap::{remap, remap_method};
+
 #[cfg(feature = "macros")]
 pub use rimecraft_text_derive::Localize;
 
 mod error;
 mod iter;
-pub mod ordered_text;
+pub mod ordered;
 pub mod style;
 
 #[cfg(feature = "serde")]
@@ -39,12 +40,14 @@ mod _serde;
 
 use std::{borrow::Cow, fmt::Display, ops::Add};
 
-pub use error::Error;
-pub use iter::{Iter, StyledIter};
 use rimecraft_global_cx::GlobalContext;
-pub use style::Style;
 
 use crate::style::Formattable;
+
+pub use error::Error;
+pub use iter::{Iter, StyledIter};
+pub use ordered::{ErasedOrderedText, OrderedText};
+pub use style::Style;
 
 /// A raw text component.
 ///
@@ -138,35 +141,67 @@ impl<T, StyleExt> RawText<T, StyleExt> {
 
     /// Returns an iterator over the content of this text.
     #[inline]
-    pub fn iter(&self) -> Iter<'_, T> {
+    pub fn iter(&self) -> Iter<'_, T, StyleExt> {
         Iter {
-            inner: Box::new(
-                std::iter::once(&self.content).chain(self.sibs.iter().flat_map(Self::iter)),
-            ),
+            content: Some(self.content()),
+            sibs: self.sibs().iter(),
+            sib_iter: None,
+        }
+    }
+
+    /// Returns an iterator over the content and style of this text.
+    #[inline]
+    pub fn styled_iter<'a>(&'a self) -> StyledIter<'a, T, StyleExt>
+    where
+        StyleExt: Add<&'a StyleExt, Output = StyleExt>,
+    {
+        StyledIter {
+            style: self.style(),
+            content: Some(self.content()),
+            sibs: self.sibs().iter(),
+            sib_iter: None,
         }
     }
 }
 
 impl<T, StyleExt> RawText<T, StyleExt>
 where
-    StyleExt: Add<Output = StyleExt> + Clone,
+    T: Display,
 {
-    /// Returns an iterator over the content and style of this text.
-    #[inline]
-    pub fn styled_iter(&self) -> StyledIter<'_, T, StyleExt> {
-        StyledIter {
-            style: &self.style,
-            inner: Box::new(
-                std::iter::once((self.content(), self.style().clone()))
-                    .chain(self.sibs.iter().flat_map(Self::styled_iter)),
-            ),
+    /// Visits the string literals of this text.
+    #[remap_method(yarn = "visit", mojmaps = "visit")]
+    #[deprecated = "use `Self::iter` instead"]
+    pub fn visit<V, U>(&self, mut visitor: V) -> Option<U>
+    where
+        V: FnMut(&str) -> Option<U>,
+    {
+        for content in self.iter() {
+            if let Some(result) = visitor(&content.to_string()) {
+                return Some(result);
+            }
         }
+        None
+    }
+
+    /// Visits the string literals of this text with style.
+    #[deprecated = "use `Self::styled_iter` instead"]
+    pub fn styled_visit<'a, V, U>(&'a self, mut visitor: V) -> Option<U>
+    where
+        V: FnMut(Style<StyleExt>, &str) -> Option<U>,
+        StyleExt: Add<&'a StyleExt, Output = StyleExt> + Default,
+    {
+        for (content, style) in self.styled_iter() {
+            if let Some(result) = visitor(style, &content.to_string()) {
+                return Some(result);
+            }
+        }
+        None
     }
 }
 
 impl<'a, T, StyleExt> IntoIterator for &'a RawText<T, StyleExt> {
     type Item = &'a T;
-    type IntoIter = Iter<'a, T>;
+    type IntoIter = Iter<'a, T, StyleExt>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

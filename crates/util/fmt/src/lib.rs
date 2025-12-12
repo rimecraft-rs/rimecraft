@@ -2,12 +2,19 @@
 
 use std::{fmt::Display, ops::Deref, sync::OnceLock};
 
+use remap::{remap, remap_method};
 use rgb::RGB8;
 
 #[cfg(feature = "regex")]
 use regex::Regex;
 #[cfg(not(feature = "regex"))]
 use regex_lite::Regex;
+
+/// The prefix of formatting codes.
+///
+/// _Note for mcsource readers: This is `167` in UTF-16._
+#[remap(yarn = "FORMATTING_CODE_PREFIX", mojmaps = "PREFIX_CODE")]
+pub const CODE_PREFIX: char = '§';
 
 /// Color index of a formatting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -54,8 +61,12 @@ macro_rules! formattings {
         )]
         #[doc(alias = "ChatFormatting")]
         #[non_exhaustive]
+        #[remap(yarn = "Formatting", mojmaps = "ChatFormatting")]
         pub enum Formatting {
-            $(#[doc = "The formatting."] $i),*
+            $(
+            #[doc = concat!("The formatting ", $n, ", `§", $c, "`.")]
+            $i
+            ),*
         }
 
         impl Formatting {
@@ -67,7 +78,6 @@ macro_rules! formattings {
             /// # use rimecraft_fmt::Formatting;
             /// assert_eq!(Formatting::DarkBlue.raw_name(), "DARK_BLUE");
             /// ```
-            #[inline]
             pub const fn raw_name(self) -> &'static str {
                 match self {
                     $(Formatting::$i => $n),*
@@ -83,7 +93,7 @@ macro_rules! formattings {
             /// # use rimecraft_fmt::Formatting;
             /// assert_eq!(Formatting::DarkBlue.code(), '1');
             /// ```
-            #[inline]
+            #[remap_method(yarn = "getCode", mojmaps = "getChar")]
             pub const fn code(self) -> char {
                 match self {
                     $(Formatting::$i => $c),*
@@ -98,6 +108,7 @@ macro_rules! formattings {
             /// # use rimecraft_fmt::{ColorIndex, Formatting};
             /// assert_eq!(Formatting::DarkBlue.color_index(), ColorIndex(Some(1)));
             /// ```
+            #[remap_method(yarn = "getColorIndex", mojmaps = "getId")]
             pub const fn color_index(self) -> ColorIndex {
                 let value = match self { $(Formatting::$i => $ci),* };
                 match value {
@@ -108,16 +119,15 @@ macro_rules! formattings {
             }
 
             /// Returns `true` if the formatting is a modifier.
-            #[inline]
+            #[remap_method(yarn = "isModifier", mojmaps = "isFormat")]
             pub const fn is_modifier(self) -> bool {
                 match self {
                     $(Formatting::$i => $m),*
                 }
             }
 
-            /// Returns the color of the formatted text, or
-            /// `None` if the formatting has no associated color.
-            #[inline]
+            /// Returns the color of the formatted text, or `None` if the formatting has no associated color.
+            #[remap_method(yarn = "getColorValue", mojmaps = "getColor")]
             pub const fn color_value(self) -> Option<RGB8> {
                 if let Some(value) = match self { $(Formatting::$i => $cv),* }
                 {
@@ -137,7 +147,7 @@ macro_rules! formattings {
             /// # use rimecraft_fmt::Formatting;
             /// assert_eq!(Formatting::DarkBlue.name(), "dark_blue");
             /// ```
-            #[inline]
+            #[remap_method(yarn = "getName", mojmaps = "getName")]
             pub const fn name(self) -> &'static str {
                 match self {
                     $(Formatting::$i => $ln),*
@@ -164,8 +174,8 @@ macro_rules! formattings {
             type Err = Error;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
-                if let Some(code) = s.strip_prefix(Self::CODE_PREFIX) {
-                    return code.chars().next().ok_or(Error::InvalidCode(Self::CODE_PREFIX)).and_then(|c| c.try_into());
+                if let Some(code) = s.strip_prefix(CODE_PREFIX) {
+                    return code.chars().next().ok_or(Error::InvalidCode(CODE_PREFIX)).and_then(|c| c.try_into());
                 }
                 let s = s.to_ascii_lowercase();
                 let s = SANITIZE_REGEX.get_or_init(|| Regex::new("[^a-z]").unwrap()).replace_all(&s, "");
@@ -246,10 +256,12 @@ impl std::error::Error for Error {}
 
 impl Formatting {
     /// The prefix of formatting codes.
+    #[deprecated = "use crate-level constant instead"]
     pub const CODE_PREFIX: char = '§';
 
     /// Whether the formatting is associated with a color.
     #[inline]
+    #[remap_method(yarn = "isColor", mojmaps = "isColor")]
     pub const fn is_color(self) -> bool {
         !self.is_modifier() && !matches!(self, Self::Reset)
     }
@@ -324,7 +336,7 @@ impl AsRef<str> for Name {
 impl Display for Formatting {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", Self::CODE_PREFIX, self.code())
+        write!(f, "{}{}", CODE_PREFIX, self.code())
     }
 }
 

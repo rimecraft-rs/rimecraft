@@ -70,5 +70,15 @@ mod sealed {
     #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
     pub struct EmptyStyleExt {}
 
-    impl Formattable for EmptyStyleExt {}
+    impl Formattable for EmptyStyleExt {
+        #[inline]
+        fn with_formatting(self, _: text::style::Formatting) -> Self {
+            self
+        }
+
+        #[inline]
+        fn with_exclusive_formatting(self, _: text::style::Formatting) -> Self {
+            self
+        }
+    }
 }

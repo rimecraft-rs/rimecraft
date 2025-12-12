@@ -9,7 +9,7 @@ use rimecraft_client_narration::{Narratable, NarrationPart};
 use rimecraft_global_cx::GlobalContext;
 use rimecraft_text::{
     ProvideTextTy, Text,
-    ordered_text::{OrderedText, OrderedTextItem},
+    ordered::{ErasedOrderedText, OrderedText as _, OrderedTextItem},
 };
 
 /// Global context for [`Tooltip`].
@@ -25,7 +25,7 @@ where
 {
     content: Arc<Text<Cx>>,
     narration: Option<Arc<Text<Cx>>>,
-    lines: Vec<OrderedText<'t, Cx>>,
+    lines: Vec<Box<dyn ErasedOrderedText<Cx> + Send + Sync + 't>>,
 }
 
 impl<Cx> Debug for Tooltip<'_, Cx>
@@ -38,8 +38,7 @@ where
         f.debug_struct("Tooltip")
             .field("content", &self.content)
             .field("narration", &self.narration)
-            .field("lines", &self.lines)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -71,7 +70,7 @@ where
     }
 
     /// Returns the tooltip lines.
-    pub fn lines(&self) -> &[OrderedText<'t, Cx>] {
+    pub fn lines(&self) -> &[Box<dyn ErasedOrderedText<Cx> + Send + Sync + 't>] {
         &self.lines
     }
 
@@ -82,7 +81,7 @@ where
     {
         self.lines
             .into_iter()
-            .map(|line| line.into_iter().collect())
+            .map(|line| line.iter().collect())
             .collect()
     }
 }
