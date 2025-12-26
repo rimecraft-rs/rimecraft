@@ -182,10 +182,10 @@ fn trace_collision_side(
             current_distance,
             approach,
             delta,
-            min.x,
+            if pos.x { min } else { max }.x,
             min.yz(),
             max.yz(),
-            (AxisDirection::from(pos.x), Axis::X).into(),
+            Direction::from((AxisDirection::from(pos.x), Axis::X)).opposite(),
             intersecting,
         );
     }
@@ -194,10 +194,10 @@ fn trace_collision_side(
             current_distance,
             approach,
             delta.yzx(),
-            min.y,
+            if pos.y { min } else { max }.y,
             min.zx(),
             max.zx(),
-            (AxisDirection::from(pos.y), Axis::Y).into(),
+            Direction::from((AxisDirection::from(pos.y), Axis::Y)).opposite(),
             intersecting,
         );
     }
@@ -206,10 +206,10 @@ fn trace_collision_side(
             current_distance,
             approach,
             delta.zxy(),
-            min.z,
+            if pos.z { min } else { max }.z,
             min.xy(),
             max.xy(),
-            (AxisDirection::from(pos.z), Axis::Z).into(),
+            Direction::from((AxisDirection::from(pos.z), Axis::Z)).opposite(),
             intersecting,
         );
     }

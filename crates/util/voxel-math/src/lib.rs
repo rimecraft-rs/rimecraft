@@ -17,6 +17,9 @@ mod hit;
 
 pub mod direction;
 
+#[cfg(test)]
+mod tests;
+
 pub use bbox::*;
 pub use glam;
 pub use hit::*;
