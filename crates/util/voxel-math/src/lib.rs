@@ -5,6 +5,7 @@ mod chunk_pos;
 mod chunk_section_pos;
 
 use glam::{DVec3, IVec3};
+use remap::{remap, remap_method};
 use std::ops::ControlFlow;
 
 pub use block_pos::BlockPos;
@@ -49,8 +50,9 @@ pub const fn coord_block_from_section(section_coord: i32) -> i32 {
     section_coord << 4
 }
 
-/// Raycasts block positions from start to end, using the given function.
-pub fn raycast_f64<F, U>(start: DVec3, end: DVec3, mut f: F) -> Option<U>
+/// Raycasts block positions from start to end, using the given function for position tests.
+#[remap(yarn = "raycast", mojmaps = "traverseBlocks")]
+pub fn raycast<F, U>(start: DVec3, end: DVec3, mut f: F) -> Option<U>
 where
     F: FnMut(BlockPos) -> ControlFlow<U>,
 {
@@ -95,4 +97,15 @@ where
     }
 
     None
+}
+
+/// Result of one or more hit tries, usually from ray casting.
+#[remap(yarn = "HitResult", mojmaps = "HitResult")]
+pub trait HitResult {
+    /// Returns the position of the hit position.
+    #[remap_method(yarn = "getPos", mojmaps = "getLocation")]
+    fn pos(&self) -> DVec3;
+
+    /// Whether the hit tries failed to hit a valid target.
+    fn is_missed(&self) -> bool;
 }
