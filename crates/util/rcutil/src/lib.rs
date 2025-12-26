@@ -152,12 +152,21 @@ impl sealed::SealedInvariantLifetime for InvariantLifetime<'_> {}
 /// Types that are supposed to be static-lifetimed all the time.
 pub trait Static: 'static {}
 
-/// A type that is invariant.
+/// A type that is invariant on its only lifetime.
 ///
 /// # Safety
 ///
 /// The type has to be invariant on its lifetime, and which should be the lifetime
 /// referred by [`Self::Lifetime`].
+/// The lifetime should also be the only single lifetime of the type.
+///
+/// After all the purpose of this trait is for safely tranmuting between types,
+/// so go with it if you consider it is safe.
+///
+/// # Safe Implementation
+///
+/// Implement [`Static`] for your always-static type, while this trait will be
+/// automatically implemented for it.
 pub unsafe trait Invariant {
     /// The lifetime, with the type of [`InvariantLifetime`].
     type Lifetime: sealed::SealedInvariantLifetime;
