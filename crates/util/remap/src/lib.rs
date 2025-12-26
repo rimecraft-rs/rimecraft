@@ -7,7 +7,7 @@ use std::{
 };
 
 use proc_macro2::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
-use smol_str::ToSmolStr as _;
+use smol_str::{ToSmolStr as _, format_smolstr};
 
 /// Expected count of mapping names for one item by default.
 ///
@@ -16,6 +16,7 @@ const HINT_NAMES_COUNT: usize = 2;
 
 const KEYWORDS: &[&str] = &[
     "pub", "mod", "fn", "type", "struct", "enum", "union", "const", "static", "char", "bool",
+    "move",
 ];
 
 fn rewrite_ident_in_rust(literal: Literal) -> Ident {
@@ -60,7 +61,11 @@ fn rewrite_ident_in_rust(literal: Literal) -> Ident {
         &output
     };
 
-    Ident::new(output_slice, literal.span())
+    if KEYWORDS.contains(&output_slice) {
+        Ident::new(&format_smolstr!("{output_slice}_"), literal.span())
+    } else {
+        Ident::new(output_slice, literal.span())
+    }
 }
 
 fn parse_attr(attr: TokenStream) -> HashMap<Ident, Vec<Ident>> {

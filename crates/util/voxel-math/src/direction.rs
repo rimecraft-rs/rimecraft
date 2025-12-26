@@ -279,6 +279,17 @@ impl AxisDirection {
     }
 }
 
+impl From<bool> for AxisDirection {
+    #[inline]
+    fn from(value: bool) -> Self {
+        if value {
+            Self::Positive
+        } else {
+            Self::Negative
+        }
+    }
+}
+
 /// An enum representing 4 cardinal directions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[allow(clippy::exhaustive_enums)]

@@ -9,9 +9,6 @@ use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 pub mod behave;
 
-mod hit;
-
-pub use hit::*;
 pub use rimecraft_state as state;
 
 /// Block containing settings and the state manager.

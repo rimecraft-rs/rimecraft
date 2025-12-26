@@ -1,6 +1,19 @@
+use glam::DVec3;
 use rcutil::Static;
 use remap::{remap, remap_method};
-use rimecraft_voxel_math::{BlockPos, HitResult, direction::Direction, glam::DVec3};
+
+use crate::{BlockPos, direction::Direction};
+
+/// Result of one or more hit tries, usually from ray casting.
+#[remap(yarn = "HitResult", mojmaps = "HitResult")]
+pub trait HitResult {
+    /// Returns the position of the hit position.
+    #[remap_method(yarn = "getPos", mojmaps = "getLocation")]
+    fn pos(&self) -> DVec3;
+
+    /// Whether the hit tries failed to hit a valid target.
+    fn is_missed(&self) -> bool;
+}
 
 /// Hit result with type of blocks.
 #[derive(Debug, Clone)]
