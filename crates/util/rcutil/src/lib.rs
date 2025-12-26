@@ -144,7 +144,16 @@ pub fn typeid<T: ?Sized>() -> TypeId {
 /// A marker type for invariant lifetime marking.
 #[allow(missing_debug_implementations)] // should not have an instance
 pub struct InvariantLifetime<'a> {
-    _marker: PhantomData<fn(&'a ()) -> &'a ()>,
+    _marker: PhantomInvariant<'a>,
+}
+
+/// Invariant phantom lifetime.
+pub type PhantomInvariant<'a> = PhantomData<fn(&'a ()) -> &'a ()>;
+
+/// Shorthand for creating a [`PhantomInvariant`].
+#[inline]
+pub const fn phantom_invariant<'a>() -> PhantomInvariant<'a> {
+    PhantomData::<fn(&'a ()) -> &'a ()>
 }
 
 impl sealed::SealedInvariantLifetime for InvariantLifetime<'_> {}
@@ -172,6 +181,7 @@ pub unsafe trait Invariant {
     type Lifetime: sealed::SealedInvariantLifetime;
 
     #[doc(hidden)]
+    #[inline]
     fn type_id() -> TypeId
     where
         Self: Sized,
@@ -189,6 +199,7 @@ where
 {
     type Lifetime = InvariantLifetime<'static>;
 
+    #[inline]
     fn type_id() -> TypeId
     where
         Self: Sized,

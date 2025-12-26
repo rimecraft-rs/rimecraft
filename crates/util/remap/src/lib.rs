@@ -435,7 +435,8 @@ struct RemapFnIter<'a, I: Iterator> {
     last_punct: Option<Punct>,
     reading_generics: bool,
     read_generic_now: bool,
-    inside_sharp_punct: u16,
+    // avoid overflowing
+    inside_sharp_punct: i16,
 }
 
 impl<I: Iterator<Item = TokenTree>> Iterator for RemapFnIter<'_, I> {
@@ -546,7 +547,7 @@ impl<I: Iterator<Item = TokenTree>> Iterator for RemapFnIter<'_, I> {
                 params.push(ident);
 
                 // forward to next ident
-                let mut inside_sharps = 0u8;
+                let mut inside_sharps = 0i16;
                 let mut last_spacing = Spacing::Alone;
                 iter.by_ref().find(|t| {
                     let mut is_comma = false;
