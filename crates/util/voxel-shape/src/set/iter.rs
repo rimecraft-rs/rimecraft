@@ -167,6 +167,7 @@ impl Voxels<'_, '_> {
 
 impl Iterator for Voxels<'_, '_> {
     type Item = (UVec3, UVec3);
+
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let result = self.__next();

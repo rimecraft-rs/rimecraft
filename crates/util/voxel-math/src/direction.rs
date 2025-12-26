@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use glam::IVec3;
+use glam::{DVec3, IVec3, Vec3};
 
 macro_rules! directions {
     ($($i:literal => $dir:ident: $doc:literal {
@@ -217,6 +217,28 @@ impl From<(AxisDirection, Axis)> for Direction {
     #[inline]
     fn from((ad, a): (AxisDirection, Axis)) -> Self {
         (a, ad).into()
+    }
+}
+
+impl From<Vec3> for Direction {
+    fn from(value: Vec3) -> Self {
+        let mut dir = Self::North;
+        let mut max = f32::MIN;
+        for d in Self::ALL {
+            let prod = IVec3::from(d).as_vec3().dot(value);
+            if prod > max {
+                max = prod;
+                dir = d;
+            }
+        }
+        dir
+    }
+}
+
+impl From<DVec3> for Direction {
+    #[inline]
+    fn from(value: DVec3) -> Self {
+        value.as_vec3().into()
     }
 }
 
