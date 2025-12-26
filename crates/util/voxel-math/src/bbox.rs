@@ -1,6 +1,7 @@
 use std::{fmt::Debug, hash::Hash};
 
 use glam::{DVec3, IVec3};
+use remap::remap;
 
 use crate::BlockPos;
 
@@ -8,7 +9,7 @@ use crate::BlockPos;
 ///
 /// The box is defined by its minimum and maximum corners.
 #[derive(PartialEq, Clone, Copy)]
-#[doc(alias = "AABB")]
+#[remap(yarn = "Box", mojmaps = "AABB")]
 pub struct BBox {
     min: DVec3,
     max: DVec3,
