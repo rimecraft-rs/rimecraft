@@ -2,7 +2,7 @@
 
 #![no_std]
 
-use core::{any::TypeId, marker::PhantomData, mem::MaybeUninit, ptr};
+use core::{any::TypeId, marker::PhantomData, mem::ManuallyDrop};
 
 /// Cast a value to itself by checking the type.
 ///
@@ -26,6 +26,29 @@ pub unsafe fn cast<L, R>(value: L) -> R {
     unsafe { transmute::<L, R>(value) }
 }
 
+/// Cast an invariant value to itself by checking the type.
+///
+/// See [`try_cast_invariant`] for handling type mismatch.
+///
+/// # Panics
+///
+/// Panics if the given types are not equal.
+#[inline]
+pub fn cast_invariant<'a, L, R>(value: L) -> R
+where
+    L: InvariantOn<'a>,
+    R: InvariantOn<'a>,
+{
+    assert_eq!(
+        L::type_id(),
+        R::type_id(),
+        "type mismatch between given types"
+    );
+
+    // SAFETY: L and R are invariant and sharing the same lifetime.
+    unsafe { transmute::<L, R>(value) }
+}
+
 /// Try to cast a value to itself by checking the type.
 ///
 /// # Safety
@@ -38,6 +61,25 @@ pub unsafe fn cast<L, R>(value: L) -> R {
 #[inline]
 pub unsafe fn try_cast<L, R>(value: L) -> Result<R, L> {
     if typeid::<L>() == typeid::<R>() {
+        Ok(unsafe { transmute::<L, R>(value) })
+    } else {
+        Err(value)
+    }
+}
+
+/// Try to cast an invariant value to itself by checking the type.
+///
+/// # Errors
+///
+/// Returns the original value if the types are not equal.
+#[inline]
+pub fn try_cast_invariant<'a, L, R>(value: L) -> Result<R, L>
+where
+    L: InvariantOn<'a>,
+    R: InvariantOn<'a>,
+{
+    if L::type_id() == R::type_id() {
+        // SAFETY: L and R are invariant and sharing the same lifetime.
         Ok(unsafe { transmute::<L, R>(value) })
     } else {
         Err(value)
@@ -81,14 +123,74 @@ pub const unsafe fn transmute<L, R>(value: L) -> R {
 /// This function is unsafe because it transmutes a value to another type.
 #[inline]
 pub const unsafe fn transmute_unchecked<L, R>(value: L) -> R {
-    let mut r = MaybeUninit::<R>::uninit();
-    unsafe { &mut *ptr::from_mut(&mut r).cast::<MaybeUninit<L>>() }.write(value);
-    //SAFETY: we have already written to the uninit memory
-    unsafe { r.assume_init() }
+    union __UnionCast<L, R> {
+        l: ManuallyDrop<L>,
+        r: ManuallyDrop<R>,
+    }
+
+    let cast = __UnionCast {
+        l: ManuallyDrop::new(value),
+    };
+    let r = unsafe { cast.r };
+    ManuallyDrop::into_inner(r)
 }
 
 /// Gets the [`TypeId`] of a type regardless of its lifetime.
 #[inline]
 pub fn typeid<T: ?Sized>() -> TypeId {
     typeid::of::<T>()
+}
+
+/// A marker type for invariant lifetime marking.
+#[allow(missing_debug_implementations)] // should not have an instance
+pub struct InvariantLifetime<'a> {
+    _marker: PhantomData<fn(&'a ()) -> &'a ()>,
+}
+
+impl sealed::SealedInvariantLifetime for InvariantLifetime<'_> {}
+
+/// Types that are supposed to be static-lifetimed all the time.
+pub trait Static: 'static {}
+
+/// A type that is invariant.
+///
+/// # Safety
+///
+/// The type has to be invariant on its lifetime, and which should be the lifetime
+/// referred by [`Self::Lifetime`].
+pub unsafe trait Invariant {
+    /// The lifetime, with the type of [`InvariantLifetime`].
+    type Lifetime: sealed::SealedInvariantLifetime;
+
+    #[doc(hidden)]
+    fn type_id() -> TypeId
+    where
+        Self: Sized,
+    {
+        typeid::<Self>()
+    }
+}
+
+/// Shorthand for `Invariant<Lifetime = InvariantLifetime<'_>'>`.
+pub trait InvariantOn<'a>: Invariant<Lifetime = InvariantLifetime<'a>> {}
+
+unsafe impl<T> Invariant for T
+where
+    T: Static + ?Sized,
+{
+    type Lifetime = InvariantLifetime<'static>;
+
+    fn type_id() -> TypeId
+    where
+        Self: Sized,
+    {
+        // optimized implementation
+        TypeId::of::<Self>()
+    }
+}
+
+impl<'a, T> InvariantOn<'a> for T where T: Invariant<Lifetime = InvariantLifetime<'a>> + ?Sized {}
+
+mod sealed {
+    pub trait SealedInvariantLifetime {}
 }

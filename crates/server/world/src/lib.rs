@@ -16,11 +16,14 @@ pub type ServerWorld<'w, Cx> = placeholder::ServerWorld<'w, Cx>;
 mod placeholder {
     use std::marker::PhantomData;
 
-    use world::{InvariantLifetime, WorldMarker};
+    use rcutil::{Invariant, InvariantLifetime};
+    use world::WorldMarker;
 
     pub struct ServerWorld<'w, Cx>(PhantomData<(Cx, InvariantLifetime<'w>)>);
 
-    unsafe impl<'w, Cx> WorldMarker for ServerWorld<'w, Cx> {
+    impl<Cx> WorldMarker for ServerWorld<'_, Cx> {}
+
+    unsafe impl<'w, Cx> Invariant for ServerWorld<'w, Cx> {
         type Lifetime = InvariantLifetime<'w>;
     }
 }

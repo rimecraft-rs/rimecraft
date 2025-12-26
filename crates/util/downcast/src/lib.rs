@@ -1,5 +1,6 @@
 //! Downcastable cells and non-static downcasting for Rust.
 
+#![deprecated = "use rcutil instead"]
 #![no_std]
 
 use core::{

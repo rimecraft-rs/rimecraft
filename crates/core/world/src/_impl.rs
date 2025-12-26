@@ -6,12 +6,11 @@ use std::{
 
 use local_cx::HoldLocalContext;
 use parking_lot::RwLock;
+use rcutil::{Invariant, InvariantLifetime};
 use rimecraft_block_entity::BlockEntityCell;
 use rimecraft_registry::RegistryKey;
 
-use crate::{
-    ArcAccess, Environment, InvariantLifetime, WorldCx, border::WorldBorderMut, view::HeightLimit,
-};
+use crate::{ArcAccess, Environment, WorldCx, border::WorldBorderMut, view::HeightLimit};
 
 /// Type of light.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -59,14 +58,7 @@ where
 ///
 /// This trait guarantees the lifetime of world is invariant, and is the lifetime which
 /// [`WorldMarker::Lifetime`] is referring to.
-pub unsafe trait WorldMarker {
-    /// The lifetime of this world.
-    ///
-    /// This is not present in the generic parameters because it should be unique for each
-    /// type with different lifetimes.
-    /// In practice this should always be [`InvariantLifetime<'w>`].
-    type Lifetime;
-
+pub trait WorldMarker: Invariant {
     /// Returns the type id of this world type.
     #[inline]
     fn typeid(&self) -> TypeId {
