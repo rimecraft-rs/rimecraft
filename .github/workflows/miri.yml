@@ -11,5 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install Miri
+        run: rustup component add --toolchain nightly miri
       - name: Test using Miri
         run: cargo +nightly miri test --all-features --workspace
