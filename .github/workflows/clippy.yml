@@ -1,10 +1,6 @@
 name: Clippy Lint
 
-on:
-  push:
-    branches: [ "*" ]
-  pull_request:
-    branches: [ "*" ]
+on: [push, pull_request]
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,6 +9,6 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Lint using Clippy
-      run: cargo clippy --all-features --no-deps --workspace
+      - uses: actions/checkout@v4
+      - name: Lint using Clippy
+        run: cargo clippy --all-features --no-deps --workspace
