@@ -62,4 +62,4 @@ suboptimal-flops = "warn"
 redundant-clone = "warn"
 
 [patch.crates-io]
-bitvec = { git = 'https://github.com/rimecraft-rs/bitvec.git', branch = 'modern-rust' }
+bitvec = { git = 'https://codeberg.org/DM-Earth/bitvec-rc.git', branch = 'modern-rust' }
