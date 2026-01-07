@@ -6,15 +6,15 @@ use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
     container::{PalettedContainer, ProvidePalette},
 };
-use rimecraft_fluid::{BlockStateExt as _, BsToFs};
+use rimecraft_fluid::{BlockStateExt as _, BsToFs, FluidState};
 use rimecraft_registry::Registry;
 
-use super::{ChunkCx, internal_types::*};
+use super::{WorldCx, internal_types::*};
 
 /// Section on a `Chunk`.
 pub struct ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     bsc: PalettedContainer<Cx::BlockStateList, BlockState<'w, Cx>, Cx>,
     bic: PalettedContainer<Cx::BiomeList, IBiome<'w, Cx>, Cx>,
@@ -26,7 +26,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: BsToFs<'w> + ChunkCx<'w>,
+    Cx: BsToFs<'w> + WorldCx<'w>,
     Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>,
     for<'a> &'a Cx::BlockStateList: IntoIterator,
     for<'a> <&'a Cx::BlockStateList as IntoIterator>::IntoIter: ExactSizeIterator,
@@ -55,7 +55,7 @@ where
 
         self.bsc.count(|bs, count| {
             let fs = bs.to_fluid_state();
-            if !bs.block.settings().is_empty {
+            if !bs.block.settings().empty {
                 ne_block_c += count;
             }
             if bs.block.settings().random_ticks {
@@ -77,7 +77,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Returns the block state container of the chunk section.
     #[inline]
@@ -130,11 +130,17 @@ where
     pub fn has_random_ticks(&self) -> bool {
         self.has_random_tick_blocks() || self.has_random_tick_fluids()
     }
+
+    /// Whether the chunk section contains the given block state.
+    #[inline]
+    pub fn contains(&self, bs: BlockState<'w, Cx>) -> bool {
+        self.bsc.contains(&bs)
+    }
 }
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
 {
     /// Returns the block state at the given position.
     ///
@@ -155,7 +161,7 @@ where
     ///
     /// Panics when the given position out of bounds.
     #[inline]
-    pub fn fluid_state(&self, x: u32, y: u32, z: u32) -> IFluidState<'w, Cx>
+    pub fn fluid_state(&self, x: u32, y: u32, z: u32) -> FluidState<'w, Cx>
     where
         Cx: BsToFs<'w>,
     {
@@ -165,7 +171,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::Biome, IBiome<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::Biome, IBiome<'w, Cx>>,
     Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>,
 {
     /// Returns the biome at the given position.
@@ -177,7 +183,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: BsToFs<'w> + ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: BsToFs<'w> + WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
         + Clone,
@@ -203,7 +209,7 @@ where
             Maybe::Owned(maybe::SimpleOwned(bs)) => bs,
         };
 
-        if !state_old.block.settings().is_empty {
+        if !state_old.block.settings().empty {
             self.ne_block_c -= 1;
             if state_old.block.settings().random_ticks {
                 self.rt_block_c -= 1;
@@ -214,7 +220,7 @@ where
             self.ne_fluid_c -= 1;
         }
 
-        if !state.block.settings().is_empty {
+        if !state.block.settings().empty {
             self.ne_block_c += 1;
             if state.block.settings().random_ticks {
                 self.rt_block_c += 1;
@@ -231,7 +237,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w>
+    Cx: WorldCx<'w>
         + ProvidePalette<Cx::BlockStateList, BlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
@@ -281,9 +287,9 @@ where
 
 impl<'w, Cx> Debug for ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w> + Debug,
+    Cx: WorldCx<'w> + Debug,
     Cx::Id: Debug,
-    Cx::BlockStateExt: Debug,
+    Cx::BlockStateExt<'w>: Debug,
     Cx::BlockStateList: Debug,
     Cx::Biome: Debug,
     Cx::BiomeList: Debug,
@@ -310,7 +316,6 @@ pub trait ComputeIndex<L, T>: ProvidePalette<L, T> {
     }
 }
 
-#[cfg(feature = "edcode")]
 mod _edcode {
 
     use edcode2::{Buf, BufMut, Decode, Encode};
@@ -319,7 +324,7 @@ mod _edcode {
 
     impl<'w, Cx, B> Encode<B> for ChunkSection<'w, Cx>
     where
-        Cx: ChunkCx<'w>,
+        Cx: WorldCx<'w>,
         Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>,
         Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>,
         B: BufMut,
@@ -333,7 +338,7 @@ mod _edcode {
 
     impl<'w, 'de, Cx, B> Decode<'de, B> for ChunkSection<'w, Cx>
     where
-        Cx: ChunkCx<'w>,
+        Cx: WorldCx<'w>,
         Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, BlockState<'w, Cx>> + Clone,
         Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
             + for<'s> PalIndexFromRaw<'s, IBiome<'w, Cx>>
@@ -362,7 +367,7 @@ mod _edcode {
 
     impl<'w, Cx> ChunkSection<'w, Cx>
     where
-        Cx: ChunkCx<'w>,
+        Cx: WorldCx<'w>,
         Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
             + for<'s> PalIndexFromRaw<'s, IBiome<'w, Cx>>
             + for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>

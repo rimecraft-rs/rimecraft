@@ -8,6 +8,7 @@ use std::{
     str::FromStr,
 };
 
+use remap::{remap, remap_method};
 use rgb::{RGB8, alt::ARGB8};
 
 use crate::Error;
@@ -15,6 +16,7 @@ use crate::Error;
 pub use rimecraft_fmt::Formatting;
 
 /// An RGB color of a text.
+#[remap(yarn = "TextColor", mojmaps = "TextColor")]
 #[derive(Debug, Clone, Copy)]
 pub struct Color {
     rgb: RGB8,
@@ -24,6 +26,7 @@ pub struct Color {
 impl Color {
     /// Gets RGB value of the color.
     #[inline]
+    #[remap_method(yarn = "getRgb", mojmaps = "getValue")]
     pub const fn rgb(&self) -> RGB8 {
         self.rgb
     }
@@ -35,6 +38,7 @@ impl Color {
 
     /// Gets the name of the color.
     #[inline]
+    #[remap_method(yarn = "getName", mojmaps = "serialize")]
     pub fn name(&self) -> Cow<'static, str> {
         match self.name {
             Some(name) => Cow::Borrowed(name),
@@ -153,11 +157,29 @@ impl From<u32> for ShadowColor {
 impl From<ShadowColor> for u32 {
     #[inline]
     fn from(color: ShadowColor) -> Self {
-        u32::from_be_bytes(color.argb.into())
+        Self::from_be_bytes(color.argb.into())
     }
 }
 
+/// A formattable type that can have [`Formatting`] applied to it.
+///
+/// All formatting operations take ownership of `self` and return a new instance with the formatting applied.
+pub trait Formattable: Sized {
+    /// Returns a new instance with the formatting applied, conserving **all** other attributes of this value.
+    #[remap_method(yarn = "withFormatting", mojmaps = "applyFormat")]
+    fn with_formatting(self, formatting: Formatting) -> Self;
+
+    /// Returns a new instance with the formatting applied, conserving **some applicable**
+    /// attributes of this value.
+    #[remap_method(yarn = "withExclusiveFormatting", mojmaps = "applyLegacyFormat")]
+    fn with_exclusive_formatting(self, formatting: Formatting) -> Self;
+}
+
 /// Style of a text, representing cosmetic attributes.
+///
+/// # Note to extension type implementors
+///
+/// This type is supposed to be cheaply-cloned, so as well as the `Ext` type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 #[cfg_attr(
     feature = "serde",
@@ -165,6 +187,7 @@ impl From<ShadowColor> for u32 {
     serde(rename_all = "camelCase")
 )]
 #[non_exhaustive]
+#[remap(yarn = "Style", mojmaps = "Style")]
 pub struct Style<Ext> {
     /// Color of the text.
     #[cfg_attr(
@@ -247,6 +270,26 @@ where
     }
 }
 
+impl<'a, Ext> Add<&'a Self> for Style<Ext>
+where
+    Ext: Add<&'a Ext, Output = Ext>,
+{
+    type Output = Self;
+
+    fn add(self, rhs: &'a Self) -> Self::Output {
+        Self {
+            color: rhs.color.or(self.color),
+            shadow_color: rhs.shadow_color.or(self.shadow_color),
+            bold: rhs.bold.or(self.bold),
+            italic: rhs.italic.or(self.italic),
+            underlined: rhs.underlined.or(self.underlined),
+            strikethrough: rhs.strikethrough.or(self.strikethrough),
+            obfuscated: rhs.obfuscated.or(self.obfuscated),
+            ext: self.ext + &rhs.ext,
+        }
+    }
+}
+
 impl<Ext> AddAssign for Style<Ext>
 where
     Ext: AddAssign,
@@ -260,6 +303,78 @@ where
         self.strikethrough = rhs.strikethrough.or(self.strikethrough);
         self.obfuscated = rhs.obfuscated.or(self.obfuscated);
         self.ext += rhs.ext;
+    }
+}
+
+impl<Ext> Style<Ext> {
+    /// Creates a new [`Style`] with the given extra data, with all other attributes unset.
+    #[inline]
+    pub fn new(ext: Ext) -> Self {
+        Self {
+            color: None,
+            shadow_color: None,
+            bold: None,
+            italic: None,
+            underlined: None,
+            strikethrough: None,
+            obfuscated: None,
+            ext,
+        }
+    }
+}
+
+impl<Ext> Formattable for Style<Ext>
+where
+    Ext: Formattable,
+{
+    fn with_formatting(self, formatting: Formatting) -> Self {
+        let mut style = self;
+        style.ext = style.ext.with_formatting(formatting);
+        match formatting {
+            Formatting::Bold => style.bold = Some(true),
+            Formatting::Italic => style.italic = Some(true),
+            Formatting::Underline => style.underlined = Some(true),
+            Formatting::Strikethrough => style.strikethrough = Some(true),
+            Formatting::Obfuscated => style.obfuscated = Some(true),
+            Formatting::Reset => {
+                // Reset clears everything
+                return Self::new(style.ext);
+            }
+            _ => {
+                style.color = formatting.try_into().ok();
+            }
+        }
+        style
+    }
+    /// When a color formatting is passed for formatting, the other formattings,
+    /// including bold, italic, strikethrough, underlined, and obfuscated, are all removed.
+    fn with_exclusive_formatting(self, formatting: Formatting) -> Self {
+        if formatting.is_color() {
+            // Color formatting clears all modifiers
+            Self {
+                color: formatting.try_into().ok(),
+                ..Self::new(self.ext.with_formatting(formatting))
+            }
+        } else {
+            // Modifier formatting
+            let mut style = self;
+            style.ext = style.ext.with_formatting(formatting);
+            match formatting {
+                Formatting::Bold => style.bold = Some(true),
+                Formatting::Italic => style.italic = Some(true),
+                Formatting::Underline => style.underlined = Some(true),
+                Formatting::Strikethrough => style.strikethrough = Some(true),
+                Formatting::Obfuscated => style.obfuscated = Some(true),
+                Formatting::Reset => {
+                    // Reset clears everything
+                    return Self::new(style.ext);
+                }
+                _ => {
+                    style.color = formatting.try_into().ok();
+                }
+            }
+            style
+        }
     }
 }
 
@@ -281,13 +396,29 @@ mod _serde {
 
     impl<'de> Deserialize<'de> for Color {
         #[inline]
-        fn deserialize<D>(deserializer: D) -> Result<Color, D::Error>
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
-            <&str>::deserialize(deserializer)?
-                .parse()
-                .map_err(serde::de::Error::custom)
+            struct Visitor;
+
+            impl serde::de::Visitor<'_> for Visitor {
+                type Value = Color;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    formatter.write_str("a string")
+                }
+
+                #[inline]
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    v.parse().map_err(serde::de::Error::custom)
+                }
+            }
+
+            deserializer.deserialize_str(Visitor)
         }
     }
 

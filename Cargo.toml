@@ -1,7 +1,12 @@
 [workspace]
 resolver = "2"
-# members = ["crates/util/*", "crates/client/*", "crates/core/*", "crates/test/*"]
-members = ["crates/util/*", "crates/core/*", "crates/test/*"]
+members = [
+    "crates/util/*",
+    "crates/client/*",
+    "crates/core/*",
+    "crates/test/*",
+    "crates/server/*",
+]
 
 [workspace.lints.rust]
 missing-docs = "warn"
@@ -18,6 +23,9 @@ dyn-drop = "forbid"
 ellipsis-inclusive-range-patterns = "forbid"
 exported-private-dependencies = "forbid"
 uncommon-codepoints = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(rc_mapping, values("mojmaps", "yarn"))',
+] }
 
 [workspace.lints.clippy]
 missing-panics-doc = "warn"
@@ -27,9 +35,28 @@ future-not-send = "warn"
 if-not-else = "warn"
 if-then-some-else-none = "warn"
 impl-trait-in-params = "warn"
-macro-use-imports = "forbid"
+macro-use-imports = "deny"
 exhaustive-enums = "warn"
 str-to-string = "warn"
 iter-without-into-iter = "warn"
 decimal-literal-representation = "warn"
 ref-as-ptr = "warn"
+unused-trait-names = "warn"
+unnecessary-semicolon = "warn"
+unnecessary-debug-formatting = "warn"
+too-long-first-doc-paragraph = "warn"
+ref-option = "warn"
+redundant-test-prefix = "warn"
+map-with-unused-argument-over-ranges = "warn"
+manual-midpoint = "warn"
+manual-is-power-of-two = "warn"
+ip-constant = "warn"
+elidable-lifetime-names = "warn"
+coerce-container-to-any = "warn"
+todo = "warn"
+inline-always = "warn"
+multiple-crate-versions = "warn"
+use-self = "warn"
+useless-let-if-seq = "warn"
+suboptimal-flops = "warn"
+redundant-clone = "warn"

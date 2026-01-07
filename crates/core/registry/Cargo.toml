@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Minecraft registry implementation"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = ["data-structures"]
 
@@ -19,6 +19,9 @@ ahash = "0.8"
 typeid = "1.0"
 local-cx = { path = "../local-cx", package = "rimecraft-local-cx" }
 marking = { path = "../../util/marking", package = "rimecraft-marking", optional = true }
+
+[dev-dependencies]
+static_assertions = "1.1"
 
 [features]
 serde = ["dep:serde", "local-cx/serde"]

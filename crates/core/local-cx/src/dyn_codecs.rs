@@ -15,7 +15,7 @@ pub use erased_serde::Serialize;
 /// An 'any' trait without any type restriction.
 pub trait Any {
     /// Gets the [`TypeId`] of this type.
-    #[inline(always)]
+    #[inline]
     fn type_id(&self) -> TypeId {
         typeid::of::<Self>()
     }

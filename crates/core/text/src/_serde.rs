@@ -76,7 +76,7 @@ where
                 content,
                 style,
                 extra,
-            } => Ok(RawText {
+            } => Ok(Self {
                 content,
                 style,
                 sibs: extra,

@@ -163,7 +163,7 @@ pub mod serde {
             D: serde::Deserializer<'de>,
         {
             let registry = deserializer.local_cx.acquire();
-            Ok(Unprefixed(TagKey {
+            Ok(Self(TagKey {
                 registry: registry.key.clone(),
                 id: K::deserialize_with_cx(deserializer)?,
             }))

@@ -1,4 +1,5 @@
 use std::{
+    any::TypeId,
     fmt::Debug,
     ops::{Add, Deref},
 };
@@ -30,6 +31,15 @@ pub trait ErasedList<T>: Send + Sync + Debug {
     #[inline]
     fn __downcast_fractional_double_list(&self) -> Option<&FractionalDoubleList> {
         None
+    }
+
+    fn __is_identical(&self, other: &dyn ErasedList<T>) -> bool {
+        let _ = other;
+        false
+    }
+
+    fn typeid(&self) -> TypeId {
+        typeid::of::<Self>()
     }
 }
 
@@ -158,6 +168,16 @@ where
     fn __downcast_fractional_double_list(&self) -> Option<&FractionalDoubleList> {
         self.0.__downcast_fractional_double_list()
     }
+
+    fn __is_identical(&self, other: &dyn ErasedList<I>) -> bool {
+        self.typeid() == other.typeid()
+            && std::ptr::eq(
+                &*self.0,
+                //SAFETY: type checked and we don't care about lifetime.
+                // soundness is another issue but literally causes nothing bad
+                &*unsafe { &*std::ptr::from_ref(other).cast::<Self>() }.0,
+            )
+    }
 }
 
 #[repr(transparent)]
@@ -245,7 +265,7 @@ where
 }
 
 impl<I, T> From<(I, T)> for OffsetList<I, T> {
-    #[inline(always)]
+    #[inline]
     fn from(value: (I, T)) -> Self {
         Self {
             offset: value.0,
@@ -571,6 +591,96 @@ where
             f(&mut base.map(|(x, y, index)| PairListIterItem { x: y, y: x, index }))
         } else {
             f(&mut base.map(|(x, y, index)| PairListIterItem { x, y, index }))
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum FastDoublePairList<T> {
+    Identity(IdentityPairList<T>),
+    Simple(SimplePairDoubleList),
+    Fractional(FractionalPairDoubleList),
+    Chained(ChainedPairList<T, T>),
+}
+
+impl<T> FastDoublePairList<T>
+where
+    T: ErasedList<f64> + 'static,
+{
+    pub fn into_boxed_list(self) -> Box<dyn ErasedList<f64>> {
+        match self {
+            Self::Identity(i) => Box::new(i),
+            Self::Simple(i) => Box::new(i),
+            Self::Fractional(i) => Box::new(i),
+            Self::Chained(i) => Box::new(i),
+        }
+    }
+}
+
+impl<T> ErasedList<f64> for FastDoublePairList<T>
+where
+    T: ErasedList<f64>,
+{
+    fn __erased_index(&self, index: usize) -> f64 {
+        match self {
+            Self::Identity(i) => i.__erased_index(index),
+            Self::Simple(i) => i.__erased_index(index),
+            Self::Fractional(i) => i.__erased_index(index),
+            Self::Chained(i) => i.__erased_index(index),
+        }
+    }
+
+    fn __peek_erased_iter(&self, f: &mut (dyn FnMut(&mut (dyn Iterator<Item = f64> + '_)) + '_)) {
+        match self {
+            Self::Identity(i) => i.__peek_erased_iter(f),
+            Self::Simple(i) => i.__peek_erased_iter(f),
+            Self::Fractional(i) => i.__peek_erased_iter(f),
+            Self::Chained(i) => i.__peek_erased_iter(f),
+        }
+    }
+
+    fn __boxed_erased_iter<'a>(&'a self) -> Box<dyn Iterator<Item = f64> + 'a>
+    where
+        f64: 'a,
+    {
+        match self {
+            Self::Identity(i) => i.__boxed_erased_iter(),
+            Self::Simple(i) => i.__boxed_erased_iter(),
+            Self::Fractional(i) => i.__boxed_erased_iter(),
+            Self::Chained(i) => i.__boxed_erased_iter(),
+        }
+    }
+
+    fn __erased_len(&self) -> usize {
+        match self {
+            Self::Identity(i) => i.__erased_len(),
+            Self::Simple(i) => i.__erased_len(),
+            Self::Fractional(i) => i.__erased_len(),
+            Self::Chained(i) => i.__erased_len(),
+        }
+    }
+}
+
+impl<T> PairErasedList<f64> for FastDoublePairList<T>
+where
+    T: ErasedList<f64>,
+{
+    fn __peek_pair_erased_iter(
+        &self,
+        f: &mut (dyn FnMut(&mut (dyn Iterator<Item = PairListIterItem> + '_)) + '_),
+    ) {
+        match self {
+            Self::Identity(i) => i.__peek_pair_erased_iter(f),
+            Self::Simple(i) => i.__peek_pair_erased_iter(f),
+            Self::Fractional(i) => i.__peek_pair_erased_iter(f),
+            Self::Chained(i) => i.__peek_pair_erased_iter(f),
+        }
+    }
+
+    fn __downcast_fractional_pair_double_list(&self) -> Option<&FractionalPairDoubleList> {
+        match self {
+            Self::Fractional(i) => Some(i),
+            _ => None,
         }
     }
 }

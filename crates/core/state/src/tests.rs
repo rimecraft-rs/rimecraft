@@ -1,5 +1,5 @@
 use crate::{
-    StatesMut,
+    States, StatesMut,
     property::{
         BoolProperty, IntProperty,
         data::{BoolData, IntData},
@@ -11,7 +11,7 @@ static BOOL_PROPERTY: BoolProperty<'static> = BoolProperty::new("bool_property",
 
 #[test]
 fn states_create() {
-    let mut states = StatesMut::new(());
+    let mut states = StatesMut::new(|_| ());
     states.add(&INT_PROPERTY).unwrap();
     states.add(&BOOL_PROPERTY).unwrap();
     let states = states.freeze();
@@ -24,7 +24,7 @@ fn states_create() {
 
 #[test]
 fn with_cycle() {
-    let mut states = StatesMut::new(());
+    let mut states = StatesMut::new(|_| ());
     states.add(&INT_PROPERTY).unwrap();
     states.add(&BOOL_PROPERTY).unwrap();
     let states = states.freeze();
@@ -37,3 +37,6 @@ fn with_cycle() {
     let state = state.cycle(&BOOL_PROPERTY).unwrap();
     assert_eq!(state.get(&BOOL_PROPERTY), Some(false));
 }
+
+static_assertions::assert_impl_all!(States<'static, fn(i32)>: Send, Sync, Unpin);
+static_assertions::assert_impl_all!(StatesMut<'static, fn(i32)>: Send, Sync, Unpin);

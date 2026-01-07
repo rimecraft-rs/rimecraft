@@ -1,9 +1,9 @@
 use component::{RawErasedComponentType, changes::ComponentChanges, map::ComponentMap};
-use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
+use edcode2::{Buf, BufExt as _, BufMut, BufMutExt as _, Decode, Encode};
 use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 use rimecraft_registry::{Reg, Registry};
 
-use crate::{Item, ItemSettings, ItemStack, RawItem, stack::ItemStackCx};
+use crate::{Item, ItemSettings as _, ItemStack, RawItem, stack::ItemStackCx};
 
 impl<'a, Cx, Fw> Encode<Fw> for ItemStack<'a, Cx>
 where

@@ -188,7 +188,7 @@ pub mod edcode {
             let buf = buf.forward();
             let registry = buf.local_cx.acquire();
             let value = K::decode(buf)?;
-            Ok(Key::new(registry.key.value.clone(), value))
+            Ok(Self::new(registry.key.value.clone(), value))
         }
     }
 
