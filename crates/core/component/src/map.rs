@@ -275,7 +275,7 @@ where
         T: Send + Sync + 'a,
     {
         let ptr = std::ptr::from_mut::<Self>(self);
-        let value = unsafe { self.insert_untracked(ty, val) };
+        let value = unsafe { (*ptr).insert_untracked(ty, val) };
         if value.is_none() {
             //SAFETY: this does not affect the lifetime of the value.
             unsafe { (*ptr).track_add() }
@@ -327,7 +327,7 @@ where
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn remove<T>(&mut self, ty: &ComponentType<'a, T, Cx>) -> Option<Maybe<'_, T>> {
         let ptr = std::ptr::from_mut::<Self>(self);
-        let value = unsafe { self.remove_untracked(ty) };
+        let value = unsafe { (*ptr).remove_untracked(ty) };
         if value.is_some() {
             //SAFETY: this does not affect the lifetime of the value.
             unsafe { (*ptr).track_rm() }
