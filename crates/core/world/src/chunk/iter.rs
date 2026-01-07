@@ -7,7 +7,7 @@ use rimecraft_block::BlockState;
 use rimecraft_voxel_math::{BlockPos, ChunkSectionPos};
 
 use crate::chunk::{
-    BORDER_LEN, BaseChunkAccess, WorldCx, ChunkSection, SECTION_HEIGHT, section::ComputeIndex,
+    BORDER_LEN, BaseChunkAccess, ChunkSection, SECTION_HEIGHT, WorldCx, section::ComputeIndex,
 };
 
 /// An iterator over all blocks in a chunk.
