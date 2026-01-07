@@ -49,9 +49,7 @@ where
         <f32 as MathDeltaExt<f32>>::map(
             value as f32 + 0.5,
             <Self as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
-                ..<Self as IntSliderCallbacks<Cx>>::max_inclusive(self)
-                    as f32
-                    + 1.0,
+                ..<Self as IntSliderCallbacks<Cx>>::max_inclusive(self) as f32 + 1.0,
             0.0..1.0,
         )
         .clamp(0.0, 1.0)
@@ -62,9 +60,7 @@ where
             slider_progress,
             0.0..1.0,
             <Self as IntSliderCallbacks<Cx>>::min_inclusive(self) as f32
-                ..<Self as IntSliderCallbacks<Cx>>::max_inclusive(self)
-                    as f32
-                    + 1.0,
+                ..<Self as IntSliderCallbacks<Cx>>::max_inclusive(self) as f32 + 1.0,
         )
         .floor() as i32
     }

@@ -10,7 +10,7 @@ use local_cx::{
     serde::{DeserializeWithCx, SerializeWithCx},
     serde_codec,
 };
-use rimecraft_global_cx::ProvideIdTy;
+use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
 use rimecraft_registry::Reg;
 
 type Object<'a> = dyn Any + Send + Sync + 'a;
@@ -112,7 +112,7 @@ pub const fn serde_codec<'a, T, Cx>() -> SerdeCodec<'a, T, Cx::LocalContext<'a>>
 where
     for<'t> &'t T: SerializeWithCx<Cx::LocalContext<'t>>,
     T: for<'de, 'cx> DeserializeWithCx<'de, Cx::LocalContext<'cx>> + Send + Sync + 'a,
-    Cx: ProvideLocalCxTy,
+    Cx: ProvideLocalCxTy + GlobalContext,
 {
     serde_codec!(Local<Cx::LocalContext<'a>> T: Any + 'a)
 }
