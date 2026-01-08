@@ -40,7 +40,7 @@ where
     R: InvariantOn<'a>,
 {
     assert_eq!(
-        L::type_id(),
+        value.type_id_dyn(),
         R::type_id(),
         "type mismatch between given types"
     );
@@ -78,7 +78,7 @@ where
     L: InvariantOn<'a>,
     R: InvariantOn<'a>,
 {
-    if L::type_id() == R::type_id() {
+    if value.type_id_dyn() == R::type_id() {
         // SAFETY: L and R are invariant and sharing the same lifetime.
         Ok(unsafe { transmute::<L, R>(value) })
     } else {
@@ -135,6 +135,28 @@ pub const unsafe fn transmute_unchecked<L, R>(value: L) -> R {
     ManuallyDrop::into_inner(r)
 }
 
+/// Casts an (possibily wide) immutable reference into a its concrete variant, or returns null.
+///
+/// # Safety
+///
+/// This function is unsafe because it has no guarantee to the lifetime soundness.
+#[inline]
+pub unsafe fn try_cast_ref<L: ?Sized, R>(value: &L) -> Option<&R> {
+    (L::type_id_dyn(value) == R::type_id())
+        .then_some(unsafe { &*core::ptr::from_ref(value).cast() })
+}
+
+/// Casts a (possibily wide) mutable reference into a its concrete variant, or returns null.
+///
+/// # Safety
+///
+/// This function is unsafe because it has no guarantee to the lifetime soundness.
+#[inline]
+pub unsafe fn try_cast_mut<L: ?Sized, R>(value: &mut L) -> Option<&mut R> {
+    (L::type_id_dyn(value) == R::type_id())
+        .then_some(unsafe { &mut *core::ptr::from_mut(value).cast() })
+}
+
 /// Gets the [`TypeId`] of a type regardless of its lifetime.
 #[inline]
 pub fn typeid<T: ?Sized>() -> TypeId {
@@ -158,6 +180,26 @@ pub const fn phantom_invariant<'a>() -> PhantomInvariant<'a> {
 
 impl sealed::SealedInvariantLifetime for InvariantLifetime<'_> {}
 
+/// `Any` trait without any type restriction.
+pub trait Any {
+    /// Returns the type id of this value.
+    #[inline]
+    fn type_id_dyn(&self) -> TypeId {
+        typeid::<Self>()
+    }
+
+    /// Returns the type id of this type.
+    #[inline]
+    fn type_id() -> TypeId
+    where
+        Self: Sized,
+    {
+        typeid::<Self>()
+    }
+}
+
+impl<T: ?Sized> Any for T {}
+
 /// Types that are supposed to be static-lifetimed all the time.
 pub trait Static: 'static {}
 
@@ -179,15 +221,6 @@ pub trait Static: 'static {}
 pub unsafe trait Invariant {
     /// The lifetime, with the type of [`InvariantLifetime`].
     type Lifetime: sealed::SealedInvariantLifetime;
-
-    #[doc(hidden)]
-    #[inline]
-    fn type_id() -> TypeId
-    where
-        Self: Sized,
-    {
-        typeid::<Self>()
-    }
 }
 
 /// Shorthand for `Invariant<Lifetime = InvariantLifetime<'_>'>`.
@@ -198,15 +231,6 @@ where
     T: Static + ?Sized,
 {
     type Lifetime = InvariantLifetime<'static>;
-
-    #[inline]
-    fn type_id() -> TypeId
-    where
-        Self: Sized,
-    {
-        // optimized implementation
-        TypeId::of::<Self>()
-    }
 }
 
 impl<'a, T> InvariantOn<'a> for T where T: Invariant<Lifetime = InvariantLifetime<'a>> + ?Sized {}
@@ -214,3 +238,6 @@ impl<'a, T> InvariantOn<'a> for T where T: Invariant<Lifetime = InvariantLifetim
 mod sealed {
     pub trait SealedInvariantLifetime {}
 }
+
+#[cfg(test)]
+mod tests;

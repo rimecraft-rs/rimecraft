@@ -1,6 +1,6 @@
 //! `ComponentChanges` implementation.
 
-use std::{cell::UnsafeCell, fmt::Debug, marker::PhantomData, str::FromStr, sync::OnceLock};
+use std::{cell::RefCell, fmt::Debug, marker::PhantomData, str::FromStr, sync::OnceLock};
 
 use ahash::{AHashMap, AHashSet};
 use bytes::{Buf, BufMut};
@@ -8,7 +8,6 @@ use edcode2::{BufExt as _, BufMutExt as _, Decode, Encode};
 use local_cx::{
     BaseLocalContext, ForwardToWithLocalCx, LocalContext, LocalContextExt as _, ProvideLocalCxTy,
     WithLocalCx,
-    dyn_codecs::Any,
     serde::{DeserializeWithCx, SerializeWithCx},
 };
 use rimecraft_global_cx::ProvideIdTy;
@@ -17,7 +16,7 @@ use rimecraft_registry::{Reg, Registry};
 use serde::{Serialize, de::DeserializeSeed, ser::SerializeMap as _};
 
 use crate::{
-    ComponentType, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
+    ComponentType, DebugIter, ErasedComponentType, Object, RawErasedComponentType,
     UnsafeSerdeCodec,
     map::{CompTyCell, ComponentMap},
 };
@@ -53,7 +52,7 @@ where
         unsafe {
             let val = self.get_raw(&RawErasedComponentType::from(ty))?;
             if let Some(val) = val {
-                let downcasted = <dyn Any>::downcast_ref::<T>(val)?;
+                let downcasted = rcutil::try_cast_ref::<_, T>(val)?;
                 Some(Some(downcasted))
             } else {
                 Some(None)
@@ -517,7 +516,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(
-            &UnsafeDebugIter(UnsafeCell::new(
+            &DebugIter(RefCell::new(
                 self.changed
                     .iter()
                     .map(|(k, v)| (k.0, v.as_ref().map(|v| (k.0.f.util.dbg)(&**v)))),
@@ -533,6 +532,6 @@ where
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&UnsafeDebugIter(UnsafeCell::new(self.changes.keys())), f)
+        Debug::fmt(&DebugIter(RefCell::new(self.changes.keys())), f)
     }
 }

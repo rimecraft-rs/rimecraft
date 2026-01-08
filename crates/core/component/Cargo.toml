@@ -25,6 +25,7 @@ local-cx = { path = "../local-cx", features = [
     "edcode",
     "dyn-codecs",
 ], package = "rimecraft-local-cx" }
+rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }
 typeid = "1.0"
 
 [dev-dependencies]

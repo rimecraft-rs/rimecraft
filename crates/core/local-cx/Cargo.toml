@@ -19,6 +19,7 @@ edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional
 typeid = { version = "1.0", optional = true }
 ahash = { version = "0.8", optional = true }
 bytes = { version = "*", optional = true }
+rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn", optional = true }
 
 [features]
