@@ -9,7 +9,18 @@ impl LeakedPtrMarker {
     /// Creates a new leaked pointer marker.
     #[inline]
     pub fn new() -> Self {
-        Self(Box::into_raw(Box::new(0u8)).cast())
+        #[cfg(not(miri))]
+        {
+            Self(Box::into_raw(Box::new(0u8)).cast())
+        }
+
+        #[cfg(miri)]
+        {
+            static ATOMIC_COUNTER: std::sync::atomic::AtomicPtr<u8> =
+                std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+            Self(ATOMIC_COUNTER.fetch_byte_add(1, std::sync::atomic::Ordering::Relaxed))
+        }
     }
 
     /// Gets a non-leaked pointer marker reference from this.

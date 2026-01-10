@@ -15,7 +15,7 @@ maintenance = { status = "passively-maintained" }
 voxel-math = { path = "../voxel-math", package = "rimecraft-voxel-math" }
 rimecraft-edcode2 = { path = "../../util/edcode2", optional = true }
 serde = { version = "1.0", optional = true }
-bitvec = "1.0"
+bitvec = "1"
 maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
 glam = "0.30"
 approx = "0.5"

@@ -1,0 +1,17 @@
+name: Miri Test
+
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+  MIRIFLAGS: -Zmiri-tree-borrows
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Miri
+        run: rustup component add --toolchain nightly miri
+      - name: Test using Miri
+        run: cargo +nightly miri test --all-features --workspace
