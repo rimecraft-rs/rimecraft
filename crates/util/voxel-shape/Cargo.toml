@@ -18,7 +18,7 @@ serde = { version = "1.0", optional = true }
 maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
 math = { path = "../math", package = "rimecraft-math" }
 remap = { path = "../../util/remap", package = "rimecraft-remap" }
-bitvec = "1.0"
+bitvec = "1.1"
 glam = "0.30"
 approx = "0.5"
 typeid = "1.0"
