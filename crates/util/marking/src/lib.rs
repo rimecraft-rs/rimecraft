@@ -23,14 +23,6 @@ impl LeakedPtrMarker {
         }
     }
 
-    #[cfg(miri)]
-    fn __new_miri() -> Self {
-        static ATOMIC_COUNTER: std::sync::atomic::AtomicPtr<u8> =
-            std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
-
-        Self(ATOMIC_COUNTER.fetch_byte_add(1, std::sync::atomic::Ordering::Relaxed))
-    }
-
     /// Gets a non-leaked pointer marker reference from this.
     #[inline]
     pub fn as_non_leaked(&self) -> &PtrMarker {
