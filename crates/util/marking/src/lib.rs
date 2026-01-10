@@ -13,7 +13,6 @@ impl LeakedPtrMarker {
         {
             Self(Box::into_raw(Box::new(0u8)).cast())
         }
-<<<<<<< HEAD
 
         #[cfg(miri)]
         {
@@ -30,16 +29,6 @@ impl LeakedPtrMarker {
             std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
 
         Self(ATOMIC_COUNTER.fetch_byte_add(1, std::sync::atomic::Ordering::Relaxed))
-=======
-
-        #[cfg(miri)]
-        {
-            static ATOMIC_COUNTER: std::sync::atomic::AtomicPtr<u8> =
-                std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
-
-            Self(ATOMIC_COUNTER.fetch_byte_add(1, std::sync::atomic::Ordering::Relaxed))
-        }
->>>>>>> ed3f7d3 (cleanup)
     }
 
     /// Gets a non-leaked pointer marker reference from this.
