@@ -1,4 +1,4 @@
-name: Miri Test
+name: Miri test
 
 on: [push, pull_request]
 
