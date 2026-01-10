@@ -1,4 +1,4 @@
-name: Clippy Lint
+name: Clippy lint
 
 on: [push, pull_request]
 
