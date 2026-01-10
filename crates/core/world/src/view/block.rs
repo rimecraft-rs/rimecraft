@@ -3,6 +3,8 @@
 //! These views all take mutable reference to the _type_ for unifying the interface of locked access
 //! and lock-free access, where the latter one requires mutability.
 
+use std::marker::PhantomData;
+
 use bitflags::bitflags;
 use local_cx::ProvideLocalCxTy;
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
@@ -11,7 +13,7 @@ use rimecraft_fluid::{FluidState, ProvideFluidStateExtTy};
 use rimecraft_voxel_math::BlockPos;
 
 /// A scoped, immutable view of [`BlockState`]s and [`FluidState`]s.
-pub trait BlockView<'w, Cx>
+pub trait BlockView<'w, Cx>: MutBlockView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
@@ -38,7 +40,7 @@ where
 /// A scoped, immutable view of [`BlockEntity`]s.
 ///
 /// This is an affiliation of [`BlockView`].
-pub trait BlockEntityView<'w, Cx>: BlockView<'w, Cx>
+pub trait BlockEntityView<'w, Cx>: BlockView<'w, Cx> + MutBlockEntityView<'w, Cx>
 where
     Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
 {
@@ -176,4 +178,50 @@ where
     {
         BlockEntityView::peek_block_entity(*self, pos, pk)
     }
+}
+
+impl<'w, Cx, T> BlockView<'w, Cx> for &T
+where
+    T: BlockView<'w, Cx>,
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+{
+    #[inline]
+    fn block_state(&self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
+        (*self).block_state(pos)
+    }
+
+    #[inline]
+    fn fluid_state(&self, pos: BlockPos) -> Option<FluidState<'w, Cx>> {
+        (*self).fluid_state(pos)
+    }
+}
+
+/// Wraps a `BlockView` into a `MutBlockView`.
+pub fn make_mut_block_view<'w, Cx, View>(view: View) -> impl MutBlockView<'w, Cx>
+where
+    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    View: BlockView<'w, Cx>,
+{
+    struct Wrap<'w, Cx, View>(View, PhantomData<&'w Cx>)
+    where
+        Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+        View: BlockView<'w, Cx>;
+
+    impl<'w, Cx, View> MutBlockView<'w, Cx> for Wrap<'w, Cx, View>
+    where
+        Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+        View: BlockView<'w, Cx>,
+    {
+        #[inline]
+        fn block_state(&mut self, pos: BlockPos) -> Option<BlockState<'w, Cx>> {
+            self.0.block_state(pos)
+        }
+
+        #[inline]
+        fn fluid_state(&mut self, pos: BlockPos) -> Option<FluidState<'w, Cx>> {
+            self.0.fluid_state(pos)
+        }
+    }
+
+    Wrap(view, PhantomData)
 }

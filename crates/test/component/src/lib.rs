@@ -4,10 +4,11 @@
 use std::sync::Arc;
 
 use component::{
-    Any, ComponentType, PacketCodec, RawErasedComponentType, SerdeCodec, changes::ComponentChanges,
+    ComponentType, PacketCodec, RawErasedComponentType, SerdeCodec, changes::ComponentChanges,
     map::ComponentMap,
 };
 use edcode2::{Buf, BufMut, Decode, Encode};
+use rcutil::Any;
 use registry::{Registry, RegistryKey};
 use serde::{Deserialize, Serialize};
 use test_global::{
@@ -157,7 +158,9 @@ fn built_map() {
             info: "wlg".to_owned(),
         },
     );
+    dbg!(&builder);
     let mut map = builder.build();
+    dbg!(&map);
 
     assert_eq!(map.len(), 2);
     assert!(map.changes().is_none());
@@ -221,7 +224,7 @@ fn iter_map() {
     assert_eq!(iter.size_hint(), (2, Some(2)));
     assert_eq!(iter.len(), 2);
     for (ty, obj) in iter {
-        let obj = unsafe { <dyn Any>::downcast_ref::<Foo>(obj) }.expect("downcast failed");
+        let obj = unsafe { rcutil::try_cast_ref::<_, Foo>(obj) }.expect("downcast failed");
         if ty == edcode_ty {
             assert_eq!(obj.value, 114);
         } else if ty == persistent_ty {
@@ -252,7 +255,7 @@ fn iter_map() {
         assert_eq!(iter.size_hint(), (2, Some(2)));
         assert_eq!(iter.len(), 2);
         for (ty, obj) in iter {
-            let obj = <dyn Any>::downcast_ref::<Foo>(obj).expect("downcast failed");
+            let obj = rcutil::try_cast_ref::<_, Foo>(obj).expect("downcast failed");
             if ty == edcode_ty {
                 assert_eq!(obj.value, 114);
             } else if ty == persistent_ty {

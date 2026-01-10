@@ -1,23 +1,23 @@
 //! Component map implementation.
 
 use std::{
-    borrow::Borrow, cell::UnsafeCell, collections::hash_map, fmt::Debug, hash::Hash,
+    borrow::Borrow, cell::RefCell, collections::hash_map, fmt::Debug, hash::Hash,
     marker::PhantomData, sync::Arc,
 };
 
 use ahash::AHashMap;
 use local_cx::{
-    LocalContext, LocalContextExt as _, ProvideLocalCxTy, WithLocalCx,
-    dyn_codecs::{self, Any},
+    LocalContext, LocalContextExt as _, ProvideLocalCxTy, WithLocalCx, dyn_codecs,
     serde::{DeserializeWithCx, SerializeWithCx},
 };
+use rcutil::Any;
 use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
 use rimecraft_registry::Registry;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ComponentType, ErasedComponentType, Object, RawErasedComponentType, UnsafeDebugIter,
+    ComponentType, DebugIter, ErasedComponentType, Object, RawErasedComponentType,
     UnsafeSerdeCodec, changes::ComponentChanges,
 };
 
@@ -154,7 +154,7 @@ where
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get<T>(&self, ty: &ComponentType<'a, T, Cx>) -> Option<&T> {
         self.get_raw(&RawErasedComponentType::from(ty))
-            .and_then(|val| unsafe { <dyn Any>::downcast_ref(val) })
+            .and_then(|val| unsafe { rcutil::try_cast_ref::<_, T>(val) })
     }
 
     /// Gets the component with given type.
@@ -183,7 +183,7 @@ where
     ) -> Option<(ErasedComponentType<'a, Cx>, &T)> {
         unsafe {
             self.get_key_value_raw(&RawErasedComponentType::from(ty))
-                .and_then(|(k, v)| <dyn Any>::downcast_ref(v).map(|v| (k, v)))
+                .and_then(|(k, v)| rcutil::try_cast_ref(v).map(|v| (k, v)))
         }
     }
 
@@ -231,7 +231,7 @@ where
     /// The type `T`'s lifetime parameters should not overlap lifetime `'a`.
     pub unsafe fn get_mut<T>(&mut self, ty: &ComponentType<'a, T, Cx>) -> Option<&mut T> {
         self.get_mut_raw(&RawErasedComponentType::from(ty))
-            .and_then(|val| unsafe { <dyn Any>::downcast_mut(val) })
+            .and_then(|val| unsafe { rcutil::try_cast_mut(val) })
     }
 
     /// Gets the component with given type, with mutable access.
@@ -308,7 +308,7 @@ where
                     Some(v)
                 } else {
                     return old
-                        .and_then(|old| unsafe { <dyn Any>::downcast_ref::<T>(old) })
+                        .and_then(|old| unsafe { rcutil::try_cast_ref(old) })
                         .map(Maybe::Borrowed);
                 }
                 .flatten()
@@ -350,7 +350,7 @@ where
                     (Some((k, v)), None) => {
                         changes.insert(CompTyCell(k), None);
                         let v: &(dyn Any + '_) = v;
-                        unsafe { v.downcast_ref::<T>().map(Maybe::Borrowed) }
+                        unsafe { rcutil::try_cast_ref(v).map(Maybe::Borrowed) }
                     }
                     (Some(_), Some(now)) => now
                         .take()
@@ -620,7 +620,7 @@ where
     {
         assert_eq!(
             ty.ty,
-            typeid::of::<T>(),
+            T::type_id(),
             "the component type should matches the type of given value"
         );
         self.map.insert(CompTyCell(ty), Box::new(val));
@@ -638,7 +638,7 @@ where
     pub fn insert_raw(&mut self, ty: ErasedComponentType<'a, Cx>, val: Box<Object<'a>>) {
         assert_eq!(
             ty.ty,
-            (*val).type_id(),
+            (*val).type_id_dyn(),
             "the component type should matches the type of given value"
         );
         self.map.insert(CompTyCell(ty), val);
@@ -664,7 +664,7 @@ where
     ) {
         self.map.extend(
             iter.into_iter()
-                .filter(|(k, v)| k.ty == (**v).type_id())
+                .filter(|(k, v)| k.ty == (**v).type_id_dyn())
                 .map(|(k, v)| (CompTyCell(k), v)),
         );
     }
@@ -721,18 +721,18 @@ where
                 .field("base", base)
                 .field(
                     "changes",
-                    &UnsafeDebugIter(UnsafeCell::new(
+                    &DebugIter(RefCell::new(
                         changes
                             .iter()
-                            .map(|(k, v)| (k, v.as_ref().map(|obj| (k.0.f.util.dbg)(obj)))),
+                            .map(|(k, v)| (k, v.as_ref().map(|obj| (k.0.f.util.dbg)(&**obj)))),
                     )),
                 )
                 .field("changes_count", changes_count)
                 .finish(),
             MapInner::Simple(map) => f
                 .debug_tuple("SimpleComponentMap")
-                .field(&UnsafeDebugIter(UnsafeCell::new(
-                    map.iter().map(|(k, v)| (k, (k.0.f.util.dbg)(v))),
+                .field(&DebugIter(RefCell::new(
+                    map.iter().map(|(k, v)| (k, (k.0.f.util.dbg)(&**v))),
                 )))
                 .finish(),
         }
@@ -753,7 +753,7 @@ where
                 changes_it: _,
             } => f
                 .debug_struct("PatchedComponentMapIter")
-                .field("changes", &UnsafeDebugIter(UnsafeCell::new(changes.keys())))
+                .field("changes", &DebugIter(RefCell::new(changes.keys())))
                 .field("base_it", base_it)
                 .finish(),
             IterInner::Simple(_it) => f.debug_tuple("SimpleComponentMapIter").finish(),
@@ -768,7 +768,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ComponentMapBuilder")
-            .field("map", &UnsafeDebugIter(UnsafeCell::new(self.map.keys())))
+            .field("map", &DebugIter(RefCell::new(self.map.keys())))
             .finish()
     }
 }

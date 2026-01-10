@@ -19,6 +19,7 @@ use global_cx::{
 };
 use local_cx::{PeekLocalContext, ProvideLocalCxTy};
 use parking_lot::Mutex;
+use rcutil::{Invariant, InvariantLifetime, PhantomInvariant, phantom_invariant};
 use registry::Reg;
 use serde::Serialize;
 use serde_update::erased::ErasedUpdate;
@@ -28,10 +29,13 @@ use voxel_math::{BlockPos, ChunkPos};
 use crate::data::{DataTracked, DataTracker, DataTrackerBuilder, EntityDataCx, SerializedEntry};
 
 mod _serde;
-pub mod data;
 mod filter;
+mod hit;
 
-pub use filter::{SafeTypeFilter, TypeFilter};
+pub mod data;
+
+pub use filter::*;
+pub use hit::*;
 
 /// Global context types satisfying use of entities.
 pub trait EntityCx<'a>:
@@ -204,7 +208,17 @@ where
     custom_compound: Cx::Compound,
     ext: Cx::EntityExt<'a>,
 
+    _ghost: PhantomInvariant<'a>,
+
     data: T,
+}
+
+// SAFETY: guaranteed by `_ghost`.
+unsafe impl<'a, T: ?Sized, Cx> Invariant for RawEntity<'a, T, Cx>
+where
+    Cx: EntityCx<'a>,
+{
+    type Lifetime = InvariantLifetime<'a>;
 }
 
 impl<'a, T: ?Sized, Cx> Debug for RawEntity<'a, T, Cx>
@@ -431,6 +445,7 @@ where
             change_listener: None,
             custom_compound: Default::default(),
             ext: Default::default(),
+            _ghost: phantom_invariant(),
             data,
         }
     }

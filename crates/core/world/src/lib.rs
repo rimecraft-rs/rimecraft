@@ -33,7 +33,6 @@ use rimecraft_voxel_math::direction::Direction;
 use std::{
     fmt::Debug,
     hash::Hash,
-    marker::PhantomData,
     sync::{Arc, Weak},
 };
 
@@ -76,10 +75,6 @@ where
     /// to be updated on block state updates in `WorldChunk`.
     fn iter_block_update_types_wc() -> impl Iterator<Item = &'w Self::HeightmapType>;
 }
-
-/// A marker type for invariant lifetime marking.
-#[allow(missing_debug_implementations)] // should not have an instance
-pub struct InvariantLifetime<'a>(PhantomData<fn(&'a ()) -> &'a ()>);
 
 /// The default max light level of Minecraft.
 pub const DEFAULT_MAX_LIGHT_LEVEL: u32 = 15;

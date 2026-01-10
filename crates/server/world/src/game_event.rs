@@ -11,7 +11,7 @@ use entity::{Entity, EntityCell};
 use glam::DVec3;
 use global_cx::ProvideIdTy;
 use ident_hash::{HashTableExt as _, IHashSet};
-use local_cx::dyn_codecs::{Any, EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
+use local_cx::dyn_codecs::{EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
 use maybe::Maybe;
 use parking_lot::Mutex;
 use registry::Reg;
@@ -418,7 +418,7 @@ where
 }
 
 /// A property of a game event listener which provides position of an in-game object.
-pub trait PositionSource<'w, Cx>: Any
+pub trait PositionSource<'w, Cx>
 where
     Cx: WorldCx<'w>,
 {

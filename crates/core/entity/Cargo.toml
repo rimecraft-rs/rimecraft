@@ -44,6 +44,8 @@ registry = { path = "../registry", package = "rimecraft-registry", features = [
 ] }
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
+rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }
+remap = { path = "../../util/remap", package = "rimecraft-remap" }
 
 [features]
 
