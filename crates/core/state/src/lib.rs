@@ -5,7 +5,6 @@
 use std::{
     collections::BTreeMap,
     fmt::{Debug, Display},
-    mem::MaybeUninit,
     ptr::NonNull,
     sync::OnceLock,
 };
@@ -29,16 +28,13 @@ type Table<'a, T> = AHashMap<ErasedProperty<'a>, IHashMap<isize, NonNull<T>>>;
 /// State of an object.
 pub struct State<'a, T> {
     pub(crate) entries: AHashMap<ErasedProperty<'a>, isize>,
-    table: MaybeUninit<Table<'a, Self>>,
-    init: bool,
+    table: Option<Table<'a, Self>>,
     data: T,
 }
 
 impl<'a, T> State<'a, T> {
     fn table(&self) -> &Table<'a, Self> {
-        assert!(self.init, "state is not fully initialized");
-        // SAFETY: we assume the state is correctly initialized
-        unsafe { self.table.assume_init_ref() }
+        self.table.as_ref().unwrap()
     }
 
     /// Gets the current value of given property in this state.
@@ -197,19 +193,14 @@ impl<'a, T> States<'a, T> {
             .map(|entries| {
                 let state = State {
                     entries,
-                    table: MaybeUninit::uninit(),
-                    init: false,
+                    table: None,
                     data: (),
                 };
                 let data = f(&state);
-                let State {
-                    entries, data: _, ..
-                } = state;
 
                 NonNull::new(Box::into_raw(Box::new(State {
-                    entries,
-                    table: MaybeUninit::uninit(),
-                    init: false,
+                    entries: state.entries,
+                    table: None,
                     data,
                 })))
                 .expect("failed to allocate state")
@@ -240,8 +231,7 @@ impl<'a, T> States<'a, T> {
                 table.insert(prop.clone(), row);
             }
             let state = unsafe { list[i].as_mut() };
-            state.table.write(table);
-            state.init = true;
+            state.table = Some(table);
         }
 
         Self {

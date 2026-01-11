@@ -45,7 +45,7 @@ glam = "0.30"
 bitflags = "2.9"
 tracing = { version = "0.1", optional = true }
 approx = "0.5"
-bitvec = "1.0"
+bitvec = "1"
 
 [features]
 tracing = ["dep:tracing"]
