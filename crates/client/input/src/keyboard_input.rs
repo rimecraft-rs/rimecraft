@@ -1,6 +1,6 @@
 //! Handles keyboard inputs.
 
-use crate::{slow_down::SlowDown, SlowDownTickable};
+use crate::{SlowDownTickable, slow_down::SlowDown};
 
 use super::Input;
 

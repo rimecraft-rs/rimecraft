@@ -1,6 +1,6 @@
 //! Minecraft Component implementation.
 
-use std::{any::TypeId, cell::UnsafeCell, fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{any::TypeId, cell::RefCell, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use bytes::{Buf, BufMut};
 use edcode2::{Decode, Encode};
@@ -10,7 +10,8 @@ use local_cx::{
     serde::{DeserializeWithCx, SerializeWithCx},
     serde_codec,
 };
-use rimecraft_global_cx::ProvideIdTy;
+use rcutil::Any;
+use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
 use rimecraft_registry::Reg;
 
 type Object<'a> = dyn Any + Send + Sync + 'a;
@@ -19,7 +20,6 @@ pub mod changes;
 pub mod map;
 
 pub use ahash::{AHashMap, AHashSet};
-pub use local_cx::dyn_codecs::Any;
 
 /// Type of a component data.
 ///
@@ -112,7 +112,7 @@ pub const fn serde_codec<'a, T, Cx>() -> SerdeCodec<'a, T, Cx::LocalContext<'a>>
 where
     for<'t> &'t T: SerializeWithCx<Cx::LocalContext<'t>>,
     T: for<'de, 'cx> DeserializeWithCx<'de, Cx::LocalContext<'cx>> + Send + Sync + 'a,
-    Cx: ProvideLocalCxTy,
+    Cx: ProvideLocalCxTy + GlobalContext,
 {
     serde_codec!(Local<Cx::LocalContext<'a>> T: Any + 'a)
 }
@@ -375,16 +375,14 @@ where
 pub type ErasedComponentType<'a, Cx> =
     Reg<'a, <Cx as ProvideIdTy>::Id, RawErasedComponentType<'a, Cx>>;
 
-struct UnsafeDebugIter<I>(UnsafeCell<I>);
+struct DebugIter<I>(RefCell<I>);
 
-impl<I> Debug for UnsafeDebugIter<I>
+impl<I> Debug for DebugIter<I>
 where
     I: Iterator<Item: Debug>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        unsafe {
-            let it = &mut *self.0.get();
-            f.debug_list().entries(it).finish()
-        }
+        let mut it = self.0.borrow_mut();
+        f.debug_list().entries(&mut *it).finish()
     }
 }

@@ -7,7 +7,7 @@ use std::{
 };
 
 use proc_macro2::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
-use smol_str::ToSmolStr as _;
+use smol_str::{ToSmolStr as _, format_smolstr};
 
 /// Expected count of mapping names for one item by default.
 ///
@@ -16,6 +16,7 @@ const HINT_NAMES_COUNT: usize = 2;
 
 const KEYWORDS: &[&str] = &[
     "pub", "mod", "fn", "type", "struct", "enum", "union", "const", "static", "char", "bool",
+    "move",
 ];
 
 fn rewrite_ident_in_rust(literal: Literal) -> Ident {
@@ -60,7 +61,11 @@ fn rewrite_ident_in_rust(literal: Literal) -> Ident {
         &output
     };
 
-    Ident::new(output_slice, literal.span())
+    if KEYWORDS.contains(&output_slice) {
+        Ident::new(&format_smolstr!("{output_slice}_"), literal.span())
+    } else {
+        Ident::new(output_slice, literal.span())
+    }
 }
 
 fn parse_attr(attr: TokenStream) -> HashMap<Ident, Vec<Ident>> {
@@ -435,7 +440,8 @@ struct RemapFnIter<'a, I: Iterator> {
     last_punct: Option<Punct>,
     reading_generics: bool,
     read_generic_now: bool,
-    inside_sharp_punct: u16,
+    // avoid overflowing
+    inside_sharp_punct: i16,
 }
 
 impl<I: Iterator<Item = TokenTree>> Iterator for RemapFnIter<'_, I> {
@@ -546,7 +552,7 @@ impl<I: Iterator<Item = TokenTree>> Iterator for RemapFnIter<'_, I> {
                 params.push(ident);
 
                 // forward to next ident
-                let mut inside_sharps = 0u8;
+                let mut inside_sharps = 0i16;
                 let mut last_spacing = Spacing::Alone;
                 iter.by_ref().find(|t| {
                     let mut is_comma = false;

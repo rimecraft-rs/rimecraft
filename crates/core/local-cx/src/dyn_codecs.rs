@@ -3,53 +3,16 @@
 
 #![cfg(feature = "dyn-codecs")]
 
-use std::{any::TypeId, fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, marker::PhantomData};
 
 use crate::WithLocalCx;
+
+use rcutil::Any;
 
 #[doc(hidden)]
 pub use edcode2::{Buf, BufMut, Decode, Encode};
 #[doc(hidden)]
 pub use erased_serde::Serialize;
-
-/// An 'any' trait without any type restriction.
-pub trait Any {
-    /// Gets the [`TypeId`] of this type.
-    #[inline]
-    fn type_id(&self) -> TypeId {
-        typeid::of::<Self>()
-    }
-}
-
-impl<T: ?Sized> Any for T {}
-
-impl dyn Any + '_ {
-    /// Downcast [`Any`] type with type checked.
-    ///
-    /// # Safety
-    ///
-    /// Lifetime not guaranteed.
-    pub unsafe fn downcast_ref<T>(&self) -> Option<&T> {
-        if (*self).type_id() == typeid::of::<T>() {
-            unsafe { Some(&*(std::ptr::from_ref::<dyn Any + '_>(self) as *const T)) }
-        } else {
-            None
-        }
-    }
-
-    /// Downcast [`Any`] type mutably with type checked.
-    ///
-    /// # Safety
-    ///
-    /// Lifetime not guaranteed.
-    pub unsafe fn downcast_mut<T>(&mut self) -> Option<&mut T> {
-        if (*self).type_id() == typeid::of::<T>() {
-            unsafe { Some(&mut *(std::ptr::from_mut::<dyn Any + '_>(self) as *mut T)) }
-        } else {
-            None
-        }
-    }
-}
 
 /// Downcast boxed [`Any`] type with type checked.
 ///
@@ -58,7 +21,7 @@ impl dyn Any + '_ {
 /// Lifetime not guaranteed.
 #[allow(clippy::missing_errors_doc)]
 pub unsafe fn downcast_boxed<'a, T>(any: Box<dyn Any + 'a>) -> Result<Box<T>, Box<dyn Any + 'a>> {
-    if (*any).type_id() == typeid::of::<T>() {
+    if (*any).type_id_dyn() == typeid::of::<T>() {
         unsafe { Ok(Box::from_raw(Box::into_raw(any) as *mut T)) }
     } else {
         Err(any)

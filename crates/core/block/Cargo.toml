@@ -18,6 +18,8 @@ rimecraft-state = { path = "../state" }
 rimecraft-voxel-math = { path = "../../util/voxel-math" }
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 voxel-shape = { path = "../../util/voxel-shape", package = "rimecraft-voxel-shape" }
+rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }
+remap = { path = "../../util/remap", package = "rimecraft-remap" }
 
 [features]
 

@@ -71,7 +71,7 @@ impl<T> Type<T> {
 pub struct DescriptorSet<'a, 'p> {
     inner: DescriptorSetInner,
     registry_marker: *const (),
-    parent: Option<&'p DescriptorSet<'a, 'p>>,
+    parent: Option<&'p Self>,
     // role of lifetime: constrain this type not to outlive it.
     _marker: PhantomData<&'a ()>,
 }

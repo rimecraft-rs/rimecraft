@@ -5,7 +5,7 @@ mod chunk_pos;
 mod chunk_section_pos;
 
 use glam::{DVec3, IVec3};
-use remap::{remap, remap_method};
+use remap::remap;
 use std::ops::ControlFlow;
 
 pub use block_pos::BlockPos;
@@ -13,11 +13,16 @@ pub use chunk_pos::ChunkPos;
 pub use chunk_section_pos::ChunkSectionPos;
 
 mod bbox;
+mod hit;
+
 pub mod direction;
 
-pub use bbox::BBox;
+#[cfg(test)]
+mod tests;
 
+pub use bbox::*;
 pub use glam;
+pub use hit::*;
 
 const F64_TOLERANCE: f64 = 1.0e-7f64;
 
@@ -97,15 +102,4 @@ where
     }
 
     None
-}
-
-/// Result of one or more hit tries, usually from ray casting.
-#[remap(yarn = "HitResult", mojmaps = "HitResult")]
-pub trait HitResult {
-    /// Returns the position of the hit position.
-    #[remap_method(yarn = "getPos", mojmaps = "getLocation")]
-    fn pos(&self) -> DVec3;
-
-    /// Whether the hit tries failed to hit a valid target.
-    fn is_missed(&self) -> bool;
 }

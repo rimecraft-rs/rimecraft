@@ -760,7 +760,8 @@ where
     Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + for<'a> ServerChunkEventCallback<'w, &'a Self>,
+        + for<'a> ServerChunkEventCallback<'w, &'a Self>
+        + for<'a> ServerChunkEventCallback<'w, &'a mut Self>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {
@@ -949,7 +950,8 @@ where
     Cx: WorldCx<'w>
         + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>
         + BsToFs<'w>
-        + for<'a> ServerChunkEventCallback<'w, &'a WorldChunk<'w, Cx>>,
+        + for<'a> ServerChunkEventCallback<'w, &'a WorldChunk<'w, Cx>>
+        + for<'a> ServerChunkEventCallback<'w, &'a mut WorldChunk<'w, Cx>>,
     Cx::Id: for<'de> Deserialize<'de>,
     Cx::LocalContext<'w>: WorldChunkLocalCx<'w, Cx>,
 {

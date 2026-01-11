@@ -16,11 +16,12 @@ use glam::{DVec3, USizeVec3, UVec3};
 use maybe::Maybe;
 
 pub use func::*;
+use remap::remap_method;
 pub use set::VoxelSet;
 pub use voxel_math;
 
 use voxel_math::{
-    BBox,
+    BBox, BlockHitResult, BlockPos,
     direction::{Axis, AxisDirection, Direction},
 };
 
@@ -207,7 +208,6 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
             && abs_diff_eq!(self.__point_pos(axis, 1), 1f64, epsilon = F64_TOLERANCE)
     }
 
-    #[allow(clippy::if_then_some_else_none)]
     fn __face(&self, this: &Arc<Slice<'static>>, facing: Direction) -> Option<Arc<Slice<'static>>> {
         // None for itself
         debug_assert!(
@@ -257,6 +257,14 @@ trait Abstract: ErasedProvidePointPosList + Send + Sync + Debug {
         math::binary_search_ie_u32(0..max, |i| coord < self.__point_pos(axis, i as usize))
             .unwrap_or(max)
             - 1
+    }
+
+    fn __priv_coord_index_vectorized(&self, coord: DVec3) -> UVec3 {
+        UVec3 {
+            x: self.__priv_coord_index(Axis::X, coord.x),
+            y: self.__priv_coord_index(Axis::Y, coord.y),
+            z: self.__priv_coord_index(Axis::Z, coord.z),
+        }
     }
 }
 
@@ -388,6 +396,48 @@ impl<'a> Slice<'a> {
             inner: self.0.__as_raw().voxels.boxes(),
         }
     }
+
+    /// Raycasts through this voxel shape, offseted by the given block position.
+    ///
+    /// See [`voxel_math::raycast_block`] for more information.
+    #[remap_method(yarn = "raycast", mojmaps = "clip")]
+    pub fn raycast(&self, src: DVec3, dst: DVec3, pos: BlockPos) -> Option<BlockHitResult> {
+        if self.is_empty() {
+            return None;
+        }
+        let delta = dst - src;
+        if delta.length_squared() < F64_TOLERANCE {
+            return None;
+        }
+
+        let adj = src + delta * 0.001;
+        let p = self.0.__priv_coord_index_vectorized(adj - DVec3::from(pos));
+        if self
+            .0
+            .__as_raw()
+            .voxels
+            .in_bounds_and_contains(p.x, p.y, p.z)
+        {
+            Some(BlockHitResult::new(
+                adj,
+                Direction::from(delta).opposite(),
+                pos,
+                true,
+            ))
+        } else {
+            voxel_math::raycast_block(self.boxes(), src, dst, pos)
+        }
+    }
+
+    /// Iterates each boxes in this slice.
+    #[deprecated = "use `boxes` to get an iterator instead. this method now only serves the need to remind people"]
+    #[remap_method(yarn = "forEachBox", mojmaps = "forAllBoxes")]
+    pub fn for_each_box<F>(&self, f: F)
+    where
+        F: FnMut(BBox),
+    {
+        self.boxes().for_each(f);
+    }
 }
 
 impl Slice<'static> {
@@ -399,7 +449,6 @@ impl Slice<'static> {
     }
 }
 
-#[allow(unsafe_code)] // SAFETY: repr(transparent)
 impl<'a> Slice<'a> {
     #[inline]
     fn from_ref<'s>(shape: &'s (dyn Abstract + 'a)) -> &'s Self {
