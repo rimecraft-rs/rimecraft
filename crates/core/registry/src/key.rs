@@ -161,7 +161,7 @@ mod serde {
 pub mod edcode {
 
     use edcode2::{Decode, Encode};
-    use local_cx::{LocalContext, WithLocalCx};
+    use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 
     use crate::Registry;
 
@@ -177,16 +177,18 @@ pub mod edcode {
         }
     }
 
-    impl<'r, 'de, K, T: 'r, B, Cx> Decode<'de, WithLocalCx<B, Cx>> for Key<K, T>
+    impl<'r, 'de, K, T: 'r, Fw> Decode<'de, Fw> for Key<K, T>
     where
-        K: Decode<'de, WithLocalCx<B, Cx>> + Clone + 'r,
-        Cx: LocalContext<&'r Registry<K, T>>,
+        K: Decode<'de, WithLocalCx<Fw::Forwarded, Fw::LocalCx>> + Clone + 'r,
+        Fw: ForwardToWithLocalCx,
+        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
     {
         #[inline]
-        fn decode(buf: WithLocalCx<B, Cx>) -> Result<Self, edcode2::BoxedError<'de>> {
+        fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
+            let buf = buf.forward();
             let registry = buf.local_cx.acquire();
             let value = K::decode(buf)?;
-            Ok(Key::new(registry.key.value.clone(), value))
+            Ok(Self::new(registry.key.value.clone(), value))
         }
     }
 

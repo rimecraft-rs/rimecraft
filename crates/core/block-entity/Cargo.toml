@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Minecraft block entity primitives"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
 
@@ -26,9 +26,11 @@ rimecraft-serde-update = { path = "../../util/serde-update", features = [
 component = { path = "../component", package = "rimecraft-component" }
 local-cx = { path = "../local-cx", features = [
     "serde",
-    "dyn-cx",
 ], package = "rimecraft-local-cx" }
 bitflags = "2.6"
+dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
+parking_lot = "0.12"
+serde-private = "1.0"
 
 [features]
 

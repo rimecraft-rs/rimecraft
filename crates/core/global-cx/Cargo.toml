@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Rimecraft global context traits"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
 
@@ -14,13 +14,18 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 serde = { version = "1.0", default-features = false, optional = true }
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
+rand = { version = "0.9", default-features = false, optional = true }
+smallbox = { version = "0.8", default-features = false, optional = true }
 
 [features]
-default = ["std"]
+default = ["std", "unit"]
 std = []
 serde = ["dep:serde"]
 nbt = ["serde"]
 edcode = ["dep:edcode2", "std"]
+rand = ["dep:rand"]
+unit = []
+smallbox = ["dep:smallbox"]
 
 [lints]
 workspace = true

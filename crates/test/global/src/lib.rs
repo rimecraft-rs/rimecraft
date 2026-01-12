@@ -11,7 +11,7 @@ use global_cx::{
     nbt::{ReadNbt, UpdateNbt, WriteNbt},
 };
 use local_cx::{
-    BaseLocalContext, LocalContextExt as _, WithLocalCx,
+    BaseLocalContext, LocalContextExt as _, ProvideLocalCxTy, WithLocalCx,
     nbt::{ReadNbtWithCx, UpdateNbtWithCx, WriteNbtWithCx},
     serde::{DeserializeWithCx, SerializeWithCx},
 };
@@ -20,18 +20,50 @@ use parking_lot::Mutex;
 pub mod identifier;
 pub mod pool;
 
+pub use global_cx;
+pub use local_cx;
+
 /// Integration with several Rimecraft crates.
 pub mod integration {
+    pub mod component;
+    pub mod keyboard;
+    pub mod mouse;
     pub mod registry;
     pub mod text;
+    pub mod tooltip;
 }
 
 pub use identifier::Id;
+#[cfg(feature = "component")]
+use registry::Registry;
 
 /// The global context.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[allow(clippy::exhaustive_enums)]
 pub enum TestContext {}
+
+/// The owned local context.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct OwnedLocalTestContext<'a> {
+    /// The component registry.
+    #[cfg(feature = "component")]
+    pub reg_components: Registry<Id, component::RawErasedComponentType<'a, TestContext>>,
+    _phantom: std::marker::PhantomData<&'a ()>,
+}
+
+impl Default for OwnedLocalTestContext<'_> {
+    fn default() -> Self {
+        Self {
+            #[cfg(feature = "component")]
+            reg_components: integration::component::default_components_registry_builder().into(),
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+/// The local context.
+pub type LocalTestContext<'a> = &'a OwnedLocalTestContext<'a>;
 
 unsafe impl GlobalContext for TestContext {}
 
@@ -42,6 +74,12 @@ impl ProvideIdTy for TestContext {
 impl ProvideVersionTy for TestContext {
     type Version = String;
 }
+
+impl ProvideLocalCxTy for TestContext {
+    type LocalContext<'cx> = LocalTestContext<'cx>;
+}
+
+impl BaseLocalContext for LocalTestContext<'_> {}
 
 /// A integer array.
 #[derive(Debug)]
@@ -75,17 +113,29 @@ impl From<NbtLongArray> for Box<[i64]> {
     }
 }
 
+/// A NBT compound.
+#[derive(Debug)]
+#[repr(transparent)]
+// Because the function `compound_to_deserializer` returns a `impl Deserializer<'_>`, we need to
+// use a value type here, instead of a hash map.
+pub struct NbtCompound(fastnbt::Value);
+
+impl Default for NbtCompound {
+    #[inline]
+    fn default() -> Self {
+        Self(fastnbt::Value::Compound(Default::default()))
+    }
+}
+
 impl ProvideNbtTy for TestContext {
-    // Because the function `compound_to_deserializer` returns a `impl Deserializer<'_>`, we need to
-    // use a value type here, instead of a hash map.
-    type Compound = fastnbt::Value;
+    type Compound = NbtCompound;
 
     type IntArray = NbtIntArray;
 
     type LongArray = NbtLongArray;
 
     fn compound_to_deserializer(compound: &Self::Compound) -> impl serde::Deserializer<'_> {
-        compound
+        &compound.0
     }
 }
 
@@ -209,7 +259,7 @@ impl TestId {
         if let Some(test_id) = tests.get(&thread_id) {
             *test_id
         } else {
-            let test_id = TestId(TEST_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
+            let test_id = Self(TEST_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
             tests.insert(thread_id, test_id);
             test_id
         }

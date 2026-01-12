@@ -1,17 +1,17 @@
 use component::{RawErasedComponentType, changes::ComponentChanges, map::ComponentMap};
-use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
-use local_cx::{LocalContext, WithLocalCx, dyn_cx::AsDynamicContext};
+use edcode2::{Buf, BufExt as _, BufMut, BufMutExt as _, Decode, Encode};
+use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 use rimecraft_registry::{Reg, Registry};
 
-use crate::{Item, ItemSettings, ItemStack, RawItem, stack::ItemStackCx};
+use crate::{Item, ItemSettings as _, ItemStack, RawItem, stack::ItemStackCx};
 
-impl<Cx, B, L> Encode<WithLocalCx<B, L>> for ItemStack<'_, Cx>
+impl<'a, Cx, Fw> Encode<Fw> for ItemStack<'a, Cx>
 where
     Cx: ItemStackCx,
-    B: BufMut,
-    L: AsDynamicContext,
+    Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx = Cx::LocalContext<'a>>,
 {
-    fn encode(&self, mut buf: WithLocalCx<B, L>) -> Result<(), edcode2::BoxedError<'static>> {
+    fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
+        let mut buf = buf.forward();
         if self.is_empty() {
             buf.put_variable(0u32);
             Ok(())
@@ -28,15 +28,15 @@ where
     }
 }
 
-impl<'r, 'de, Cx, B, L> Decode<'de, WithLocalCx<B, L>> for ItemStack<'r, Cx>
+impl<'r, 'de, Cx, Fw> Decode<'de, Fw> for ItemStack<'r, Cx>
 where
-    Cx: ItemStackCx<Id: for<'b> Decode<'de, WithLocalCx<&'b mut B, L>>>,
-    B: Buf,
-    L: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
-        + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>
-        + AsDynamicContext,
+    Cx: ItemStackCx<Id: for<'b> Decode<'de, WithLocalCx<&'b mut Fw::Forwarded, Fw::LocalCx>>>,
+    Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'r>>,
+    Cx::LocalContext<'r>: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
+        + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>,
 {
-    fn decode(mut buf: WithLocalCx<B, L>) -> Result<Self, edcode2::BoxedError<'de>> {
+    fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
+        let mut buf = buf.forward();
         let count: u32 = buf.get_variable();
         if count == 0 {
             Ok(ItemStack::empty(buf.local_cx))

@@ -1,7 +1,4 @@
-//! Macro rules.
-
-#[allow(unused_imports)]
-use crate::*; // Used in docs
+//! Macro rules for generating vanilla identifiers.
 
 /// Creates a new [`Identifier<Namespace, Path>`] with formatted literals.
 ///

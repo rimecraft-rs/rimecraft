@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Minecraft block primitives"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
 
@@ -16,6 +16,9 @@ rimecraft-global-cx = { path = "../global-cx" }
 rimecraft-registry = { path = "../registry" }
 rimecraft-state = { path = "../state" }
 rimecraft-voxel-math = { path = "../../util/voxel-math" }
+dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
+rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }
+remap = { path = "../../util/remap", package = "rimecraft-remap" }
 
 [features]
 

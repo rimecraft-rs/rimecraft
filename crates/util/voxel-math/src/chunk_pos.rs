@@ -1,3 +1,5 @@
+use crate::{BlockPos, coord_section_from_block};
+
 /// A pair of two integers representing the X and Z coordinates of a chunk.
 ///
 /// Chunk positions are usually serialized as an [`u64`].
@@ -10,6 +12,9 @@ pub struct ChunkPos {
 }
 
 impl ChunkPos {
+    /// The origin chunk position.
+    pub const ORIGIN: Self = Self { x: 0, z: 0 };
+
     /// Creates a new `ChunkPos` with the given X and Z coordinates.
     #[inline]
     pub const fn new(x: i32, z: i32) -> Self {
@@ -51,7 +56,7 @@ impl From<(i32, i32)> for ChunkPos {
 impl From<ChunkPos> for u64 {
     #[inline]
     fn from(ChunkPos { x, z }: ChunkPos) -> Self {
-        x as u64 & 0xFFFF_FFFF_u64 | ((z as u64 & 0xFFFF_FFFF_u64) << 32)
+        x as Self & 0xFFFF_FFFF_u64 | ((z as Self & 0xFFFF_FFFF_u64) << 32)
     }
 }
 
@@ -69,6 +74,16 @@ impl From<ChunkPos> for (i32, i32) {
     #[inline]
     fn from(ChunkPos { x, z }: ChunkPos) -> Self {
         (x, z)
+    }
+}
+
+impl From<BlockPos> for ChunkPos {
+    #[inline]
+    fn from(value: BlockPos) -> Self {
+        Self {
+            x: coord_section_from_block(value.x()),
+            z: coord_section_from_block(value.z()),
+        }
     }
 }
 

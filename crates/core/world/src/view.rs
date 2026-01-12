@@ -1,10 +1,13 @@
 //! View traits.
 
-use rimecraft_voxel_math::section_coord;
+use rimecraft_voxel_math::coord_section_from_block;
 
 pub mod block;
+pub mod chunk;
+pub mod entity;
 pub mod light;
 mod state_option;
+pub mod world;
 
 pub use state_option::StateOption;
 
@@ -45,17 +48,17 @@ impl HeightLimit {
 
     /// Returns the bottom section coordinate, inclusive.
     pub const fn bottom_section_coord(self) -> i32 {
-        section_coord(self.bottom())
+        coord_section_from_block(self.bottom())
     }
 
     /// Returns the top section coordinate, exclusive.
     pub const fn top_section_coord(self) -> i32 {
-        section_coord(self.top() - 1) + 1
+        coord_section_from_block(self.top() - 1) + 1
     }
 
     /// Returns the number of sections in the view, vertically.
-    pub const fn count_vertical_sections(self) -> i32 {
-        self.top_section_coord() - self.bottom_section_coord()
+    pub const fn count_vertical_sections(self) -> usize {
+        (self.top_section_coord() - self.bottom_section_coord()) as usize
     }
 
     /// Whether the given Y level is within the view's height limit.
@@ -65,7 +68,7 @@ impl HeightLimit {
 
     /// Returns a zero-based section index for the given Y level.
     pub const fn section_index(self, y: i32) -> usize {
-        self.section_coord_to_index(section_coord(y)) as usize
+        self.section_coord_to_index(coord_section_from_block(y)) as usize
     }
 
     /// Converts a section coordinate to a zero-based section index.
@@ -74,7 +77,7 @@ impl HeightLimit {
     }
 
     /// Converts a zero-based section index to a section coordinate.
-    pub const fn section_index_to_coord(self, index: i32) -> i32 {
-        index + self.bottom_section_coord()
+    pub const fn section_index_to_coord(self, index: usize) -> i32 {
+        index as i32 + self.bottom_section_coord()
     }
 }

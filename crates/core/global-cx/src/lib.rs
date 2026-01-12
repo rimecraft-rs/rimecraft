@@ -21,6 +21,12 @@ pub mod nbt;
 #[cfg(feature = "edcode")]
 pub mod edcode;
 
+#[cfg(feature = "rand")]
+pub mod rand;
+
+#[cfg(feature = "smallbox")]
+pub mod smallbox;
+
 /// Marker trait for global contexts.
 ///
 /// # Safety
@@ -46,7 +52,7 @@ pub trait ProvideVersionTy: GlobalContext {
 #[cfg(feature = "nbt")]
 pub trait ProvideNbtTy: GlobalContext {
     /// NBT compound type.
-    type Compound;
+    type Compound: Default;
 
     /// [`i32`] array type.
     type IntArray: Into<alloc::boxed::Box<[i32]>> + From<alloc::boxed::Box<[i32]>>;
@@ -60,3 +66,18 @@ pub trait ProvideNbtTy: GlobalContext {
 
 #[deprecated = "use `nbt` feature instead"]
 pub use nbt as nbt_edcode;
+
+#[cfg(feature = "unit")]
+unsafe impl GlobalContext for () {}
+
+/// Trait usually for global-context-provided 'extension types' to represent types that is held.
+pub trait Hold<T> {
+    /// Returns the held value.
+    fn get_held(&self) -> &T;
+}
+
+/// Trait usually for global-context-provided 'extension types' to represent types that is held mutably.
+pub trait HoldMut<T>: Hold<T> {
+    /// Returns the held value mutably.
+    fn get_held_mut(&mut self) -> &mut T;
+}

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Minecraft world implementation"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
 
@@ -14,7 +14,7 @@ maintenance = { status = "passively-maintained" }
 [dependencies]
 # Rimecraft crates
 rimecraft-global-cx = { path = "../global-cx", features = ["nbt"] }
-rimecraft-chunk-palette = { path = "../palette" }
+rimecraft-chunk-palette = { path = "../palette", features = ["edcode"] }
 rimecraft-registry = { path = "../registry", features = ["serde"] }
 rimecraft-state = { path = "../state" }
 rimecraft-block = { path = "../block" }
@@ -23,22 +23,31 @@ rimecraft-block-entity = { path = "../block-entity" }
 rimecraft-voxel-math = { path = "../../util/voxel-math" }
 rimecraft-packed-int-array = { path = "../../util/packed-int-array" }
 local-cx = { path = "../local-cx", package = "rimecraft-local-cx", features = [
-  "dyn-cx",
-  "dyn-codecs",
+    "dyn-codecs",
+    "dsyn",
 ] }
+entity = { path = "../entity", package = "rimecraft-entity" }
 maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
+ident-hash = { path = "../../util/ident-hash", package = "rimecraft-ident-hash" }
+dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
+voxel-shape = { path = "../../util/voxel-shape", package = "rimecraft-voxel-shape" }
+rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }
+edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2" }
+math = { path = "../../util/math", package = "rimecraft-math" }
 # External utils
 serde = { version = "1.0", features = ["derive"] }
+serde-private = "1.0"
 erased-serde = "0.4"
 serde_repr = "0.1"
-edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 parking_lot = "0.12"
 ahash = "0.8"
 glam = "0.30"
+bitflags = "2.9"
+tracing = { version = "0.1", optional = true }
+approx = "0.5"
 
 [features]
-default = ["edcode"]
-edcode = ["dep:edcode2", "rimecraft-chunk-palette/edcode"]
+tracing = ["dep:tracing"]
 
 [lints]
 workspace = true

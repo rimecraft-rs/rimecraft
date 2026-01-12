@@ -164,7 +164,7 @@ fn direct() {
 mod edcode {
     use super::List;
     use crate::{Palette, Strategy};
-    use edcode2::{Decode, Encode};
+    use edcode2::{Decode as _, Encode as _};
     use rimecraft_maybe::Maybe;
 
     macro_rules! helper {
@@ -200,6 +200,7 @@ mod container {
                     (Strategy::$pascal, 0)
                 }
             }
+            static_assertions::assert_impl_all!(PalettedContainer<List<0>, u8, Cx>: Send, Sync, Unpin);
         };
     }
 
@@ -210,7 +211,7 @@ mod container {
             container::{PalettedContainer, ProvidePalette, Storage},
             tests::List,
         };
-        use edcode2::{Decode, Encode};
+        use edcode2::{Decode as _, Encode as _};
 
         macro_rules! helper_base {
             ($pascal:ident, $snake:ident, $expect:expr) => {
@@ -258,9 +259,8 @@ mod container {
 
     #[cfg(feature = "serde")]
     mod serde {
-        use rimecraft_serde_update::Update;
-        use serde::Serialize;
-        use serde_json::{Deserializer, Serializer};
+        use fastnbt::{DeOpts, SerOpts, de::Deserializer};
+        use rimecraft_serde_update::Update as _;
 
         use crate::{
             Strategy,
@@ -286,10 +286,9 @@ mod container {
                         Storage::Empty(0),
                         vec![114],
                     );
-                    let mut serializer = Serializer::new(Vec::<u8>::new());
-                    src.serialize(&mut serializer).expect("serialize failed");
-                    let buf = serializer.into_inner();
-                    let mut deserializer = Deserializer::from_reader(&*buf);
+                    let buf = fastnbt::to_bytes_with_opts(&src, SerOpts::network_nbt())
+                        .expect("serialize failed");
+                    let mut deserializer = Deserializer::from_reader(&*buf, DeOpts::network_nbt());
                     dest.update(&mut deserializer).expect("deserialize failed");
                     assert_eq!(
                         dest.get(0).map(|m| *m),

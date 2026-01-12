@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Voxel shapes"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = ["game-development"]
 
@@ -12,10 +12,16 @@ categories = ["game-development"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rimecraft-voxel-math = { path = "../voxel-math" }
+voxel-math = { path = "../voxel-math", package = "rimecraft-voxel-math" }
 rimecraft-edcode2 = { path = "../../util/edcode2", optional = true }
 serde = { version = "1.0", optional = true }
-bitvec = "1.0"
+maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
+math = { path = "../math", package = "rimecraft-math" }
+remap = { path = "../../util/remap", package = "rimecraft-remap" }
+bitvec = "1"
+glam = "0.30"
+approx = "0.5"
+typeid = "1.0"
 
 [features]
 default = ["serde", "edcode"]

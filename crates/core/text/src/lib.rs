@@ -1,7 +1,38 @@
 //! Minecraft text API.
 
+#[cfg(feature = "macros")]
+mod macros;
+
+#[doc(hidden)]
+pub mod __priv_macro_use {
+    pub use std::concat;
+    pub use std::string::{String, ToString};
+    pub use std::vec::Vec;
+
+    #[inline]
+    pub const fn strip_dot_prefix(s: &str) -> &str {
+        assert!(s.len() >= ".".len());
+        __strip_dot_prefix(s)
+    }
+
+    const fn __strip_dot_prefix(s: &str) -> &str {
+        let prefix_len = ".".len();
+        let bytes = s.as_bytes();
+        let len = bytes.len() - prefix_len;
+        let ptr = bytes.as_ptr();
+        let bytes = unsafe { std::slice::from_raw_parts(ptr.add(prefix_len), len) };
+        unsafe { str::from_utf8_unchecked(bytes) }
+    }
+}
+
+use remap::{remap, remap_method};
+
+#[cfg(feature = "macros")]
+pub use rimecraft_text_derive::Localize;
+
 mod error;
 mod iter;
+pub mod ordered;
 pub mod style;
 
 #[cfg(feature = "serde")]
@@ -9,9 +40,13 @@ mod _serde;
 
 use std::{borrow::Cow, fmt::Display, ops::Add};
 
+use rimecraft_global_cx::GlobalContext;
+
+use crate::style::Formattable;
+
 pub use error::Error;
 pub use iter::{Iter, StyledIter};
-use rimecraft_global_cx::GlobalContext;
+pub use ordered::{ErasedOrderedText, OrderedText};
 pub use style::Style;
 
 /// A raw text component.
@@ -71,65 +106,102 @@ impl<T, StyleExt> RawText<T, StyleExt> {
 
     /// Returns the content of this text.
     #[inline]
+    #[remap_method(yarn = "getContent", mojmaps = "getContents")]
     pub fn content(&self) -> &T {
         &self.content
     }
 
     /// Returns the content of this text.
     #[inline]
+    #[remap_method(yarn = "getContentMut", mojmaps = "getContentsMut")]
     pub fn content_mut(&mut self) -> &mut T {
         &mut self.content
     }
 
     /// Returns the siblings of this text.
     #[inline]
+    #[remap_method(yarn = "getSiblings", mojmaps = "getSiblings")]
     pub fn sibs(&self) -> &[Self] {
         &self.sibs
     }
 
     /// Returns the siblings of this text.
     #[inline]
+    #[remap_method(yarn = "getSiblingsMut", mojmaps = "getSiblingsMut")]
     pub fn sibs_mut(&mut self) -> &mut Vec<Self> {
         &mut self.sibs
     }
 
     /// Returns the style of this text.
     #[inline]
+    #[remap_method(yarn = "append", mojmaps = "append")]
     pub fn push(&mut self, text: Self) {
         self.sibs.push(text);
     }
 
     /// Returns an iterator over the content of this text.
     #[inline]
-    pub fn iter(&self) -> Iter<'_, T> {
+    pub fn iter(&self) -> Iter<'_, T, StyleExt> {
         Iter {
-            inner: Box::new(
-                std::iter::once(&self.content).chain(self.sibs.iter().flat_map(Self::iter)),
-            ),
+            content: Some(self.content()),
+            sibs: self.sibs().iter(),
+            sib_iter: None,
+        }
+    }
+
+    /// Returns an iterator over the content and style of this text.
+    #[inline]
+    pub fn styled_iter<'a>(&'a self) -> StyledIter<'a, T, StyleExt>
+    where
+        StyleExt: Add<&'a StyleExt, Output = StyleExt>,
+    {
+        StyledIter {
+            style: self.style(),
+            content: Some(self.content()),
+            sibs: self.sibs().iter(),
+            sib_iter: None,
         }
     }
 }
 
 impl<T, StyleExt> RawText<T, StyleExt>
 where
-    StyleExt: Add<Output = StyleExt> + Clone,
+    T: Display,
 {
-    /// Returns an iterator over the content and style of this text.
-    #[inline]
-    pub fn styled_iter(&self) -> StyledIter<'_, T, StyleExt> {
-        StyledIter {
-            style: &self.style,
-            inner: Box::new(
-                std::iter::once((self.content(), self.style().clone()))
-                    .chain(self.sibs.iter().flat_map(Self::styled_iter)),
-            ),
+    /// Visits the string literals of this text.
+    #[remap_method(yarn = "visit", mojmaps = "visit")]
+    #[deprecated = "use `Self::iter` instead"]
+    pub fn visit<V, U>(&self, mut visitor: V) -> Option<U>
+    where
+        V: FnMut(&str) -> Option<U>,
+    {
+        for content in self.iter() {
+            if let Some(result) = visitor(&content.to_string()) {
+                return Some(result);
+            }
         }
+        None
+    }
+
+    /// Visits the string literals of this text with style.
+    #[deprecated = "use `Self::styled_iter` instead"]
+    pub fn styled_visit<'a, V, U>(&'a self, mut visitor: V) -> Option<U>
+    where
+        V: FnMut(Style<StyleExt>, &str) -> Option<U>,
+        StyleExt: Add<&'a StyleExt, Output = StyleExt> + Default,
+    {
+        for (content, style) in self.styled_iter() {
+            if let Some(result) = visitor(style, &content.to_string()) {
+                return Some(result);
+            }
+        }
+        None
     }
 }
 
 impl<'a, T, StyleExt> IntoIterator for &'a RawText<T, StyleExt> {
     type Item = &'a T;
-    type IntoIter = Iter<'a, T>;
+    type IntoIter = Iter<'a, T, StyleExt>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -180,7 +252,7 @@ where
     }
 }
 
-/// Global context for text.
+/// Global context for [`Text`].
 ///
 /// The associated type `Content` and `StyleExt` should be applied to [`Text`] when used.
 pub trait ProvideTextTy: GlobalContext {
@@ -188,10 +260,12 @@ pub trait ProvideTextTy: GlobalContext {
     type Content: Plain;
 
     /// Generic `StyleExt` that should be applied to [`Text`].
-    type StyleExt;
+    type StyleExt: Formattable;
 }
 
 /// Context type decorated [`RawText`].
+#[remap(yarn = "Text", mojmaps = "Component")]
+#[remap(yarn = "MutableText", mojmaps = "MutableComponent")] // two in one
 pub type Text<Cx> = RawText<<Cx as ProvideTextTy>::Content, <Cx as ProvideTextTy>::StyleExt>;
 
 /// A localizable value.
@@ -202,6 +276,3 @@ pub trait Localize {
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(feature = "macros")]
-mod macros;

@@ -41,22 +41,17 @@ pub struct Registry<K, T> {
 
     /// The default registration raw id.
     default: Option<usize>,
+
+    #[cfg(all(feature = "marking", not(feature = "marking-leaked")))]
+    marker: marking::PtrMarker,
+    #[cfg(all(feature = "marking", feature = "marking-leaked"))]
+    marker: marking::LeakedPtrMarker,
 }
 
 /// Reference of a registration.
 ///
-/// # Serialization and Deserialization
-///
-/// This type can be serialized and deserialized using `serde` and `edcode2`.
-/// (with `serde` feature and `edcode` feature respectively)
-///
-/// ## Serde
-///
 /// When serializing this reference with `serde`, it will serialize the ID
-/// of the entry, if the serializer is **human readable**. Otherwise, it will
-/// serialize the **raw ID** of the entry.
-///
-/// This corresponds to the `compressed` option in *Mojang Serialization*.
+/// of the entry.
 pub struct Reg<'a, K, T> {
     raw: usize,
     entry: &'a RefEntry<K, T>,
@@ -167,6 +162,26 @@ impl<K, T> Registry<K, T> {
     }
 }
 
+#[cfg(feature = "marking")]
+impl<K, T> Registry<K, T> {
+    /// Gets the marker of this registry.
+    #[inline]
+    pub fn marker(&self) -> &marking::PtrMarker {
+        #[cfg(feature = "marking-leaked")]
+        return self.marker.as_non_leaked();
+
+        #[cfg(not(feature = "marking-leaked"))]
+        return &self.marker;
+    }
+
+    /// Gets the leaked marker of this registry.
+    #[inline]
+    #[cfg(feature = "marking-leaked")]
+    pub fn marker_leaked(&self) -> marking::LeakedPtrMarker {
+        self.marker
+    }
+}
+
 impl<K, T, Q> Index<Q> for Registry<K, T>
 where
     K: Hash + Eq,
@@ -189,13 +204,13 @@ impl<K: std::fmt::Debug, T> std::fmt::Debug for Reg<'_, K, T> {
 
 impl<'a, K, T> Reg<'a, K, T> {
     /// Gets the inner reference of this reference.
-    #[inline(always)]
+    #[inline]
     pub fn to_value(this: Self) -> &'a T {
         unsafe { this.entry.value().unwrap_unchecked() }
     }
 
     /// Gets the raw index of this reference.
-    #[inline(always)]
+    #[inline]
     pub fn to_raw_id(this: Self) -> usize {
         this.raw
     }
@@ -208,13 +223,13 @@ impl<'a, K, T> Reg<'a, K, T> {
     }
 
     /// Gets the ID of this registration.
-    #[inline(always)]
+    #[inline]
     pub fn to_id(this: Self) -> &'a K {
         Self::to_entry(this).key().value()
     }
 
     /// Gets the reference entry of this registration.
-    #[inline(always)]
+    #[inline]
     pub fn to_entry(this: Self) -> &'a RefEntry<K, T> {
         this.entry
     }
@@ -281,7 +296,7 @@ pub trait AsKey<K, T> {
 }
 
 impl<K, T> AsKey<K, T> for K {
-    #[inline(always)]
+    #[inline]
     fn as_key<'a>(&'a self, _registry: &'a Key<K, Registry<K, T>>) -> &'a K {
         self
     }
@@ -402,17 +417,29 @@ pub struct RegistryMut<K, T> {
     keys: OnceLock<HashSet<K>>,
 
     default: Option<usize>,
+
+    #[cfg(all(feature = "marking", not(feature = "marking-leaked")))]
+    marker: marking::PtrMarker,
+    #[cfg(all(feature = "marking", feature = "marking-leaked"))]
+    marker: marking::LeakedPtrMarker,
 }
 
 impl<K, T> RegistryMut<K, T> {
     /// Creates a new mutable registry.
+    #[cfg_attr(
+        feature = "marking-leaked",
+        doc = "\n _Note on feature `marking-leaked`:_ This function introduces tiny memory leaking behavior."
+    )]
     #[inline]
-    pub const fn new(key: Key<K, Registry<K, T>>) -> Self {
+    pub fn new(key: Key<K, Registry<K, T>>) -> Self {
         Self {
             key,
             entries: Vec::new(),
             keys: OnceLock::new(),
             default: None,
+
+            #[cfg(feature = "marking")]
+            marker: Default::default(),
         }
     }
 
@@ -461,6 +488,8 @@ where
                 value: None,
                 tags: RwLock::new(HashSet::new()),
                 is_default,
+                #[cfg(feature = "marking-leaked")]
+                marker: self.marker,
             },
         ));
         Ok(raw)
@@ -493,7 +522,7 @@ where
                 r
             })
             .collect();
-        Registry {
+        Self {
             key: value.key,
             kv: entries
                 .iter()
@@ -503,6 +532,8 @@ where
             tv: RwLock::new(HashMap::new()),
             entries,
             default: value.default,
+            #[cfg(feature = "marking")]
+            marker: value.marker,
         }
     }
 }
@@ -592,8 +623,8 @@ mod serde {
 #[cfg(feature = "edcode")]
 mod edcode {
 
-    use edcode2::{Buf, BufExt, BufMut, BufMutExt, Decode, Encode};
-    use local_cx::{LocalContext, WithLocalCx};
+    use edcode2::{Buf, BufExt as _, BufMut, BufMutExt as _, Decode, Encode};
+    use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 
     use crate::{Reg, Registry};
 
@@ -608,14 +639,14 @@ mod edcode {
         }
     }
 
-    impl<'a, 'r, 'de, K: 'r, T: 'r, B, Cx> Decode<'de, WithLocalCx<B, Cx>> for Reg<'a, K, T>
+    impl<'a, 'r, 'de, K: 'r, T: 'r, Fw> Decode<'de, Fw> for Reg<'a, K, T>
     where
         'r: 'a,
-        B: Buf,
-        Cx: LocalContext<&'r Registry<K, T>>,
+        Fw: ForwardToWithLocalCx<Forwarded: Buf>,
+        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
     {
-        fn decode(buf: WithLocalCx<B, Cx>) -> Result<Self, edcode2::BoxedError<'de>> {
-            let WithLocalCx { inner, local_cx } = buf;
+        fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
+            let WithLocalCx { inner, local_cx } = buf.forward();
             let mut buf = inner;
             let id = buf.get_variable::<i32>() as usize;
             local_cx

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "essential tests for rimecraft-text that require a context"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
 
@@ -15,11 +15,12 @@ maintenance = { status = "passively-maintained" }
 test-global = { path = "../global", package = "rimecraft-test-global", features = [
     "text",
 ] }
-fastnbt = "2.5"
+fastnbt = "2.6"
 serde = "1.0"
 text = { path = "../../core/text", package = "rimecraft-text", features = [
     "serde",
 ] }
+static_assertions = "1.1"
 
 [features]
 

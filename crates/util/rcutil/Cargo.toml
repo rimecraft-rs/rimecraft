@@ -1,0 +1,20 @@
+[package]
+name = "rimecraft-util"
+version = "0.1.0"
+edition = "2024"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "General purpose utilities for Rust programming"
+repository = "https://github.com/rimecraft-rs/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["rust-patterns"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+typeid = "1.0"
+
+[features]
+
+[lints]
+workspace = true

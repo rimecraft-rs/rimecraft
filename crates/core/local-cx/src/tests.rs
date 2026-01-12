@@ -27,7 +27,7 @@ fn dyn_context() {
     use crate::dyn_cx::{ContextTable, DynamicContext};
 
     let context_raw = DummyCx {
-        msg: 114,
+        msg: 114_u32,
         info: "hello".to_owned(),
     };
 

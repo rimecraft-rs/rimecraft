@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use glam::IVec3;
+use glam::{DVec3, IVec3, Vec3};
 
 macro_rules! directions {
     ($($i:literal => $dir:ident: $doc:literal {
@@ -183,10 +183,62 @@ directions! {
     },
 }
 
+impl Direction {
+    /// The number of directions.
+    pub const COUNT: usize = 6;
+
+    /// Gets the ordinal of the direction.
+    #[inline]
+    pub fn ordinal(self) -> usize {
+        self as u8 as usize
+    }
+
+    /// Gets the axis of the direction.
+    #[inline]
+    pub fn axis(self) -> Axis {
+        self.into()
+    }
+
+    /// Gets the axis direction of the direction.
+    #[inline]
+    #[doc(alias = "axis_direction")]
+    pub fn axis_dir(self) -> AxisDirection {
+        self.into()
+    }
+
+    /// Gets the offset vector of the direction.
+    #[inline]
+    pub fn offset(self) -> IVec3 {
+        self.into()
+    }
+}
+
 impl From<(AxisDirection, Axis)> for Direction {
     #[inline]
     fn from((ad, a): (AxisDirection, Axis)) -> Self {
         (a, ad).into()
+    }
+}
+
+impl From<Vec3> for Direction {
+    fn from(value: Vec3) -> Self {
+        let mut dir = Self::North;
+        let mut max = f32::MIN;
+        for d in Self::ALL {
+            let prod = IVec3::from(d).as_vec3().dot(value);
+            if prod > max {
+                max = prod;
+                dir = d;
+            }
+        }
+        dir
+    }
+}
+
+impl From<DVec3> for Direction {
+    #[inline]
+    fn from(value: DVec3) -> Self {
+        value.as_vec3().into()
     }
 }
 
@@ -204,13 +256,16 @@ pub enum Axis {
 }
 
 impl Axis {
+    /// All available values of [`Axis`].
+    pub const VALUES: [Self; 3] = [Self::X, Self::Y, Self::Z];
+
     /// Chooses a value from a position based on the axis.
     #[inline]
     pub fn choose<T>(self, x: T, y: T, z: T) -> T {
         match self {
-            Axis::X => x,
-            Axis::Y => y,
-            Axis::Z => z,
+            Self::X => x,
+            Self::Y => y,
+            Self::Z => z,
         }
     }
 }
@@ -231,8 +286,8 @@ impl AxisDirection {
     #[inline]
     pub const fn offset(self) -> i32 {
         match self {
-            AxisDirection::Positive => 1,
-            AxisDirection::Negative => -1,
+            Self::Positive => 1,
+            Self::Negative => -1,
         }
     }
 
@@ -240,8 +295,19 @@ impl AxisDirection {
     #[inline]
     pub const fn opposite(self) -> Self {
         match self {
-            AxisDirection::Positive => AxisDirection::Negative,
-            AxisDirection::Negative => AxisDirection::Positive,
+            Self::Positive => Self::Negative,
+            Self::Negative => Self::Positive,
+        }
+    }
+}
+
+impl From<bool> for AxisDirection {
+    #[inline]
+    fn from(value: bool) -> Self {
+        if value {
+            Self::Positive
+        } else {
+            Self::Negative
         }
     }
 }
@@ -315,7 +381,7 @@ impl From<Direction> for EightWayDirection {
 
 impl From<EightWayDirection> for IVec3 {
     fn from(value: EightWayDirection) -> Self {
-        value.directions().iter().copied().map(IVec3::from).sum()
+        value.directions().iter().copied().map(Self::from).sum()
     }
 }
 

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["JieningYu <jiening.yu@outlook.com>"]
 description = "Minecraft Component implementation"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
 
@@ -21,18 +21,18 @@ rimecraft-registry = { path = "../registry", features = ["serde", "edcode"] }
 rimecraft-global-cx = { path = "../global-cx", features = ["nbt", "std"] }
 rimecraft-maybe = { path = "../../util/maybe" }
 local-cx = { path = "../local-cx", features = [
-  "serde",
-  "edcode",
-  "dyn-cx",
-  "dyn-codecs",
+    "serde",
+    "edcode",
+    "dyn-codecs",
 ], package = "rimecraft-local-cx" }
+rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }
 typeid = "1.0"
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }
-fastnbt = "2.5"
+fastnbt = "2.6"
 test-global = { path = "../../test/global", features = [
-  "registry",
+    "registry",
 ], package = "rimecraft-test-global" }
 
 [features]

@@ -1,0 +1,19 @@
+[package]
+name = "rimecraft-marking"
+version = "0.1.0"
+edition = "2024"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "smol marker types for identifying objects"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = ["rust-patterns"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+
+[features]
+
+[lints]
+workspace = true

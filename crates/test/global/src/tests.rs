@@ -1,7 +1,7 @@
 use crate::{TestId, pool::Pool};
 
 #[test]
-fn test_id_single_thread() {
+fn id_single_thread() {
     // Simulate a test thread
     let jh = std::thread::spawn(TestId::current);
 
@@ -17,7 +17,7 @@ fn test_id_single_thread() {
 }
 
 #[test]
-fn test_id_multi_thread() {
+fn id_multi_thread() {
     let current = TestId::current();
     let jh = std::thread::spawn(move || {
         TestId::capture(current);

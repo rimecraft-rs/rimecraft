@@ -6,6 +6,8 @@ use std::{
     hash::Hash,
 };
 
+use bytes::BytesMut;
+
 use crate::*;
 
 /// A variable-length wrapper type.
@@ -188,7 +190,7 @@ where
 
     #[inline]
     fn decode(_buf: B) -> Result<Self, BoxedError<'de>> {
-        Err("slices does not support non-in-place decoding".into())
+        panic!("slices does not support non-in-place decoding")
     }
 
     const SUPPORT_NON_IN_PLACE: bool = false;
@@ -200,7 +202,7 @@ where
 {
     fn decode(mut buf: B) -> Result<Self, BoxedError<'de>> {
         let len = buf.get_variable::<u32>() as usize;
-        let mut vec = Vec::with_capacity(len);
+        let mut vec = Self::with_capacity(len);
         for _ in 0..len {
             vec.push(T::decode(&mut buf)?);
         }
@@ -307,7 +309,7 @@ impl<'de, B: Buf> Decode<'de, B> for String {
         if bytes.len() > MAX_STR_LEN {
             return Err("string too large".into());
         }
-        String::from_utf8(bytes).map_err(Into::into)
+        Self::from_utf8(bytes).map_err(Into::into)
     }
 }
 
@@ -407,7 +409,7 @@ where
 {
     fn decode(mut buf: B) -> Result<Self, BoxedError<'de>> {
         let len = buf.get_variable::<u32>() as usize;
-        let mut map = HashMap::with_capacity_and_hasher(len.min(u16::MAX as usize), S::default());
+        let mut map = Self::with_capacity_and_hasher(len.min(u16::MAX as usize), S::default());
         for _ in 0..len {
             let key = K::decode(&mut buf)?;
             let value = V::decode(&mut buf)?;
@@ -439,7 +441,7 @@ where
 {
     fn decode(mut buf: B) -> Result<Self, BoxedError<'de>> {
         let len = buf.get_variable::<u32>() as usize;
-        let mut map = BTreeMap::new();
+        let mut map = Self::new();
         for _ in 0..len {
             let key = K::decode(&mut buf)?;
             let value = V::decode(&mut buf)?;
@@ -469,7 +471,7 @@ where
 {
     fn decode(mut buf: B) -> Result<Self, BoxedError<'de>> {
         let len = buf.get_variable::<u32>() as usize;
-        let mut set = HashSet::with_capacity_and_hasher(len.min(u16::MAX as usize), S::default());
+        let mut set = Self::with_capacity_and_hasher(len.min(u16::MAX as usize), S::default());
         for _ in 0..len {
             set.insert(T::decode(&mut buf)?);
         }
@@ -496,10 +498,204 @@ where
 {
     fn decode(mut buf: B) -> Result<Self, BoxedError<'de>> {
         let len = buf.get_variable::<u32>() as usize;
-        let mut set = BTreeSet::new();
+        let mut set = Self::new();
         for _ in 0..len {
             set.insert(T::decode(&mut buf)?);
         }
         Ok(set)
     }
 }
+
+/// A length-prepended cell for encoding and decoding.
+#[derive(Debug, Clone, Copy)]
+pub struct LengthPrepended<T: ?Sized> {
+    max_len: usize,
+    inner: T,
+}
+
+impl<T> LengthPrepended<T> {
+    /// Creates a new length-prepended value for encoding or seed for decoding.
+    #[inline]
+    pub const fn new(inner: T, max_len: usize) -> Self {
+        Self { inner, max_len }
+    }
+
+    /// Gets the inner value.
+    #[inline]
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<T> LengthPrepended<PhantomData<T>> {
+    /// Creates a new length-prepended seed for decoding without internal seed.
+    #[inline]
+    pub const fn new_unseeded(max_len: usize) -> Self {
+        Self {
+            inner: PhantomData,
+            max_len,
+        }
+    }
+}
+
+impl<T: ?Sized> LengthPrepended<T> {
+    /// Gets the maximum length of encoded bytes.
+    #[inline]
+    pub fn max_len(&self) -> usize {
+        self.max_len
+    }
+}
+
+impl<T> From<T> for LengthPrepended<T> {
+    #[inline]
+    fn from(inner: T) -> Self {
+        Self::new(inner, usize::MAX)
+    }
+}
+
+impl<T> Default for LengthPrepended<PhantomData<T>> {
+    fn default() -> Self {
+        Self::new_unseeded(usize::MAX)
+    }
+}
+
+impl<T, B> Encode<B> for LengthPrepended<T>
+where
+    B: BufMut,
+    T: for<'b> Encode<&'b mut BytesMut>,
+{
+    fn encode(&self, mut buf: B) -> Result<(), BoxedError<'static>> {
+        let mut bytes = BytesMut::new();
+        self.inner.encode(&mut bytes)?;
+        // why not 'limit' cells: they panic.
+        if bytes.len() > self.max_len {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "length too long: expected <= {} bytes, received {} bytes",
+                    self.max_len,
+                    bytes.len()
+                ),
+            )
+            .into());
+        }
+        buf.put_variable(bytes.len() as u32);
+        buf.put_slice(&bytes);
+        Ok(())
+    }
+}
+
+impl<'de, T, B> DecodeSeed<'de, B> for LengthPrepended<T>
+where
+    T: DecodeSeed<'de, bytes::buf::Take<B>>,
+    B: Buf,
+{
+    type Output = T::Output;
+
+    fn decode(self, mut buf: B) -> Result<Self::Output, BoxedError<'de>> {
+        let len = buf.get_variable::<u32>() as usize;
+        if len > self.max_len {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "length too long: expected <= {} bytes, received {len} bytes",
+                    self.max_len
+                ),
+            )
+            .into());
+        }
+        let taken = buf.take(len);
+        self.inner.decode(taken)
+    }
+}
+
+/// A fixed length sequence cell for encoding and decoding.
+///
+/// This is same as encoding/decoding an array but without writing or
+/// reading its length.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FixedLength<T>(T);
+
+impl<T> FixedLength<T> {
+    /// Creates a new fixed length sequence cell.
+    #[inline]
+    pub const fn new(inner: T) -> Self {
+        Self(inner)
+    }
+
+    /// Gets the inner value.
+    #[inline]
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+
+impl<T> From<T> for FixedLength<T> {
+    #[inline]
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T, B> Encode<B> for FixedLength<&'_ [T]>
+where
+    T: for<'b> Encode<&'b mut B>,
+{
+    fn encode(&self, mut buf: B) -> Result<(), BoxedError<'static>> {
+        for item in self.0 {
+            item.encode(&mut buf)?;
+        }
+        Ok(())
+    }
+}
+
+impl<'de, T, B> Decode<'de, B> for FixedLength<&'_ mut [T]>
+where
+    T: for<'b> Decode<'de, &'b mut B>,
+{
+    const SUPPORT_NON_IN_PLACE: bool = false;
+
+    fn decode_in_place(&mut self, mut buf: B) -> Result<(), BoxedError<'de>> {
+        for item in self.0.iter_mut() {
+            item.decode_in_place(&mut buf)?;
+        }
+        Ok(())
+    }
+
+    fn decode(_buf: B) -> Result<Self, BoxedError<'de>> {
+        panic!("fixed length slices does not support non-in-place decoding")
+    }
+}
+
+macro_rules! tuple_impl {
+    ($($t:ident),*$(,)?) => {
+        impl<B,$($t),*> Encode<B> for ($($t,)*) where $($t: for<'env> Encode<&'env mut B>),* {
+            #[allow(non_snake_case)]
+            fn encode(&self, mut _buf: B) -> Result<(), BoxedError<'static>> {
+                let ($($t,)*) = self;
+                $($t.encode(&mut _buf)?;)*
+                Ok(())
+            }
+        }
+
+        impl<'de, B,$($t),*> Decode<'de, B> for ($($t,)*) where $($t: for<'env> Decode<'de, &'env mut B>),* {
+            fn decode(mut _buf: B) -> Result<Self, BoxedError<'de>> {
+                Ok(($($t::decode(&mut _buf)?,)*))
+            }
+        }
+    };
+}
+
+// There exist tuple codec with up to 11 elements in vanilla Minecraft
+tuple_impl![];
+tuple_impl![T1];
+tuple_impl![T1, T2];
+tuple_impl![T1, T2, T3];
+tuple_impl![T1, T2, T3, T4];
+tuple_impl![T1, T2, T3, T4, T5];
+tuple_impl![T1, T2, T3, T4, T5, T6];
+tuple_impl![T1, T2, T3, T4, T5, T6, T7];
+tuple_impl![T1, T2, T3, T4, T5, T6, T7, T8];
+tuple_impl![T1, T2, T3, T4, T5, T6, T7, T8, T9];
+tuple_impl![T1, T2, T3, T4, T5, T6, T7, T8, T9, T10];
+tuple_impl![T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11];

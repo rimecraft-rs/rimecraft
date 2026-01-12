@@ -1,20 +1,20 @@
 use std::fmt::Debug;
 
 use local_cx::LocalContext;
-use rimecraft_block::{Block, BlockState, ProvideStateIds, RawBlock};
+use rimecraft_block::{Block, BlockState, RawBlock};
 use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe,
     container::{PalettedContainer, ProvidePalette},
 };
-use rimecraft_fluid::{BlockStateExt as _, BsToFs};
+use rimecraft_fluid::{BlockStateExt as _, BsToFs, FluidState};
 use rimecraft_registry::Registry;
 
-use super::{ChunkCx, internal_types::*};
+use super::{WorldCx, internal_types::*};
 
 /// Section on a `Chunk`.
 pub struct ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     bsc: PalettedContainer<Cx::BlockStateList, BlockState<'w, Cx>, Cx>,
     bic: PalettedContainer<Cx::BiomeList, IBiome<'w, Cx>, Cx>,
@@ -26,13 +26,12 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: BsToFs<'w> + ChunkCx<'w>,
+    Cx: BsToFs<'w> + WorldCx<'w>,
     Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>,
     for<'a> &'a Cx::BlockStateList: IntoIterator,
     for<'a> <&'a Cx::BlockStateList as IntoIterator>::IntoIter: ExactSizeIterator,
 {
     /// Creates a new chunk section with the given containers.
-    #[inline]
     pub fn new(
         bs_container: PalettedContainer<Cx::BlockStateList, BlockState<'w, Cx>, Cx>,
         bi_container: PalettedContainer<Cx::BiomeList, IBiome<'w, Cx>, Cx>,
@@ -56,7 +55,7 @@ where
 
         self.bsc.count(|bs, count| {
             let fs = bs.to_fluid_state();
-            if !bs.block.settings().is_empty {
+            if !bs.block.settings().empty {
                 ne_block_c += count;
             }
             if bs.block.settings().random_ticks {
@@ -78,7 +77,7 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Returns the block state container of the chunk section.
     #[inline]
@@ -131,31 +130,48 @@ where
     pub fn has_random_ticks(&self) -> bool {
         self.has_random_tick_blocks() || self.has_random_tick_fluids()
     }
+
+    /// Whether the chunk section contains the given block state.
+    #[inline]
+    pub fn contains(&self, bs: BlockState<'w, Cx>) -> bool {
+        self.bsc.contains(&bs)
+    }
 }
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
 {
     /// Returns the block state at the given position.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the given position out of bounds.
     #[inline]
-    pub fn block_state(&self, x: u32, y: u32, z: u32) -> Option<Maybe<'_, BlockState<'w, Cx>>> {
-        self.bsc.get(Cx::compute_index(x, y, z))
+    pub fn block_state(&self, x: u32, y: u32, z: u32) -> BlockState<'w, Cx> {
+        *self
+            .bsc
+            .get(Cx::compute_index(x, y, z))
+            .expect("position out of bounds: {x},{y},{z}")
     }
 
     /// Returns the fluid state at the given position.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the given position out of bounds.
     #[inline]
-    pub fn fluid_state(&self, x: u32, y: u32, z: u32) -> Option<Maybe<'_, IFluidState<'w, Cx>>>
+    pub fn fluid_state(&self, x: u32, y: u32, z: u32) -> FluidState<'w, Cx>
     where
         Cx: BsToFs<'w>,
     {
-        self.block_state(x, y, z).map(Cx::block_to_fluid_state)
+        Cx::block_to_fluid_state(self.block_state(x, y, z))
     }
 }
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w> + ComputeIndex<Cx::Biome, IBiome<'w, Cx>>,
+    Cx: WorldCx<'w> + ComputeIndex<Cx::Biome, IBiome<'w, Cx>>,
     Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>,
 {
     /// Returns the biome at the given position.
@@ -167,55 +183,61 @@ where
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: BsToFs<'w> + ChunkCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
+    Cx: BsToFs<'w> + WorldCx<'w> + ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
         + Clone,
 {
-    /// Sets the block state at the given position and returns the
-    /// old one if present.
-    #[inline]
+    /// Sets the block state at the given position and returns the old one.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given inner position is out of bounds.
     pub fn set_block_state(
         &mut self,
         x: u32,
         y: u32,
         z: u32,
         state: BlockState<'w, Cx>,
-    ) -> Option<Maybe<'_, BlockState<'w, Cx>>> {
-        let bs_old = self.bsc.swap(Cx::compute_index(x, y, z), state);
+    ) -> BlockState<'w, Cx> {
+        let state_old = match self
+            .bsc
+            .swap(Cx::compute_index(x, y, z), state)
+            .expect("position out of bounds")
+        {
+            Maybe::Borrowed(bs) => *bs,
+            Maybe::Owned(maybe::SimpleOwned(bs)) => bs,
+        };
 
-        if let Some(state_old) = bs_old.as_deref() {
-            if !state_old.block.settings().is_empty {
-                self.ne_block_c -= 1;
-                if state_old.block.settings().random_ticks {
-                    self.rt_block_c -= 1;
-                }
-            }
-            let fs = state_old.to_fluid_state();
-            if !fs.fluid.settings().is_empty {
-                self.ne_fluid_c -= 1;
-            }
-
-            if !state.block.settings().is_empty {
-                self.ne_block_c += 1;
-                if state.block.settings().random_ticks {
-                    self.rt_block_c += 1;
-                }
-            }
-            let fs = state.to_fluid_state();
-            if !fs.fluid.settings().is_empty {
-                self.ne_fluid_c += 1;
+        if !state_old.block.settings().empty {
+            self.ne_block_c -= 1;
+            if state_old.block.settings().random_ticks {
+                self.rt_block_c -= 1;
             }
         }
+        let fs = state_old.to_fluid_state();
+        if !fs.fluid.settings().is_empty {
+            self.ne_fluid_c -= 1;
+        }
 
-        bs_old
+        if !state.block.settings().empty {
+            self.ne_block_c += 1;
+            if state.block.settings().random_ticks {
+                self.rt_block_c += 1;
+            }
+        }
+        let fs = state.to_fluid_state();
+        if !fs.fluid.settings().is_empty {
+            self.ne_fluid_c += 1;
+        }
+
+        state_old
     }
 }
 
 impl<'w, Cx> ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w>
-        + ProvideStateIds<List = Cx::BlockStateList>
+    Cx: WorldCx<'w>
         + ProvidePalette<Cx::BlockStateList, BlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
@@ -234,7 +256,8 @@ where
     pub fn from_registries<Local>(cx: Local) -> Self
     where
         Local: LocalContext<&'w Registry<Cx::Id, Cx::Biome>>
-            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>,
+            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+            + LocalContext<Cx::BlockStateList>,
     {
         let default_block = std::convert::identity::<&Registry<_, RawBlock<'_, _>>>(cx.acquire())
             .default_entry()
@@ -243,7 +266,7 @@ where
 
         Self {
             bsc: PalettedContainer::of_single(
-                Cx::state_ids(),
+                LocalContext::<Cx::BlockStateList>::acquire(cx),
                 BlockState {
                     block: default_block,
                     state: Block::to_value(default_block).states().default_state(),
@@ -264,9 +287,9 @@ where
 
 impl<'w, Cx> Debug for ChunkSection<'w, Cx>
 where
-    Cx: ChunkCx<'w> + Debug,
+    Cx: WorldCx<'w> + Debug,
     Cx::Id: Debug,
-    Cx::BlockStateExt: Debug,
+    Cx::BlockStateExt<'w>: Debug,
     Cx::BlockStateList: Debug,
     Cx::Biome: Debug,
     Cx::BiomeList: Debug,
@@ -293,7 +316,6 @@ pub trait ComputeIndex<L, T>: ProvidePalette<L, T> {
     }
 }
 
-#[cfg(feature = "edcode")]
 mod _edcode {
 
     use edcode2::{Buf, BufMut, Decode, Encode};
@@ -302,7 +324,7 @@ mod _edcode {
 
     impl<'w, Cx, B> Encode<B> for ChunkSection<'w, Cx>
     where
-        Cx: ChunkCx<'w>,
+        Cx: WorldCx<'w>,
         Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>,
         Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>,
         B: BufMut,
@@ -316,7 +338,7 @@ mod _edcode {
 
     impl<'w, 'de, Cx, B> Decode<'de, B> for ChunkSection<'w, Cx>
     where
-        Cx: ChunkCx<'w>,
+        Cx: WorldCx<'w>,
         Cx::BlockStateList: for<'s> PalIndexFromRaw<'s, BlockState<'w, Cx>> + Clone,
         Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
             + for<'s> PalIndexFromRaw<'s, IBiome<'w, Cx>>
@@ -337,7 +359,7 @@ mod _edcode {
 
         #[inline]
         fn decode(_buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
-            Err("chunk sections does not support non-in-place decoding".into())
+            panic!("chunk sections does not support non-in-place decoding")
         }
 
         const SUPPORT_NON_IN_PLACE: bool = false;
@@ -345,7 +367,7 @@ mod _edcode {
 
     impl<'w, Cx> ChunkSection<'w, Cx>
     where
-        Cx: ChunkCx<'w>,
+        Cx: WorldCx<'w>,
         Cx::BiomeList: for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
             + for<'s> PalIndexFromRaw<'s, IBiome<'w, Cx>>
             + for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>

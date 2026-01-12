@@ -2,78 +2,65 @@
 //!
 //! A chunk represents a scoped, mutable view of `Biome`s, `BlockState`s, `FluidState`s and `BlockEntity`s.
 
-use std::{fmt::Debug, hash::Hash, sync::Arc};
+use std::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+    sync::atomic::AtomicBool,
+};
 
 use ahash::AHashMap;
 use local_cx::LocalContext;
 use parking_lot::{Mutex, RwLock};
-use rimecraft_block::{BlockState, ProvideBlockStateExtTy, ProvideStateIds, RawBlock};
+use rimecraft_block::{BlockState, RawBlock};
+use rimecraft_block_entity::BlockEntityCell;
 use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, Maybe, container::ProvidePalette,
 };
-use rimecraft_fluid::ProvideFluidStateExtTy;
-use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
 use rimecraft_registry::Registry;
-use rimecraft_voxel_math::BlockPos;
+use rimecraft_voxel_math::{BlockPos, ChunkSectionPos};
 
 use crate::{
-    BlockEntityCell, Sealed,
-    event::game_event,
-    heightmap::{self, Heightmap},
+    WorldCx,
+    chunk::light::ChunkSkyLight,
+    heightmap::Heightmap,
     view::{
         HeightLimit,
-        block::{BlockLuminanceView, BlockView, LockedBlockViewMut},
+        block::{MutBlockEntityView, MutBlockView},
+        light::{MutBlockLuminanceView, MutLightSourceView},
     },
 };
 
 mod internal_types;
 
 mod be_tick;
+pub mod iter;
 pub mod light;
 mod section;
+pub mod status;
 mod upgrade;
 
-pub mod world_chunk;
+mod world_chunk;
 
 pub use rimecraft_voxel_math::ChunkPos;
 
-pub use section::ChunkSection;
-pub use upgrade::UpgradeData;
-pub use world_chunk::WorldChunk;
-
 pub use internal_types::*;
+
+pub use section::*;
+pub use status::{ChunkStatus, ChunkType};
+pub use upgrade::UpgradeData;
+pub use world_chunk::*;
 
 /// The length of the border of a chunk.
 pub const BORDER_LEN: u32 = 16;
 
-/// Types associated with a `Chunk`.
-///
-/// # Generics
-///
-/// - `'w`: The world lifetime. See the crate document for more information.
-pub trait ChunkCx<'w>
-where
-    Self: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideIdTy + ProvideNbtTy,
-{
-    /// The type of block state id list.
-    type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>
-        + for<'a> PalIndexToRaw<&'a BlockState<'w, Self>>
-        + Clone;
-
-    /// The type of biomes.
-    type Biome: 'w;
-    /// The type of biome id list.
-    type BiomeList;
-
-    /// The `Heightmap.Type` type of heightmaps.
-    type HeightmapType: heightmap::Type<'w, Self> + Hash + Eq;
-}
+/// The height of a chunk section.
+pub const SECTION_HEIGHT: u32 = BORDER_LEN;
 
 /// A generic chunk data structure.
 #[non_exhaustive]
 pub struct BaseChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
     /// Position of this chunk.
     pub pos: ChunkPos,
@@ -93,14 +80,16 @@ where
     /// This is a cumulative measure of time.
     pub inhabited_time: u64,
     /// Whether this chunk needs saving.
-    pub needs_saving: bool,
+    pub needs_saving: AtomicBool,
+    /// The propagated sky light levels.
+    pub sky_light: Mutex<ChunkSkyLight>,
 }
 
 impl<'w, Cx> Debug for BaseChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w> + Debug,
+    Cx: WorldCx<'w> + Debug,
     Cx::Id: Debug,
-    Cx::BlockStateExt: Debug,
+    Cx::BlockStateExt<'w>: Debug,
     Cx::BlockStateList: Debug,
     Cx::FluidStateExt: Debug,
     Cx::Biome: Debug,
@@ -120,12 +109,11 @@ where
 
 impl<'w, Cx> BaseChunk<'w, Cx>
 where
-    Cx: ChunkCx<'w>
-        + ProvideStateIds<List = Cx::BlockStateList>
-        + ProvidePalette<Cx::BlockStateList, IBlockState<'w, Cx>>
+    Cx: WorldCx<'w>
+        + ProvidePalette<Cx::BlockStateList, BlockState<'w, Cx>>
         + ProvidePalette<Cx::BiomeList, IBiome<'w, Cx>>,
-    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a IBlockState<'w, Cx>>
-        + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBlockState<'w, Cx>>>
+    Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
+        + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
         + Clone,
     &'w Registry<Cx::Id, Cx::Biome>: Into<Cx::BiomeList>,
     Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>
@@ -151,11 +139,12 @@ where
     where
         I: Iterator<Item = Option<ChunkSection<'w, Cx>>> + ExactSizeIterator,
         Local: LocalContext<&'w Registry<Cx::Id, Cx::Biome>>
-            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>,
+            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+            + LocalContext<Cx::BlockStateList>,
     {
         Self {
             pos,
-            needs_saving: false,
+            needs_saving: AtomicBool::new(false),
             inhabited_time,
             upgrade_data,
             height_limit,
@@ -163,7 +152,7 @@ where
             block_entities: Mutex::new(AHashMap::new()),
             block_entity_nbts: Mutex::new(AHashMap::new()),
             section_array: {
-                let len = height_limit.count_vertical_sections() as usize;
+                let len = height_limit.count_vertical_sections();
                 if let Some(section_array) = section_array {
                     assert_eq!(
                         section_array.len(),
@@ -176,43 +165,50 @@ where
                         })
                         .collect()
                 } else {
-                    (0..len)
-                        .map(|_| Mutex::new(ChunkSection::from_registries(cx)))
+                    std::iter::repeat_with(|| Mutex::new(ChunkSection::from_registries(cx)))
+                        .take(len)
                         .collect()
                 }
             },
+            sky_light: Mutex::new(ChunkSkyLight::new(height_limit)),
         }
     }
 }
 
-/// Types that can represent an immutable [`BaseChunk`].
-pub trait AsBaseChunk<'w, Cx>
+/// Types that can represent an access to a [`BaseChunk`].
+pub trait AsBaseChunkAccess<'w, Cx>
 where
-    Cx: ChunkCx<'w>,
+    Cx: WorldCx<'w>,
 {
-    /// Returns a [`BaseChunk`].
-    fn as_base_chunk(&self) -> Sealed<&BaseChunk<'w, Cx>>;
+    /// The accessor type.
+    type Access<'a>: BaseChunkAccess<'w, Cx>
+    where
+        Self: 'a;
+
+    /// Returns an accessor to this chunk.
+    fn as_base_chunk_access(&mut self) -> Self::Access<'_>;
+
+    /// Returns a reference to the chunk.
+    fn as_base_chunk(&self) -> &BaseChunk<'w, Cx>;
 }
 
-/// Types that can represent a mutable [`BaseChunk`].
-pub trait AsBaseChunkMut<'w, Cx>: AsBaseChunk<'w, Cx>
-where
-    Cx: ChunkCx<'w>,
-{
-    /// Returns a [`BaseChunk`].
-    fn as_base_chunk_mut(&mut self) -> Sealed<&mut BaseChunk<'w, Cx>>;
-}
+type SectionReadShorthand<'a, 'w, Chunk, Cx> =
+    <<Chunk as AsBaseChunkAccess<'w, Cx>>::Access<'a> as BaseChunkAccess<'w, Cx>>::ChunkSectionRead;
 
-/// Immutable chunk behaviors.
+/// Chunk behaviors.
 pub trait Chunk<'w, Cx>
 where
-    Self: AsBaseChunk<'w, Cx> + BlockView<'w, Cx> + BlockLuminanceView<'w, Cx>,
-    Cx: ChunkCx<'w>,
+    Self: AsBaseChunkAccess<'w, Cx>
+        + MutBlockView<'w, Cx>
+        + MutBlockEntityView<'w, Cx>
+        + MutBlockLuminanceView<'w, Cx>
+        + MutLightSourceView<'w, Cx>,
+    Cx: WorldCx<'w>,
 {
     /// Returns the array of chunk sections of this chunk.
     #[inline]
     fn sections(&self) -> &[Mutex<ChunkSection<'w, Cx>>] {
-        &self.as_base_chunk().0.section_array
+        &self.as_base_chunk().section_array
     }
 
     /// Gets the [`ChunkSection`] at the given Y index of this chunk.
@@ -224,79 +220,27 @@ where
     /// Returns the [`HeightLimit`] of this chunk.
     #[inline]
     fn height_limit(&self) -> HeightLimit {
-        self.as_base_chunk().0.height_limit
+        self.as_base_chunk().height_limit
     }
 
     /// Returns the index of highest non-empty [`ChunkSection`] in this chunk.
     ///
     /// See [`ChunkSection::is_empty`].
-    fn highest_non_empty_section(&self) -> Option<usize> {
-        self.sections().iter().rposition(|s| !s.lock().is_empty())
+    fn highest_non_empty_section(&mut self) -> Option<usize> {
+        self.as_base_chunk_access()
+            .iter_read_chunk_sections()
+            .into_iter()
+            .rposition(|(_, s)| !s.is_empty())
     }
 
     /// Peeks the heightmaps of this chunk.
     #[inline]
-    fn peek_heightmaps<F, T>(&self, pk: F) -> T
+    fn peek_heightmaps<F, T>(&mut self, pk: F) -> T
     where
         F: for<'a> FnOnce(&'a AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
     {
-        let rg = self.as_base_chunk().0.heightmaps.read();
+        let rg = self.as_base_chunk_access().read_heightmaps();
         pk(&rg)
-    }
-
-    /// Peeks the heightmaps of this chunk.
-    #[inline]
-    fn peek_heightmaps_mut_locked<F, T>(&self, pk: F) -> T
-    where
-        F: for<'a> FnOnce(&'a mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
-    {
-        let mut rg = self.as_base_chunk().0.heightmaps.write();
-        pk(&mut rg)
-    }
-
-    /// Returns the position of this chunk.
-    #[inline]
-    fn pos(&self) -> ChunkPos {
-        self.as_base_chunk().0.pos
-    }
-
-    /// Peeks the [`game_event::Dispatcher`] of given Y section corrdinate.
-    #[inline]
-    fn peek_game_event_dispatcher<F, T>(&self, y_section_coord: i32, f: F) -> Option<T>
-    where
-        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
-    {
-        let _ = y_section_coord;
-        drop(f);
-        None
-    }
-
-    /// Gets the [`game_event::Dispatcher`] of given Y section corrdinate.
-    #[inline]
-    fn game_event_dispatcher(
-        &self,
-        y_section_coord: i32,
-    ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
-        self.peek_game_event_dispatcher(y_section_coord, Arc::clone)
-    }
-}
-
-/// Mutable chunk behaviors.
-pub trait ChunkMut<'w, Cx>
-where
-    Self: AsBaseChunkMut<'w, Cx> + Chunk<'w, Cx> + LockedBlockViewMut<'w, Cx>,
-    Cx: ChunkCx<'w>,
-{
-    /// Returns the array of chunk sections of this chunk.
-    #[inline]
-    fn sections_mut(&mut self) -> &mut [Mutex<ChunkSection<'w, Cx>>] {
-        &mut self.as_base_chunk_mut().0.section_array
-    }
-
-    /// Gets the [`ChunkSection`] at the given Y index of this chunk.
-    #[inline]
-    fn section_mut(&mut self, index: usize) -> Option<&mut Mutex<ChunkSection<'w, Cx>>> {
-        self.sections_mut().get_mut(index)
     }
 
     /// Peeks the heightmaps of this chunk.
@@ -305,41 +249,294 @@ where
     where
         F: for<'a> FnOnce(&'a mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>) -> T,
     {
-        pk(self.as_base_chunk_mut().0.heightmaps.get_mut())
+        let mut rg = self.as_base_chunk_access().write_heightmaps();
+        pk(&mut rg)
     }
 
-    /// Returns the index of highest non-empty [`ChunkSection`] in this chunk.
-    ///
-    /// This method is the same as [`Chunk::highest_non_empty_section`] but lock-free.
-    ///
-    /// See [`ChunkSection::is_empty`].
-    fn highest_non_empty_section_lf(&mut self) -> Option<usize> {
-        self.sections_mut()
-            .iter_mut()
-            .rposition(|s| !s.get_mut().is_empty())
-    }
-
-    /// Peeks the [`game_event::Dispatcher`] of given Y section corrdinate.
-    ///
-    /// This method is the same as [`Chunk::peek_game_event_dispatcher`] but lock-free.
+    /// Returns the position of this chunk.
     #[inline]
-    fn peek_game_event_dispatcher_lf<F, T>(&mut self, y_section_coord: i32, f: F) -> Option<T>
+    fn pos(&self) -> ChunkPos {
+        self.as_base_chunk().pos
+    }
+
+    /// Refreshes the surface sky light propagated levels of this chunk.
+    #[inline]
+    fn refresh_surface_y(&mut self)
     where
-        F: for<'env> FnOnce(&'env Arc<game_event::Dispatcher<'w, Cx>>) -> T,
+        Cx: ComputeIndex<Cx::BlockStateList, BlockState<'w, Cx>>,
     {
-        let _ = y_section_coord;
-        drop(f);
-        None
+        BaseChunk::__csl_refresh_surface_y(self.as_base_chunk_access());
     }
 
-    /// Gets the [`game_event::Dispatcher`] of given Y section corrdinate.
+    /// Returns an iterator over all blocks in this chunk.
     ///
-    /// This method is the same as [`Chunk::game_event_dispatcher`] but lock-free.
+    /// # Optimization
+    ///
+    /// The returned iterator is optimized for filtering, following vanilla behavior to do chunk section
+    /// palette pre-checks for filtering out those sections that don't contain the desired block at all.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the chunk has zero sections, which is not an intended state.
+    #[allow(clippy::type_complexity)] // cant do better. help
     #[inline]
-    fn game_event_dispatcher_lf(
+    fn blocks(
         &mut self,
-        y_section_coord: i32,
-    ) -> Option<Arc<game_event::Dispatcher<'w, Cx>>> {
-        self.peek_game_event_dispatcher_lf(y_section_coord, Arc::clone)
+    ) -> iter::Blocks<
+        'w,
+        impl DoubleEndedIterator<Item = (ChunkSectionPos, SectionReadShorthand<'_, 'w, Self, Cx>)>,
+        SectionReadShorthand<'_, 'w, Self, Cx>,
+        Cx,
+    > {
+        iter::blocks(self.as_base_chunk_access())
+    }
+}
+
+#[allow(missing_docs)]
+pub trait BaseChunkAccess<'w, Cx>
+where
+    Cx: WorldCx<'w>,
+{
+    fn bca_as_bc(&self) -> &BaseChunk<'w, Cx>;
+
+    type Reclaim<'borrow>: BaseChunkAccess<'w, Cx>
+    where
+        Self: 'borrow;
+
+    fn reclaim(&mut self) -> Self::Reclaim<'_>;
+
+    type HeighmapsRead: Deref<Target = AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
+    type HeighmapsWrite: DerefMut<Target = AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
+    type BlockEntitiesRead: Deref<Target = AHashMap<BlockPos, BlockEntityCell<'w, Cx>>>;
+    type BlockEntitiesWrite: DerefMut<Target = AHashMap<BlockPos, BlockEntityCell<'w, Cx>>>;
+    type BlockEntityNbtsRead: Deref<Target = AHashMap<BlockPos, Cx::Compound>>;
+    type BlockEntityNbtsWrite: DerefMut<Target = AHashMap<BlockPos, Cx::Compound>>;
+    type ChunkSectionRead: Deref<Target = ChunkSection<'w, Cx>>;
+    type ChunkSectionWrite: DerefMut<Target = ChunkSection<'w, Cx>>;
+    type ChunkSkyLightRead: Deref<Target = ChunkSkyLight>;
+    type ChunkSkyLightWrite: DerefMut<Target = ChunkSkyLight>;
+
+    fn read_heightmaps(self) -> Self::HeighmapsRead;
+    fn write_heightmaps(self) -> Self::HeighmapsWrite;
+    fn read_block_entities(self) -> Self::BlockEntitiesRead;
+    fn write_block_entities(self) -> Self::BlockEntitiesWrite;
+    fn read_block_entity_nbts(self) -> Self::BlockEntityNbtsRead;
+    fn write_block_entity_nbts(self) -> Self::BlockEntityNbtsWrite;
+    fn read_chunk_section(self, index: usize) -> Option<Self::ChunkSectionRead>;
+    fn write_chunk_section(self, index: usize) -> Option<Self::ChunkSectionWrite>;
+    #[allow(clippy::implied_bounds_in_impls)]
+    fn iter_read_chunk_sections(
+        self,
+    ) -> impl Iterator<Item = (ChunkSectionPos, Self::ChunkSectionRead)>
+    + DoubleEndedIterator
+    + ExactSizeIterator;
+    fn read_chunk_sky_light(self) -> Self::ChunkSkyLightRead;
+    fn write_chunk_sky_light(self) -> Self::ChunkSkyLightWrite;
+
+    fn mark_needs_saving(self);
+    fn needs_saving(self) -> bool;
+}
+
+impl<'a, 'w, Cx: WorldCx<'w>> BaseChunkAccess<'w, Cx> for &'a BaseChunk<'w, Cx> {
+    type HeighmapsRead =
+        parking_lot::RwLockReadGuard<'a, AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
+    type HeighmapsWrite =
+        parking_lot::RwLockWriteGuard<'a, AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>>;
+    type BlockEntitiesRead = Self::BlockEntitiesWrite;
+    type BlockEntitiesWrite =
+        parking_lot::MutexGuard<'a, AHashMap<BlockPos, BlockEntityCell<'w, Cx>>>;
+    type BlockEntityNbtsRead = Self::BlockEntityNbtsWrite;
+    type BlockEntityNbtsWrite = parking_lot::MutexGuard<'a, AHashMap<BlockPos, Cx::Compound>>;
+    type ChunkSectionRead = Self::ChunkSectionWrite;
+    type ChunkSectionWrite = parking_lot::MutexGuard<'a, ChunkSection<'w, Cx>>;
+    type ChunkSkyLightRead = Self::ChunkSkyLightWrite;
+    type ChunkSkyLightWrite = parking_lot::MutexGuard<'a, ChunkSkyLight>;
+
+    #[inline]
+    fn read_heightmaps(self) -> Self::HeighmapsRead {
+        self.heightmaps.read()
+    }
+
+    #[inline]
+    fn write_heightmaps(self) -> Self::HeighmapsWrite {
+        self.heightmaps.write()
+    }
+
+    #[inline]
+    fn read_block_entities(self) -> Self::BlockEntitiesRead {
+        self.write_block_entities()
+    }
+
+    #[inline]
+    fn write_block_entities(self) -> Self::BlockEntitiesWrite {
+        self.block_entities.lock()
+    }
+
+    #[inline]
+    fn read_block_entity_nbts(self) -> Self::BlockEntityNbtsRead {
+        self.write_block_entity_nbts()
+    }
+
+    #[inline]
+    fn write_block_entity_nbts(self) -> Self::BlockEntityNbtsWrite {
+        self.block_entity_nbts.lock()
+    }
+
+    #[inline]
+    fn read_chunk_section(self, index: usize) -> Option<Self::ChunkSectionRead> {
+        self.write_chunk_section(index)
+    }
+
+    #[inline]
+    fn write_chunk_section(self, index: usize) -> Option<Self::ChunkSectionWrite> {
+        self.section_array.get(index).map(Mutex::lock)
+    }
+
+    #[inline]
+    #[allow(clippy::implied_bounds_in_impls)]
+    fn iter_read_chunk_sections(
+        self,
+    ) -> impl Iterator<Item = (ChunkSectionPos, Self::ChunkSectionRead)>
+    + DoubleEndedIterator
+    + ExactSizeIterator {
+        (self.height_limit.bottom_section_coord()..self.height_limit.top_section_coord())
+            .zip(self.section_array.iter())
+            .map(|(i, section)| ((self.pos, i).into(), section.lock()))
+    }
+
+    #[inline]
+    fn read_chunk_sky_light(self) -> Self::ChunkSkyLightRead {
+        self.write_chunk_sky_light()
+    }
+
+    #[inline]
+    fn write_chunk_sky_light(self) -> Self::ChunkSkyLightWrite {
+        self.sky_light.lock()
+    }
+
+    #[inline]
+    fn bca_as_bc(&self) -> &BaseChunk<'w, Cx> {
+        self
+    }
+
+    type Reclaim<'e>
+        = Self
+    where
+        Self: 'e;
+
+    #[inline]
+    fn reclaim(&mut self) -> Self::Reclaim<'_> {
+        *self
+    }
+
+    #[inline]
+    fn mark_needs_saving(self) {
+        self.needs_saving
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    #[inline]
+    fn needs_saving(self) -> bool {
+        self.needs_saving.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+impl<'a, 'w, Cx: WorldCx<'w>> BaseChunkAccess<'w, Cx> for &'a mut BaseChunk<'w, Cx> {
+    type HeighmapsRead = Self::HeighmapsWrite;
+    type HeighmapsWrite = &'a mut AHashMap<Cx::HeightmapType, Heightmap<'w, Cx>>;
+    type BlockEntitiesRead = Self::BlockEntitiesWrite;
+    type BlockEntitiesWrite = &'a mut AHashMap<BlockPos, BlockEntityCell<'w, Cx>>;
+    type BlockEntityNbtsRead = Self::BlockEntityNbtsWrite;
+    type BlockEntityNbtsWrite = &'a mut AHashMap<BlockPos, Cx::Compound>;
+    type ChunkSectionRead = Self::ChunkSectionWrite;
+    type ChunkSectionWrite = &'a mut ChunkSection<'w, Cx>;
+    type ChunkSkyLightRead = Self::ChunkSkyLightWrite;
+    type ChunkSkyLightWrite = &'a mut ChunkSkyLight;
+
+    #[inline]
+    fn read_heightmaps(self) -> Self::HeighmapsRead {
+        self.write_heightmaps()
+    }
+
+    #[inline]
+    fn write_heightmaps(self) -> Self::HeighmapsWrite {
+        self.heightmaps.get_mut()
+    }
+
+    #[inline]
+    fn read_block_entities(self) -> Self::BlockEntitiesRead {
+        self.write_block_entities()
+    }
+
+    #[inline]
+    fn write_block_entities(self) -> Self::BlockEntitiesWrite {
+        self.block_entities.get_mut()
+    }
+
+    #[inline]
+    fn read_block_entity_nbts(self) -> Self::BlockEntityNbtsRead {
+        self.write_block_entity_nbts()
+    }
+
+    #[inline]
+    fn write_block_entity_nbts(self) -> Self::BlockEntityNbtsWrite {
+        self.block_entity_nbts.get_mut()
+    }
+
+    #[inline]
+    fn read_chunk_section(self, index: usize) -> Option<Self::ChunkSectionRead> {
+        self.write_chunk_section(index)
+    }
+
+    #[inline]
+    fn write_chunk_section(self, index: usize) -> Option<Self::ChunkSectionWrite> {
+        self.section_array.get_mut(index).map(Mutex::get_mut)
+    }
+
+    #[inline]
+    fn read_chunk_sky_light(self) -> Self::ChunkSkyLightRead {
+        self.write_chunk_sky_light()
+    }
+
+    #[inline]
+    fn write_chunk_sky_light(self) -> Self::ChunkSkyLightWrite {
+        self.sky_light.get_mut()
+    }
+
+    #[inline]
+    #[allow(clippy::implied_bounds_in_impls)]
+    fn iter_read_chunk_sections(
+        self,
+    ) -> impl Iterator<Item = (ChunkSectionPos, Self::ChunkSectionRead)>
+    + DoubleEndedIterator
+    + ExactSizeIterator {
+        (self.height_limit.bottom_section_coord()..self.height_limit.top_section_coord())
+            .zip(self.section_array.iter_mut())
+            .map(|(i, section)| ((self.pos, i).into(), section.get_mut()))
+    }
+
+    #[inline]
+    fn bca_as_bc(&self) -> &BaseChunk<'w, Cx> {
+        self
+    }
+
+    type Reclaim<'borrow>
+        = &'borrow mut BaseChunk<'w, Cx>
+    where
+        Self: 'borrow;
+
+    #[inline]
+    fn reclaim(&mut self) -> Self::Reclaim<'_> {
+        &mut **self
+    }
+
+    #[inline]
+    fn mark_needs_saving(self) {
+        *self.needs_saving.get_mut() = true;
+    }
+
+    #[inline]
+    fn needs_saving(self) -> bool {
+        *self.needs_saving.get_mut()
     }
 }

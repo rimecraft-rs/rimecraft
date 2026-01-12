@@ -7,7 +7,7 @@ authors = [
     "C191239 <zhushunzhong2025@i.pkuschool.edu.cn>",
 ]
 description = "Minecraft text API"
-repository = "https://github.com/rimecraft-rs/rimecraft/"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
 license = "AGPL-3.0-or-later"
 categories = []
 
@@ -20,12 +20,15 @@ rgb = "0.8"
 rimecraft-fmt = { path = "../../util/fmt" }
 serde = { version = "1.0", features = ["derive"], optional = true }
 edcode2 = { path = "../../util/edcode2", optional = true, package = "rimecraft-edcode2" }
+rimecraft-text-derive = { path = "../../util/text-derive", optional = true }
+remap = { path = "../../util/remap", package = "rimecraft-remap" }
+smallbox = "0.8"
 
 [features]
-default = ["macros"]
+default = ["macros", "rgb/argb"]
 serde = ["dep:serde"]
-macros = []
-edcode = ["dep:edcode2", "serde", "rimecraft-global-cx/edcode"]
+macros = ["dep:rimecraft-text-derive"]
+edcode = ["dep:edcode2", "rimecraft-global-cx/edcode", "serde"]
 
 [lints]
 workspace = true
