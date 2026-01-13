@@ -26,4 +26,8 @@ workspace = true
 
 [features]
 default = ["edcode"]
-edcode = ["dep:rimecraft-edcode2", "rimecraft-text/edcode"]
+edcode = [
+    "dep:rimecraft-edcode2",
+    "rimecraft-local-cx/dyn-cx",
+    "rimecraft-text/edcode",
+]
