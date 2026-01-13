@@ -7,6 +7,7 @@ mod dbg_impl;
 
 pub mod criterion;
 
+use remap::remap;
 use rimecraft_fmt::Formatting;
 use rimecraft_item::{stack::ItemStackCx, ItemStack};
 use rimecraft_text::{ProvideTextTy, Text};
@@ -20,9 +21,7 @@ pub use edcode::AdvancementEdcodeCx;
 /// All information about an advancement.\
 /// `'r` is registry lifetime.\
 /// Generic type `Cx` is context type.
-///
-/// # MCJE Reference
-/// `net.minecraft.advancement.Advancement` in yarn.
+#[remap(yarn = "Advancement")]
 pub struct Advancement<'r, Cx>
 where
     Cx: AdvancementCx,
@@ -34,9 +33,7 @@ where
 }
 
 /// Display-related information.
-///
-/// # MCJE Reference
-/// `net.minecraft.advancement.AdvancementDisplay` in yarn.
+#[remap(yarn = "AdvancementDisplay")]
 pub struct DisplayInfo<'r, Cx>
 where
     Cx: AdvancementCx,
@@ -125,8 +122,7 @@ where
 }
 
 /// Describes how an advancement will be announced in the chat.
-/// # MCJE Reference
-/// `net.minecraft.advancement.AdvancementFrame` in yarn.
+#[remap(yarn = "AdvancementFrame")]
 #[cfg_attr(
     feature = "edcode",
     derive(::rimecraft_edcode2::Encode, ::rimecraft_edcode2::Decode)

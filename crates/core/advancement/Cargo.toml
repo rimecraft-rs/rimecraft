@@ -20,6 +20,7 @@ rimecraft-global-cx = { path = "../global-cx" }
 rimecraft-edcode2 = { path = "../../util/edcode2", optional = true }
 rimecraft-registry = { path = "../registry" }
 rimecraft-local-cx = { path = "../local-cx" }
+remap = { path = "../../util/remap", package = "rimecraft-remap" }
 
 [lints]
 workspace = true
@@ -28,7 +29,7 @@ workspace = true
 default = ["edcode"]
 edcode = [
     "dep:rimecraft-edcode2",
+    "rimecraft-edcode2/derive",
     "rimecraft-local-cx/dyn-cx",
     "rimecraft-text/edcode",
-    "rimecraft-edcode2/derive",
 ]
