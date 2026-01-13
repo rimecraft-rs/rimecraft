@@ -30,4 +30,5 @@ edcode = [
     "dep:rimecraft-edcode2",
     "rimecraft-local-cx/dyn-cx",
     "rimecraft-text/edcode",
+    "rimecraft-edcode2/derive",
 ]

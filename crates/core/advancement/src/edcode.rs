@@ -4,7 +4,7 @@ use rimecraft_global_cx::{
     nbt::{ReadNbt, WriteNbt},
 };
 use rimecraft_item::{component::RawErasedComponentType, ItemStack, RawItem};
-use rimecraft_local_cx::{LocalContext, WithLocalCx};
+use rimecraft_local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 use rimecraft_registry::Registry;
 use rimecraft_text::Text;
 
@@ -16,18 +16,16 @@ pub trait AdvancementEdcodeCx: AdvancementCx {
     fn frame_fmt(name: &str) -> Frame;
 }
 
-impl<'r, Cx, B> Encode<WithLocalCx<B, Cx::LocalContext<'_>>> for DisplayInfo<'r, Cx>
+impl<'r, Cx, Fw> Encode<Fw> for DisplayInfo<'r, Cx>
 where
     Cx: AdvancementEdcodeCx
         + LocalContext<Registry<Cx::Id, RawItem<'r, Cx>>>
         + for<'a, 'b> WriteNbt<&'a &'b Text<Cx>>,
-    B: BufMut,
-    Cx::Id: for<'a> Encode<&'a mut B>,
+    Cx::Id: for<'a> Encode<WithLocalCx<&'a mut Fw::Forwarded, Fw::LocalCx>>,
+    Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx = Cx::LocalContext<'r>>,
 {
-    fn encode(
-        &self,
-        mut buf: WithLocalCx<B, Cx::LocalContext<'_>>,
-    ) -> Result<(), rimecraft_edcode2::BoxedError<'static>> {
+    fn encode(&self, fw: Fw) -> Result<(), rimecraft_edcode2::BoxedError<'static>> {
+        let mut buf = fw.forward();
         Nbt::<&Text<Cx>, Cx>::new(&self.title).encode(&mut buf)?;
         Nbt::<&Text<Cx>, Cx>::new(&self.description).encode(&mut buf)?;
         self.icon.encode(buf.as_mut())?;
@@ -45,31 +43,35 @@ where
         i.encode(&mut buf)?;
         self.background
             .as_ref()
-            .map_or(Ok(()), |bg| bg.encode(buf.as_mut().inner))?;
+            .map_or(Ok(()), |bg| bg.encode(buf.as_mut()))?;
         self.pos.0.encode(&mut buf)?;
         self.pos.1.encode(&mut buf)?;
         Ok(())
     }
 }
 
-impl<'de, 'r, Cx, B> Decode<'de, B> for DisplayInfo<'r, Cx>
+impl<'de, 'r, Cx, Fw> Decode<'de, Fw> for DisplayInfo<'r, Cx>
 where
     Cx: AdvancementEdcodeCx
         + LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
         + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>
         + ReadNbt<Text<Cx>>,
-    B: Buf,
-    Cx::Id: for<'a, 'b> Decode<'de, &'a mut &'b mut B> + for<'a> Decode<'de, &'a mut B>,
+    Cx::Id: for<'a, 'b> Decode<'de, WithLocalCx<&'a mut &'b mut Fw::Forwarded, Fw::LocalCx>>
+        + for<'a> Decode<'de, WithLocalCx<&'a mut Fw::Forwarded, Fw::LocalCx>>,
+    Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'r>>,
+    Cx::LocalContext<'r>: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
+        + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>,
 {
     #[allow(unused_variables)]
-    fn decode(mut buf: B) -> Result<Self, rimecraft_edcode2::BoxedError<'de>> {
+    fn decode(fw: Fw) -> Result<Self, rimecraft_edcode2::BoxedError<'de>> {
+        let mut buf = fw.forward();
         let title = Nbt::<Text<Cx>, Cx>::decode(&mut buf)?.into_inner();
         let description = Nbt::<Text<Cx>, Cx>::decode(&mut buf)?.into_inner();
-        let icon: ItemStack<'r, Cx> = Decode::decode(&mut buf)?;
+        let icon: ItemStack<'r, Cx> = Decode::decode(buf.as_mut())?;
         let frame: Frame = Decode::decode(&mut buf)?;
         let i: i32 = Decode::decode(&mut buf)?;
         let background: Option<Cx::Id> = ((i & 1) != 0)
-            .then(|| Decode::decode(&mut buf))
+            .then(|| Decode::decode(buf.as_mut()))
             .transpose()?;
         let show_toast = (i & 2) != 0;
         let hidden = (i & 4) != 0;
