@@ -18,9 +18,7 @@ pub trait AdvancementEdcodeCx: AdvancementCx {
 
 impl<'r, Cx, Fw> Encode<Fw> for DisplayInfo<'r, Cx>
 where
-    Cx: AdvancementEdcodeCx
-        + LocalContext<Registry<Cx::Id, RawItem<'r, Cx>>>
-        + for<'a, 'b> WriteNbt<&'a &'b Text<Cx>>,
+    Cx: AdvancementEdcodeCx + for<'a, 'b> WriteNbt<&'a &'b Text<Cx>>,
     Cx::Id: for<'a> Encode<WithLocalCx<&'a mut Fw::Forwarded, Fw::LocalCx>>,
     Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx = Cx::LocalContext<'r>>,
 {
@@ -52,17 +50,13 @@ where
 
 impl<'de, 'r, Cx, Fw> Decode<'de, Fw> for DisplayInfo<'r, Cx>
 where
-    Cx: AdvancementEdcodeCx
-        + LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
-        + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>
-        + ReadNbt<Text<Cx>>,
+    Cx: AdvancementEdcodeCx + ReadNbt<Text<Cx>>,
     Cx::Id: for<'a, 'b> Decode<'de, WithLocalCx<&'a mut &'b mut Fw::Forwarded, Fw::LocalCx>>
         + for<'a> Decode<'de, WithLocalCx<&'a mut Fw::Forwarded, Fw::LocalCx>>,
     Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'r>>,
     Cx::LocalContext<'r>: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
         + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>,
 {
-    #[allow(unused_variables)]
     fn decode(fw: Fw) -> Result<Self, rimecraft_edcode2::BoxedError<'de>> {
         let mut buf = fw.forward();
         let title = Nbt::<Text<Cx>, Cx>::decode(&mut buf)?.into_inner();
