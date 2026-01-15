@@ -10,6 +10,7 @@ pub mod criterion;
 use remap::remap;
 use rimecraft_fmt::Formatting;
 use rimecraft_item::{stack::ItemStackCx, ItemStack};
+use rimecraft_registry::{RegistryEntry, RegistryKey};
 use rimecraft_text::{ProvideTextTy, Text};
 
 /// Global context for [`Advancement`].
@@ -166,4 +167,17 @@ pub struct FrameData {
     pub name: &'static str,
     /// Color
     pub fmt: Formatting,
+}
+
+/// Rewards of completing an advancement.
+#[remap(yarn = "AdvancementRewards")]
+#[derive(Debug)]
+pub struct Rewards<Cx>
+where
+    Cx: AdvancementCx,
+{
+    experience: i32,
+    loot: Vec<RegistryKey<Cx::Id, ()>>,
+    recipe: Vec<RegistryKey<Cx::Id, ()>>,
+    func: Option<fn() -> ()>,
 }
