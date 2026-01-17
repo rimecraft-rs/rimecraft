@@ -10,7 +10,7 @@ pub mod criterion;
 use remap::remap;
 use rimecraft_fmt::Formatting;
 use rimecraft_item::{stack::ItemStackCx, ItemStack};
-use rimecraft_registry::{RegistryEntry, RegistryKey};
+use rimecraft_registry::RegistryKey;
 use rimecraft_text::{ProvideTextTy, Text};
 
 /// Global context for [`Advancement`].
@@ -22,7 +22,7 @@ pub use edcode::AdvancementEdcodeCx;
 /// All information about an advancement.\
 /// `'r` is registry lifetime.\
 /// Generic type `Cx` is context type.
-#[remap(yarn = "Advancement")]
+#[remap(yarn = "Advancement", mojmaps = "Advancement")]
 pub struct Advancement<'r, Cx>
 where
     Cx: AdvancementCx,
@@ -34,7 +34,7 @@ where
 }
 
 /// Display-related information.
-#[remap(yarn = "AdvancementDisplay")]
+#[remap(yarn = "AdvancementDisplay", mojmaps = "DisplayInfo")]
 pub struct DisplayInfo<'r, Cx>
 where
     Cx: AdvancementCx,
@@ -123,7 +123,7 @@ where
 }
 
 /// Describes how an advancement will be announced in the chat.
-#[remap(yarn = "AdvancementFrame")]
+#[remap(yarn = "AdvancementFrame", mojmaps = "AdvancementType")]
 #[cfg_attr(
     feature = "edcode",
     derive(::rimecraft_edcode2::Encode, ::rimecraft_edcode2::Decode)
@@ -170,7 +170,7 @@ pub struct FrameData {
 }
 
 /// Rewards of completing an advancement.
-#[remap(yarn = "AdvancementRewards")]
+#[remap(yarn = "AdvancementRewards", mojmaps = "AdvancementRewards")]
 #[derive(Debug)]
 pub struct Rewards<Cx>
 where
