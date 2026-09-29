@@ -23,6 +23,17 @@ dyn_drop = "forbid"
 ellipsis_inclusive_range_patterns = "forbid"
 exported_private_dependencies = "forbid"
 uncommon_codepoints = "deny"
+ambiguous_negative_literals = "warn"
+explicit_outlives_requirements = "warn"
+if_let_rescope = "warn"
+impl_trait_overcaptures = "warn"
+meta_variable_misuse = "deny"
+non_ascii_idents = "forbid"
+raw_borrows_via_references = "warn"
+redundant_lifetimes = "warn"
+tail_expr_drop_order = "warn"
+unit_bindings = "warn"
+unused_import_braces = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(rc_mapping, values("mojmaps", "yarn"))',
 ] }
@@ -56,10 +67,14 @@ coerce_container_to_any = "warn"
 todo = "warn"
 inline_always = "warn"
 multiple_crate_versions = "warn"
-use_self = "warn"
 useless_let_if_seq = "warn"
 suboptimal_flops = "warn"
 redundant_clone = "warn"
+unused_async_trait_impl = "warn"
+unnecessary_trailing_comma = "warn"
+ptr_offset_by_literal = "warn"
+manual_ilog2 = "warn"
+decimal_bitwise_operands = "warn"
 
 [patch.crates-io]
 bitvec = { git = 'https://codeberg.org/DM-Earth/bitvec-rc.git', branch = 'modern-rust' }
