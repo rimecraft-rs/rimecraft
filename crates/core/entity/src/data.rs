@@ -732,7 +732,7 @@ where
     }
 }
 
-impl<'a, 'de, Cx, Fw> Decode<'de, Fw> for SerializedEntry<'static, 'a, Cx>
+impl<'a, 'de, Cx, Fw> Decode<'de, Fw> for SerializedEntry<'_, 'a, Cx>
 where
     Cx: EntityDataCx<'a>,
     Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'a>>,
