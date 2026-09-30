@@ -589,17 +589,13 @@ mod _serde {
             let mut ty: Option<PositionSourceType<'w, Cx>> = None;
             while let Some(key) = map.next_key_seed(ContentVisitor::new())? {
                 match &key {
-                    Content::String(val) => {
-                        if val == TYPE_KEY {
-                            ty = Some(map.next_value_seed(self.0.with(PhantomData))?);
-                            continue;
-                        }
+                    Content::String(val) if val == TYPE_KEY => {
+                        ty = Some(map.next_value_seed(self.0.with(PhantomData))?);
+                        continue;
                     }
-                    Content::Str(val) => {
-                        if *val == TYPE_KEY {
-                            ty = Some(map.next_value_seed(self.0.with(PhantomData))?);
-                            continue;
-                        }
+                    Content::Str(TYPE_KEY) => {
+                        ty = Some(map.next_value_seed(self.0.with(PhantomData))?);
+                        continue;
                     }
                     _ => {}
                 }

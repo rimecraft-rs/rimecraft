@@ -68,7 +68,7 @@ where
 impl<'w, P, Cx> RawHeightmap<'w, P, Cx>
 where
     Cx: WorldCx<'w>,
-    P: for<'s> FnMut(Option<BlockState<'w, Cx>>) -> bool,
+    P: FnMut(Option<BlockState<'w, Cx>>) -> bool,
 {
     /// Updates this heightmap when the given [`BlockState`] at the location in this map is updated,
     /// and returns whether there is an update to this heightmap.
@@ -119,7 +119,7 @@ const fn to_index(x: i32, z: i32) -> usize {
 /// and are used for different purposes.
 pub trait Type<'w, Cx: WorldCx<'w>>: 'w {
     /// Predicate of block states.
-    type Predicate: for<'s> Fn(Option<BlockState<'w, Cx>>) -> bool;
+    type Predicate: Fn(Option<BlockState<'w, Cx>>) -> bool;
 
     /// Predicate of this type.
     fn predicate(&self) -> Self::Predicate;

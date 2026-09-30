@@ -109,7 +109,7 @@ where
 
 /// A mutex guard wrapper.
 #[derive(Debug)]
-pub struct Guard<'a, T: 'a> {
+pub struct Guard<'a, T> {
     inner: MutexGuard<'a, Option<T>>,
 }
 
