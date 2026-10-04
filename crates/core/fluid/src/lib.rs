@@ -1,8 +1,7 @@
 //! Minecraft Fluid primitives.
 
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
-use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::Reg;
+use rimecraft_registry::{Reg, RegistryCx};
 use rimecraft_state::{State, States};
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
@@ -57,10 +56,10 @@ pub struct Settings {
 }
 
 /// A fluid in a `World`.
-pub type Fluid<'a, Cx> = Reg<'a, <Cx as ProvideIdTy>::Id, RawFluid<'a, Cx>>;
+pub type Fluid<'a, Cx> = Reg<'a, RawFluid<'a, Cx>, Cx>;
 
 /// Global contexts providing fluid state extensions.
-pub trait ProvideFluidStateExtTy: ProvideIdTy {
+pub trait ProvideFluidStateExtTy: RegistryCx {
     /// The type of the fluid state extension.
     type FluidStateExt;
 }

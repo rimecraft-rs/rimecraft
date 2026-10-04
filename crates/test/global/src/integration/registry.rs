@@ -2,11 +2,24 @@
 
 #![cfg(feature = "registry")]
 
-use crate::Id;
+use registry::{AsKey, RegistryCx};
+
+use crate::{Id, TestContext};
+
+impl RegistryCx for TestContext {}
 
 impl registry::key::Root for Id {
     fn root() -> Self {
         ROOT_ID
+    }
+}
+
+impl<T> AsKey<T, TestContext> for Id {
+    fn as_key<'a>(
+        &'a self,
+        _: &'a registry::RegistryKey<registry::Registry<T, TestContext>, TestContext>,
+    ) -> &'a Id {
+        self
     }
 }
 

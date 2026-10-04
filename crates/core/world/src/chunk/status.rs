@@ -3,7 +3,6 @@
 use std::{fmt::Debug, sync::Arc};
 
 use ahash::AHashSet;
-use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
 
 use crate::WorldCx;
@@ -26,7 +25,7 @@ where
 /// Descriptor to loading status of a chunk.
 ///
 /// Statuses of a chunk are ordered by their index to represent the loading process.
-pub type ChunkStatus<'w, Cx> = Reg<'w, <Cx as ProvideIdTy>::Id, RawChunkStatus<'w, Cx>>;
+pub type ChunkStatus<'w, Cx> = Reg<'w, RawChunkStatus<'w, Cx>, Cx>;
 
 struct ChunkStatusInner<'w, Cx>
 where

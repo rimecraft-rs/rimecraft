@@ -2,17 +2,16 @@
 
 use component::map::ComponentMap;
 use local_cx::{LocalContext, ProvideLocalCxTy};
-use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::{Reg, Registry};
+use rimecraft_registry::{Reg, Registry, RegistryCx};
 
 use std::{fmt::Debug, marker::PhantomData};
 
 use crate::{Item, ItemSettings as _, ProvideSettingsTy, RawItem};
 
 /// Global context used for item stacks.
-pub trait ItemStackCx: ProvideIdTy + ProvideSettingsTy + ProvideLocalCxTy {}
+pub trait ItemStackCx: RegistryCx + ProvideSettingsTy + ProvideLocalCxTy {}
 
-impl<T> ItemStackCx for T where T: ProvideIdTy + ProvideSettingsTy + ProvideLocalCxTy {}
+impl<T> ItemStackCx for T where T: RegistryCx + ProvideSettingsTy + ProvideLocalCxTy {}
 
 /// A stack of items.
 ///
@@ -62,7 +61,7 @@ where
     #[inline]
     pub fn empty<Local>(cx: Local) -> Self
     where
-        Local: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>,
+        Local: LocalContext<&'r Registry<RawItem<'r, Cx>, Cx>>,
     {
         Self::new(
             cx.acquire()
@@ -220,8 +219,8 @@ mod _serde {
     where
         Cx: ItemStackCx,
         Cx::Id: Deserialize<'de> + FromStr + Hash + Eq,
-        Cx::LocalContext<'r>: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
-            + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>,
+        Cx::LocalContext<'r>: LocalContext<&'r Registry<RawItem<'r, Cx>, Cx>>
+            + LocalContext<&'r Registry<RawErasedComponentType<'r, Cx>, Cx>>,
     {
         fn deserialize_with_cx<D>(
             deserializer: WithLocalCx<D, Cx::LocalContext<'r>>,
@@ -238,8 +237,8 @@ mod _serde {
             where
                 Cx: ItemStackCx,
                 Cx::Id: Deserialize<'de> + FromStr + Hash + Eq,
-                Cx::LocalContext<'r>: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
-                    + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>,
+                Cx::LocalContext<'r>: LocalContext<&'r Registry<RawItem<'r, Cx>, Cx>>
+                    + LocalContext<&'r Registry<RawErasedComponentType<'r, Cx>, Cx>>,
             {
                 type Value = ItemStack<'r, Cx>;
 
@@ -303,13 +302,13 @@ mod _serde {
                                 if id.is_some() {
                                     return Err(serde::de::Error::duplicate_field("id"));
                                 }
-                                let entry: &RefEntry<Cx::Id, RawItem<'r, Cx>> = map
-                                    .next_value_seed(WithLocalCx {
+                                let entry: &RefEntry<RawItem<'r, Cx>, Cx> =
+                                    map.next_value_seed(WithLocalCx {
                                         inner: PhantomData,
                                         local_cx: self.cx,
                                     })?;
                                 id = Some(
-                                    std::convert::identity::<&Registry<_, RawItem<'_, _>>>(
+                                    std::convert::identity::<&Registry<RawItem<'_, _>, _>>(
                                         self.cx.acquire(),
                                     )
                                     .of_raw(entry.raw_id())

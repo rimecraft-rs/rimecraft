@@ -31,7 +31,7 @@ where
     pub border: RwLock<WorldBorderMut<'w>>,
 
     /// Registry key of this world.
-    pub registry_key: RegistryKey<Cx::Id, Self>,
+    pub registry_key: RegistryKey<Self, Cx>,
     /// The runtime environment of this world, indicating whether it is a server or a client.
     pub env: Environment,
     /// The local context of this game instance.

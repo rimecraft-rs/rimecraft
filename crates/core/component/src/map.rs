@@ -11,9 +11,8 @@ use local_cx::{
     serde::{DeserializeWithCx, SerializeWithCx},
 };
 use rcutil::Any;
-use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
-use rimecraft_registry::Registry;
+use rimecraft_registry::{Registry, RegistryCx};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -24,16 +23,16 @@ use crate::{
 #[repr(transparent)]
 pub(crate) struct CompTyCell<'a, Cx>(pub(crate) ErasedComponentType<'a, Cx>)
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy;
+    Cx: RegistryCx + ProvideLocalCxTy;
 
 /// A map that stores components.
 pub struct ComponentMap<'a, Cx>(MapInner<'a, Cx>)
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy;
+    Cx: RegistryCx + ProvideLocalCxTy;
 
 enum MapInner<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     Empty,
     Patched {
@@ -46,7 +45,7 @@ where
 
 impl<Cx> Default for ComponentMap<'_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     #[inline]
     fn default() -> Self {
@@ -56,7 +55,7 @@ where
 
 impl<'a, Cx> ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     /// An empty component map.
     pub const EMPTY: Self = Self(MapInner::Empty);
@@ -428,7 +427,7 @@ where
 
 impl<'a, 's, Cx> IntoIterator for &'s ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     type Item = <Iter<'s, 'a, Cx> as Iterator>::Item;
 
@@ -450,23 +449,23 @@ where
     }
 }
 
-impl<Cx: ProvideIdTy + ProvideLocalCxTy> PartialEq for CompTyCell<'_, Cx> {
+impl<Cx: RegistryCx + ProvideLocalCxTy> PartialEq for CompTyCell<'_, Cx> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         *self.0 == *other.0
     }
 }
 
-impl<Cx: ProvideIdTy + ProvideLocalCxTy> Eq for CompTyCell<'_, Cx> {}
+impl<Cx: RegistryCx + ProvideLocalCxTy> Eq for CompTyCell<'_, Cx> {}
 
-impl<Cx: ProvideIdTy + ProvideLocalCxTy> Hash for CompTyCell<'_, Cx> {
+impl<Cx: RegistryCx + ProvideLocalCxTy> Hash for CompTyCell<'_, Cx> {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         (*self.0).hash(state)
     }
 }
 
-impl<'a, Cx: ProvideIdTy + ProvideLocalCxTy> Borrow<RawErasedComponentType<'a, Cx>>
+impl<'a, Cx: RegistryCx + ProvideLocalCxTy> Borrow<RawErasedComponentType<'a, Cx>>
     for CompTyCell<'a, Cx>
 {
     #[inline]
@@ -478,9 +477,9 @@ impl<'a, Cx: ProvideIdTy + ProvideLocalCxTy> Borrow<RawErasedComponentType<'a, C
 /// Iterates over the components in this map.
 pub struct Iter<'s, 'a, Cx>(IterInner<'s, 'a, Cx>, &'s ComponentMap<'a, Cx>)
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy;
+    Cx: RegistryCx + ProvideLocalCxTy;
 
-enum IterInner<'s, 'a, Cx: ProvideIdTy + ProvideLocalCxTy> {
+enum IterInner<'s, 'a, Cx: RegistryCx + ProvideLocalCxTy> {
     Empty,
     Patched {
         changes: &'s AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
@@ -492,7 +491,7 @@ enum IterInner<'s, 'a, Cx: ProvideIdTy + ProvideLocalCxTy> {
 
 impl<'s, 'a, Cx> Iterator for Iter<'s, 'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     type Item = (ErasedComponentType<'a, Cx>, &'s Object<'a>);
 
@@ -532,7 +531,7 @@ where
 
 impl<Cx> ExactSizeIterator for Iter<'_, '_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -542,7 +541,7 @@ where
 
 impl<Cx> PartialEq for ComponentMap<'_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     fn eq(&self, other: &Self) -> bool {
         if self.len() != other.len() {
@@ -554,11 +553,11 @@ where
     }
 }
 
-impl<Cx> Eq for ComponentMap<'_, Cx> where Cx: ProvideIdTy + ProvideLocalCxTy {}
+impl<Cx> Eq for ComponentMap<'_, Cx> where Cx: RegistryCx + ProvideLocalCxTy {}
 
 impl<Cx> Hash for ComponentMap<'_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         for (ty, obj) in self.iter() {
@@ -570,7 +569,7 @@ where
 
 impl<Cx> Clone for ComponentMap<'_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     fn clone(&self) -> Self {
         match &self.0 {
@@ -599,14 +598,14 @@ where
 /// A builder for creating a simple component map.
 pub struct Builder<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     map: AHashMap<CompTyCell<'a, Cx>, Box<Object<'a>>>,
 }
 
 impl<'a, Cx> Builder<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     /// Inserts a component into this map.
     ///
@@ -656,7 +655,7 @@ where
 
 impl<'a, Cx> Extend<(ErasedComponentType<'a, Cx>, Box<Object<'a>>)> for Builder<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     fn extend<T: IntoIterator<Item = (ErasedComponentType<'a, Cx>, Box<Object<'a>>)>>(
         &mut self,
@@ -672,7 +671,7 @@ where
 
 impl<'a, 's, Cx> Extend<(ErasedComponentType<'a, Cx>, &'s Object<'a>)> for Builder<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     #[inline]
     fn extend<T: IntoIterator<Item = (ErasedComponentType<'a, Cx>, &'s Object<'a>)>>(
@@ -685,7 +684,7 @@ where
 
 impl<'a, Cx> From<Builder<'a, Cx>> for ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     #[inline]
     fn from(builder: Builder<'a, Cx>) -> Self {
@@ -695,7 +694,7 @@ where
 
 impl<Cx> Debug for CompTyCell<'_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy + Debug,
+    Cx: RegistryCx + ProvideLocalCxTy + Debug,
     Cx::Id: Debug,
 {
     #[inline]
@@ -706,7 +705,7 @@ where
 
 impl<Cx> Debug for ComponentMap<'_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy + Debug,
+    Cx: RegistryCx + ProvideLocalCxTy + Debug,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -741,7 +740,7 @@ where
 
 impl<Cx> Debug for Iter<'_, '_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy + Debug,
+    Cx: RegistryCx + ProvideLocalCxTy + Debug,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -763,7 +762,7 @@ where
 
 impl<Cx> Debug for Builder<'_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy + Debug,
+    Cx: RegistryCx + ProvideLocalCxTy + Debug,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -775,7 +774,7 @@ where
 
 impl<'a, Cx> SerializeWithCx<Cx::LocalContext<'a>> for ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
     Cx::Id: Serialize,
 {
     fn serialize_with_cx<S>(
@@ -800,7 +799,7 @@ where
 
 impl<'a, Cx> SerializeWithCx<Cx::LocalContext<'a>> for &ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
     Cx::Id: Serialize,
 {
     #[inline]
@@ -817,9 +816,9 @@ where
 
 impl<'a, 'de, Cx> DeserializeWithCx<'de, Cx::LocalContext<'a>> for ComponentMap<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
     Cx::Id: Deserialize<'de> + Hash + Eq,
-    Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
+    Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
 {
     fn deserialize_with_cx<D>(
         deserializer: WithLocalCx<D, Cx::LocalContext<'a>>,
@@ -833,10 +832,9 @@ where
 
         impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
         where
-            Cx: ProvideIdTy + ProvideLocalCxTy,
+            Cx: RegistryCx + ProvideLocalCxTy,
             Cx::Id: DeserializeWithCx<'de, Cx::LocalContext<'a>> + Hash + Eq,
-            Cx::LocalContext<'a>:
-                LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
+            Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
         {
             type Value = ComponentMap<'a, Cx>;
 

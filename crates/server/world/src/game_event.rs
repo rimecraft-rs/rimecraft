@@ -9,7 +9,6 @@ use std::{fmt::Debug, hash::Hash, sync::Arc};
 use block::BlockState;
 use entity::{Entity, EntityCell};
 use glam::DVec3;
-use global_cx::ProvideIdTy;
 use ident_hash::{HashTableExt as _, IHashSet};
 use local_cx::dyn_codecs::{EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
 use maybe::Maybe;
@@ -52,7 +51,7 @@ impl Default for RawGameEvent {
 }
 
 /// A game event in the form of registry entry.
-pub type GameEvent<'w, Cx> = Reg<'w, <Cx as ProvideIdTy>::Id, RawGameEvent>;
+pub type GameEvent<'w, Cx> = Reg<'w, RawGameEvent, Cx>;
 
 /// A game event listener listens to [`GameEvent`]s from dispatchers.
 ///
@@ -448,8 +447,7 @@ where
 }
 
 /// Registry entry of [`RawPositionSourceType`].
-pub type PositionSourceType<'a, Cx> =
-    Reg<'a, <Cx as ProvideIdTy>::Id, RawPositionSourceType<'a, Cx>>;
+pub type PositionSourceType<'a, Cx> = Reg<'a, RawPositionSourceType<'a, Cx>, Cx>;
 
 impl<'a, Cx> RawPositionSourceType<'a, Cx>
 where
@@ -512,7 +510,7 @@ mod _edcode {
     where
         Cx: WorldCx<'w>,
         Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'w>>,
-        Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>>,
+        Cx::LocalContext<'w>: LocalContext<&'w Registry<RawPositionSourceType<'w, Cx>, Cx>>,
     {
         fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
             let WithLocalCx {
@@ -569,7 +567,7 @@ mod _serde {
 
     impl<'de, 'w, Cx> serde::de::Visitor<'de> for Visitor<'w, Cx::LocalContext<'w>, Cx>
     where
-        Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>>,
+        Cx::LocalContext<'w>: LocalContext<&'w Registry<RawPositionSourceType<'w, Cx>, Cx>>,
         Cx: WorldCx<'w, Id: Deserialize<'de>>,
     {
         type Value = Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>;
@@ -615,7 +613,7 @@ mod _serde {
     impl<'de, 'w, Cx> DeserializeWithCx<'de, Cx::LocalContext<'w>>
         for Box<dyn PositionSource<'w, Cx> + Send + Sync + 'w>
     where
-        Cx::LocalContext<'w>: LocalContext<&'w Registry<Cx::Id, RawPositionSourceType<'w, Cx>>>,
+        Cx::LocalContext<'w>: LocalContext<&'w Registry<RawPositionSourceType<'w, Cx>, Cx>>,
         Cx: WorldCx<'w, Id: Deserialize<'de>>,
     {
         fn deserialize_with_cx<D>(

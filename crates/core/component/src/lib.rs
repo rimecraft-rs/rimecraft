@@ -11,7 +11,7 @@ use local_cx::{
     serde_codec,
 };
 use rcutil::Any;
-use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
+use rimecraft_global_cx::GlobalContext;
 use rimecraft_registry::Reg;
 
 type Object<'a> = dyn Any + Send + Sync + 'a;
@@ -372,8 +372,7 @@ where
 }
 
 /// Registration wrapper of [`RawErasedComponentType`].
-pub type ErasedComponentType<'a, Cx> =
-    Reg<'a, <Cx as ProvideIdTy>::Id, RawErasedComponentType<'a, Cx>>;
+pub type ErasedComponentType<'a, Cx> = Reg<'a, RawErasedComponentType<'a, Cx>, Cx>;
 
 struct DebugIter<I>(RefCell<I>);
 

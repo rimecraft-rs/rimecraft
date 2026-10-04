@@ -12,7 +12,6 @@ use erased_serde::{Serialize as ErasedSerialize, serialize_trait_object};
 use local_cx::{LocalContext, ProvideLocalCxTy};
 use parking_lot::Mutex;
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
-use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_registry::Reg;
 use rimecraft_serde_update::erased::ErasedUpdate;
 use rimecraft_voxel_math::BlockPos;
@@ -110,8 +109,7 @@ pub type DynErasedRawBlockEntityType<'r, Cx> =
     Box<dyn ErasedRawBlockEntityType<'r, Cx> + Send + Sync + 'r>;
 
 /// A type of [`BlockEntity`].
-pub type BlockEntityType<'r, Cx> =
-    Reg<'r, <Cx as ProvideIdTy>::Id, DynErasedRawBlockEntityType<'r, Cx>>;
+pub type BlockEntityType<'r, Cx> = Reg<'r, DynErasedRawBlockEntityType<'r, Cx>, Cx>;
 
 /// An object holding extra data about a block in a world.
 pub struct RawBlockEntity<'a, T: ?Sized, Cx>

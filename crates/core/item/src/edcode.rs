@@ -32,8 +32,8 @@ impl<'r, 'de, Cx, Fw> Decode<'de, Fw> for ItemStack<'r, Cx>
 where
     Cx: ItemStackCx<Id: for<'b> Decode<'de, WithLocalCx<&'b mut Fw::Forwarded, Fw::LocalCx>>>,
     Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'r>>,
-    Cx::LocalContext<'r>: LocalContext<&'r Registry<Cx::Id, RawItem<'r, Cx>>>
-        + LocalContext<&'r Registry<Cx::Id, RawErasedComponentType<'r, Cx>>>,
+    Cx::LocalContext<'r>: LocalContext<&'r Registry<RawItem<'r, Cx>, Cx>>
+        + LocalContext<&'r Registry<RawErasedComponentType<'r, Cx>, Cx>>,
 {
     fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
         let mut buf = buf.forward();

@@ -4,20 +4,25 @@ use std::{collections::HashSet, ops::Deref};
 
 use parking_lot::RwLock;
 
-use crate::{key::Key, tag::TagKey};
+use crate::{RegistryCx, key::Key, tag::TagKey};
 
 /// Type holds a value that can be registered
 /// in a registry.
-#[derive(Debug)]
 #[allow(clippy::exhaustive_enums)]
-pub enum Entry<'a, K, T> {
+pub enum Entry<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// Holds the value directly.
     Direct(T),
     /// Holds the value by reference.
-    Ref(&'a RefEntry<K, T>),
+    Ref(&'a RefEntry<T, Cx>),
 }
 
-impl<K, T> Entry<'_, K, T> {
+impl<T, Cx> Entry<'_, T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// Gets the containing value of this entry.
     #[inline]
     pub fn value(&self) -> Option<&T> {
@@ -31,7 +36,7 @@ impl<K, T> Entry<'_, K, T> {
     ///
     /// Returns `None` if the entry is a direct value.
     #[inline]
-    pub fn key(&self) -> Option<&Key<K, T>> {
+    pub fn key(&self) -> Option<&Key<T, Cx>> {
         match self {
             Entry::Direct(_) => None,
             Entry::Ref(entry) => Some(entry.key()),
@@ -42,12 +47,15 @@ impl<K, T> Entry<'_, K, T> {
     ///
     /// Returns `None` if the entry is a direct value.
     #[inline]
-    pub fn id(&self) -> Option<&K> {
+    pub fn id(&self) -> Option<&Cx::Id> {
         self.key().map(Key::value)
     }
 }
 
-impl<K, T> From<T> for Entry<'_, K, T> {
+impl<T, Cx> From<T> for Entry<'_, T, Cx>
+where
+    Cx: RegistryCx,
+{
     #[inline]
     fn from(value: T) -> Self {
         Self::Direct(value)
@@ -60,19 +68,24 @@ impl<K, T> From<T> for Entry<'_, K, T> {
 /// they can be referred to their registry keys.
 ///
 /// This type also holds the entry's tags.
-#[derive(Debug)]
-pub struct RefEntry<K, T> {
+pub struct RefEntry<T, Cx>
+where
+    Cx: RegistryCx,
+{
     pub(crate) raw: usize,
-    pub(crate) key: Key<K, T>,
+    pub(crate) key: Key<T, Cx>,
     pub(crate) value: Option<T>,
-    pub(crate) tags: RwLock<HashSet<TagKey<K, T>>>,
+    pub(crate) tags: RwLock<HashSet<TagKey<T, Cx>>>,
     pub(crate) is_default: bool,
 
     #[cfg(feature = "marking-leaked")]
     pub(crate) marker: marking::LeakedPtrMarker,
 }
 
-impl<K, T> RefEntry<K, T> {
+impl<T, Cx> RefEntry<T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// Gets the raw id of this entry.
     #[inline]
     pub fn raw_id(&self) -> usize {
@@ -87,13 +100,13 @@ impl<K, T> RefEntry<K, T> {
 
     /// Gets the key of this entry.
     #[inline]
-    pub fn key(&self) -> &Key<K, T> {
+    pub fn key(&self) -> &Key<T, Cx> {
         &self.key
     }
 
     /// Gets the tags of this entry.
     #[inline]
-    pub fn tags(&self) -> TagsGuard<'_, K, T> {
+    pub fn tags(&self) -> TagsGuard<'_, T, Cx> {
         TagsGuard {
             inner: self.tags.read(),
         }
@@ -107,7 +120,10 @@ impl<K, T> RefEntry<K, T> {
 }
 
 #[cfg(feature = "marking-leaked")]
-impl<K, T> RefEntry<K, T> {
+impl<T, Cx> RefEntry<T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// Gets the leaked marker of this registry.
     #[inline]
     pub fn marker_leaked(&self) -> marking::LeakedPtrMarker {
@@ -115,13 +131,49 @@ impl<K, T> RefEntry<K, T> {
     }
 }
 
-/// Guard of tags.
-pub struct TagsGuard<'a, K, T> {
-    inner: parking_lot::RwLockReadGuard<'a, HashSet<TagKey<K, T>>>,
+impl<T, Cx> std::fmt::Debug for Entry<'_, T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Direct(arg0) => f.debug_tuple("Direct").field(arg0).finish(),
+            Self::Ref(arg0) => f.debug_tuple("Ref").field(arg0).finish(),
+        }
+    }
 }
 
-impl<K, T> Deref for TagsGuard<'_, K, T> {
-    type Target = HashSet<TagKey<K, T>>;
+impl<T, Cx> std::fmt::Debug for RefEntry<T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RefEntry")
+            .field("raw", &self.raw)
+            .field("key", &self.key)
+            .field("value", &self.value)
+            .field("tags", &self.tags)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Guard of tags.
+pub struct TagsGuard<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    inner: parking_lot::RwLockReadGuard<'a, HashSet<TagKey<T, Cx>>>,
+}
+
+impl<T, Cx> Deref for TagsGuard<'_, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    type Target = HashSet<TagKey<T, Cx>>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -129,7 +181,11 @@ impl<K, T> Deref for TagsGuard<'_, K, T> {
     }
 }
 
-impl<K: std::fmt::Debug, T> std::fmt::Debug for TagsGuard<'_, K, T> {
+impl<T, Cx> std::fmt::Debug for TagsGuard<'_, T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("TagsGuard").field(&self.inner).finish()
     }
@@ -141,13 +197,14 @@ mod serde {
 
     use local_cx::{LocalContext, serde::DeserializeWithCx};
 
-    use crate::{Reg, Registry};
+    use crate::{Query, Reg, Registry, RegistryCx};
 
     use super::RefEntry;
 
-    impl<K, T> serde::Serialize for RefEntry<K, T>
+    impl<T, Cx> serde::Serialize for RefEntry<T, Cx>
     where
-        K: serde::Serialize,
+        Cx: RegistryCx,
+        Cx::Id: serde::Serialize,
     {
         /// Serializes the registry entry using the ID.
         #[inline]
@@ -159,21 +216,22 @@ mod serde {
         }
     }
 
-    impl<'a, 'de, K, T: 'a, Cx> DeserializeWithCx<'de, Cx> for &'a RefEntry<K, T>
+    impl<'a, 'de, T, Cx, L> DeserializeWithCx<'de, L> for &'a RefEntry<T, Cx>
     where
-        K: DeserializeWithCx<'de, Cx> + Hash + Eq + 'a,
-        Cx: LocalContext<&'a Registry<K, T>>,
+        Cx: RegistryCx,
+        Cx::Id: DeserializeWithCx<'de, L> + Hash + Eq,
+        L: LocalContext<&'a Registry<T, Cx>>,
     {
         fn deserialize_with_cx<D>(
-            deserializer: local_cx::WithLocalCx<D, Cx>,
+            deserializer: local_cx::WithLocalCx<D, L>,
         ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
             let cx = deserializer.local_cx;
-            let id = K::deserialize_with_cx(deserializer)?;
+            let id = Cx::Id::deserialize_with_cx(deserializer)?;
             cx.acquire()
-                .get(&id)
+                .get(&Query(&id))
                 .map(Reg::to_entry)
                 .ok_or_else(|| serde::de::Error::custom("unknown registry key"))
         }
@@ -182,20 +240,19 @@ mod serde {
 
 #[cfg(feature = "edcode")]
 mod edcode {
-    use std::{fmt::Display, hash::Hash};
-
     use edcode2::{Buf, BufExt as _, BufMut, BufMutExt as _, Decode, Encode};
     use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 
-    use crate::{Reg, Registry};
+    use crate::{Reg, Registry, RegistryCx};
 
     use super::{Entry, RefEntry};
 
-    impl<'r, K, T: 'r, Fw> Encode<Fw> for RefEntry<K, T>
+    impl<'r, T: 'r, Cx, Fw> Encode<Fw> for RefEntry<T, Cx>
     where
-        K: Hash + Eq + Clone + Display + 'r,
+        Cx: RegistryCx,
+        Cx::Id: Clone,
         Fw: ForwardToWithLocalCx<Forwarded: BufMut>,
-        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
+        Fw::LocalCx: LocalContext<&'r Registry<T, Cx>>,
     {
         fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
             let buf = buf.forward();
@@ -212,11 +269,12 @@ mod edcode {
         }
     }
 
-    impl<'a, 'r, 'de, K: 'r, T: 'r, Fw> Decode<'de, Fw> for &'a RefEntry<K, T>
+    impl<'a, 'r, 'de, T: 'r, Fw, Cx> Decode<'de, Fw> for &'a RefEntry<T, Cx>
     where
         'r: 'a,
+        Cx: RegistryCx,
         Fw: ForwardToWithLocalCx<Forwarded: Buf>,
-        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
+        Fw::LocalCx: LocalContext<&'r Registry<T, Cx>>,
     {
         fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
             let mut buf = buf.forward();
@@ -229,12 +287,13 @@ mod edcode {
         }
     }
 
-    impl<'r, K, T, Fw> Encode<Fw> for Entry<'_, K, T>
+    impl<'r, T, Cx, Fw> Encode<Fw> for Entry<'_, T, Cx>
     where
-        K: Hash + Eq + Clone + Display + 'r,
+        Cx: RegistryCx,
+        Cx::Id: Clone,
         T: Encode<WithLocalCx<Fw::Forwarded, Fw::LocalCx>> + 'r,
         Fw: ForwardToWithLocalCx<Forwarded: BufMut>,
-        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
+        Fw::LocalCx: LocalContext<&'r Registry<T, Cx>>,
     {
         fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
             let mut buf = buf.forward();
@@ -248,13 +307,14 @@ mod edcode {
         }
     }
 
-    impl<'a, 'r, 'de, K, T, Fw> Decode<'de, Fw> for Entry<'a, K, T>
+    impl<'a, 'r, 'de, T, Cx, Fw> Decode<'de, Fw> for Entry<'a, T, Cx>
     where
         'r: 'a,
-        K: 'r,
+        Cx: RegistryCx,
+        Cx::Id: Clone,
         T: Decode<'de, WithLocalCx<Fw::Forwarded, Fw::LocalCx>> + 'r,
         Fw: ForwardToWithLocalCx<Forwarded: Buf>,
-        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
+        Fw::LocalCx: LocalContext<&'r Registry<T, Cx>>,
     {
         fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
             let mut buf = buf.forward();

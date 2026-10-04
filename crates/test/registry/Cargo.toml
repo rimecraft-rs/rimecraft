@@ -1,0 +1,24 @@
+[package]
+name = "rimecraft-test-registry"
+version = "0.1.0"
+edition = "2024"
+authors = ["JieningYu <jiening.yu@outlook.com>"]
+description = "essential tests for rimecraft-registry that require a context"
+repository = "https://codeberg.org/DM-Earth/rimecraft/"
+license = "AGPL-3.0-or-later"
+categories = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+test-global = { path = "../global", package = "rimecraft-test-global", features = [
+    "registry",
+] }
+registry = { path = "../../core/registry", package = "rimecraft-registry" }
+static_assertions = "1.1"
+
+[features]
+
+[lints]
+workspace = true

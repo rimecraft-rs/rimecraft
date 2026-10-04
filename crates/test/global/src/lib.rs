@@ -48,7 +48,7 @@ pub enum TestContext {}
 pub struct OwnedLocalTestContext<'a> {
     /// The component registry.
     #[cfg(feature = "component")]
-    pub reg_components: Registry<Id, component::RawErasedComponentType<'a, TestContext>>,
+    pub reg_components: Registry<component::RawErasedComponentType<'a, TestContext>, TestContext>,
     _phantom: std::marker::PhantomData<&'a ()>,
 }
 

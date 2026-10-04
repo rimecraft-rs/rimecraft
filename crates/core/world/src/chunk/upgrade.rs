@@ -3,8 +3,8 @@ use std::{cell::Cell, fmt::Debug, hash::Hash, marker::PhantomData};
 use local_cx::{LocalContext, LocalContextExt as _, serde::DeserializeWithCx};
 use rimecraft_block::RawBlock;
 use rimecraft_fluid::RawFluid;
-use rimecraft_global_cx::{ProvideIdTy, ProvideNbtTy};
-use rimecraft_registry::{Reg, Registry};
+use rimecraft_global_cx::ProvideNbtTy;
+use rimecraft_registry::{Reg, Registry, RegistryCx};
 use rimecraft_voxel_math::direction::EightWayDirection;
 use serde::{
     Deserialize,
@@ -27,12 +27,21 @@ where
     fluid_ticks: Vec<TickedFluid<'w, Cx>>,
 }
 
-type TickedBlock<'w, Cx> = TickedReg<'w, RawBlock<'w, Cx>, <Cx as ProvideIdTy>::Id>;
-type TickedFluid<'w, Cx> = TickedReg<'w, RawFluid<'w, Cx>, <Cx as ProvideIdTy>::Id>;
+type TickedBlock<'w, Cx> = TickedReg<'w, RawBlock<'w, Cx>, Cx>;
+type TickedFluid<'w, Cx> = TickedReg<'w, RawFluid<'w, Cx>, Cx>;
 
-#[derive(Debug)]
 #[repr(transparent)]
-struct TickedReg<'r, T, K>(Reg<'r, K, T>);
+struct TickedReg<'r, T, Cx: RegistryCx>(Reg<'r, T, Cx>);
+
+impl<T, Cx> Debug for TickedReg<'_, T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("TickedReg").field(&self.0).finish()
+    }
+}
 
 impl<'w, Cx> UpgradeData<'w, Cx>
 where
@@ -86,8 +95,8 @@ where
         D: serde::Deserializer<'de>,
         Cx::Id: Deserialize<'de>,
         Cx::IntArray: DeserializeOwned,
-        Local: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
-            + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
+        Local: LocalContext<&'w Registry<RawBlock<'w, Cx>, Cx>>
+            + LocalContext<&'w Registry<RawFluid<'w, Cx>, Cx>>,
     {
         let indices_len = height_limit.count_vertical_sections();
 
@@ -107,8 +116,8 @@ where
         impl<'w, 'de, Cx, L> DeserializeWithCx<'de, L> for Serialized<'w, Cx>
         where
             Cx: WorldCx<'w, IntArray: DeserializeOwned, Id: Deserialize<'de>>,
-            L: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
-                + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
+            L: LocalContext<&'w Registry<RawBlock<'w, Cx>, Cx>>
+                + LocalContext<&'w Registry<RawFluid<'w, Cx>, Cx>>,
         {
             fn deserialize_with_cx<D>(
                 deserializer: local_cx::WithLocalCx<D, L>,
@@ -167,8 +176,8 @@ where
                 impl<'w, 'de, L, Cx> serde::de::Visitor<'de> for Visitor<'w, L, Cx>
                 where
                     Cx: WorldCx<'w, IntArray: DeserializeOwned, Id: Deserialize<'de>>,
-                    L: LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
-                        + LocalContext<&'w Registry<Cx::Id, RawFluid<'w, Cx>>>,
+                    L: LocalContext<&'w Registry<RawBlock<'w, Cx>, Cx>>
+                        + LocalContext<&'w Registry<RawFluid<'w, Cx>, Cx>>,
                 {
                     type Value = Serialized<'w, Cx>;
 
@@ -335,14 +344,14 @@ where
                     }
                 }
 
-                struct TicksSeed<'a, 'w, Cx, T, L>(&'a mut Vec<TickedReg<'w, T, Cx::Id>>, L)
+                struct TicksSeed<'a, 'w, Cx, T, L>(&'a mut Vec<TickedReg<'w, T, Cx>>, L)
                 where
                     Cx: WorldCx<'w>;
 
                 impl<'de, 'w, Cx, T, L> serde::de::Visitor<'de> for TicksSeed<'_, 'w, Cx, T, L>
                 where
                     Cx: WorldCx<'w, Id: Deserialize<'de>>,
-                    L: LocalContext<&'w Registry<Cx::Id, T>>,
+                    L: LocalContext<&'w Registry<T, Cx>>,
                 {
                     type Value = ();
 
@@ -360,9 +369,9 @@ where
                         if let Some(len) = seq.size_hint() {
                             self.0.reserve(len);
                         }
-                        while let Some(reg) = seq.next_element_seed(
-                            self.1.with(PhantomData::<TickedReg<'w, T, Cx::Id>>),
-                        )? {
+                        while let Some(reg) =
+                            seq.next_element_seed(self.1.with(PhantomData::<TickedReg<'w, T, Cx>>))?
+                        {
                             self.0.push(reg);
                         }
                         Ok(())
@@ -372,7 +381,7 @@ where
                 impl<'de, 'w, Cx, T, L> DeserializeSeed<'de> for TicksSeed<'_, 'w, Cx, T, L>
                 where
                     Cx: WorldCx<'w, Id: Deserialize<'de>>,
-                    L: LocalContext<&'w Registry<Cx::Id, T>>,
+                    L: LocalContext<&'w Registry<T, Cx>>,
                 {
                     type Value = ();
 
@@ -421,9 +430,10 @@ mod _serde {
 
     use super::*;
 
-    impl<T, K> Serialize for TickedReg<'_, T, K>
+    impl<T, Cx> Serialize for TickedReg<'_, T, Cx>
     where
-        K: Serialize,
+        Cx: RegistryCx,
+        Cx::Id: Serialize,
     {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -434,10 +444,11 @@ mod _serde {
         }
     }
 
-    impl<'a, 'de, K, T, L> DeserializeWithCx<'de, L> for TickedReg<'a, T, K>
+    impl<'a, 'de, Cx, T, L> DeserializeWithCx<'de, L> for TickedReg<'a, T, Cx>
     where
-        K: Deserialize<'de> + Hash + Eq + 'a,
-        L: LocalContext<&'a Registry<K, T>>,
+        Cx: RegistryCx,
+        Cx::Id: Deserialize<'de> + Hash + Eq + 'a,
+        L: LocalContext<&'a Registry<T, Cx>>,
     {
         fn deserialize_with_cx<D>(
             deserializer: local_cx::WithLocalCx<D, L>,
@@ -446,10 +457,10 @@ mod _serde {
             D: serde::Deserializer<'de>,
         {
             let cx = deserializer.local_cx;
-            let key = K::deserialize(deserializer.inner)?;
+            let key = Cx::Id::deserialize(deserializer.inner)?;
             let registry = cx.acquire();
             registry
-                .get(&key)
+                .get(&rimecraft_registry::Query(&key))
                 .or_else(|| registry.default_entry())
                 .ok_or_else(|| serde::de::Error::custom("no valid entry deserialized"))
                 .map(Self)

@@ -13,6 +13,7 @@ use std::{
 };
 
 use entry::RefEntry;
+use global_cx::ProvideIdTy;
 use key::Key;
 use parking_lot::RwLock;
 use tag::Tags;
@@ -30,14 +31,21 @@ pub use tag::TagKey;
 
 pub use dyn_manager::*;
 
-/// Immutable registry of various in-game components.
-#[derive(Debug)]
-pub struct Registry<K, T> {
-    key: Key<K, Self>,
+/// Global context types for registries.
+pub trait RegistryCx: ProvideIdTy {
+    // make this a standalone trait for future extensions (e.g. hasher)
+}
 
-    entries: Vec<RefEntry<K, T>>,
-    kv: HashMap<K, usize>,
-    tv: RwLock<HashMap<TagKey<K, T>, Vec<usize>>>,
+/// Immutable registry of various in-game components.
+pub struct Registry<T, Cx>
+where
+    Cx: RegistryCx,
+{
+    key: Key<Self, Cx>,
+
+    entries: Vec<RefEntry<T, Cx>>,
+    kv: HashMap<Cx::Id, usize>,
+    tv: RwLock<HashMap<TagKey<T, Cx>, Vec<usize>>>,
 
     /// The default registration raw id.
     default: Option<usize>,
@@ -52,19 +60,22 @@ pub struct Registry<K, T> {
 ///
 /// When serializing this reference with `serde`, it will serialize the ID
 /// of the entry.
-pub struct Reg<'a, K, T> {
+pub struct Reg<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
     raw: usize,
-    entry: &'a RefEntry<K, T>,
+    entry: &'a RefEntry<T, Cx>,
 }
 
-impl<K, T> Registry<K, T>
+impl<T, Cx> Registry<T, Cx>
 where
-    K: Hash + Eq,
+    Cx: RegistryCx,
 {
     /// Gets an entry with the given key.
-    pub fn get<'a, Q>(&'a self, key: &Q) -> Option<Reg<'a, K, T>>
+    pub fn get<'a, Q>(&'a self, key: &Q) -> Option<Reg<'a, T, Cx>>
     where
-        Q: AsKey<K, T>,
+        Q: AsKey<T, Cx>,
     {
         let index = *self.kv.get(key.as_key(&self.key))?;
 
@@ -81,13 +92,13 @@ where
     #[inline]
     pub fn contains<Q>(&self, key: &Q) -> bool
     where
-        Q: AsKey<K, T>,
+        Q: AsKey<T, Cx>,
     {
         self.kv.contains_key(key.as_key(&self.key))
     }
 
     /// Gets entries of given tag.
-    pub fn of_tag<'a>(&'a self, tag: &TagKey<K, T>) -> OfTag<'a, K, T> {
+    pub fn of_tag<'a>(&'a self, tag: &TagKey<T, Cx>) -> OfTag<'a, T, Cx> {
         OfTag {
             inner: self
                 .tv
@@ -101,15 +112,18 @@ where
     }
 }
 
-impl<K, T> Registry<K, T> {
+impl<T, Cx> Registry<T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// Gets the key of this registry.
     #[inline]
-    pub fn key(&self) -> &Key<K, Self> {
+    pub fn key(&self) -> &Key<Self, Cx> {
         &self.key
     }
 
     /// Gets entry of given raw id.
-    pub fn of_raw(&self, raw: usize) -> Option<Reg<'_, K, T>> {
+    pub fn of_raw(&self, raw: usize) -> Option<Reg<'_, T, Cx>> {
         let entry = self.entries.get(raw)?;
         debug_assert!(entry.value.is_some(), "entry is empty");
 
@@ -118,7 +132,7 @@ impl<K, T> Registry<K, T> {
 
     /// Gets all entries of this registry.
     #[inline]
-    pub fn entries(&self) -> Entries<'_, K, T> {
+    pub fn entries(&self) -> Entries<'_, T, Cx> {
         Entries {
             inner: EntriesInner::Direct {
                 iter: self.entries.iter().enumerate(),
@@ -128,7 +142,7 @@ impl<K, T> Registry<K, T> {
 
     /// Gets all values of this registry.
     #[inline]
-    pub fn values(&self) -> Values<'_, K, T> {
+    pub fn values(&self) -> Values<'_, T, Cx> {
         Values {
             inner: self.entries.iter(),
         }
@@ -136,7 +150,7 @@ impl<K, T> Registry<K, T> {
 
     /// Gets tags of this registry.
     #[inline]
-    pub fn tags(&self) -> Tags<'_, K, T> {
+    pub fn tags(&self) -> Tags<'_, T, Cx> {
         Tags {
             inner: self.tv.read(),
             registry: self,
@@ -157,13 +171,16 @@ impl<K, T> Registry<K, T> {
 
     /// Gets the default entry of this registry.
     #[inline]
-    pub fn default_entry(&self) -> Option<Reg<'_, K, T>> {
+    pub fn default_entry(&self) -> Option<Reg<'_, T, Cx>> {
         self.default.and_then(|raw| self.of_raw(raw))
     }
 }
 
 #[cfg(feature = "marking")]
-impl<K, T> Registry<K, T> {
+impl<T, Cx> Registry<T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// Gets the marker of this registry.
     #[inline]
     pub fn marker(&self) -> &marking::PtrMarker {
@@ -182,10 +199,10 @@ impl<K, T> Registry<K, T> {
     }
 }
 
-impl<K, T, Q> Index<Q> for Registry<K, T>
+impl<T, Cx, Q> Index<Q> for Registry<T, Cx>
 where
-    K: Hash + Eq,
-    Q: AsKey<K, T>,
+    Cx: RegistryCx,
+    Q: AsKey<T, Cx>,
 {
     type Output = T;
 
@@ -196,13 +213,37 @@ where
     }
 }
 
-impl<K: std::fmt::Debug, T> std::fmt::Debug for Reg<'_, K, T> {
+impl<T, Cx> std::fmt::Debug for Registry<T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Registry")
+            .field("key", &self.key)
+            .field("entries", &self.entries)
+            .field("kv", &self.kv)
+            .field("tv", &self.tv)
+            .field("default", &self.default)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<T, Cx> std::fmt::Debug for Reg<'_, T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Self::to_id(*self))
     }
 }
 
-impl<'a, K, T> Reg<'a, K, T> {
+impl<'a, T, Cx> Reg<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// Gets the inner reference of this reference.
     #[inline]
     pub fn to_value(this: Self) -> &'a T {
@@ -217,26 +258,27 @@ impl<'a, K, T> Reg<'a, K, T> {
 
     /// Gets the registry of this reference.
     #[deprecated = "this function fails"]
-    pub fn registry(this: Self) -> &'a Registry<K, T> {
+    pub fn registry(this: Self) -> &'a Registry<T, Cx> {
         let _ = this;
         unreachable!("deprecated function")
     }
 
     /// Gets the ID of this registration.
     #[inline]
-    pub fn to_id(this: Self) -> &'a K {
+    pub fn to_id(this: Self) -> &'a Cx::Id {
         Self::to_entry(this).key().value()
     }
 
     /// Gets the reference entry of this registration.
     #[inline]
-    pub fn to_entry(this: Self) -> &'a RefEntry<K, T> {
+    pub fn to_entry(this: Self) -> &'a RefEntry<T, Cx> {
         this.entry
     }
 }
 
-impl<K, T> PartialEq<T> for Reg<'_, K, T>
+impl<T, Cx> PartialEq<T> for Reg<'_, T, Cx>
 where
+    Cx: RegistryCx,
     T: PartialEq,
 {
     #[inline]
@@ -245,16 +287,22 @@ where
     }
 }
 
-impl<K, T> Copy for Reg<'_, K, T> {}
+impl<T, Cx> Copy for Reg<'_, T, Cx> where Cx: RegistryCx {}
 
-impl<K, T> Clone for Reg<'_, K, T> {
+impl<T, Cx> Clone for Reg<'_, T, Cx>
+where
+    Cx: RegistryCx,
+{
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<K, T> Deref for Reg<'_, K, T> {
+impl<T, Cx> Deref for Reg<'_, T, Cx>
+where
+    Cx: RegistryCx,
+{
     type Target = T;
 
     #[inline]
@@ -263,25 +311,31 @@ impl<K, T> Deref for Reg<'_, K, T> {
     }
 }
 
-impl<K, T> Hash for Reg<'_, K, T> {
+impl<T, Cx> Hash for Reg<'_, T, Cx>
+where
+    Cx: RegistryCx,
+{
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.raw.hash(state)
     }
 }
 
-impl<K, T> PartialEq for Reg<'_, K, T> {
+impl<T, Cx> PartialEq for Reg<'_, T, Cx>
+where
+    Cx: RegistryCx,
+{
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.raw == other.raw
     }
 }
 
-impl<K, T> Eq for Reg<'_, K, T> {}
+impl<T, Cx> Eq for Reg<'_, T, Cx> where Cx: RegistryCx {}
 
-impl<K, T> Display for Reg<'_, K, T>
+impl<T, Cx> Display for Reg<'_, T, Cx>
 where
-    K: Display,
+    Cx: RegistryCx,
 {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -290,24 +344,40 @@ where
 }
 
 /// Trait for converting to a key.
-pub trait AsKey<K, T> {
+///
+/// Use [`Query`] if you found the identifier type hasn't implemented this.
+pub trait AsKey<T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// Converts to a key.
-    fn as_key<'a>(&'a self, registry: &'a Key<K, Registry<K, T>>) -> &'a K;
+    fn as_key<'a>(&'a self, registry: &'a Key<Registry<T, Cx>, Cx>) -> &'a Cx::Id;
 }
 
-impl<K, T> AsKey<K, T> for K {
+/// A newtype wrapper around identifier type, for [`AsKey`] implementation.
+///
+/// Implementors of global contexts can also implement `AsKey` for the identifier type,
+/// so this type can be retired. They are not implemented automatically due to restrictions
+/// of the Rust compiler.
+#[derive(Debug, Clone, Copy)]
+pub struct Query<K>(pub K);
+
+impl<T, Cx> AsKey<T, Cx> for Query<&Cx::Id>
+where
+    Cx: RegistryCx,
+{
     #[inline]
-    fn as_key<'a>(&'a self, _registry: &'a Key<K, Registry<K, T>>) -> &'a K {
-        self
+    fn as_key<'a>(&'a self, _registry: &'a Key<Registry<T, Cx>, Cx>) -> &'a Cx::Id {
+        self.0
     }
 }
 
-impl<K, T> AsKey<K, T> for Key<K, T>
+impl<T, Cx> AsKey<T, Cx> for Key<T, Cx>
 where
-    K: PartialEq,
+    Cx: RegistryCx,
 {
     #[inline]
-    fn as_key<'a>(&'a self, registry: &'a Key<K, Registry<K, T>>) -> &'a K {
+    fn as_key<'a>(&'a self, registry: &'a Key<Registry<T, Cx>, Cx>) -> &'a Cx::Id {
         if self.registry() == registry.value() {
             self.value()
         } else {
@@ -319,24 +389,31 @@ where
 }
 
 /// Iterator of entry references.
-#[derive(Debug)]
-pub struct Entries<'a, K, T> {
-    inner: EntriesInner<'a, K, T>,
+pub struct Entries<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    inner: EntriesInner<'a, T, Cx>,
 }
 
-#[derive(Debug)]
-enum EntriesInner<'a, K, T> {
+enum EntriesInner<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
     Direct {
-        iter: std::iter::Enumerate<std::slice::Iter<'a, RefEntry<K, T>>>,
+        iter: std::iter::Enumerate<std::slice::Iter<'a, RefEntry<T, Cx>>>,
     },
     Raw {
-        registry: &'a Registry<K, T>,
+        registry: &'a Registry<T, Cx>,
         iter: std::slice::Iter<'a, usize>,
     },
 }
 
-impl<'a, K, T> Iterator for Entries<'a, K, T> {
-    type Item = Reg<'a, K, T>;
+impl<'a, T, Cx> Iterator for Entries<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    type Item = Reg<'a, T, Cx>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match &mut self.inner {
@@ -355,15 +432,48 @@ impl<'a, K, T> Iterator for Entries<'a, K, T> {
     }
 }
 
+impl<T, Cx> std::fmt::Debug for Entries<'_, T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Entries").field(&self.inner).finish()
+    }
+}
+
+impl<T, Cx> std::fmt::Debug for EntriesInner<'_, T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Direct { iter } => f.debug_struct("Direct").field("iter", iter).finish(),
+            Self::Raw { registry: _, iter } => f
+                .debug_struct("Raw")
+                .field("iter", iter)
+                .finish_non_exhaustive(),
+        }
+    }
+}
+
 /// Iterator of entry references of a tag.
-#[derive(Debug)]
-pub struct OfTag<'a, K, T> {
-    registry: &'a Registry<K, T>,
+pub struct OfTag<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    registry: &'a Registry<T, Cx>,
     inner: std::vec::IntoIter<usize>,
 }
 
-impl<'a, K, T> Iterator for OfTag<'a, K, T> {
-    type Item = Reg<'a, K, T>;
+impl<'a, T, Cx> Iterator for OfTag<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    type Item = Reg<'a, T, Cx>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -376,13 +486,29 @@ impl<'a, K, T> Iterator for OfTag<'a, K, T> {
     }
 }
 
-/// Iterator of entry values.
-#[derive(Debug)]
-pub struct Values<'a, K, T> {
-    inner: std::slice::Iter<'a, RefEntry<K, T>>,
+impl<T, Cx> std::fmt::Debug for OfTag<'_, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OfTag")
+            .field("inner", &self.inner)
+            .finish_non_exhaustive()
+    }
 }
 
-impl<'a, K, T> Iterator for Values<'a, K, T> {
+/// Iterator of entry values.
+pub struct Values<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    inner: std::slice::Iter<'a, RefEntry<T, Cx>>,
+}
+
+impl<'a, T, Cx> Iterator for Values<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
     type Item = &'a T;
 
     #[inline]
@@ -396,10 +522,24 @@ impl<'a, K, T> Iterator for Values<'a, K, T> {
     }
 }
 
-impl<'a, K, T> IntoIterator for &'a Registry<K, T> {
+impl<T, Cx> std::fmt::Debug for Values<'_, T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Values").field(&self.inner).finish()
+    }
+}
+
+impl<'a, T, Cx> IntoIterator for &'a Registry<T, Cx>
+where
+    Cx: RegistryCx,
+{
     type Item = &'a T;
 
-    type IntoIter = Values<'a, K, T>;
+    type IntoIter = Values<'a, T, Cx>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -410,11 +550,13 @@ impl<'a, K, T> IntoIterator for &'a Registry<K, T> {
 }
 
 /// Mutable registry of various in-game components.
-#[derive(Debug)]
-pub struct RegistryMut<K, T> {
-    key: Key<K, Registry<K, T>>,
-    entries: Vec<(T, RefEntry<K, T>)>,
-    keys: OnceLock<HashSet<K>>,
+pub struct RegistryMut<T, Cx>
+where
+    Cx: RegistryCx,
+{
+    key: Key<Registry<T, Cx>, Cx>,
+    entries: Vec<(T, RefEntry<T, Cx>)>,
+    keys: OnceLock<HashSet<Cx::Id>>,
 
     default: Option<usize>,
 
@@ -424,14 +566,17 @@ pub struct RegistryMut<K, T> {
     marker: marking::LeakedPtrMarker,
 }
 
-impl<K, T> RegistryMut<K, T> {
+impl<T, Cx> RegistryMut<T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// Creates a new mutable registry.
     #[cfg_attr(
         feature = "marking-leaked",
-        doc = "\n _Note on feature `marking-leaked`:_ This function introduces tiny memory leaking behavior."
+        doc = "\n_Note on feature `marking-leaked`:_ This function introduces tiny memory leaking behavior."
     )]
     #[inline]
-    pub fn new(key: Key<K, Registry<K, T>>) -> Self {
+    pub fn new(key: Key<Registry<T, Cx>, Cx>) -> Self {
         Self {
             key,
             entries: Vec::new(),
@@ -445,14 +590,15 @@ impl<K, T> RegistryMut<K, T> {
 
     /// Gets the key of this registry.
     #[inline]
-    pub fn key(&self) -> &Key<K, Registry<K, T>> {
+    pub fn key(&self) -> &Key<Registry<T, Cx>, Cx> {
         &self.key
     }
 }
 
-impl<K, T> RegistryMut<K, T>
+impl<T, Cx> RegistryMut<T, Cx>
 where
-    K: Hash + Eq + Clone,
+    Cx: RegistryCx,
+    Cx::Id: Clone,
 {
     /// Registers a new entry and returns its raw id if successful.
     ///
@@ -461,16 +607,16 @@ where
     /// Returns back the given key and value if registration with the key already exists.
     #[allow(clippy::missing_panics_doc)]
     #[inline]
-    pub fn register(&mut self, key: Key<K, T>, value: T) -> Result<usize, (Key<K, T>, T)> {
+    pub fn register(&mut self, key: Key<T, Cx>, value: T) -> Result<usize, (Key<T, Cx>, T)> {
         self.register_raw(key, value, false)
     }
 
     fn register_raw(
         &mut self,
-        key: Key<K, T>,
+        key: Key<T, Cx>,
         value: T,
         is_default: bool,
-    ) -> Result<usize, (Key<K, T>, T)> {
+    ) -> Result<usize, (Key<T, Cx>, T)> {
         if self.keys.get_mut().is_none() {
             self.keys = HashSet::new().into();
         }
@@ -499,7 +645,11 @@ where
     ///
     /// See [`Self::register`].
     #[allow(clippy::missing_errors_doc)]
-    pub fn register_default(&mut self, key: Key<K, T>, value: T) -> Result<usize, (Key<K, T>, T)> {
+    pub fn register_default(
+        &mut self,
+        key: Key<T, Cx>,
+        value: T,
+    ) -> Result<usize, (Key<T, Cx>, T)> {
         if self.default.is_some() {
             return Err((key, value));
         }
@@ -509,11 +659,28 @@ where
     }
 }
 
-impl<K, T> From<RegistryMut<K, T>> for Registry<K, T>
+impl<T, Cx> std::fmt::Debug for RegistryMut<T, Cx>
 where
-    K: Hash + Eq + Clone,
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+    T: std::fmt::Debug,
 {
-    fn from(value: RegistryMut<K, T>) -> Self {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegistryMut")
+            .field("key", &self.key)
+            .field("entries", &self.entries)
+            .field("keys", &self.keys)
+            .field("default", &self.default)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<T, Cx> From<RegistryMut<T, Cx>> for Registry<T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: Clone,
+{
+    fn from(value: RegistryMut<T, Cx>) -> Self {
         let entries: Vec<_> = value
             .entries
             .into_iter()
@@ -538,22 +705,16 @@ where
     }
 }
 
-/// Trait for providing a registry.
-#[deprecated = "use local-cx to obtain registry instead"]
-pub trait ProvideRegistry<'r, K, T> {
-    /// Gets the registry.
-    fn registry() -> &'r Registry<K, T>;
-}
-
-impl<K, T> Registry<K, T>
+impl<T, Cx> Registry<T, Cx>
 where
-    K: Hash + Eq + Clone,
+    Cx: RegistryCx,
+    Cx::Id: Clone,
 {
     /// Binds given tags to entries, and removes old tag bindings.
     #[doc(alias = "bind_tags")]
     pub fn populate_tags<'a, I>(&'a self, entries: I)
     where
-        I: IntoIterator<Item = (TagKey<K, T>, Vec<&'a RefEntry<K, T>>)>,
+        I: IntoIterator<Item = (TagKey<T, Cx>, Vec<&'a RefEntry<T, Cx>>)>,
     {
         self.clear_tags();
 
@@ -586,11 +747,12 @@ mod serde {
 
     use local_cx::{LocalContext, serde::DeserializeWithCx};
 
-    use crate::{Reg, Registry};
+    use crate::{Query, Reg, Registry, RegistryCx};
 
-    impl<K, T> serde::Serialize for Reg<'_, K, T>
+    impl<T, Cx> serde::Serialize for Reg<'_, T, Cx>
     where
-        K: serde::Serialize,
+        Cx: RegistryCx,
+        Cx::Id: serde::Serialize,
     {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
@@ -600,21 +762,22 @@ mod serde {
         }
     }
 
-    impl<'a, 'de, K, T, Cx> DeserializeWithCx<'de, Cx> for Reg<'a, K, T>
+    impl<'a, 'de, T, Cx, L> DeserializeWithCx<'de, L> for Reg<'a, T, Cx>
     where
-        K: DeserializeWithCx<'de, Cx> + Hash + Eq + 'a,
-        Cx: LocalContext<&'a Registry<K, T>>,
+        Cx: RegistryCx,
+        Cx::Id: DeserializeWithCx<'de, L> + Hash + Eq + 'a,
+        L: LocalContext<&'a Registry<T, Cx>>,
     {
         fn deserialize_with_cx<D>(
-            deserializer: local_cx::WithLocalCx<D, Cx>,
+            deserializer: local_cx::WithLocalCx<D, L>,
         ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
             let cx = deserializer.local_cx;
-            let key = K::deserialize_with_cx(deserializer)?;
+            let key = Cx::Id::deserialize_with_cx(deserializer)?;
             cx.acquire()
-                .get(&key)
+                .get(&Query(&key))
                 .ok_or_else(|| serde::de::Error::custom("key not found"))
         }
     }
@@ -626,10 +789,11 @@ mod edcode {
     use edcode2::{Buf, BufExt as _, BufMut, BufMutExt as _, Decode, Encode};
     use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 
-    use crate::{Reg, Registry};
+    use crate::{Reg, Registry, RegistryCx};
 
-    impl<K, T, B> Encode<B> for Reg<'_, K, T>
+    impl<T, Cx, B> Encode<B> for Reg<'_, T, Cx>
     where
+        Cx: RegistryCx,
         B: BufMut,
     {
         #[inline]
@@ -639,11 +803,12 @@ mod edcode {
         }
     }
 
-    impl<'a, 'r, 'de, K: 'r, T: 'r, Fw> Decode<'de, Fw> for Reg<'a, K, T>
+    impl<'a, 'r, 'de, T: 'r, Cx, Fw> Decode<'de, Fw> for Reg<'a, T, Cx>
     where
         'r: 'a,
+        Cx: RegistryCx,
         Fw: ForwardToWithLocalCx<Forwarded: Buf>,
-        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
+        Fw::LocalCx: LocalContext<&'r Registry<T, Cx>>,
     {
         fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
             let WithLocalCx { inner, local_cx } = buf.forward();
@@ -656,9 +821,3 @@ mod edcode {
         }
     }
 }
-
-#[allow(dead_code)]
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
-
-#[cfg(test)]
-mod tests;

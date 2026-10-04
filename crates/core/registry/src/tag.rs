@@ -2,17 +2,23 @@
 
 use std::{collections::HashMap, hash::Hash};
 
-use crate::{Registry, key::Key};
+use crate::{Registry, RegistryCx, key::Key};
 
 /// Key of a tag.
-pub struct TagKey<K, T> {
+pub struct TagKey<T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// The registry reference.
-    pub registry: Key<K, Registry<K, T>>,
+    pub registry: Key<Registry<T, Cx>, Cx>,
     /// The tag id.
-    pub id: K,
+    pub id: Cx::Id,
 }
 
-impl<K: Hash, T> Hash for TagKey<K, T> {
+impl<T, Cx> Hash for TagKey<T, Cx>
+where
+    Cx: RegistryCx,
+{
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.registry.hash(state);
@@ -20,16 +26,29 @@ impl<K: Hash, T> Hash for TagKey<K, T> {
     }
 }
 
-impl<K: PartialEq, T> PartialEq for TagKey<K, T> {
+impl<T, Cx> PartialEq for TagKey<T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: PartialEq,
+{
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.registry == other.registry && self.id == other.id
     }
 }
 
-impl<K: Eq, T> Eq for TagKey<K, T> {}
+impl<T, Cx> Eq for TagKey<T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: Eq,
+{
+}
 
-impl<K: Clone, T> Clone for TagKey<K, T> {
+impl<T, Cx> Clone for TagKey<T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: Clone,
+{
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -39,9 +58,18 @@ impl<K: Clone, T> Clone for TagKey<K, T> {
     }
 }
 
-impl<K: Copy, T> Copy for TagKey<K, T> {}
+impl<T, Cx> Copy for TagKey<T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: Copy,
+{
+}
 
-impl<K: std::fmt::Debug, T> std::fmt::Debug for TagKey<K, T> {
+impl<T, Cx> std::fmt::Debug for TagKey<T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("TagKey")
             .field(&self.registry.value())
@@ -51,16 +79,24 @@ impl<K: std::fmt::Debug, T> std::fmt::Debug for TagKey<K, T> {
 }
 
 /// Tags of a registry.
-#[derive(Debug)]
-pub struct Tags<'r, K, T> {
-    pub(crate) inner: parking_lot::RwLockReadGuard<'r, HashMap<TagKey<K, T>, Vec<usize>>>,
-    pub(crate) registry: &'r Registry<K, T>,
+pub struct Tags<'r, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    pub(crate) inner: parking_lot::RwLockReadGuard<'r, HashMap<TagKey<T, Cx>, Vec<usize>>>,
+    pub(crate) registry: &'r Registry<T, Cx>,
 }
 
-impl<K, T> Tags<'_, K, T> {
+impl<T, Cx> Tags<'_, T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// Gets an iterator over the tags.
     #[inline]
-    pub fn iter(&self) -> Iter<'_, K, T> {
+    pub fn iter(&self) -> Iter<'_, T, Cx>
+    where
+        Cx: RegistryCx,
+    {
         Iter {
             inner: self.inner.iter(),
             registry: self.registry,
@@ -68,10 +104,25 @@ impl<K, T> Tags<'_, K, T> {
     }
 }
 
-impl<'a: 'a, K, T> IntoIterator for &'a Tags<'_, K, T> {
-    type Item = (&'a TagKey<K, T>, crate::Entries<'a, K, T>);
+impl<T, Cx> std::fmt::Debug for Tags<'_, T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Tags")
+            .field("inner", &self.inner)
+            .finish_non_exhaustive()
+    }
+}
 
-    type IntoIter = Iter<'a, K, T>;
+impl<'a: 'a, T, Cx> IntoIterator for &'a Tags<'_, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    type Item = (&'a TagKey<T, Cx>, crate::Entries<'a, T, Cx>);
+
+    type IntoIter = Iter<'a, T, Cx>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -80,14 +131,19 @@ impl<'a: 'a, K, T> IntoIterator for &'a Tags<'_, K, T> {
 }
 
 /// Iterator of tags.
-#[derive(Debug)]
-pub struct Iter<'a, K, T> {
-    inner: std::collections::hash_map::Iter<'a, TagKey<K, T>, Vec<usize>>,
-    registry: &'a Registry<K, T>,
+pub struct Iter<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    inner: std::collections::hash_map::Iter<'a, TagKey<T, Cx>, Vec<usize>>,
+    registry: &'a Registry<T, Cx>,
 }
 
-impl<'a, K, T> Iterator for Iter<'a, K, T> {
-    type Item = (&'a TagKey<K, T>, crate::Entries<'a, K, T>);
+impl<'a, T, Cx> Iterator for Iter<'a, T, Cx>
+where
+    Cx: RegistryCx,
+{
+    type Item = (&'a TagKey<T, Cx>, crate::Entries<'a, T, Cx>);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(|(t, v)| {
@@ -109,6 +165,18 @@ impl<'a, K, T> Iterator for Iter<'a, K, T> {
     }
 }
 
+impl<T, Cx> std::fmt::Debug for Iter<'_, T, Cx>
+where
+    Cx: RegistryCx,
+    Cx::Id: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Iter")
+            .field("inner", &self.inner)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Helper module for `serde` support.
 #[cfg(feature = "serde")]
 pub mod serde {
@@ -116,7 +184,7 @@ pub mod serde {
 
     use local_cx::{LocalContext, serde::DeserializeWithCx};
 
-    use crate::Registry;
+    use crate::{Registry, RegistryCx};
 
     use super::TagKey;
 
@@ -125,9 +193,10 @@ pub mod serde {
     #[derive(Debug, Clone, Copy)]
     pub struct Unprefixed<T>(pub T);
 
-    impl<K, T> serde::Serialize for Unprefixed<&TagKey<K, T>>
+    impl<T, Cx> serde::Serialize for Unprefixed<&TagKey<T, Cx>>
     where
-        K: serde::Serialize,
+        Cx: RegistryCx,
+        Cx::Id: serde::Serialize,
     {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -138,9 +207,10 @@ pub mod serde {
         }
     }
 
-    impl<K, T> serde::Serialize for Unprefixed<TagKey<K, T>>
+    impl<T, Cx> serde::Serialize for Unprefixed<TagKey<T, Cx>>
     where
-        K: serde::Serialize,
+        Cx: RegistryCx,
+        Cx::Id: serde::Serialize,
     {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -151,13 +221,14 @@ pub mod serde {
         }
     }
 
-    impl<'de, 'r, K, T: 'r, Cx> DeserializeWithCx<'de, Cx> for Unprefixed<TagKey<K, T>>
+    impl<'de, 'r, T: 'r, Cx, L> DeserializeWithCx<'de, L> for Unprefixed<TagKey<T, Cx>>
     where
-        K: DeserializeWithCx<'de, Cx> + Clone + 'r,
-        Cx: LocalContext<&'r Registry<K, T>>,
+        Cx: RegistryCx,
+        Cx::Id: DeserializeWithCx<'de, L> + Clone,
+        L: LocalContext<&'r Registry<T, Cx>>,
     {
         fn deserialize_with_cx<D>(
-            deserializer: local_cx::WithLocalCx<D, Cx>,
+            deserializer: local_cx::WithLocalCx<D, L>,
         ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
@@ -165,32 +236,33 @@ pub mod serde {
             let registry = deserializer.local_cx.acquire();
             Ok(Self(TagKey {
                 registry: registry.key.clone(),
-                id: K::deserialize_with_cx(deserializer)?,
+                id: Cx::Id::deserialize_with_cx(deserializer)?,
             }))
         }
     }
 
-    impl<K, T> serde::Serialize for TagKey<K, T>
+    impl<T, Cx> serde::Serialize for TagKey<T, Cx>
     where
-        K: ToString,
+        Cx: RegistryCx,
     {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
-            format!("#{}", self.id.to_string()).serialize(serializer)
+            format!("#{}", self.id).serialize(serializer)
         }
     }
 
-    impl<'de, 'r, K, T: 'r, Cx> DeserializeWithCx<'de, Cx> for TagKey<K, T>
+    impl<'de, 'r, T: 'r, Cx, L> DeserializeWithCx<'de, L> for TagKey<T, Cx>
     where
-        K: FromStr + Clone + 'r,
-        <K as FromStr>::Err: std::fmt::Display,
-        Cx: LocalContext<&'r Registry<K, T>>,
+        Cx: RegistryCx,
+        Cx::Id: FromStr + Clone,
+        <Cx::Id as FromStr>::Err: std::fmt::Display,
+        L: LocalContext<&'r Registry<T, Cx>>,
     {
         fn deserialize_with_cx<D>(
-            deserializer: local_cx::WithLocalCx<D, Cx>,
+            deserializer: local_cx::WithLocalCx<D, L>,
         ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
@@ -222,7 +294,7 @@ pub mod serde {
             let registry = deserializer.local_cx.acquire();
             let id = deserializer
                 .inner
-                .deserialize_str(Visitor(PhantomData::<K>))?;
+                .deserialize_str(Visitor(PhantomData::<Cx::Id>))?;
             Ok(Self {
                 registry: registry.key.clone(),
                 id,

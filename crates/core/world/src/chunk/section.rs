@@ -243,7 +243,7 @@ where
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
         + Clone,
-    &'w Registry<Cx::Id, Cx::Biome>: Into<Cx::BiomeList>,
+    &'w Registry<Cx::Biome, Cx>: Into<Cx::BiomeList>,
     Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
         + Clone,
@@ -255,14 +255,14 @@ where
     /// Panics if the biome registry doesn't contains a default entry.
     pub fn from_registries<Local>(cx: Local) -> Self
     where
-        Local: LocalContext<&'w Registry<Cx::Id, Cx::Biome>>
-            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+        Local: LocalContext<&'w Registry<Cx::Biome, Cx>>
+            + LocalContext<&'w Registry<RawBlock<'w, Cx>, Cx>>
             + LocalContext<Cx::BlockStateList>,
     {
-        let default_block = std::convert::identity::<&Registry<_, RawBlock<'_, _>>>(cx.acquire())
+        let default_block = std::convert::identity::<&Registry<RawBlock<'_, _>, _>>(cx.acquire())
             .default_entry()
             .expect("no default block found for registry");
-        let registry = std::convert::identity::<&Registry<_, Cx::Biome>>(cx.acquire());
+        let registry = std::convert::identity::<&Registry<Cx::Biome, _>>(cx.acquire());
 
         Self {
             bsc: PalettedContainer::of_single(

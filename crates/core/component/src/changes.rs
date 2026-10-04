@@ -10,9 +10,8 @@ use local_cx::{
     WithLocalCx,
     serde::{DeserializeWithCx, SerializeWithCx},
 };
-use rimecraft_global_cx::ProvideIdTy;
 use rimecraft_maybe::{Maybe, SimpleOwned};
-use rimecraft_registry::{Reg, Registry};
+use rimecraft_registry::{Reg, Registry, RegistryCx};
 use serde::{Serialize, de::DeserializeSeed, ser::SerializeMap as _};
 
 use crate::{
@@ -24,7 +23,7 @@ use crate::{
 /// Changes of components.
 pub struct ComponentChanges<'a, 'cow, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     pub(crate) changed: Maybe<'cow, AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>>,
     pub(crate) ser_count: usize,
@@ -32,7 +31,7 @@ where
 
 impl<'a, Cx> ComponentChanges<'a, '_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     /// Returns a builder for `ComponentChanges`.
     pub fn builder() -> Builder<'a, Cx> {
@@ -131,7 +130,7 @@ where
 
 impl<'a, Cx> SerializeWithCx<Cx::LocalContext<'a>> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     fn serialize_with_cx<S>(
         &self,
@@ -184,7 +183,7 @@ where
 
 impl<'a, Cx> SerializeWithCx<Cx::LocalContext<'a>> for &ComponentChanges<'a, '_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     #[inline]
     fn serialize_with_cx<S>(
@@ -200,8 +199,8 @@ where
 
 impl<'a, 'de, Cx> DeserializeWithCx<'de, Cx::LocalContext<'a>> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: ProvideIdTy<Id: FromStr> + ProvideLocalCxTy,
-    Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
+    Cx: RegistryCx<Id: FromStr> + ProvideLocalCxTy,
+    Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
 {
     fn deserialize_with_cx<D>(
         deserializer: WithLocalCx<D, Cx::LocalContext<'a>>,
@@ -215,9 +214,8 @@ where
 
         impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
         where
-            Cx: ProvideIdTy<Id: FromStr> + ProvideLocalCxTy,
-            Cx::LocalContext<'a>:
-                LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
+            Cx: RegistryCx<Id: FromStr> + ProvideLocalCxTy,
+            Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
         {
             type Value = AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>;
 
@@ -289,7 +287,7 @@ where
 
 impl<'a, Cx, Fw> Encode<Fw> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
     Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx = Cx::LocalContext<'a>>,
 {
     fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
@@ -318,9 +316,9 @@ where
 
 impl<'a, 'de, Cx, Fw> Decode<'de, Fw> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
     Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'a>>,
-    Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
+    Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
 {
     fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
         let mut buf = buf.forward();
@@ -351,7 +349,7 @@ where
 /// Builder for [`ComponentChanges`].
 pub struct Builder<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     changes: AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
     ser_count: usize,
@@ -359,7 +357,7 @@ where
 
 impl<'a, Cx> Builder<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     /// Inserts a component type with a valid value.
     ///
@@ -401,7 +399,7 @@ where
 
 impl<'a, Cx> From<Builder<'a, Cx>> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     #[inline]
     fn from(builder: Builder<'a, Cx>) -> Self {
@@ -413,7 +411,7 @@ const REMOVED_PREFIX: char = '!';
 
 struct Type<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     ty: ErasedComponentType<'a, Cx>,
     rm: bool,
@@ -423,7 +421,7 @@ where
 
 impl<Cx> Serialize for Type<'_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -442,9 +440,9 @@ where
 
 impl<'a, 'de, Cx, L> DeserializeWithCx<'de, L> for Type<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
     Cx::Id: FromStr,
-    L: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
+    L: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
 {
     fn deserialize_with_cx<D>(deserializer: WithLocalCx<D, L>) -> Result<Self, D::Error>
     where
@@ -452,7 +450,7 @@ where
     {
         struct Visitor<'a, Cx, L>
         where
-            Cx: ProvideIdTy + ProvideLocalCxTy,
+            Cx: RegistryCx + ProvideLocalCxTy,
         {
             cx: L,
             _marker: PhantomData<&'a Cx>,
@@ -460,9 +458,9 @@ where
 
         impl<'a, Cx, L> serde::de::Visitor<'_> for Visitor<'a, Cx, L>
         where
-            Cx: ProvideIdTy + ProvideLocalCxTy,
+            Cx: RegistryCx + ProvideLocalCxTy,
             Cx::Id: FromStr,
-            L: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>,
+            L: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
         {
             type Value = Type<'a, Cx>;
 
@@ -481,10 +479,11 @@ where
                     E::custom(format!("unable to deserialize the identifier {any}"))
                 })?;
 
-                let ty =
-                    self.cx.acquire().get(&id).ok_or_else(|| {
-                        E::custom(format!("unable to find the component type {id}"))
-                    })?;
+                let ty = self
+                    .cx
+                    .acquire()
+                    .get(&rimecraft_registry::Query(&id))
+                    .ok_or_else(|| E::custom(format!("unable to find the component type {id}")))?;
 
                 if ty.is_transient() {
                     return Err(E::custom(format!(
@@ -511,7 +510,7 @@ where
 
 impl<Cx> Debug for ComponentChanges<'_, '_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy + Debug,
+    Cx: RegistryCx + ProvideLocalCxTy + Debug,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -528,7 +527,7 @@ where
 
 impl<Cx> Debug for Builder<'_, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy + Debug,
+    Cx: RegistryCx + ProvideLocalCxTy + Debug,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

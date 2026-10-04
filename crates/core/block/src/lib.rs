@@ -1,8 +1,8 @@
 //! Minecraft block primitives.
 
 use dsyn::{DescriptorSet, HoldDescriptors};
-use rimecraft_global_cx::{GlobalContext, ProvideIdTy};
-use rimecraft_registry::Reg;
+use rimecraft_global_cx::GlobalContext;
+use rimecraft_registry::{Reg, RegistryCx};
 use rimecraft_state::{State, States};
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
@@ -76,7 +76,7 @@ where
 }
 
 /// A voxel in a `World`.
-pub type Block<'a, Cx> = Reg<'a, <Cx as ProvideIdTy>::Id, RawBlock<'a, Cx>>;
+pub type Block<'a, Cx> = Reg<'a, RawBlock<'a, Cx>, Cx>;
 
 /// The maximum opacity of a block.
 pub const MAX_OPACITY: u8 = 15;
@@ -164,7 +164,7 @@ pub trait ProvideStateIds: GlobalContext {
 }
 
 /// Global contexts providing block state extensions.
-pub trait ProvideBlockStateExtTy: ProvideIdTy {
+pub trait ProvideBlockStateExtTy: RegistryCx {
     /// The type of the block state extension.
     type BlockStateExt<'a>: BlockStateExt<'a, Self>;
 }

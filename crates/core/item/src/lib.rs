@@ -5,8 +5,7 @@ use std::marker::PhantomData;
 use component::map::ComponentMap;
 use local_cx::ProvideLocalCxTy;
 use rimecraft_fmt::Formatting;
-use rimecraft_global_cx::ProvideIdTy;
-use rimecraft_registry::Reg;
+use rimecraft_registry::{Reg, RegistryCx};
 
 #[cfg(feature = "edcode")]
 mod edcode;
@@ -16,7 +15,7 @@ pub use component;
 pub use stack::ItemStack;
 
 /// Provides settings type for items.
-pub trait ProvideSettingsTy: ProvideIdTy + ProvideLocalCxTy {
+pub trait ProvideSettingsTy: RegistryCx + ProvideLocalCxTy {
     /// Settings type of an item.
     type Settings<'a>: ItemSettings<'a, Self>;
 }
@@ -24,7 +23,7 @@ pub trait ProvideSettingsTy: ProvideIdTy + ProvideLocalCxTy {
 /// Settings of an item.
 pub trait ItemSettings<'a, Cx>
 where
-    Cx: ProvideIdTy + ProvideLocalCxTy,
+    Cx: RegistryCx + ProvideLocalCxTy,
 {
     /// Returns components of the item.
     fn components(&self) -> &ComponentMap<'a, Cx>;
@@ -61,7 +60,7 @@ where
 }
 
 /// An item usable by players and other entities.
-pub type Item<'r, Cx> = Reg<'r, <Cx as ProvideIdTy>::Id, RawItem<'r, Cx>>;
+pub type Item<'r, Cx> = Reg<'r, RawItem<'r, Cx>, Cx>;
 
 /// The max item count of an `ItemStack`.
 pub const MAX_STACK_COUNT: u32 = 64u32;

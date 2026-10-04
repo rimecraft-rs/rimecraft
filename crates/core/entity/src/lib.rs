@@ -14,13 +14,13 @@ use dsyn::HoldDescriptors;
 use erased_serde::Serialize as ErasedSerialize;
 use glam::DVec3;
 use global_cx::{
-    GlobalContext, ProvideIdTy, ProvideNbtTy,
+    GlobalContext, ProvideNbtTy,
     rand::{LockedRng as _, ProvideRng, Rng as _},
 };
 use local_cx::{PeekLocalContext, ProvideLocalCxTy};
 use parking_lot::Mutex;
 use rcutil::{Invariant, InvariantLifetime, PhantomInvariant, phantom_invariant};
-use registry::Reg;
+use registry::{Reg, RegistryCx};
 use serde::Serialize;
 use serde_update::erased::ErasedUpdate;
 use uuid::Uuid;
@@ -39,7 +39,7 @@ pub use hit::*;
 
 /// Global context types satisfying use of entities.
 pub trait EntityCx<'a>:
-    ProvideIdTy
+    RegistryCx
     + ProvideNbtTy
     + ProvideEntityExtTy
     + ProvideBlockStateExtTy
@@ -171,7 +171,7 @@ where
 pub type DynErasedRawEntityType<'r, Cx> = Box<dyn ErasedRawEntityType<'r, Cx> + Send + Sync + 'r>;
 
 /// A type of [`Entity`].
-pub type EntityType<'r, Cx> = Reg<'r, <Cx as ProvideIdTy>::Id, DynErasedRawEntityType<'r, Cx>>;
+pub type EntityType<'r, Cx> = Reg<'r, DynErasedRawEntityType<'r, Cx>, Cx>;
 
 /// An object in a world with double-precision position.
 pub struct RawEntity<'a, T: ?Sized, Cx>

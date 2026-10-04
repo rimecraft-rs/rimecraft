@@ -84,7 +84,8 @@ const fn type_transient_edcode<'a>() -> ComponentType<'a, Foo, Context> {
         .packet_codec(packet_codec_edcode())
         .build()
 }
-const fn type_transient_edcode_key<'a>() -> RegistryKey<Id, RawErasedComponentType<'a, Context>> {
+const fn type_transient_edcode_key<'a>() -> RegistryKey<RawErasedComponentType<'a, Context>, Context>
+{
     registry_key("foo_transient_edcode")
 }
 
@@ -94,17 +95,17 @@ const fn type_persistent<'a>() -> ComponentType<'a, Foo, Context> {
         .serde_codec(serde_codec())
         .build()
 }
-const fn type_persistent_key<'a>() -> RegistryKey<Id, RawErasedComponentType<'a, Context>> {
+const fn type_persistent_key<'a>() -> RegistryKey<RawErasedComponentType<'a, Context>, Context> {
     registry_key("foo_persistent")
 }
 
 const fn registry_key<'a>(
     name: &'static str,
-) -> RegistryKey<Id, RawErasedComponentType<'a, Context>> {
+) -> RegistryKey<RawErasedComponentType<'a, Context>, Context> {
     RegistryKey::new(REGISTRY_ID, unsafe { Id::const_new("test", name) })
 }
 
-fn init_registry<'a>() -> Registry<Id, RawErasedComponentType<'a, Context>> {
+fn init_registry<'a>() -> Registry<RawErasedComponentType<'a, Context>, Context> {
     let mut registry = test_global::integration::component::default_components_registry_builder();
     registry
         .register(

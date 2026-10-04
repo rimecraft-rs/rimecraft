@@ -215,8 +215,8 @@ where
 impl<'a, 'de, Cx> DeserializeSeed<'de> for Seed<'a, Cx, Cx::LocalContext<'a>>
 where
     Cx: BlockEntityCx<'a, Id: Deserialize<'de>>,
-    Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
-        + LocalContext<&'a Registry<Cx::Id, DynErasedRawBlockEntityType<'a, Cx>>>,
+    Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>
+        + LocalContext<&'a Registry<DynErasedRawBlockEntityType<'a, Cx>, Cx>>,
 {
     type Value = Box<BlockEntity<'a, Cx>>;
 
@@ -231,8 +231,8 @@ where
         impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx, Cx::LocalContext<'a>>
         where
             Cx: BlockEntityCx<'a, Id: Deserialize<'de>>,
-            Cx::LocalContext<'a>: LocalContext<&'a Registry<Cx::Id, RawErasedComponentType<'a, Cx>>>
-                + LocalContext<&'a Registry<Cx::Id, DynErasedRawBlockEntityType<'a, Cx>>>,
+            Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>
+                + LocalContext<&'a Registry<DynErasedRawBlockEntityType<'a, Cx>, Cx>>,
         {
             type Value = Box<BlockEntity<'a, Cx>>;
 
@@ -267,14 +267,14 @@ where
                     }
                 }
 
-                let id = id.ok_or_else(|| serde::de::Error::missing_field("id"))?;
+                let id: Cx::Id = id.ok_or_else(|| serde::de::Error::missing_field("id"))?;
                 let components = components.unwrap_or(ComponentMap::EMPTY);
 
                 let ty =
-                    std::convert::identity::<&Registry<_, DynErasedRawBlockEntityType<'_, _>>>(
+                    std::convert::identity::<&Registry<DynErasedRawBlockEntityType<'_, _>, _>>(
                         self.2.acquire(),
                     )
-                    .get(&id)
+                    .get(&rimecraft_registry::Query(&id))
                     .ok_or_else(|| {
                         serde::de::Error::custom(format!("unknown block entity type {id}"))
                     })?;

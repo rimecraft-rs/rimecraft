@@ -115,7 +115,7 @@ where
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
         + Clone,
-    &'w Registry<Cx::Id, Cx::Biome>: Into<Cx::BiomeList>,
+    &'w Registry<Cx::Biome, Cx>: Into<Cx::BiomeList>,
     Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
         + Clone,
@@ -138,8 +138,8 @@ where
     ) -> Self
     where
         I: Iterator<Item = Option<ChunkSection<'w, Cx>>> + ExactSizeIterator,
-        Local: LocalContext<&'w Registry<Cx::Id, Cx::Biome>>
-            + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+        Local: LocalContext<&'w Registry<Cx::Biome, Cx>>
+            + LocalContext<&'w Registry<RawBlock<'w, Cx>, Cx>>
             + LocalContext<Cx::BlockStateList>,
     {
         Self {

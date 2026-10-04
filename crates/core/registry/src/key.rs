@@ -2,22 +2,30 @@
 
 use std::{hash::Hash, marker::PhantomData};
 
+use crate::RegistryCx;
+
 /// A key for a value in a registry in a context
 /// where a root registry is available.
-pub struct Key<K, T> {
+pub struct Key<T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// The id of the registry in the root registry.
-    registry: K,
+    registry: Cx::Id,
     /// The id of the value in the registry specified
     /// by [`Self::registry`].
-    value: K,
+    value: Cx::Id,
 
     _marker: PhantomData<T>,
 }
 
-impl<K, T> Key<K, T> {
+impl<T, Cx> Key<T, Cx>
+where
+    Cx: RegistryCx,
+{
     /// Creates a new key.
     #[inline]
-    pub const fn new(registry: K, value: K) -> Self {
+    pub const fn new(registry: Cx::Id, value: Cx::Id) -> Self {
         Self {
             registry,
             value,
@@ -27,19 +35,19 @@ impl<K, T> Key<K, T> {
 
     /// Gets the id of the value in the registry.
     #[inline]
-    pub fn value(&self) -> &K {
+    pub fn value(&self) -> &Cx::Id {
         &self.value
     }
 
     /// Gets the id of the registry in the root registry.
     #[inline]
-    pub fn registry(&self) -> &K {
+    pub fn registry(&self) -> &Cx::Id {
         &self.registry
     }
 
     #[doc(hidden)]
     #[inline]
-    pub fn cast<V>(self) -> Key<K, V> {
+    pub fn cast<V>(self) -> Key<V, Cx> {
         Key {
             registry: self.registry,
             value: self.value,
@@ -49,23 +57,26 @@ impl<K, T> Key<K, T> {
 
     #[doc(hidden)]
     #[inline]
-    pub fn cast_ref<V>(&self) -> &Key<K, V> {
-        unsafe { &*std::ptr::from_ref(self).cast::<Key<K, V>>() }
+    pub fn cast_ref<V>(&self) -> &Key<V, Cx> {
+        unsafe { &*std::ptr::from_ref(self).cast::<Key<V, Cx>>() }
     }
 }
 
-impl<K, T> Key<K, T>
+impl<T, Cx> Key<T, Cx>
 where
-    K: Root,
+    Cx: RegistryCx<Id: Root>,
 {
     /// Creates a new key with the root registry.
     #[inline]
-    pub fn with_root(value: K) -> Self {
-        Self::new(K::root(), value)
+    pub fn with_root(value: Cx::Id) -> Self {
+        Self::new(Cx::Id::root(), value)
     }
 }
 
-impl<K: Hash, T> Hash for Key<K, T> {
+impl<T, Cx> Hash for Key<T, Cx>
+where
+    Cx: RegistryCx,
+{
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.registry.hash(state);
@@ -73,7 +84,10 @@ impl<K: Hash, T> Hash for Key<K, T> {
     }
 }
 
-impl<K: Clone, T> Clone for Key<K, T> {
+impl<T, Cx> Clone for Key<T, Cx>
+where
+    Cx: RegistryCx<Id: Clone>,
+{
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -84,9 +98,12 @@ impl<K: Clone, T> Clone for Key<K, T> {
     }
 }
 
-impl<K: Copy, T> Copy for Key<K, T> {}
+impl<T, Cx> Copy for Key<T, Cx> where Cx: RegistryCx<Id: Copy> {}
 
-impl<K: std::fmt::Debug, T> std::fmt::Debug for Key<K, T> {
+impl<T, Cx> std::fmt::Debug for Key<T, Cx>
+where
+    Cx: RegistryCx<Id: std::fmt::Debug>,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("RegistryKey")
             .field(&self.registry)
@@ -95,18 +112,21 @@ impl<K: std::fmt::Debug, T> std::fmt::Debug for Key<K, T> {
     }
 }
 
-impl<K: PartialEq, T> PartialEq for Key<K, T> {
+impl<T, Cx> PartialEq for Key<T, Cx>
+where
+    Cx: RegistryCx<Id: PartialEq>,
+{
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.registry == other.registry && self.value == other.value
     }
 }
 
-impl<K: Eq, T> Eq for Key<K, T> {}
+impl<T, Cx> Eq for Key<T, Cx> where Cx: RegistryCx<Id: Eq> {}
 
-impl<K, T> AsRef<K> for Key<K, T> {
+impl<T, Cx: RegistryCx> AsRef<Cx::Id> for Key<T, Cx> {
     #[inline]
-    fn as_ref(&self) -> &K {
+    fn as_ref(&self) -> &Cx::Id {
         &self.value
     }
 }
@@ -121,13 +141,14 @@ pub trait Root: Sized {
 mod serde {
     use local_cx::{LocalContext, serde::DeserializeWithCx};
 
-    use crate::Registry;
+    use crate::{Registry, RegistryCx};
 
     use super::Key;
 
-    impl<K, T> serde::Serialize for Key<K, T>
+    impl<T, Cx> serde::Serialize for Key<T, Cx>
     where
-        K: serde::Serialize,
+        Cx: RegistryCx,
+        Cx::Id: serde::Serialize,
     {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -138,19 +159,20 @@ mod serde {
         }
     }
 
-    impl<'r, 'de, K, T: 'r, Cx> DeserializeWithCx<'de, Cx> for Key<K, T>
+    impl<'r, 'de, T: 'r, L, Cx> DeserializeWithCx<'de, L> for Key<T, Cx>
     where
-        K: DeserializeWithCx<'de, Cx> + Clone + 'r,
-        Cx: LocalContext<&'r Registry<K, T>>,
+        L: LocalContext<&'r Registry<T, Cx>>,
+        Cx: RegistryCx,
+        Cx::Id: DeserializeWithCx<'de, L> + Clone,
     {
         fn deserialize_with_cx<D>(
-            deserializer: local_cx::WithLocalCx<D, Cx>,
+            deserializer: local_cx::WithLocalCx<D, L>,
         ) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
             let registry = deserializer.local_cx.acquire();
-            let value = K::deserialize_with_cx(deserializer)?;
+            let value = Cx::Id::deserialize_with_cx(deserializer)?;
             Ok(Self::new(registry.key.value.clone(), value))
         }
     }
@@ -163,13 +185,14 @@ pub mod edcode {
     use edcode2::{Decode, Encode};
     use local_cx::{ForwardToWithLocalCx, LocalContext, WithLocalCx};
 
-    use crate::Registry;
+    use crate::{Registry, RegistryCx};
 
     use super::{Key, Root};
 
-    impl<K, T, B> Encode<B> for Key<K, T>
+    impl<T, Cx, B> Encode<B> for Key<T, Cx>
     where
-        K: Encode<B>,
+        Cx: RegistryCx,
+        Cx::Id: Encode<B>,
     {
         #[inline]
         fn encode(&self, buf: B) -> Result<(), edcode2::BoxedError<'static>> {
@@ -177,17 +200,18 @@ pub mod edcode {
         }
     }
 
-    impl<'r, 'de, K, T: 'r, Fw> Decode<'de, Fw> for Key<K, T>
+    impl<'r, 'de, T: 'r, Cx, Fw> Decode<'de, Fw> for Key<T, Cx>
     where
-        K: Decode<'de, WithLocalCx<Fw::Forwarded, Fw::LocalCx>> + Clone + 'r,
+        Cx: RegistryCx,
+        Cx::Id: Decode<'de, WithLocalCx<Fw::Forwarded, Fw::LocalCx>> + Clone,
         Fw: ForwardToWithLocalCx,
-        Fw::LocalCx: LocalContext<&'r Registry<K, T>>,
+        Fw::LocalCx: LocalContext<&'r Registry<T, Cx>>,
     {
         #[inline]
         fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
             let buf = buf.forward();
             let registry = buf.local_cx.acquire();
-            let value = K::decode(buf)?;
+            let value = Cx::Id::decode(buf)?;
             Ok(Self::new(registry.key.value.clone(), value))
         }
     }
@@ -196,9 +220,10 @@ pub mod edcode {
     #[derive(Debug, Clone, Copy)]
     pub struct RegRef<T>(pub T);
 
-    impl<K, T, B> Encode<B> for RegRef<&Key<K, T>>
+    impl<T, Cx, B> Encode<B> for RegRef<&Key<T, Cx>>
     where
-        K: Encode<B>,
+        Cx: RegistryCx,
+        Cx::Id: Encode<B>,
     {
         #[inline]
         fn encode(&self, buf: B) -> Result<(), edcode2::BoxedError<'static>> {
@@ -206,9 +231,10 @@ pub mod edcode {
         }
     }
 
-    impl<K, T, B> Encode<B> for RegRef<Key<K, T>>
+    impl<T, Cx, B> Encode<B> for RegRef<Key<T, Cx>>
     where
-        K: Encode<B>,
+        Cx: RegistryCx,
+        Cx::Id: Encode<B>,
     {
         #[inline]
         fn encode(&self, buf: B) -> Result<(), edcode2::BoxedError<'static>> {
@@ -216,13 +242,14 @@ pub mod edcode {
         }
     }
 
-    impl<'de, K, T, B> Decode<'de, B> for RegRef<Key<K, T>>
+    impl<'de, T, Cx, B> Decode<'de, B> for RegRef<Key<T, Cx>>
     where
-        K: Decode<'de, B> + Clone + Root,
+        Cx: RegistryCx,
+        Cx::Id: Decode<'de, B> + Root + Clone,
     {
         #[inline]
         fn decode(buf: B) -> Result<Self, edcode2::BoxedError<'de>> {
-            Ok(Self(Key::new(K::root(), K::decode(buf)?)))
+            Ok(Self(Key::new(Cx::Id::root(), Cx::Id::decode(buf)?)))
         }
     }
 }

@@ -38,8 +38,8 @@ use std::{
 
 /// Local context bounds alias for most [`WorldChunk`] operations.
 pub trait WorldChunkLocalCx<'w, Cx>:
-    LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-    + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
+    LocalContext<&'w Registry<RawErasedComponentType<'w, Cx>, Cx>>
+    + LocalContext<&'w Registry<DynErasedRawBlockEntityType<'w, Cx>, Cx>>
     + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>
 where
     Cx: WorldCx<'w>,
@@ -49,8 +49,8 @@ where
 impl<'w, Cx, L> WorldChunkLocalCx<'w, Cx> for L
 where
     Cx: WorldCx<'w>,
-    L: LocalContext<&'w Registry<Cx::Id, RawErasedComponentType<'w, Cx>>>
-        + LocalContext<&'w Registry<Cx::Id, DynErasedRawBlockEntityType<'w, Cx>>>
+    L: LocalContext<&'w Registry<RawErasedComponentType<'w, Cx>, Cx>>
+        + LocalContext<&'w Registry<DynErasedRawBlockEntityType<'w, Cx>, Cx>>
         + LocalContext<dsyn::Type<BlockEntityConstructor<Cx>>>,
 {
 }
@@ -157,13 +157,13 @@ where
     Cx::BlockStateList: for<'a> PalIndexToRaw<&'a BlockState<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Cx>>>
         + Clone,
-    &'w Registry<Cx::Id, Cx::Biome>: Into<Cx::BiomeList>,
+    &'w Registry<Cx::Biome, Cx>: Into<Cx::BiomeList>,
     Cx::BiomeList: for<'a> PalIndexToRaw<&'a IBiome<'w, Cx>>
         + for<'s> PalIndexFromRaw<'s, Maybe<'s, IBiome<'w, Cx>>>
         + Clone,
     Cx::LocalContext<'w>: LocalContext<chunk::status::Full<'w, Cx>>
-        + LocalContext<&'w Registry<Cx::Id, Cx::Biome>>
-        + LocalContext<&'w Registry<Cx::Id, RawBlock<'w, Cx>>>
+        + LocalContext<&'w Registry<Cx::Biome, Cx>>
+        + LocalContext<&'w Registry<RawBlock<'w, Cx>, Cx>>
         + LocalContext<Cx::BlockStateList>,
 {
     /// Creates a new [`WorldChunk`] with defaulted empty values.
