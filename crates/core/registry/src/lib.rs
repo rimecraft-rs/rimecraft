@@ -13,7 +13,7 @@ use std::{
 };
 
 use entry::RefEntry;
-use global_cx::ProvideIdTy;
+use global_cx::{ProvideIdTy, ProviderHasherTy};
 use key::Key;
 use parking_lot::RwLock;
 use tag::Tags;
@@ -32,9 +32,7 @@ pub use tag::TagKey;
 pub use dyn_manager::*;
 
 /// Global context types for registries.
-pub trait RegistryCx: ProvideIdTy {
-    // make this a standalone trait for future extensions (e.g. hasher)
-}
+pub trait RegistryCx: ProvideIdTy + ProviderHasherTy<global_cx::hash::Seeded> {}
 
 /// Immutable registry of various in-game components.
 pub struct Registry<T, Cx>
@@ -44,8 +42,9 @@ where
     key: Key<Self, Cx>,
 
     entries: Vec<RefEntry<T, Cx>>,
-    kv: HashMap<Cx::Id, usize>,
-    tv: RwLock<HashMap<TagKey<T, Cx>, Vec<usize>>>,
+    kv: HashMap<Cx::Id, usize, Cx::BuildHasher>,
+    #[allow(clippy::type_complexity)]
+    tv: RwLock<HashMap<TagKey<T, Cx>, Vec<usize>, Cx::BuildHasher>>,
 
     /// The default registration raw id.
     default: Option<usize>,
@@ -696,7 +695,7 @@ where
                 .enumerate()
                 .map(|(raw, entry)| (entry.key.value().clone(), raw))
                 .collect(),
-            tv: RwLock::new(HashMap::new()),
+            tv: RwLock::new(HashMap::default()),
             entries,
             default: value.default,
             #[cfg(feature = "marking")]

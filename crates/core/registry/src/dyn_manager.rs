@@ -1,6 +1,4 @@
-use std::{any::TypeId, borrow::Borrow, fmt::Debug, hash::Hash, sync::Arc};
-
-use ahash::AHashSet;
+use std::{any::TypeId, borrow::Borrow, collections::HashSet, fmt::Debug, hash::Hash, sync::Arc};
 
 use crate::{Registry, RegistryCx, key::Key};
 
@@ -94,7 +92,7 @@ pub struct DynRegistries<'a, Cx>
 where
     Cx: RegistryCx,
 {
-    map: AHashSet<RegCell<'a, Cx>>,
+    map: HashSet<RegCell<'a, Cx>, Cx::BuildHasher>,
 }
 
 impl<Cx> DynRegistries<'_, Cx>
