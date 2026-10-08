@@ -2,7 +2,7 @@
 
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
 use rimecraft_registry::{Reg, RegistryCx};
-use rimecraft_state::{State, States};
+use rimecraft_state::{State, StateCx, States};
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
 
@@ -14,7 +14,7 @@ pub struct RawFluid<'a, Cx>
 where
     Cx: ProvideFluidStateExtTy,
 {
-    states: States<'a, Cx::FluidStateExt>,
+    states: States<'a, Cx::FluidStateExt, Cx>,
     settings: Settings,
     _marker: PhantomData<Cx>,
 }
@@ -25,7 +25,7 @@ where
 {
     /// Creates a new fluid from the given settings.
     #[inline]
-    pub const fn new(settings: Settings, states: States<'a, Cx::FluidStateExt>) -> Self {
+    pub const fn new(settings: Settings, states: States<'a, Cx::FluidStateExt, Cx>) -> Self {
         Self {
             states,
             settings,
@@ -35,7 +35,7 @@ where
 
     /// Returns the state manager of the fluid.
     #[inline]
-    pub fn states(&self) -> &States<'a, Cx::FluidStateExt> {
+    pub fn states(&self) -> &States<'a, Cx::FluidStateExt, Cx> {
         &self.states
     }
 
@@ -59,7 +59,7 @@ pub struct Settings {
 pub type Fluid<'a, Cx> = Reg<'a, RawFluid<'a, Cx>, Cx>;
 
 /// Global contexts providing fluid state extensions.
-pub trait ProvideFluidStateExtTy: RegistryCx {
+pub trait ProvideFluidStateExtTy: RegistryCx + StateCx {
     /// The type of the fluid state extension.
     type FluidStateExt;
 }
@@ -74,7 +74,7 @@ where
     /// The fluid.
     pub fluid: Fluid<'w, Cx>,
     /// The state.
-    pub state: Arc<State<'w, Cx::FluidStateExt>>,
+    pub state: Arc<State<'w, Cx::FluidStateExt, Cx>>,
 }
 
 impl<Cx> Debug for FluidState<'_, Cx>

@@ -2,8 +2,10 @@
 
 use core::{hash::BuildHasher, marker::PhantomData};
 
+use crate::GlobalContext;
+
 /// Marker trait for global contexts that provide a hasher implementation.
-pub trait ProvideHasherTy<Marker> {
+pub trait ProvideHasherTy<Marker>: GlobalContext {
     /// The random state type.
     type BuildHasher: BuildHasher + Default;
 }
@@ -40,6 +42,9 @@ pub trait HashTableExt {
     fn with_capacity(capacity: usize) -> Self;
 }
 
+/// Shorthand for `<Cx as ProvideHasherTy<M>>::BuildHasher`.
+pub type Hasher<M, Cx> = <Cx as ProvideHasherTy<M>>::BuildHasher;
+
 #[cfg(feature = "std")]
 mod imp_std {
     use core::hash::BuildHasher;
@@ -75,5 +80,10 @@ mod imp_std {
         fn with_capacity(capacity: usize) -> Self {
             Self::with_capacity_and_hasher(capacity, Default::default())
         }
+    }
+
+    #[cfg(feature = "unit")]
+    impl<M> crate::ProvideHasherTy<M> for () {
+        type BuildHasher = std::hash::RandomState;
     }
 }

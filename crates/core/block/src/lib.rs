@@ -3,7 +3,7 @@
 use dsyn::{DescriptorSet, HoldDescriptors};
 use rimecraft_global_cx::GlobalContext;
 use rimecraft_registry::{Reg, RegistryCx};
-use rimecraft_state::{State, States};
+use rimecraft_state::{State, StateCx, States};
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
@@ -18,7 +18,7 @@ where
     Cx: ProvideBlockStateExtTy,
 {
     settings: Settings<'a, Cx>,
-    states: States<'a, Cx::BlockStateExt<'a>>,
+    states: States<'a, Cx::BlockStateExt<'a>, Cx>,
     _marker: PhantomData<Cx>,
     descriptors: DescriptorSet<'static, 'a>,
 }
@@ -36,7 +36,7 @@ where
     /// - `opaque` and `transparent` are both `true`.
     pub const fn new(
         settings: Settings<'a, Cx>,
-        states: States<'a, Cx::BlockStateExt<'a>>,
+        states: States<'a, Cx::BlockStateExt<'a>, Cx>,
         descriptors: DescriptorSet<'static, 'a>,
     ) -> Self {
         assert!(
@@ -60,7 +60,7 @@ where
 
     /// Returns the state manager of the block.
     #[inline]
-    pub fn states(&self) -> &States<'a, Cx::BlockStateExt<'a>> {
+    pub fn states(&self) -> &States<'a, Cx::BlockStateExt<'a>, Cx> {
         &self.states
     }
 }
@@ -164,7 +164,7 @@ pub trait ProvideStateIds: GlobalContext {
 }
 
 /// Global contexts providing block state extensions.
-pub trait ProvideBlockStateExtTy: RegistryCx {
+pub trait ProvideBlockStateExtTy: RegistryCx + StateCx {
     /// The type of the block state extension.
     type BlockStateExt<'a>: BlockStateExt<'a, Self>;
 }
@@ -189,7 +189,7 @@ where
     pub block: Block<'w, Cx>,
 
     /// The state.
-    pub state: &'w State<'w, Cx::BlockStateExt<'w>>,
+    pub state: &'w State<'w, Cx::BlockStateExt<'w>, Cx>,
 }
 
 impl<'w, Cx> BlockState<'w, Cx>
@@ -212,21 +212,6 @@ where
     #[inline]
     pub fn settings(&self) -> &Settings<'w, Cx> {
         self.block.settings()
-    }
-}
-
-#[allow(deprecated)]
-impl<'a, Cx> BlockState<'a, Cx>
-where
-    Cx: ProvideBlockStateExtTy,
-    Cx::BlockStateExt<'a>: behave::ProvideLuminance,
-{
-    /// Returns the luminance level of this block state.
-    #[inline]
-    #[deprecated = "this function should be provided by the nested block state extension types"]
-    pub fn luminance(&self) -> u32 {
-        use behave::ProvideLuminance as _;
-        self.state.data().luminance(self.state)
     }
 }
 

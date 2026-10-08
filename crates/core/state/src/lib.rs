@@ -3,14 +3,17 @@
 //! This corresponds to `net.minecraft.state` in `yarn`.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fmt::{Debug, Display},
+    marker::PhantomData,
     ptr::NonNull,
     sync::OnceLock,
 };
 
-use ahash::AHashMap;
-use ident_hash::{HashTableExt as _, IHashMap};
+use global_cx::{
+    Hasher, ProvideHasherTy,
+    hash::{Numeric, Seeded},
+};
 use property::{BiIndex, ErasedProperty, Property, UnObjSafeErasedWrap as _, Wrap};
 
 #[cfg(feature = "regex")]
@@ -22,17 +25,32 @@ use crate::property::ErasedWrap as _;
 
 pub mod property;
 
+/// Global context types for states.
+pub trait StateCx:
+    ProvideHasherTy<Numeric<{ isize::BITS }, Seeded>> + ProvideHasherTy<Seeded>
+{
+}
+
+impl<T: ProvideHasherTy<Numeric<{ isize::BITS }, Seeded>> + ProvideHasherTy<Seeded>> StateCx for T {}
+
 // <property> -> <<value> -> <state>>
-type Table<'a, T> = AHashMap<ErasedProperty<'a>, IHashMap<isize, NonNull<T>>>;
+type Table<'a, T, Cx> = HashMap<
+    ErasedProperty<'a>,
+    HashMap<isize, NonNull<T>, Hasher<Numeric<{ isize::BITS }, Seeded>, Cx>>,
+    Hasher<Seeded, Cx>,
+>;
 
 /// State of an object.
-pub struct State<'a, T> {
-    pub(crate) entries: AHashMap<ErasedProperty<'a>, isize>,
-    table: OnceLock<Table<'a, Self>>,
+pub struct State<'a, T, Cx>
+where
+    Cx: StateCx,
+{
+    pub(crate) entries: HashMap<ErasedProperty<'a>, isize, Hasher<Seeded, Cx>>,
+    table: OnceLock<Table<'a, Self, Cx>>,
     data: T,
 }
 
-impl<T> State<'_, T> {
+impl<T, Cx: StateCx> State<'_, T, Cx> {
     /// Gets the current value of given property in this state.
     #[inline]
     pub fn get<V, W>(&self, prop: &Property<'_, W>) -> Option<V>
@@ -143,7 +161,7 @@ fn obtain_next(value: isize, mut iter: impl Iterator<Item = isize>) -> Option<is
     iter.next()
 }
 
-impl<T: Debug> Debug for State<'_, T> {
+impl<T: Debug, Cx: StateCx> Debug for State<'_, T, Cx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("State")
             .field("entries", &self.entries)
@@ -157,17 +175,20 @@ impl<T: Debug> Debug for State<'_, T> {
 /// See [`StatesMut`] for creating a new instance.
 #[derive(Debug)]
 #[doc(alias = "StateManager")]
-pub struct States<'a, T> {
-    states: Vec<NonNull<State<'a, T>>>,
+pub struct States<'a, T, Cx>
+where
+    Cx: StateCx,
+{
+    states: Vec<NonNull<State<'a, T, Cx>>>,
     #[allow(unused)]
     props: BTreeMap<&'a str, ErasedProperty<'a>>,
 }
 
-impl<'a, T> States<'a, T> {
+impl<'a, T, Cx: StateCx> States<'a, T, Cx> {
     fn new<I, F>(props: I, mut f: F) -> Self
     where
         I: IntoIterator<Item = ErasedProperty<'a>>,
-        F: FnMut(&State<'a, ()>) -> T,
+        F: FnMut(&State<'a, (), Cx>) -> T,
     {
         let props: BTreeMap<_, _> = props.into_iter().map(|prop| (prop.name, prop)).collect();
         let mut iter: Vec<Vec<(ErasedProperty<'a>, isize)>> = vec![Vec::new()];
@@ -191,7 +212,7 @@ impl<'a, T> States<'a, T> {
         let mut unit_lock_reuse = Some(OnceLock::new());
         let list = iter
             .into_iter()
-            .map(|vec| vec.into_iter().collect::<AHashMap<_, _>>())
+            .map(|vec| vec.into_iter().collect())
             .map(|entries| {
                 let state = State {
                     entries,
@@ -218,9 +239,9 @@ impl<'a, T> States<'a, T> {
         // Initialize tables
         for state in list.iter() {
             let state = unsafe { state.as_ref() };
-            let mut table: Table<'a, State<'a, T>> = Table::new();
+            let mut table = Table::<'a, State<'a, T, Cx>, Cx>::default();
             for (prop, s_val) in state.entries.iter() {
-                let mut row = IHashMap::new();
+                let mut row = HashMap::default();
                 for val in prop.wrap.erased_iter().filter(|v| v != s_val) {
                     let Some(s) = list.iter().find(|s| {
                         let s = unsafe { s.as_ref() };
@@ -248,10 +269,10 @@ impl<'a, T> States<'a, T> {
     }
 }
 
-impl<'a, T> States<'a, T> {
+impl<'a, T, Cx: StateCx> States<'a, T, Cx> {
     /// Gets all states of this state.
     #[inline]
-    pub fn states(&self) -> &[NonNull<State<'a, T>>] {
+    pub fn states(&self) -> &[NonNull<State<'a, T, Cx>>] {
         &self.states
     }
 
@@ -261,7 +282,7 @@ impl<'a, T> States<'a, T> {
     ///
     /// Panics if no state is available.
     #[inline]
-    pub fn default_state(&self) -> &State<'a, T> {
+    pub fn default_state(&self) -> &State<'a, T, Cx> {
         unsafe { self.states.first().expect("no state available").as_ref() }
     }
 
@@ -278,7 +299,7 @@ impl<'a, T> States<'a, T> {
     }
 }
 
-impl<T> Drop for States<'_, T> {
+impl<T, Cx: StateCx> Drop for States<'_, T, Cx> {
     fn drop(&mut self) {
         for state in self.states.iter() {
             drop(unsafe { Box::from_raw(state.as_ptr()) });
@@ -288,12 +309,16 @@ impl<T> Drop for States<'_, T> {
 
 /// Mutable instance of [`States`].
 #[derive(Debug)]
-pub struct StatesMut<'a, F> {
+pub struct StatesMut<'a, F, Cx>
+where
+    Cx: StateCx,
+{
     props: Vec<ErasedProperty<'a>>,
     f: F,
+    _marker: PhantomData<Cx>,
 }
 
-impl<'a, F> StatesMut<'a, F> {
+impl<'a, F, Cx: StateCx> StatesMut<'a, F, Cx> {
     /// Adds a property to the states.
     ///
     /// # Errors
@@ -336,9 +361,9 @@ impl<'a, F> StatesMut<'a, F> {
     }
 }
 
-impl<'a, F, T> StatesMut<'a, F>
+impl<'a, F, T, Cx: StateCx> StatesMut<'a, F, Cx>
 where
-    F: FnMut(&State<'a, ()>) -> T,
+    F: FnMut(&State<'a, (), Cx>) -> T,
 {
     /// Creates a new states with given data factory.
     #[inline]
@@ -346,23 +371,24 @@ where
         Self {
             props: Vec::new(),
             f,
+            _marker: PhantomData,
         }
     }
 
     /// Freezes the state.
     #[inline]
     #[doc(alias = "build")]
-    pub fn freeze(self) -> States<'a, T> {
+    pub fn freeze(self) -> States<'a, T, Cx> {
         States::new(self.props, self.f)
     }
 }
 
-impl<'a, F, T> From<StatesMut<'a, F>> for States<'a, T>
+impl<'a, F, T, Cx: StateCx> From<StatesMut<'a, F, Cx>> for States<'a, T, Cx>
 where
-    F: FnMut(&State<'a, ()>) -> T,
+    F: FnMut(&State<'a, (), Cx>) -> T,
 {
     #[inline]
-    fn from(value: StatesMut<'a, F>) -> Self {
+    fn from(value: StatesMut<'a, F, Cx>) -> Self {
         value.freeze()
     }
 }
@@ -421,9 +447,9 @@ mod _serde {
     use rimecraft_serde_update::Update;
     use serde::{Serialize, ser::SerializeMap as _};
 
-    use crate::State;
+    use crate::{State, StateCx};
 
-    impl<T> Serialize for State<'_, T> {
+    impl<T, Cx: StateCx> Serialize for State<'_, T, Cx> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
@@ -444,7 +470,7 @@ mod _serde {
         }
     }
 
-    impl<'de, T> Update<'de> for &State<'_, T> {
+    impl<'de, T, Cx: StateCx> Update<'de> for &State<'_, T, Cx> {
         #[inline]
         fn update<D>(
             &mut self,
@@ -453,10 +479,10 @@ mod _serde {
         where
             D: serde::Deserializer<'de>,
         {
-            struct Visitor<'a, T>(*const State<'a, T>);
+            struct Visitor<'a, T, Cx: StateCx>(*const State<'a, T, Cx>);
 
-            impl<'de, 'a, T> serde::de::Visitor<'de> for Visitor<'a, T> {
-                type Value = *const State<'a, T>;
+            impl<'de, 'a, T, Cx: StateCx> serde::de::Visitor<'de> for Visitor<'a, T, Cx> {
+                type Value = *const State<'a, T, Cx>;
 
                 fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     formatter.write_str("a map")
@@ -495,11 +521,11 @@ mod _serde {
     }
 }
 
-unsafe impl<T: Send> Send for State<'_, T> {}
-unsafe impl<T: Sync> Sync for State<'_, T> {}
+unsafe impl<T: Send, Cx: StateCx> Send for State<'_, T, Cx> {}
+unsafe impl<T: Sync, Cx: StateCx> Sync for State<'_, T, Cx> {}
 
-unsafe impl<T: Send> Send for States<'_, T> {}
-unsafe impl<T: Sync> Sync for States<'_, T> {}
+unsafe impl<T: Send, Cx: StateCx> Send for States<'_, T, Cx> {}
+unsafe impl<T: Sync, Cx: StateCx> Sync for States<'_, T, Cx> {}
 
 #[cfg(test)]
 mod tests;
