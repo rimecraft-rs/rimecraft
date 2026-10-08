@@ -83,6 +83,7 @@ pub struct Tags<'r, T, Cx>
 where
     Cx: RegistryCx,
 {
+    #[allow(clippy::type_complexity)]
     pub(crate) inner:
         parking_lot::RwLockReadGuard<'r, HashMap<TagKey<T, Cx>, Vec<usize>, Cx::BuildHasher>>,
     pub(crate) registry: &'r Registry<T, Cx>,

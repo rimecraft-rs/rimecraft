@@ -6,9 +6,8 @@
 use std::marker::PhantomData;
 
 use bitflags::bitflags;
-use local_cx::ProvideLocalCxTy;
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
-use rimecraft_block_entity::{BlockEntity, BlockEntityCell};
+use rimecraft_block_entity::{BlockEntity, BlockEntityCell, BlockEntityCx};
 use rimecraft_fluid::{FluidState, ProvideFluidStateExtTy};
 use rimecraft_voxel_math::BlockPos;
 
@@ -42,7 +41,7 @@ where
 /// This is an affiliation of [`BlockView`].
 pub trait BlockEntityView<'w, Cx>: BlockView<'w, Cx> + MutBlockEntityView<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: BlockEntityCx<'w> + ProvideFluidStateExtTy,
 {
     /// Peeks the [`BlockEntity`] at the given position.
     fn peek_block_entity<F, T>(&self, pos: BlockPos, pk: F) -> Option<T>
@@ -54,7 +53,7 @@ where
 /// and lock-free access, where the latter one requires mutability.
 pub trait MutBlockEntityView<'w, Cx>: MutBlockView<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: BlockEntityCx<'w> + ProvideFluidStateExtTy,
 {
     /// Peeks the [`BlockEntity`] at the given position.
     fn peek_block_entity<F, T>(&mut self, pos: BlockPos, pk: F) -> Option<T>
@@ -129,7 +128,7 @@ where
 /// Mutable variant of [`BlockEntityView`], without internal mutability.
 pub trait BlockEntityViewMut<'w, Cx>: MutBlockEntityView<'w, Cx> + BlockViewMut<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
+    Cx: BlockEntityCx<'w> + ProvideFluidStateExtTy,
 {
     /// Adds a [`BlockEntity`] to this view.
     fn set_block_entity(&mut self, block_entity: Box<BlockEntity<'w, Cx>>);
@@ -141,7 +140,7 @@ where
 /// [`BlockEntityViewMut`] with internal mutability.
 pub trait ConstBlockEntityViewMut<'w, Cx>: ConstBlockViewMut<'w, Cx>
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy + ProvideLocalCxTy,
+    Cx: BlockEntityCx<'w> + ProvideFluidStateExtTy,
 {
     /// Adds a [`BlockEntity`] to this view.
     fn set_block_entity(&self, block_entity: Box<BlockEntity<'w, Cx>>);
@@ -168,7 +167,7 @@ where
 
 impl<'w, Cx, T> MutBlockEntityView<'w, Cx> for &T
 where
-    Cx: ProvideBlockStateExtTy + ProvideFluidStateExtTy,
+    Cx: BlockEntityCx<'w> + ProvideFluidStateExtTy,
     T: BlockEntityView<'w, Cx>,
 {
     #[inline]

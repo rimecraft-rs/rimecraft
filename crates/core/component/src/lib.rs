@@ -219,7 +219,7 @@ where
     _marker: PhantomData<Cx>,
 }
 
-impl<Cx: Debug> Debug for RawErasedComponentType<'_, Cx>
+impl<Cx> Debug for RawErasedComponentType<'_, Cx>
 where
     Cx: ProvideLocalCxTy,
 {

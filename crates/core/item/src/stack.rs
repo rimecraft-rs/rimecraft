@@ -1,6 +1,6 @@
 //! Item stack related types and traits.
 
-use component::map::ComponentMap;
+use component::map::{ComponentMap, ComponentMapCx};
 use local_cx::{LocalContext, ProvideLocalCxTy};
 use rimecraft_registry::{Reg, Registry, RegistryCx};
 
@@ -9,9 +9,10 @@ use std::{fmt::Debug, marker::PhantomData};
 use crate::{Item, ItemSettings as _, ProvideSettingsTy, RawItem};
 
 /// Global context used for item stacks.
-pub trait ItemStackCx: RegistryCx + ProvideSettingsTy + ProvideLocalCxTy {}
+pub trait ItemStackCx: RegistryCx + ProvideSettingsTy + ProvideLocalCxTy + ComponentMapCx {}
 
-impl<T> ItemStackCx for T where T: RegistryCx + ProvideSettingsTy + ProvideLocalCxTy {}
+impl<T> ItemStackCx for T where T: RegistryCx + ProvideSettingsTy + ProvideLocalCxTy + ComponentMapCx
+{}
 
 /// A stack of items.
 ///

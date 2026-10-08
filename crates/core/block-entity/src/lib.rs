@@ -6,6 +6,7 @@ use ::component::{
     ErasedComponentType, RawErasedComponentType, changes::ComponentChanges, map::ComponentMap,
 };
 use ahash::AHashSet;
+use component::map::ComponentMapCx;
 use dsyn::HoldDescriptors;
 use erased_serde::{Serialize as ErasedSerialize, serialize_trait_object};
 
@@ -24,9 +25,9 @@ pub use components_util::ComponentsAccess;
 pub use component;
 
 /// Global context types satisfying use of block entities.
-pub trait BlockEntityCx<'a>: ProvideLocalCxTy + ProvideBlockStateExtTy {}
+pub trait BlockEntityCx<'a>: ProvideLocalCxTy + ProvideBlockStateExtTy + ComponentMapCx {}
 
-impl<T> BlockEntityCx<'_> for T where T: ProvideLocalCxTy + ProvideBlockStateExtTy {}
+impl<T> BlockEntityCx<'_> for T where T: ProvideLocalCxTy + ProvideBlockStateExtTy + ComponentMapCx {}
 
 /// Boxed block entity cell with internal mutability and reference-counting.
 pub type BlockEntityCell<'w, Cx> = Arc<Mutex<Box<BlockEntity<'w, Cx>>>>;

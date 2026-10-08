@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use component::map::ComponentMap;
+use component::map::{ComponentMap, ComponentMapCx};
 use local_cx::ProvideLocalCxTy;
 use rimecraft_fmt::Formatting;
 use rimecraft_registry::{Reg, RegistryCx};
@@ -15,7 +15,7 @@ pub use component;
 pub use stack::ItemStack;
 
 /// Provides settings type for items.
-pub trait ProvideSettingsTy: RegistryCx + ProvideLocalCxTy {
+pub trait ProvideSettingsTy: RegistryCx + ProvideLocalCxTy + ComponentMapCx {
     /// Settings type of an item.
     type Settings<'a>: ItemSettings<'a, Self>;
 }
@@ -23,7 +23,7 @@ pub trait ProvideSettingsTy: RegistryCx + ProvideLocalCxTy {
 /// Settings of an item.
 pub trait ItemSettings<'a, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ProvideSettingsTy,
 {
     /// Returns components of the item.
     fn components(&self) -> &ComponentMap<'a, Cx>;

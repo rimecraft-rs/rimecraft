@@ -23,6 +23,7 @@ use entity::EntityCx;
 use local_cx::GlobalProvideLocalCxTy;
 use maybe::Maybe;
 use rimecraft_block::{BlockState, ProvideBlockStateExtTy};
+use rimecraft_block_entity::{BlockEntityCx, component::map::ComponentMapCx};
 use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, IntoIteratorRef,
 };
@@ -51,7 +52,9 @@ where
         + ProvideNbtTy
         + ProvideBlockStateExtTy<BlockStateExt<'w>: Hold<NestedBlockStateExt<'w>>>
         + GlobalProvideLocalCxTy
-        + EntityCx<'w>,
+        + EntityCx<'w>
+        + BlockEntityCx<'w>
+        + ComponentMapCx,
 {
     /// The type of block state id list.
     type BlockStateList: for<'s> PalIndexFromRaw<'s, Maybe<'s, BlockState<'w, Self>>>

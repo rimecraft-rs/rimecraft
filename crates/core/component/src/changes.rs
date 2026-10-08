@@ -11,19 +11,19 @@ use local_cx::{
     serde::{DeserializeWithCx, SerializeWithCx},
 };
 use rimecraft_maybe::{Maybe, SimpleOwned};
-use rimecraft_registry::{Reg, Registry, RegistryCx};
+use rimecraft_registry::{Reg, Registry};
 use serde::{Serialize, de::DeserializeSeed, ser::SerializeMap as _};
 
 use crate::{
     ComponentType, DebugIter, ErasedComponentType, Object, RawErasedComponentType,
     UnsafeSerdeCodec,
-    map::{CompTyCell, ComponentMap},
+    map::{CompTyCell, ComponentMap, ComponentMapCx},
 };
 
 /// Changes of components.
 pub struct ComponentChanges<'a, 'cow, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
 {
     pub(crate) changed: Maybe<'cow, AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>>,
     pub(crate) ser_count: usize,
@@ -31,7 +31,7 @@ where
 
 impl<'a, Cx> ComponentChanges<'a, '_, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
 {
     /// Returns a builder for `ComponentChanges`.
     pub fn builder() -> Builder<'a, Cx> {
@@ -130,7 +130,7 @@ where
 
 impl<'a, Cx> SerializeWithCx<Cx::LocalContext<'a>> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
 {
     fn serialize_with_cx<S>(
         &self,
@@ -183,7 +183,7 @@ where
 
 impl<'a, Cx> SerializeWithCx<Cx::LocalContext<'a>> for &ComponentChanges<'a, '_, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
 {
     #[inline]
     fn serialize_with_cx<S>(
@@ -199,7 +199,7 @@ where
 
 impl<'a, 'de, Cx> DeserializeWithCx<'de, Cx::LocalContext<'a>> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: RegistryCx<Id: FromStr> + ProvideLocalCxTy,
+    Cx: ComponentMapCx<Id: FromStr>,
     Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
 {
     fn deserialize_with_cx<D>(
@@ -214,7 +214,7 @@ where
 
         impl<'a, 'de, Cx> serde::de::Visitor<'de> for Visitor<'a, Cx>
         where
-            Cx: RegistryCx<Id: FromStr> + ProvideLocalCxTy,
+            Cx: ComponentMapCx<Id: FromStr>,
             Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
         {
             type Value = AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>;
@@ -287,7 +287,7 @@ where
 
 impl<'a, Cx, Fw> Encode<Fw> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
     Fw: ForwardToWithLocalCx<Forwarded: BufMut, LocalCx = Cx::LocalContext<'a>>,
 {
     fn encode(&self, buf: Fw) -> Result<(), edcode2::BoxedError<'static>> {
@@ -316,7 +316,7 @@ where
 
 impl<'a, 'de, Cx, Fw> Decode<'de, Fw> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
     Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'a>>,
     Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
 {
@@ -349,7 +349,7 @@ where
 /// Builder for [`ComponentChanges`].
 pub struct Builder<'a, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
 {
     changes: AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
     ser_count: usize,
@@ -357,7 +357,7 @@ where
 
 impl<'a, Cx> Builder<'a, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
 {
     /// Inserts a component type with a valid value.
     ///
@@ -399,7 +399,7 @@ where
 
 impl<'a, Cx> From<Builder<'a, Cx>> for ComponentChanges<'a, '_, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
 {
     #[inline]
     fn from(builder: Builder<'a, Cx>) -> Self {
@@ -411,7 +411,7 @@ const REMOVED_PREFIX: char = '!';
 
 struct Type<'a, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
 {
     ty: ErasedComponentType<'a, Cx>,
     rm: bool,
@@ -421,7 +421,7 @@ where
 
 impl<Cx> Serialize for Type<'_, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -440,7 +440,7 @@ where
 
 impl<'a, 'de, Cx, L> DeserializeWithCx<'de, L> for Type<'a, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
     Cx::Id: FromStr,
     L: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
 {
@@ -450,7 +450,7 @@ where
     {
         struct Visitor<'a, Cx, L>
         where
-            Cx: RegistryCx + ProvideLocalCxTy,
+            Cx: ComponentMapCx,
         {
             cx: L,
             _marker: PhantomData<&'a Cx>,
@@ -458,7 +458,7 @@ where
 
         impl<'a, Cx, L> serde::de::Visitor<'_> for Visitor<'a, Cx, L>
         where
-            Cx: RegistryCx + ProvideLocalCxTy,
+            Cx: ComponentMapCx,
             Cx::Id: FromStr,
             L: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
         {
@@ -510,7 +510,7 @@ where
 
 impl<Cx> Debug for ComponentChanges<'_, '_, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy + Debug,
+    Cx: ComponentMapCx + Debug,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -527,7 +527,7 @@ where
 
 impl<Cx> Debug for Builder<'_, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy + Debug,
+    Cx: ComponentMapCx + Debug,
     Cx::Id: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

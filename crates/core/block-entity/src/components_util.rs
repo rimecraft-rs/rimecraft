@@ -1,14 +1,15 @@
 use std::fmt::Debug;
 
 use ahash::AHashSet;
-use component::{ComponentType, RawErasedComponentType, map::ComponentMap};
-use local_cx::ProvideLocalCxTy;
-use rimecraft_registry::RegistryCx;
+use component::{
+    ComponentType, RawErasedComponentType,
+    map::{ComponentMap, ComponentMapCx},
+};
 
 /// Access to components of a block entity.
 pub struct ComponentsAccess<'env, 'a, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
 {
     pub(crate) set: &'env mut AHashSet<RawErasedComponentType<'a, Cx>>,
     pub(crate) map: &'env ComponentMap<'a, Cx>,
@@ -16,7 +17,7 @@ where
 
 impl<'a, Cx> ComponentsAccess<'_, 'a, Cx>
 where
-    Cx: RegistryCx + ProvideLocalCxTy,
+    Cx: ComponentMapCx,
 {
     /// Gets a component of the given type.
     ///
@@ -42,7 +43,7 @@ where
 
 impl<Cx> Debug for ComponentsAccess<'_, '_, Cx>
 where
-    Cx: RegistryCx<Id: Debug> + ProvideLocalCxTy + Debug,
+    Cx: ComponentMapCx<Id: Debug>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ComponentsAccess")
