@@ -1,5 +1,7 @@
 //! Hasher that doesn't hash at all.
 
+#![deprecated = "shall not be used"]
+
 use std::{
     collections::{HashMap, HashSet},
     hash::{BuildHasherDefault, Hasher},

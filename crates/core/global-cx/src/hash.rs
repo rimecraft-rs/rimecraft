@@ -30,3 +30,50 @@ pub struct Seeded;
 /// Hashers with no protection at all. You may not want to use this.
 #[derive(Debug)]
 pub struct Unsecure;
+
+/// Extension trait for hash tables.
+pub trait HashTableExt {
+    /// Creates an empty hash table, with zeroed capacity.
+    fn new() -> Self;
+
+    /// Creates an empty hash table, with at least the given capacity.
+    fn with_capacity(capacity: usize) -> Self;
+}
+
+#[cfg(feature = "std")]
+mod imp_std {
+    use core::hash::BuildHasher;
+    use std::collections::{HashMap, HashSet};
+
+    use crate::HashTableExt;
+
+    impl<K, V, R> HashTableExt for HashMap<K, V, R>
+    where
+        R: BuildHasher + Default,
+    {
+        #[inline]
+        fn new() -> Self {
+            Self::default()
+        }
+
+        #[inline]
+        fn with_capacity(capacity: usize) -> Self {
+            Self::with_capacity_and_hasher(capacity, Default::default())
+        }
+    }
+
+    impl<K, R> HashTableExt for HashSet<K, R>
+    where
+        R: BuildHasher + Default,
+    {
+        #[inline]
+        fn new() -> Self {
+            Self::default()
+        }
+
+        #[inline]
+        fn with_capacity(capacity: usize) -> Self {
+            Self::with_capacity_and_hasher(capacity, Default::default())
+        }
+    }
+}
