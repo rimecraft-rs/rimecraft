@@ -3,7 +3,7 @@
 use core::{hash::BuildHasher, marker::PhantomData};
 
 /// Marker trait for global contexts that provide a hasher implementation.
-pub trait ProviderHasherTy<Marker> {
+pub trait ProvideHasherTy<Marker> {
     /// The random state type.
     type BuildHasher: BuildHasher + Default;
 }

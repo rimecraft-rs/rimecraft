@@ -13,7 +13,7 @@ use std::{
 };
 
 use entry::RefEntry;
-use global_cx::{ProvideIdTy, ProviderHasherTy};
+use global_cx::{ProvideHasherTy, ProvideIdTy};
 use key::Key;
 use parking_lot::RwLock;
 use tag::Tags;
@@ -32,7 +32,7 @@ pub use tag::TagKey;
 pub use dyn_manager::*;
 
 /// Global context types for registries.
-pub trait RegistryCx: ProvideIdTy + ProviderHasherTy<global_cx::hash::Seeded> {}
+pub trait RegistryCx: ProvideIdTy + ProvideHasherTy<global_cx::hash::Seeded> {}
 
 /// Immutable registry of various in-game components.
 pub struct Registry<T, Cx>

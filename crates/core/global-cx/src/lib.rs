@@ -51,7 +51,7 @@ pub trait ProvideVersionTy: GlobalContext {
 }
 
 pub use hash::HashTableExt;
-pub use hash::ProviderHasherTy;
+pub use hash::ProvideHasherTy;
 
 /// Marker trait for global contexts that provide a `NbtCompound` type and friends.
 #[cfg(feature = "nbt")]
