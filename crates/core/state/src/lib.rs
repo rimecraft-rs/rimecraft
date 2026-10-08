@@ -12,7 +12,7 @@ use std::{
 
 use global_cx::{
     Hasher, ProvideHasherTy,
-    hash::{Numeric, Seeded},
+    hash::{Seeded, Specific},
 };
 use property::{BiIndex, ErasedProperty, Property, UnObjSafeErasedWrap as _, Wrap};
 
@@ -26,17 +26,14 @@ use crate::property::ErasedWrap as _;
 pub mod property;
 
 /// Global context types for states.
-pub trait StateCx:
-    ProvideHasherTy<Numeric<{ isize::BITS }, Seeded>> + ProvideHasherTy<Seeded>
-{
-}
+pub trait StateCx: ProvideHasherTy<Specific<isize, Seeded>> + ProvideHasherTy<Seeded> {}
 
-impl<T: ProvideHasherTy<Numeric<{ isize::BITS }, Seeded>> + ProvideHasherTy<Seeded>> StateCx for T {}
+impl<T: ProvideHasherTy<Specific<isize, Seeded>> + ProvideHasherTy<Seeded>> StateCx for T {}
 
 // <property> -> <<value> -> <state>>
 type Table<'a, T, Cx> = HashMap<
     ErasedProperty<'a>,
-    HashMap<isize, NonNull<T>, Hasher<Numeric<{ isize::BITS }, Seeded>, Cx>>,
+    HashMap<isize, NonNull<T>, Hasher<Specific<isize, Seeded>, Cx>>,
     Hasher<Seeded, Cx>,
 >;
 

@@ -1,19 +1,26 @@
 //! Component map implementation.
 
 use std::{
-    borrow::Borrow, cell::RefCell, collections::hash_map, fmt::Debug, hash::Hash,
-    marker::PhantomData, sync::Arc,
+    borrow::Borrow,
+    cell::RefCell,
+    collections::{HashMap, hash_map},
+    fmt::Debug,
+    hash::Hash,
+    marker::PhantomData,
+    sync::Arc,
 };
 
-use ahash::AHashMap;
 use local_cx::{
     LocalContext, LocalContextExt as _, ProvideLocalCxTy, WithLocalCx, dyn_codecs,
     serde::{DeserializeWithCx, SerializeWithCx},
 };
 use rcutil::Any;
-use rimecraft_global_cx::ProvideHasherTy;
+use rimecraft_global_cx::{
+    ProvideHasherTy,
+    hash::{Seeded, Specific},
+};
 use rimecraft_maybe::{Maybe, SimpleOwned};
-use rimecraft_registry::{Registry, RegistryCx};
+use rimecraft_registry::{RegHasher, Registry, RegistryCx};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -23,12 +30,16 @@ use crate::{
 
 /// Global context types for component maps.
 pub trait ComponentMapCx:
-    RegistryCx + ProvideLocalCxTy + ProvideHasherTy<rimecraft_global_cx::hash::Seeded>
+    RegistryCx + ProvideLocalCxTy + ProvideHasherTy<Seeded> + ProvideHasherTy<Specific<usize, Seeded>>
 {
 }
 
-impl<T> ComponentMapCx for T where
-    T: RegistryCx + ProvideLocalCxTy + ProvideHasherTy<rimecraft_global_cx::hash::Seeded>
+impl<
+    T: RegistryCx
+        + ProvideLocalCxTy
+        + ProvideHasherTy<Seeded>
+        + ProvideHasherTy<Specific<usize, Seeded>>,
+> ComponentMapCx for T
 {
 }
 
@@ -49,10 +60,10 @@ where
     Empty,
     Patched {
         base: Maybe<'a, ComponentMap<'a, Cx>, Arc<ComponentMap<'a, Cx>>>,
-        changes: AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
+        changes: HashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>, RegHasher<Cx>>,
         changes_count: isize,
     },
-    Simple(AHashMap<CompTyCell<'a, Cx>, Box<Object<'a>>>),
+    Simple(HashMap<CompTyCell<'a, Cx>, Box<Object<'a>>, RegHasher<Cx>>),
 }
 
 impl<Cx> Default for ComponentMap<'_, Cx>
@@ -70,7 +81,7 @@ where
     Cx: ComponentMapCx,
 {
     /// An empty component map.
-    pub const EMPTY: Self = Self(MapInner::Empty);
+    pub const EMPTY: Self = Self(MapInner::<'a, Cx>::Empty);
 
     /// Creates an empty component map.
     #[deprecated = "use `ComponentMap::EMPTY` instead"]
@@ -84,7 +95,7 @@ where
     pub fn new(base: &'a Self) -> Self {
         Self(MapInner::Patched {
             base: Maybe::Borrowed(base),
-            changes: AHashMap::new(),
+            changes: HashMap::default(),
             changes_count: 0,
         })
     }
@@ -94,7 +105,7 @@ where
     pub fn arc_new(base: Arc<Self>) -> Self {
         Self(MapInner::Patched {
             base: Maybe::Owned(base),
-            changes: AHashMap::new(),
+            changes: HashMap::default(),
             changes_count: 0,
         })
     }
@@ -145,7 +156,7 @@ where
     #[inline]
     pub fn builder() -> Builder<'a, Cx> {
         Builder {
-            map: AHashMap::new(),
+            map: HashMap::default(),
         }
     }
 
@@ -153,7 +164,7 @@ where
     #[inline]
     pub fn builder_with_capacity(capacity: usize) -> Builder<'a, Cx> {
         Builder {
-            map: AHashMap::with_capacity(capacity),
+            map: HashMap::with_capacity_and_hasher(capacity, Default::default()),
         }
     }
 
@@ -492,7 +503,7 @@ where
 enum IterInner<'s, 'a, Cx: ComponentMapCx> {
     Empty,
     Patched {
-        changes: &'s AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
+        changes: &'s HashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>, RegHasher<Cx>>,
         base_it: Box<Iter<'s, 'a, Cx>>,
         changes_it: hash_map::Iter<'s, CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
     },
@@ -610,7 +621,7 @@ pub struct Builder<'a, Cx>
 where
     Cx: ComponentMapCx,
 {
-    map: AHashMap<CompTyCell<'a, Cx>, Box<Object<'a>>>,
+    map: HashMap<CompTyCell<'a, Cx>, Box<Object<'a>>, RegHasher<Cx>>,
 }
 
 impl<'a, Cx> Builder<'a, Cx>
@@ -849,14 +860,15 @@ where
             type Value = ComponentMap<'a, Cx>;
 
             #[inline]
+            #[allow(clippy::mutable_key_type)]
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
                 A: serde::de::MapAccess<'de>,
             {
                 let mut m = if let Some(sz) = map.size_hint() {
-                    AHashMap::with_capacity(sz)
+                    HashMap::with_capacity_and_hasher(sz, Default::default())
                 } else {
-                    AHashMap::new()
+                    HashMap::default()
                 };
                 struct DeSeed<'a, 's, Cx: ProvideLocalCxTy>(
                     &'s UnsafeSerdeCodec<'a, Cx::LocalContext<'a>>,

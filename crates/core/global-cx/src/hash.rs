@@ -10,10 +10,11 @@ pub trait ProvideHasherTy<Marker>: GlobalContext {
     type BuildHasher: BuildHasher + Default;
 }
 
-/// Marker for hash tables with numeric keys with `BITS` bits.
+/// Marker for hash tables with keys of a specific type `T`, or same hashing implementation.
 #[derive(Debug)]
-pub struct Numeric<const BITS: u32, Marker> {
-    _marker: PhantomData<Marker>,
+pub struct Specific<T, Marker> {
+    _marker1: PhantomData<Marker>,
+    _marker2: PhantomData<T>,
 }
 
 /// Cryptographically-secure hashers.

@@ -1,8 +1,14 @@
 //! `ComponentChanges` implementation.
 
-use std::{cell::RefCell, fmt::Debug, marker::PhantomData, str::FromStr, sync::OnceLock};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    marker::PhantomData,
+    str::FromStr,
+    sync::OnceLock,
+};
 
-use ahash::{AHashMap, AHashSet};
 use bytes::{Buf, BufMut};
 use edcode2::{BufExt as _, BufMutExt as _, Decode, Encode};
 use local_cx::{
@@ -10,8 +16,9 @@ use local_cx::{
     WithLocalCx,
     serde::{DeserializeWithCx, SerializeWithCx},
 };
+use rimecraft_global_cx::{Hasher, hash::Seeded};
 use rimecraft_maybe::{Maybe, SimpleOwned};
-use rimecraft_registry::{Reg, Registry};
+use rimecraft_registry::{Reg, RegHasher, Registry};
 use serde::{Serialize, de::DeserializeSeed, ser::SerializeMap as _};
 
 use crate::{
@@ -21,11 +28,13 @@ use crate::{
 };
 
 /// Changes of components.
+#[allow(clippy::type_complexity)]
 pub struct ComponentChanges<'a, 'cow, Cx>
 where
     Cx: ComponentMapCx,
 {
-    pub(crate) changed: Maybe<'cow, AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>>,
+    pub(crate) changed:
+        Maybe<'cow, HashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>, RegHasher<Cx>>>,
     pub(crate) ser_count: usize,
 }
 
@@ -36,7 +45,7 @@ where
     /// Returns a builder for `ComponentChanges`.
     pub fn builder() -> Builder<'a, Cx> {
         Builder {
-            changes: AHashMap::new(),
+            changes: HashMap::default(),
             ser_count: 0,
         }
     }
@@ -108,14 +117,18 @@ where
     }
 
     /// Converts the changes into a pair of added components and removed component types.
+    #[allow(clippy::type_complexity, clippy::mutable_key_type)]
     pub fn into_added_removed_pair(
         self,
-    ) -> (ComponentMap<'a, Cx>, AHashSet<ErasedComponentType<'a, Cx>>) {
+    ) -> (
+        ComponentMap<'a, Cx>,
+        HashSet<ErasedComponentType<'a, Cx>, Hasher<Seeded, Cx>>,
+    ) {
         if self.is_empty() {
-            (ComponentMap::EMPTY, AHashSet::new())
+            (ComponentMap::EMPTY, HashSet::default())
         } else {
             let mut builder = ComponentMap::builder();
-            let mut set = AHashSet::new();
+            let mut set = HashSet::default();
             for (CompTyCell(ty), obj) in self.changed.iter() {
                 if let Some(obj) = obj {
                     builder.insert_raw(*ty, (ty.f.util.clone)(&**obj));
@@ -217,20 +230,21 @@ where
             Cx: ComponentMapCx<Id: FromStr>,
             Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
         {
-            type Value = AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>;
+            type Value = HashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>, RegHasher<Cx>>;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(formatter, "a map")
             }
 
+            #[allow(clippy::mutable_key_type)]
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
                 A: serde::de::MapAccess<'de>,
             {
                 let mut changes = if let Some(hint) = map.size_hint() {
-                    AHashMap::with_capacity(hint)
+                    HashMap::with_capacity_and_hasher(hint, Default::default())
                 } else {
-                    AHashMap::new()
+                    HashMap::default()
                 };
 
                 while let Some(ty) = map.next_key_seed(WithLocalCx {
@@ -320,6 +334,7 @@ where
     Fw: ForwardToWithLocalCx<Forwarded: Buf, LocalCx = Cx::LocalContext<'a>>,
     Cx::LocalContext<'a>: LocalContext<&'a Registry<RawErasedComponentType<'a, Cx>, Cx>>,
 {
+    #[allow(clippy::mutable_key_type)]
     fn decode(buf: Fw) -> Result<Self, edcode2::BoxedError<'de>> {
         let mut buf = buf.forward();
         let cx = buf.local_cx;
@@ -328,7 +343,7 @@ where
         let absent = buf.get_variable::<u32>();
         let len = (present + absent) as usize;
 
-        let mut changed = AHashMap::with_capacity(len);
+        let mut changed = HashMap::with_capacity_and_hasher(len, Default::default());
         for _ in 0..present {
             let ty = ErasedComponentType::decode(buf.as_mut())?;
             let obj = (ty.f.packet_codec.decode)(&mut buf, cx)?;
@@ -351,7 +366,7 @@ pub struct Builder<'a, Cx>
 where
     Cx: ComponentMapCx,
 {
-    changes: AHashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>>,
+    changes: HashMap<CompTyCell<'a, Cx>, Option<Box<Object<'a>>>, RegHasher<Cx>>,
     ser_count: usize,
 }
 

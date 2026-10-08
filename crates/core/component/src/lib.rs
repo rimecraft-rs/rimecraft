@@ -19,8 +19,6 @@ type Object<'a> = dyn Any + Send + Sync + 'a;
 pub mod changes;
 pub mod map;
 
-pub use ahash::{AHashMap, AHashSet};
-
 /// Type of a component data.
 ///
 /// The type `T` should be unique for each component, as it's used to identify the component.

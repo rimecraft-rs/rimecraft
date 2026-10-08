@@ -34,6 +34,10 @@ pub use dyn_manager::*;
 /// Global context types for registries.
 pub trait RegistryCx: ProvideIdTy + ProvideHasherTy<global_cx::hash::Seeded> {}
 
+/// Hasher suitable for most `Reg`-keyed hash tables.
+pub type RegHasher<Cx> =
+    <Cx as ProvideHasherTy<global_cx::hash::Specific<usize, global_cx::hash::Seeded>>>::BuildHasher;
+
 /// Immutable registry of various in-game components.
 pub struct Registry<T, Cx>
 where
