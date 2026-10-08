@@ -2,59 +2,75 @@
 
 #![cfg(feature = "dyn-cx")]
 
-use std::{any::TypeId, borrow::Cow, fmt::Debug};
+use std::{any::TypeId, borrow::Cow, collections::HashMap, fmt::Debug};
 
-use ahash::AHashMap;
+use global_cx::{
+    ProvideHasherTy,
+    hash::{Specific, Unsecure},
+};
 
 use crate::{BaseLocalContext, LocalContext};
 
 type Caller<Cx> = fn(Cx, &mut (dyn FnMut(*const ()) + '_));
 
+/// Global context types for dynamic local contexts.
+pub trait DynamicContextCx: ProvideHasherTy<Specific<TypeId, Unsecure>> {}
+
+impl<T: ProvideHasherTy<Specific<TypeId, Unsecure>>> DynamicContextCx for T {}
+
+type Hasher<Cx> = <Cx as ProvideHasherTy<Specific<TypeId, Unsecure>>>::BuildHasher;
+
 /// Local context that can be converted to a dynamic context.
-pub trait AsDynamicContext: BaseLocalContext {
+pub trait AsDynamicContext<Cx>: BaseLocalContext
+where
+    Cx: DynamicContextCx,
+{
     /// The inner local context type.
     type InnerContext: BaseLocalContext;
 
     /// Converts this context to a dynamic context.
-    fn as_dynamic_context(&self) -> DynamicContext<'_, Self::InnerContext>;
+    fn as_dynamic_context(&self) -> DynamicContext<'_, Self::InnerContext, Cx>;
 }
 
 /// Function table for getting contexts.
 #[derive(Debug)]
-pub struct ContextTable<LocalCx> {
-    map: AHashMap<TypeId, Caller<LocalCx>>,
+pub struct ContextTable<LocalCx, Cx>
+where
+    Cx: DynamicContextCx,
+{
+    map: HashMap<TypeId, Caller<LocalCx>, Hasher<Cx>>,
 }
 
-impl<Cx> ContextTable<Cx> {
+impl<L, Cx: DynamicContextCx> ContextTable<L, Cx> {
     /// Creates a new context table.
     #[inline]
     pub fn new() -> Self {
         Self {
-            map: AHashMap::new(),
+            map: HashMap::default(),
         }
     }
 
     /// Enables dynamic fetching of a type.
     pub fn enable<T>(&mut self)
     where
-        Cx: LocalContext<T>,
+        L: LocalContext<T>,
     {
         let ty = typeid::of::<T>();
         self.map.insert(ty, |cx, f| {
-            let val = <Cx as LocalContext<T>>::acquire(cx);
+            let val = <L as LocalContext<T>>::acquire(cx);
             f(std::ptr::from_ref(&val).cast::<()>())
         });
     }
 }
 
-impl<Cx> Default for ContextTable<Cx> {
+impl<L, Cx: DynamicContextCx> Default for ContextTable<L, Cx> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<Cx> Clone for ContextTable<Cx> {
+impl<L, Cx: DynamicContextCx> Clone for ContextTable<L, Cx> {
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -65,15 +81,18 @@ impl<Cx> Clone for ContextTable<Cx> {
 
 /// A dynamic context provider.
 #[derive(Debug)]
-pub struct DynamicContext<'a, LocalCx> {
+pub struct DynamicContext<'a, LocalCx, Cx>
+where
+    Cx: DynamicContextCx,
+{
     cx: LocalCx,
-    table: Cow<'a, ContextTable<LocalCx>>,
+    table: Cow<'a, ContextTable<LocalCx, Cx>>,
 }
 
-impl<'a, Cx> DynamicContext<'a, Cx> {
+impl<'a, L, Cx: DynamicContextCx> DynamicContext<'a, L, Cx> {
     /// Creates a new dynamic context with owned context table.
     #[inline]
-    pub fn new(cx: Cx, table: ContextTable<Cx>) -> Self {
+    pub fn new(cx: L, table: ContextTable<L, Cx>) -> Self {
         Self {
             cx,
             table: Cow::Owned(table),
@@ -82,7 +101,7 @@ impl<'a, Cx> DynamicContext<'a, Cx> {
 
     /// Creates a new dynamic context with borrowed context table.
     #[inline]
-    pub fn from_borrowed_table(cx: Cx, table: &'a ContextTable<Cx>) -> Self {
+    pub fn from_borrowed_table(cx: L, table: &'a ContextTable<L, Cx>) -> Self {
         Self {
             cx,
             table: Cow::Borrowed(table),
@@ -90,9 +109,10 @@ impl<'a, Cx> DynamicContext<'a, Cx> {
     }
 }
 
-impl<Cx> DynamicContext<'_, Cx>
+impl<L, Cx> DynamicContext<'_, L, Cx>
 where
-    Cx: BaseLocalContext,
+    L: BaseLocalContext,
+    Cx: DynamicContextCx,
 {
     /// Turns this context into an [`UnsafeDynamicContext`].
     ///
@@ -105,11 +125,11 @@ where
     }
 }
 
-impl<Cx> BaseLocalContext for &DynamicContext<'_, Cx> {}
+impl<L, Cx: DynamicContextCx> BaseLocalContext for &DynamicContext<'_, L, Cx> {}
 
-impl<Cx, T> LocalContext<T> for &DynamicContext<'_, Cx>
+impl<L, Cx: DynamicContextCx, T> LocalContext<T> for &DynamicContext<'_, L, Cx>
 where
-    Cx: LocalContext<T>,
+    L: LocalContext<T>,
 {
     #[inline]
     fn acquire(self) -> T {
@@ -121,9 +141,9 @@ trait ErasedDynCx {
     fn erased_acquire(&self, ty: TypeId, f: &mut (dyn FnMut(*const ()) + '_));
 }
 
-impl<Cx> ErasedDynCx for DynamicContext<'_, Cx>
+impl<L, Cx: DynamicContextCx> ErasedDynCx for DynamicContext<'_, L, Cx>
 where
-    Cx: BaseLocalContext,
+    L: BaseLocalContext,
 {
     #[inline]
     fn erased_acquire(&self, ty: TypeId, f: &mut (dyn FnMut(*const ()) + '_)) {

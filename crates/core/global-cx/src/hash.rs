@@ -7,7 +7,7 @@ use crate::GlobalContext;
 /// Marker trait for global contexts that provide a hasher implementation.
 pub trait ProvideHasherTy<Marker>: GlobalContext {
     /// The random state type.
-    type BuildHasher: BuildHasher + Default;
+    type BuildHasher: BuildHasher + Default + Clone;
 }
 
 /// Marker for hash tables with keys of a specific type `T`, or same hashing implementation.

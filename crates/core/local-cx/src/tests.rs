@@ -34,7 +34,7 @@ fn dyn_context() {
     let mut table = ContextTable::new();
     table.enable::<u32>();
     table.enable::<&str>();
-    let table: ContextTable<&DummyCx> = table;
+    let table: ContextTable<&DummyCx, ()> = table;
 
     let dyn_cx = DynamicContext::new(&context_raw, table);
     let erased = unsafe { dyn_cx.as_unsafe_cx() };
