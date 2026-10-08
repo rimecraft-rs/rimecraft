@@ -29,7 +29,6 @@ maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }
 voxel-math = { path = "../../util/voxel-math", package = "rimecraft-voxel-math" }
-ident-hash = { path = "../../util/ident-hash", package = "rimecraft-ident-hash" }
 entity = { path = "../../core/entity", package = "rimecraft-entity" }
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2" }
 # External utils

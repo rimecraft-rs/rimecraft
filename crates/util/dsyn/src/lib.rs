@@ -1,12 +1,11 @@
 //! General-purpose descriptor set system for Rust.
 
-use std::{fmt::Debug, marker::PhantomData};
-
-use ident_hash::{HashTableExt as _, IHashMap};
+use std::{collections::HashMap, fmt::Debug, marker::PhantomData};
 
 #[cfg(any(feature = "simple-registry", test))]
 mod simple_registry;
 
+use rustc_hash::FxBuildHasher;
 #[cfg(feature = "simple-registry")]
 pub use simple_registry::SimpleRegistry;
 
@@ -79,7 +78,7 @@ pub struct DescriptorSet<'a, 'p> {
 /// Builder of a [`DescriptorSet`].
 #[derive(Debug, Clone)]
 pub struct DescriptorSetBuilder<'a, 'p> {
-    map: IHashMap<usize, *const ()>,
+    map: HashMap<usize, *const (), FxBuildHasher>,
     registry_marker: *const (),
     max_index: usize,
     parent: Option<&'p DescriptorSet<'a, 'p>>,
@@ -152,7 +151,7 @@ impl<'a, 'p> DescriptorSet<'a, 'p> {
                     .filter_map(|(k, &v)| if v.is_null() { None } else { Some((k, v)) })
                     .collect(),
                 DescriptorSetInner::Map(hash_map) => hash_map.clone(),
-                DescriptorSetInner::Empty => IHashMap::new(),
+                DescriptorSetInner::Empty => HashMap::default(),
             },
             registry_marker: self.registry_marker,
             parent: self.parent,
@@ -169,7 +168,7 @@ impl<'a, 'p> DescriptorSetBuilder<'a, 'p> {
     #[inline]
     pub fn new() -> Self {
         Self {
-            map: IHashMap::new(),
+            map: HashMap::default(),
             registry_marker: std::ptr::null(),
             max_index: usize::MIN,
             parent: None,
@@ -181,7 +180,7 @@ impl<'a, 'p> DescriptorSetBuilder<'a, 'p> {
     #[inline]
     pub fn with_parent(parent: &'p DescriptorSet<'a, 'p>) -> Self {
         Self {
-            map: IHashMap::new(),
+            map: HashMap::default(),
             registry_marker: parent.registry_marker,
             max_index: usize::MIN,
             parent: Some(parent),
@@ -288,7 +287,7 @@ impl<'a, 'p> From<DescriptorSetBuilder<'a, 'p>> for DescriptorSet<'a, 'p> {
 #[derive(Debug, Clone)]
 enum DescriptorSetInner {
     Slice(Vec<*const ()>),
-    Map(IHashMap<usize, *const ()>),
+    Map(HashMap<usize, *const (), FxBuildHasher>),
     Empty,
 }
 

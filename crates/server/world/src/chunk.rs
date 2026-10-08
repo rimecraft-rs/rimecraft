@@ -1,6 +1,7 @@
 //! Server-only chunk stuff.
 
 use std::{
+    collections::HashMap,
     fmt::Debug,
     ops::{Deref, DerefMut},
     sync::Arc,
@@ -8,7 +9,6 @@ use std::{
 
 use block_entity::{BlockEntity, BlockEntityCell};
 use global_cx::{Hold, HoldMut};
-use ident_hash::IHashMap;
 use local_cx::{LocalContext, dsyn_instanceof};
 use parking_lot::{Mutex, MutexGuard};
 use voxel_math::coord_section_from_block;
@@ -24,7 +24,7 @@ pub struct NestedWorldChunkExt<'w, Cx>
 where
     Cx: WorldCx<'w>,
 {
-    game_event_dispatchers: Mutex<IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>,
+    game_event_dispatchers: Mutex<HashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>,
 }
 
 impl<'w, Cx> Debug for NestedWorldChunkExt<'w, Cx>
@@ -70,11 +70,9 @@ pub trait ServerWorldChunkAccess<'w, Cx>: WorldChunkAccess<'w, Cx>
 where
     Cx: WorldCx<'w>,
 {
-    type GameEventDispatchersRead: Deref<
-        Target = IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>,
-    >;
+    type GameEventDispatchersRead: Deref<Target = HashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>;
     type GameEventDispatchersWrite: DerefMut<
-        Target = IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>,
+        Target = HashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>,
     >;
 
     fn read_game_event_dispatchers(self) -> Self::GameEventDispatchersRead;
@@ -92,7 +90,7 @@ where
     type GameEventDispatchersRead = Self::GameEventDispatchersWrite;
 
     type GameEventDispatchersWrite =
-        MutexGuard<'a, IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>;
+        MutexGuard<'a, HashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>>;
 
     #[inline]
     fn read_game_event_dispatchers(self) -> Self::GameEventDispatchersRead {
@@ -118,7 +116,7 @@ where
 {
     type GameEventDispatchersRead = Self::GameEventDispatchersWrite;
 
-    type GameEventDispatchersWrite = &'a mut IHashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>;
+    type GameEventDispatchersWrite = &'a mut HashMap<i32, Arc<game_event::Dispatcher<'w, Cx>>>;
 
     #[inline]
     fn read_game_event_dispatchers(self) -> Self::GameEventDispatchersRead {

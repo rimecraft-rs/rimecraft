@@ -28,7 +28,6 @@ local-cx = { path = "../local-cx", package = "rimecraft-local-cx", features = [
 ] }
 entity = { path = "../entity", package = "rimecraft-entity" }
 maybe = { path = "../../util/maybe", package = "rimecraft-maybe" }
-ident-hash = { path = "../../util/ident-hash", package = "rimecraft-ident-hash" }
 dsyn = { path = "../../util/dsyn", package = "rimecraft-dsyn" }
 voxel-shape = { path = "../../util/voxel-shape", package = "rimecraft-voxel-shape" }
 rcutil = { path = "../../util/rcutil", package = "rimecraft-util" }

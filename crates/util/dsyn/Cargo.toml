@@ -12,17 +12,15 @@ categories = ["rust-patterns"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-ident-hash = { path = "../ident-hash", package = "rimecraft-ident-hash" }
-ahash = { version = "0.8", optional = true }
 typeid = { version = "1.0", optional = true }
+rustc-hash = "2.1"
 
 [dev-dependencies]
-ahash = "0.8"
 typeid = "1.0"
 static_assertions = "1.1"
 
 [features]
-simple-registry = ["dep:ahash", "dep:typeid"]
+simple-registry = ["dep:typeid"]
 
 [lints]
 workspace = true

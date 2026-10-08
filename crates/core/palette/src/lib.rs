@@ -14,6 +14,7 @@ use iter::IterImpl;
 
 pub use rimecraft_maybe::{Maybe, SimpleOwned};
 
+/// Global context types for palettes.
 pub trait PaletteCx: ProvideHasherTy<Seeded> {}
 
 impl<T: ProvideHasherTy<Seeded>> PaletteCx for T {}

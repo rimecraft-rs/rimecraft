@@ -28,7 +28,7 @@ use rimecraft_chunk_palette::{
     IndexFromRaw as PalIndexFromRaw, IndexToRaw as PalIndexToRaw, IntoIteratorRef,
 };
 use rimecraft_fluid::ProvideFluidStateExtTy;
-use rimecraft_global_cx::{Hold, ProvideHasherTy, ProvideIdTy, ProvideNbtTy, hash::Specific};
+use rimecraft_global_cx::{Hold, ProvideIdTy, ProvideNbtTy};
 use rimecraft_voxel_math::direction::Direction;
 
 use std::{

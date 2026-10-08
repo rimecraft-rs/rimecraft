@@ -4,12 +4,15 @@
 
 //TODO: funtion of dispatch manager, which requires interacting with a world instance.
 
-use std::{fmt::Debug, hash::Hash, sync::Arc};
+use std::{collections::HashSet, fmt::Debug, hash::Hash, sync::Arc};
 
 use block::BlockState;
 use entity::{Entity, EntityCell};
 use glam::DVec3;
-use ident_hash::{HashTableExt as _, IHashSet};
+use global_cx::{
+    Hasher,
+    hash::{Seeded, Specific},
+};
 use local_cx::dyn_codecs::{EdcodeCodec, SerdeCodec, UnsafeEdcodeCodec, UnsafeSerdeCodec};
 use maybe::Maybe;
 use parking_lot::Mutex;
@@ -294,7 +297,7 @@ where
     Cx: WorldCx<'w>,
 {
     push: Vec<Arc<DynListener<'w, Cx>>>,
-    pop: IHashSet<ListenerKey>,
+    pop: HashSet<ListenerKey, Hasher<Specific<usize, Seeded>, Cx>>,
 }
 
 impl<'w, Cx> Dispatcher<'w, Cx>
@@ -307,7 +310,7 @@ where
             listeners: Mutex::new(Vec::new()),
             buf: Mutex::new(DispatcherBuf {
                 push: Vec::new(),
-                pop: IHashSet::new(),
+                pop: HashSet::default(),
             }),
         }
     }

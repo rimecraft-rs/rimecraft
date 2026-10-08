@@ -1,11 +1,9 @@
-use std::{any::TypeId, hash::Hash};
-
-use ahash::AHashSet;
+use std::{any::TypeId, collections::HashSet, hash::Hash};
 
 /// A simple registry implementation.
 #[derive(Debug, Clone)]
 pub struct SimpleRegistry<K> {
-    set: AHashSet<(K, TypeId)>,
+    set: HashSet<(K, TypeId)>,
     ptr: Box<usize>,
 }
 
@@ -14,7 +12,7 @@ impl<K> SimpleRegistry<K> {
     #[inline]
     pub fn new() -> Self {
         Self {
-            set: AHashSet::new(),
+            set: HashSet::new(),
             ptr: Box::new(0),
         }
     }
