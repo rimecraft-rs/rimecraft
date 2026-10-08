@@ -7,7 +7,7 @@ use std::{
 };
 
 use global_cx::{
-    GlobalContext, ProvideIdTy, ProvideNbtTy, ProvideVersionTy,
+    GlobalContext, ProvideIdTy, ProvideNbtTy, ProvideVersionTy, ProviderHasherTy,
     nbt::{ReadNbt, UpdateNbt, WriteNbt},
 };
 use local_cx::{
@@ -77,6 +77,10 @@ impl ProvideVersionTy for TestContext {
 
 impl ProvideLocalCxTy for TestContext {
     type LocalContext<'cx> = LocalTestContext<'cx>;
+}
+
+impl<M> ProviderHasherTy<M> for TestContext {
+    type BuildHasher = std::hash::RandomState;
 }
 
 impl BaseLocalContext for LocalTestContext<'_> {}

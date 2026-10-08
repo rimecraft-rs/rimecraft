@@ -27,6 +27,8 @@ pub mod rand;
 #[cfg(feature = "smallbox")]
 pub mod smallbox;
 
+pub mod hash;
+
 /// Marker trait for global contexts.
 ///
 /// # Safety
@@ -47,6 +49,8 @@ pub trait ProvideVersionTy: GlobalContext {
     /// Version type.
     type Version: Display + Hash + Eq;
 }
+
+pub use hash::ProviderHasherTy;
 
 /// Marker trait for global contexts that provide a `NbtCompound` type and friends.
 #[cfg(feature = "nbt")]
