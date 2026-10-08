@@ -1,6 +1,6 @@
 //! Minecraft chunk palette implementation.
 
-use std::hash::Hash;
+use std::{collections::HashMap, hash::Hash};
 
 pub mod container;
 mod iter;
@@ -8,21 +8,28 @@ mod iter;
 #[cfg(test)]
 mod tests;
 
-use ahash::AHashMap;
+use global_cx::{Hasher, ProvideHasherTy, hash::Seeded};
 pub use iter::Iter;
 use iter::IterImpl;
 
 pub use rimecraft_maybe::{Maybe, SimpleOwned};
+
+pub trait PaletteCx: ProvideHasherTy<Seeded> {}
+
+impl<T: ProvideHasherTy<Seeded>> PaletteCx for T {}
 
 /// A palette maps object from and to small integer IDs that uses less number of bits
 /// to make storage smaller.
 ///
 /// See [`Strategy`] for the available strategies.
 #[derive(Debug, Clone)]
-pub struct Palette<L, T> {
+pub struct Palette<L, T, Cx>
+where
+    Cx: PaletteCx,
+{
     list: L,
     index_bits: u32,
-    internal: PaletteImpl<T>,
+    internal: PaletteImpl<T, Cx>,
 }
 
 /// The strategy to use for the palette.
@@ -47,7 +54,10 @@ pub enum Strategy {
 
 /// The palette implementations.
 #[derive(Debug, Clone)]
-enum PaletteImpl<T> {
+enum PaletteImpl<T, Cx>
+where
+    Cx: PaletteCx,
+{
     /// A palette that only holds a unique entry.
     Singular(Option<T>),
     /// A palette that stores the possible entries in an array
@@ -56,14 +66,15 @@ enum PaletteImpl<T> {
     /// A palette backed by bidirectional hash tables.
     BiMap {
         forward: Vec<T>,
-        reverse: AHashMap<T, usize>,
+        reverse: HashMap<T, usize, Hasher<Seeded, Cx>>,
     },
     Direct,
 }
 
-impl<L, T> Palette<L, T>
+impl<L, T, Cx> Palette<L, T, Cx>
 where
     T: Clone + Hash + Eq,
+    Cx: PaletteCx,
 {
     /// Creates a new palette with the given strategy and list of entries.
     ///
@@ -115,7 +126,7 @@ where
             Strategy::BiMap => {
                 let len = 1 << bits_size;
                 let mut forward = Vec::with_capacity(len);
-                let mut reverse = AHashMap::with_capacity(len);
+                let mut reverse = HashMap::with_capacity_and_hasher(len, Default::default());
                 assert!(
                     entries.len() <= forward.capacity(),
                     "can't initialize BiMapPalette of length {} with {} entries",
@@ -146,10 +157,11 @@ where
     }
 }
 
-impl<L, T> Palette<L, T>
+impl<L, T, Cx> Palette<L, T, Cx>
 where
     L: for<'a> IndexToRaw<&'a T>,
     T: Hash + Eq,
+    Cx: PaletteCx,
 {
     /// Returns the ID of an object in the palette.
     pub fn index(&self, object: &T) -> Option<usize> {
@@ -215,9 +227,10 @@ where
     }
 }
 
-impl<L, T> Palette<L, T>
+impl<L, T, Cx> Palette<L, T, Cx>
 where
     L: for<'s> IndexFromRaw<'s, Maybe<'s, T>>,
+    Cx: PaletteCx,
 {
     /// Returns the object associated with the given ID.
     pub fn get(&self, id: usize) -> Option<Maybe<'_, T>> {
@@ -234,7 +247,10 @@ where
     }
 }
 
-impl<L, T> Palette<L, T> {
+impl<L, T, Cx> Palette<L, T, Cx>
+where
+    Cx: PaletteCx,
+{
     /// Returns the size of this palette.
     #[allow(clippy::len_without_is_empty)] // A palette is never empty.
     pub fn len<'a>(&'a self) -> usize
@@ -280,9 +296,10 @@ impl<L, T> Palette<L, T> {
     }
 }
 
-impl<L, T> Palette<L, T>
+impl<L, T, Cx> Palette<L, T, Cx>
 where
     T: Hash + Eq,
+    Cx: PaletteCx,
 {
     /// Returns whether the given object is (or may) in the palette.
     pub fn contains(&self, object: &T) -> bool {
@@ -298,9 +315,10 @@ where
     }
 }
 
-impl<'a, L, T> IntoIterator for &'a Palette<L, T>
+impl<'a, L, T, Cx> IntoIterator for &'a Palette<L, T, Cx>
 where
     L: IntoIteratorRef<'a, Item = &'a T>,
+    Cx: PaletteCx,
 {
     type Item = &'a T;
     type IntoIter = Iter<'a, <L as IntoIteratorRef<'a>>::IntoIter, T>;
@@ -319,10 +337,11 @@ mod _edcode {
 
     use super::*;
 
-    impl<L, T, B> Encode<B> for Palette<L, T>
+    impl<L, T, B, Cx> Encode<B> for Palette<L, T, Cx>
     where
         L: for<'a> IndexToRaw<&'a T>,
         B: BufMut,
+        Cx: PaletteCx,
     {
         fn encode(&self, mut buf: B) -> Result<(), edcode2::BoxedError<'static>> {
             match &self.internal {
@@ -345,10 +364,11 @@ mod _edcode {
         }
     }
 
-    impl<'de, L, T, B> Decode<'de, B> for Palette<L, T>
+    impl<'de, L, T, B, Cx> Decode<'de, B> for Palette<L, T, Cx>
     where
         L: for<'s> IndexFromRaw<'s, T>,
         B: Buf,
+        Cx: PaletteCx,
     {
         fn decode_in_place(&mut self, mut buf: B) -> Result<(), edcode2::BoxedError<'de>> {
             match &mut self.internal {

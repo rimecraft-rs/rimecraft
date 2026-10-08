@@ -17,7 +17,7 @@ rimecraft-maybe = { path = "../../util/maybe" }
 edcode2 = { path = "../../util/edcode2", package = "rimecraft-edcode2", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 rimecraft-serde-update = { path = "../../util/serde-update", optional = true }
-ahash = "0.8"
+global-cx = { path = "../global-cx", package = "rimecraft-global-cx" }
 
 [dev-dependencies]
 fastnbt = "2.6"

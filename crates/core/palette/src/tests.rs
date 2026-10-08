@@ -1,7 +1,9 @@
 use std::marker::PhantomData;
 
-use crate::{IndexFromRaw, IndexToRaw, Palette, Strategy};
+use crate::{IndexFromRaw, IndexToRaw, Strategy};
 use rimecraft_maybe::Maybe;
+
+type Palette<L, T> = crate::Palette<L, T, ()>;
 
 #[derive(Clone, Debug)]
 struct List<const N: usize>;
@@ -64,7 +66,8 @@ macro_rules! helper {
     ($pascal:ident, $snake:ident) => {
         #[test]
         fn $snake() {
-            let mut palette = Palette::new(Strategy::$pascal, 2, List::<0>, vec![36u8, 39u8]);
+            let mut palette =
+                Palette::<_, _>::new(Strategy::$pascal, 2, List::<0>, vec![36u8, 39u8]);
 
             // For easier diagnosis.
             assert_eq!(palette.len(), 2, "initial length failed");
@@ -162,8 +165,8 @@ fn direct() {
 
 #[cfg(feature = "edcode")]
 mod edcode {
-    use super::List;
-    use crate::{Palette, Strategy};
+    use super::{List, Palette};
+    use crate::Strategy;
     use edcode2::{Decode as _, Encode as _};
     use rimecraft_maybe::Maybe;
 
@@ -199,6 +202,10 @@ mod container {
                 fn provide_palette_config(_list: &List<0>, _bits: u32) -> (Strategy, u32) {
                     (Strategy::$pascal, 0)
                 }
+            }
+            unsafe impl global_cx::GlobalContext for Cx {}
+            impl<T> global_cx::ProvideHasherTy<T> for Cx {
+                type BuildHasher = std::hash::RandomState;
             }
             static_assertions::assert_impl_all!(PalettedContainer<List<0>, u8, Cx>: Send, Sync, Unpin);
         };
